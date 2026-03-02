@@ -1,0 +1,5 @@
+{
+  "api_key": "ak-xxxx",
+  "base_url": "https://chat-dev.ainft.com",
+  "timeout_ms": 15000
+}

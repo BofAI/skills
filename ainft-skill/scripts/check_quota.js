@@ -9,6 +9,7 @@ function parseArgs(argv) {
     apiKey: defaults.apiKey,
     timeoutMs: defaults.timeoutMs,
     configSource: defaults.configSource,
+    procedure: "usage.points",
     format: "json",
   };
 
@@ -37,6 +38,13 @@ function parseArgs(argv) {
       i += 1;
       continue;
     }
+    if (token === "--procedure") {
+      const raw = argv[i + 1];
+      if (!raw) throw new Error("invalid --procedure <router.procedure>");
+      args.procedure = raw.trim();
+      i += 1;
+      continue;
+    }
     if (token === "--format") {
       const raw = argv[i + 1];
       if (!raw || !["json", "text"].includes(raw)) {
@@ -48,31 +56,36 @@ function parseArgs(argv) {
     }
     throw new Error(`unknown arg: ${token}`);
   }
-
   return args;
 }
 
-async function fetchBalance(args) {
+function buildBatchInput() {
+  return {
+    "0": {
+      json: null,
+      meta: { values: ["undefined"], v: 1 },
+    },
+  };
+}
+
+function extractTrpcData(body) {
+  if (Array.isArray(body) && body[0]) {
+    return body[0]?.result?.data?.json ?? body[0]?.result?.data ?? body[0];
+  }
+  return body?.result?.data?.json ?? body?.result?.data ?? body;
+}
+
+async function queryQuota(args) {
   if (!args.apiKey) {
     throw new Error("AINFT_API_KEY is required (--api-key, env, or ainft-config.json)");
   }
 
-  const endpointCandidates = [
-    `${args.baseUrl}/webapi/credit/balance`,
-    `${args.baseUrl}/credit/balance`,
-  ];
+  const input = encodeURIComponent(JSON.stringify(buildBatchInput()));
+  const url = `${args.baseUrl}/trpc/lambda/${args.procedure}?batch=1&input=${input}`;
 
-  const trpcInput = encodeURIComponent(
-    JSON.stringify({
-      "0": {
-        json: null,
-        meta: { values: ["undefined"], v: 1 },
-      },
-    })
-  );
-  const trpcFallbackUrl = `${args.baseUrl}/trpc/lambda/usage.points?batch=1&input=${trpcInput}`;
-
-  const request = async (url) => {
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), args.timeoutMs);
+  try {
     const resp = await fetch(url, {
       method: "GET",
       headers: {
@@ -81,6 +94,7 @@ async function fetchBalance(args) {
       },
       signal: controller.signal,
     });
+
     const text = await resp.text();
     let body = {};
     try {
@@ -88,40 +102,13 @@ async function fetchBalance(args) {
     } catch {
       body = { raw: text };
     }
-    return { resp, body, url };
-  };
 
-  const controller = new AbortController();
-  const timer = setTimeout(() => controller.abort(), args.timeoutMs);
-  try {
-    for (const url of endpointCandidates) {
-      const { resp, body } = await request(url);
-      if (resp.ok && typeof body?.code === "number" && body.code === 0) {
-        return {
-          endpoint: url,
-          http_status: resp.status,
-          code: body.code,
-          message: body.message || "",
-          balance: body?.data?.balance ?? null,
-          data: body?.data ?? {},
-          raw: body,
-          ok: true,
-        };
-      }
-    }
-
-    const { resp, body, url } = await request(trpcFallbackUrl);
-    const points =
-      Array.isArray(body) ? body?.[0]?.result?.data?.json?.points_balance : body?.result?.data?.json?.points_balance;
     return {
-      endpoint: url,
       http_status: resp.status,
-      code: resp.ok ? 0 : null,
-      message: resp.ok ? "success(fallback: usage.points)" : "",
-      balance: points ?? null,
-      data: { points_balance: points ?? null },
+      procedure: args.procedure,
+      data: extractTrpcData(body),
       raw: body,
-      ok: resp.ok && points != null,
+      ok: resp.ok,
     };
   } finally {
     clearTimeout(timer);
@@ -130,31 +117,29 @@ async function fetchBalance(args) {
 
 function toText(result) {
   if (result.ok) {
-    return `AINFT 余额: ${result.balance}${result.config_source ? ` (config: ${result.config_source})` : ""}`;
+    return `AINFT 额度查询成功 (${result.procedure})${result.config_source ? ` (config: ${result.config_source})` : ""}`;
   }
-  return `AINFT 余额查询失败: http=${result.http_status}, code=${result.code}, message=${result.message}`;
+  return `AINFT 额度查询失败: http=${result.http_status}, procedure=${result.procedure}`;
 }
 
 async function main() {
   try {
     const args = parseArgs(process.argv.slice(2));
-    const result = await fetchBalance(args);
+    const result = await queryQuota(args);
     if (!result.config_source && args.configSource) {
       result.config_source = args.configSource;
     }
-
     if (args.format === "text") {
       process.stdout.write(`${toText(result)}\n`);
       return;
     }
-
     process.stdout.write(`${JSON.stringify(result)}\n`);
   } catch (err) {
     process.stderr.write(
       `${JSON.stringify({
         error: err.message,
         usage:
-          "node scripts/check_balance.js [--api-key <key>] [--base-url <url>] [--timeout-ms <ms>] [--format json|text]  # supports ainft-config.json",
+          "node scripts/check_quota.js [--api-key <key>] [--base-url <url>] [--procedure usage.points] [--timeout-ms <ms>] [--format json|text]  # supports ainft-config.json",
       })}\n`,
     );
     process.exit(1);
