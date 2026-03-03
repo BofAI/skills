@@ -3,7 +3,7 @@
 AI Agent Skills Library - Reusable capability modules for AI agents
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
-[![GitHub](https://img.shields.io/badge/GitHub-bankofai%2Fskills-blue)](https://github.com/bankofai/skills)
+[![GitHub](https://img.shields.io/badge/GitHub-BofAI%2Fskills-blue)](https://github.com/BofAI/skills)
 
 ## What is a Skill?
 
@@ -101,7 +101,7 @@ These Skills can be used with various AI agent platforms that support MCP (Model
 1. ✅ Install AI Agent (e.g., OpenClaw)
 2. ✅ Install **OpenClaw Extension** 
    ```bash
-   curl -fsSL https://raw.githubusercontent.com/bankofai/openclaw-extension/refs/heads/main/install.sh | bash
+   curl -fsSL https://raw.githubusercontent.com/BofAI/openclaw-extension/refs/heads/main/install.sh | bash
    ```
 
 That's it! The installer will set up everything you need.
@@ -114,7 +114,7 @@ If you're using other MCP-compatible AI agents (ClawdCode, OpenCode, etc.):
 2. ✅ Configure MCP servers manually (see respective MCP server documentation)
 3. ✅ Clone this Skills repository to your local machine:
    ```bash
-   git clone https://github.com/bankofai/skills.git
+   git clone https://github.com/BofAI/skills.git
    ```
 4. ✅ Point your AI agent to the Skills directory or reference specific SKILL.md files when needed
 
@@ -213,7 +213,7 @@ See [CONTRIBUTING.md](CONTRIBUTING.md) for guidelines.
 ## Related Resources
 
 - **[AGENTS.md](AGENTS.md)** - Skill development guide
-- **[OpenClaw Extension](https://github.com/bankofai/openclaw-extension)** - TRON MCP Server & Tools
+- **[OpenClaw Extension](https://github.com/BofAI/openclaw-extension)** - TRON MCP Server & Tools
 
 ---
 
@@ -223,6 +223,6 @@ MIT License - see [LICENSE](LICENSE) file for details
 
 ---
 
-**Repository**: [bankofai/skills](https://github.com/bankofai/skills)  
+**Repository**: [BofAI/skills](https://github.com/BofAI/skills)  
 **Last Updated**: 2026-02-11  
 **Maintainer**: Bank of AI Team
