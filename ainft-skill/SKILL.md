@@ -69,6 +69,9 @@ TRON 私钥读取优先级（`pay_trx_native.js`）：
 - 额度查询（默认调用 `usage.points`）：
   - `node scripts/check_quota.js --format text`
   - 可指定 procedure：`--procedure usage.points`
+- 订单查询（自动兼容 `order.listOrders` / `order.listOrder`）：
+  - `node scripts/check_orders.js --format text`
+  - 可指定 procedure：`--procedure order.listOrders`
 - 本地阈值判断（可选）：
   - `node scripts/quota_guard.js --requested 20000`
 - TRX 原生充值闭环（自动“转账 + 回调校验”）：
@@ -88,7 +91,7 @@ TRON 私钥读取优先级（`pay_trx_native.js`）：
 
 ## 执行顺序建议
 
-1. 先跑 `check_balance.js` 和 `check_quota.js`
+1. 先跑 `check_balance.js` 和 `check_orders.js`
 2. 若需充值，按资产类型选择 MCP 工具：
    - TRC20 -> `ainft_pay_trc20`
    - TRX -> `ainft_pay_trx`
