@@ -1,0 +1,11 @@
+{
+  "notes": {
+    "energy": "Energy is consumed when executing smart contract calls. Each instruction costs a fixed amount of energy. Obtained by staking TRX.",
+    "bandwidth": "Bandwidth is consumed by the byte-size of each transaction. Every account gets 600 free bandwidth points per day. Obtained by staking TRX.",
+    "freeze_resource_types": ["ENERGY", "BANDWIDTH"],
+    "unstake_cooldown_days": 14,
+    "delegation": "You can delegate energy or bandwidth to another account. Delegated resources can be reclaimed after unlocking.",
+    "energy_price_sun": "The energy price in SUN varies by network parameters. Use getChainParameters to get the current price.",
+    "bandwidth_free_daily": 600
+  }
+}
