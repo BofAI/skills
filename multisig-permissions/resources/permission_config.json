@@ -1,0 +1,104 @@
+{
+  "operation_codes": {
+    "0":  { "name": "AccountCreateContract",              "description": "Create a new account" },
+    "1":  { "name": "TransferContract",                   "description": "Transfer TRX" },
+    "2":  { "name": "TransferAssetContract",              "description": "Transfer TRC10 tokens" },
+    "4":  { "name": "VoteWitnessContract",                "description": "Vote for Super Representatives" },
+    "6":  { "name": "AssetIssueContract",                 "description": "Issue TRC10 token" },
+    "8":  { "name": "AccountUpdateContract",              "description": "Update account name" },
+    "9":  { "name": "FreezeBalanceContract",              "description": "Freeze balance (v1, deprecated)" },
+    "11": { "name": "FreezeBalanceV2Contract",            "description": "Stake TRX for energy/bandwidth" },
+    "12": { "name": "UnfreezeBalanceV2Contract",          "description": "Unstake TRX" },
+    "13": { "name": "WithdrawExpireUnfreezeContract",     "description": "Withdraw expired unstaked TRX" },
+    "30": { "name": "CreateSmartContract",                "description": "Deploy a smart contract" },
+    "31": { "name": "TriggerSmartContract",               "description": "Call a smart contract" },
+    "33": { "name": "UpdateSettingContract",              "description": "Update smart contract settings" },
+    "41": { "name": "ExchangeCreateContract",             "description": "Create Bancor exchange" },
+    "42": { "name": "ExchangeInjectContract",             "description": "Inject into Bancor exchange" },
+    "43": { "name": "ExchangeWithdrawContract",           "description": "Withdraw from Bancor exchange" },
+    "44": { "name": "ExchangeTransactionContract",        "description": "Bancor exchange transaction" },
+    "45": { "name": "UpdateEnergyLimitContract",          "description": "Update smart contract energy limit" },
+    "46": { "name": "AccountPermissionUpdateContract",    "description": "Update account permissions" },
+    "48": { "name": "DelegateResourceContract",           "description": "Delegate energy/bandwidth" },
+    "49": { "name": "UnDelegateResourceContract",         "description": "Undelegate energy/bandwidth" },
+    "51": { "name": "CancelAllUnfreezeV2Contract",        "description": "Cancel all pending unstakes" }
+  },
+  "templates": {
+    "basic-2of3": {
+      "description": "Standard 2-of-3 multi-sig owner, single-key active with all operations",
+      "owner": {
+        "threshold": 2,
+        "key_roles": ["KEY_1", "KEY_2", "KEY_3"],
+        "weights": [1, 1, 1]
+      },
+      "active": [
+        {
+          "name": "active0",
+          "threshold": 1,
+          "key_roles": ["KEY_1"],
+          "weights": [1],
+          "operations": "all"
+        }
+      ]
+    },
+    "agent-restricted": {
+      "description": "Agent can only call smart contracts; owner retains 2-of-2 control",
+      "owner": {
+        "threshold": 2,
+        "key_roles": ["HUMAN_KEY", "BACKUP_KEY"],
+        "weights": [1, 1]
+      },
+      "active": [
+        {
+          "name": "agent-defi",
+          "threshold": 1,
+          "key_roles": ["AGENT_KEY"],
+          "weights": [1],
+          "operations": ["TriggerSmartContract"]
+        }
+      ]
+    },
+    "team-tiered": {
+      "description": "3-of-5 owner, 2-of-3 active for daily operations",
+      "owner": {
+        "threshold": 3,
+        "key_roles": ["KEY_1", "KEY_2", "KEY_3", "KEY_4", "KEY_5"],
+        "weights": [1, 1, 1, 1, 1]
+      },
+      "active": [
+        {
+          "name": "operations",
+          "threshold": 2,
+          "key_roles": ["KEY_1", "KEY_2", "KEY_3"],
+          "weights": [1, 1, 1],
+          "operations": ["TransferContract", "TransferAssetContract", "TriggerSmartContract"]
+        }
+      ]
+    },
+    "weighted-authority": {
+      "description": "Primary key has weight 2, secondaries weight 1, threshold 3",
+      "owner": {
+        "threshold": 3,
+        "key_roles": ["PRIMARY_KEY", "SECONDARY_1", "SECONDARY_2"],
+        "weights": [2, 1, 1]
+      },
+      "active": [
+        {
+          "name": "default",
+          "threshold": 1,
+          "key_roles": ["PRIMARY_KEY"],
+          "weights": [1],
+          "operations": "all"
+        }
+      ]
+    }
+  },
+  "notes": {
+    "permission_types": "TRON accounts have three permission tiers: Owner (type 0), Witness (type 1, SR only), Active (type 2). Owner can change all permissions. Active can be scoped.",
+    "operations_bitmask": "Active permissions use a hex-encoded bitmask where bit N controls whether transaction type N is allowed. A 32-byte (256-bit) field.",
+    "default_permissions": "New accounts start with a single key on both owner and active (id=2) with threshold 1 and all operations enabled.",
+    "lockout_warning": "Setting threshold higher than the total weight of keys you control permanently locks the account. There is NO recovery mechanism.",
+    "permission_ids": "Owner permission has implicit id=0. Active permissions start at id=2. The id is assigned when the permission is created.",
+    "multi_sig_flow": "Build tx -> set Permission_id on the raw tx -> sign with first key -> addSign with more keys -> broadcast when threshold met."
+  }
+}
