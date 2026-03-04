@@ -1,0 +1,53 @@
+{
+  "comptroller": {
+    "mainnet": "TGjYzgCyPobsNS9n6WcbdLVR9dH7mWqFx7"
+  },
+  "markets": {
+    "mainnet": [
+      { "symbol": "TRX",  "jToken": "TE2RzoSV3wFK99w6J9UnnZ4vLfXYoxvRwP", "underlying": null,                                      "decimals": 6,  "jDecimals": 8, "is_native": true },
+      { "symbol": "USDT", "jToken": "TXJgMdjVX5dKiQaUi9QobwNxtSQaFqccvd", "underlying": "TR7NHqjeKQxGTCi8q8ZY4pL8otSzgjLj6t", "decimals": 6,  "jDecimals": 8, "is_native": false },
+      { "symbol": "USDC", "jToken": "TNSBA6KvSvMoTqQcEgpVK7VhHT3z7wifxy", "underlying": "TEkxiTehnzSmSe2XqrBj4w32RUN966rdz8", "decimals": 6,  "jDecimals": 8, "is_native": false },
+      { "symbol": "USDD", "jToken": "TKFRELGGoRgiayhwJTNNLqCNjFoLBh3Mnf", "underlying": "TPYmHEhy5n8TCEfYGqW2rPxsghSfzghPDn", "decimals": 18, "jDecimals": 8, "is_native": false },
+      { "symbol": "SUN",  "jToken": "TGBr8uh9jBVHJhhkwSJvQN2ZAKzVkxDmno", "underlying": "TSSMHYeV2uE9qYH95DqyoCuNCzEL1NvU3S", "decimals": 18, "jDecimals": 8, "is_native": false },
+      { "symbol": "BTT",  "jToken": "TUaUHU9Dy8x5yNi1pKnFYqHWojot61Jfto", "underlying": "TAFjULxiVgT4qWk6UZwjqwZXTSaGaqnVp4", "decimals": 18, "jDecimals": 8, "is_native": false },
+      { "symbol": "JST",  "jToken": "TWQhCXaWz4eHK4Kd1ErSDHjMFPoPc9czts", "underlying": "TCFLL5dx5ZJdKnWuesXxi1VPwjLVmWZZy9", "decimals": 18, "jDecimals": 8, "is_native": false },
+      { "symbol": "WIN",  "jToken": "TRg6MnpsFXc82ymUPgf5qbj59ibxiEDWvv", "underlying": "TLa2f6VPqDgRE67v1736s7bJ8Ray5wYjU7", "decimals": 6,  "jDecimals": 8, "is_native": false },
+      { "symbol": "BTC",  "jToken": "TLeEu311Cbw63BcmMHDgDLu7fnk9fqGcqT", "underlying": "TN3W4H6rK2ce4vX9YnFQHwKENnHjoxb3m9", "decimals": 8,  "jDecimals": 8, "is_native": false }
+    ]
+  },
+  "abi": {
+    "jToken": {
+      "mint": { "type": "function", "name": "mint", "inputs": [{ "name": "mintAmount", "type": "uint256" }], "outputs": [{ "name": "", "type": "uint256" }], "stateMutability": "nonpayable" },
+      "mintNative": { "type": "function", "name": "mint", "inputs": [], "outputs": [], "stateMutability": "payable" },
+      "redeem": { "type": "function", "name": "redeem", "inputs": [{ "name": "redeemTokens", "type": "uint256" }], "outputs": [{ "name": "", "type": "uint256" }], "stateMutability": "nonpayable" },
+      "redeemUnderlying": { "type": "function", "name": "redeemUnderlying", "inputs": [{ "name": "redeemAmount", "type": "uint256" }], "outputs": [{ "name": "", "type": "uint256" }], "stateMutability": "nonpayable" },
+      "borrow": { "type": "function", "name": "borrow", "inputs": [{ "name": "borrowAmount", "type": "uint256" }], "outputs": [{ "name": "", "type": "uint256" }], "stateMutability": "nonpayable" },
+      "repayBorrow": { "type": "function", "name": "repayBorrow", "inputs": [{ "name": "repayAmount", "type": "uint256" }], "outputs": [{ "name": "", "type": "uint256" }], "stateMutability": "nonpayable" },
+      "repayBorrowNative": { "type": "function", "name": "repayBorrow", "inputs": [], "outputs": [], "stateMutability": "payable" },
+      "balanceOf": { "type": "function", "name": "balanceOf", "inputs": [{ "name": "owner", "type": "address" }], "outputs": [{ "name": "", "type": "uint256" }], "stateMutability": "view" },
+      "balanceOfUnderlying": { "type": "function", "name": "balanceOfUnderlying", "inputs": [{ "name": "owner", "type": "address" }], "outputs": [{ "name": "", "type": "uint256" }], "stateMutability": "nonpayable" },
+      "borrowBalanceCurrent": { "type": "function", "name": "borrowBalanceCurrent", "inputs": [{ "name": "account", "type": "address" }], "outputs": [{ "name": "", "type": "uint256" }], "stateMutability": "nonpayable" },
+      "exchangeRateCurrent": { "type": "function", "name": "exchangeRateCurrent", "inputs": [], "outputs": [{ "name": "", "type": "uint256" }], "stateMutability": "nonpayable" },
+      "exchangeRateStored": { "type": "function", "name": "exchangeRateStored", "inputs": [], "outputs": [{ "name": "", "type": "uint256" }], "stateMutability": "view" },
+      "borrowBalanceStored": { "type": "function", "name": "borrowBalanceStored", "inputs": [{ "name": "account", "type": "address" }], "outputs": [{ "name": "", "type": "uint256" }], "stateMutability": "view" },
+      "supplyRatePerBlock": { "type": "function", "name": "supplyRatePerBlock", "inputs": [], "outputs": [{ "name": "", "type": "uint256" }], "stateMutability": "view" },
+      "borrowRatePerBlock": { "type": "function", "name": "borrowRatePerBlock", "inputs": [], "outputs": [{ "name": "", "type": "uint256" }], "stateMutability": "view" }
+    },
+    "comptroller": {
+      "enterMarkets": { "type": "function", "name": "enterMarkets", "inputs": [{ "name": "jTokens", "type": "address[]" }], "outputs": [{ "name": "", "type": "uint256[]" }], "stateMutability": "nonpayable" },
+      "getAccountLiquidity": { "type": "function", "name": "getAccountLiquidity", "inputs": [{ "name": "account", "type": "address" }], "outputs": [{ "name": "", "type": "uint256" }, { "name": "", "type": "uint256" }, { "name": "", "type": "uint256" }], "stateMutability": "view" },
+      "getAllMarkets": { "type": "function", "name": "getAllMarkets", "inputs": [], "outputs": [{ "name": "", "type": "address[]" }], "stateMutability": "view" }
+    },
+    "trc20": {
+      "approve": { "type": "function", "name": "approve", "inputs": [{ "name": "spender", "type": "address" }, { "name": "amount", "type": "uint256" }], "outputs": [{ "name": "", "type": "bool" }], "stateMutability": "nonpayable" },
+      "allowance": { "type": "function", "name": "allowance", "inputs": [{ "name": "owner", "type": "address" }, { "name": "spender", "type": "address" }], "outputs": [{ "name": "", "type": "uint256" }], "stateMutability": "view" }
+    }
+  },
+  "notes": {
+    "jTokens": "jTokens represent your supplied position. They accrue interest over time as the exchange rate increases.",
+    "exchange_rate": "exchangeRateCurrent returns a scaled value (18 + underlying decimals - jToken decimals). Divide jToken balance * exchangeRate / 1e18 to get underlying.",
+    "enter_markets": "You must call enterMarkets on the Comptroller before borrowing against a supplied asset.",
+    "native_trx": "For jTRX, use mint() with callValue (payable) instead of mint(uint256). For repay, use repayBorrow() with callValue.",
+    "blocks_per_year": "TRON produces ~1 block per 3 seconds = ~10,512,000 blocks/year. APY = (1 + ratePerBlock)^blocksPerYear - 1"
+  }
+}
