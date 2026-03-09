@@ -5,7 +5,13 @@
   "scripts": {
     "quote": "node scripts/quote.js",
     "swap": "node scripts/swap.js",
-    "balance": "node scripts/balance.js"
+    "balance": "node scripts/balance.js",
+    "price": "node scripts/price.js",
+    "liquidity": "node scripts/liquidity.js",
+    "position": "node scripts/position.js",
+    "test:price": "node scripts/price.test.js",
+    "test:liquidity": "node scripts/liquidity.test.js",
+    "test:position": "node scripts/position.test.js"
   },
   "dependencies": {
     "tronweb": "^6.0.0",

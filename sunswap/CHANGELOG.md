@@ -2,6 +2,18 @@
 
 All notable changes to the SunSwap skill will be documented in this file.
 
+## [2.0.3] - 2016-02-26
+### Added
+- add SunSwap V3 liquidity management skills
+
+## [2.0.2] - 2016-02-25
+### Added
+- add SunSwap V2 liquidity management skills
+
+## [2.0.1] - 2026-02-24
+### Added
+- get token price from sun price API
+
 ## [2.0.0] - 2026-02-13
 
 ### Changed - Major Architecture Shift
