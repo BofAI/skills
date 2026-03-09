@@ -124,6 +124,8 @@ async function main() {
     ExactPermitTronClientMechanism,
     ExactPermitEvmClientMechanism,
     ExactGasFreeClientMechanism,
+    GasFreeAPIClient,
+    GASFREE_API_BASE_URLS,
     SufficientBalancePolicy
   } = await import('@bankofai/x402');
 
@@ -140,6 +142,11 @@ async function main() {
     if (evmKey) {
       const signer = new EvmClientSigner(evmKey);
       console.error(`[OK] EVM Wallet: ${signer.getAddress()}`);
+    }
+    if (process.env.GASFREE_API_KEY && process.env.GASFREE_API_SECRET) {
+      console.error(`[OK] GasFree API credentials configured (will prefer exact_gasfree).`);
+    } else {
+      console.error(`[--] GasFree API credentials not configured (GASFREE_API_KEY / GASFREE_API_SECRET).`);
     }
     process.exit(0);
   }
@@ -163,12 +170,19 @@ async function main() {
 
     const tw = new TronWeb(tronWebOptions);
     const signer = new TronClientSigner(tronKey);
+
+    // Build GasFree API clients per network
+    const gasFreeClients: Record<string, any> = {};
+    for (const [networkId, baseUrl] of Object.entries(GASFREE_API_BASE_URLS as Record<string, string>)) {
+      gasFreeClients[networkId] = new GasFreeAPIClient(baseUrl);
+    }
+
     const networks = ['mainnet', 'nile', 'shasta', '*'];
     for (const net of networks) {
       const networkId = net === '*' ? 'tron:*' : `tron:${net}`;
       client.register(networkId, new ExactTronClientMechanism(signer));
       client.register(networkId, new ExactPermitTronClientMechanism(signer));
-      client.register(networkId, new ExactGasFreeClientMechanism(signer));
+      client.register(networkId, new ExactGasFreeClientMechanism(signer, gasFreeClients));
     }
     console.error(`[x402] TRON mechanisms enabled (exact, exact_permit, exact_gasfree).`);
   }
@@ -182,6 +196,19 @@ async function main() {
 
   client.registerPolicy(new SufficientBalancePolicy(client));
 
+  // Prefer exact_gasfree when GasFree API credentials are configured
+  const gasFreeApiKey = process.env.GASFREE_API_KEY;
+  const gasFreeApiSecret = process.env.GASFREE_API_SECRET;
+  if (gasFreeApiKey && gasFreeApiSecret) {
+    client.registerPolicy({
+      apply(requirements: any[]) {
+        const gasfree = requirements.filter((r: any) => r.scheme === 'exact_gasfree');
+        const others = requirements.filter((r: any) => r.scheme !== 'exact_gasfree');
+        return [...gasfree, ...others];
+      }
+    });
+    console.error(`[x402] GasFree priority policy enabled.`);
+  }
 
   let finalUrl = url;
   let finalMethod = methodArg || 'GET';

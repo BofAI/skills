@@ -113,4 +113,4 @@ If allowance is insufficient, the tool will automatically attempt an "infinite a
 Ensure you have enough USDT/USDC/USDD in your wallet on the specified network.
 
 ---
-*Last Updated: 2026-02-11*
+*Last Updated: 2026-03-09*
