@@ -88,6 +88,44 @@ async function findApiKey(): Promise<string | undefined> {
   return undefined;
 }
 
+async function findGasFreeCredentials(): Promise<{ apiKey: string; apiSecret: string } | undefined> {
+  if (process.env.GASFREE_API_KEY && process.env.GASFREE_API_SECRET) {
+    return { apiKey: process.env.GASFREE_API_KEY, apiSecret: process.env.GASFREE_API_SECRET };
+  }
+
+  const configFiles = [
+    path.join(process.cwd(), 'x402-config.json'),
+    path.join(os.homedir(), '.x402-config.json')
+  ];
+
+  for (const file of configFiles) {
+    if (fs.existsSync(file)) {
+      try {
+        const config = JSON.parse(fs.readFileSync(file, 'utf8'));
+        const key = config.gasfree_api_key;
+        const secret = config.gasfree_api_secret;
+        if (key && secret) return { apiKey: key, apiSecret: secret };
+      } catch (e) { /* ignore */ }
+    }
+  }
+
+  const mcporterPath = path.join(os.homedir(), '.mcporter', 'mcporter.json');
+  if (fs.existsSync(mcporterPath)) {
+    try {
+      const config = JSON.parse(fs.readFileSync(mcporterPath, 'utf8'));
+      if (config.mcpServers) {
+        for (const serverName in config.mcpServers) {
+          const s = config.mcpServers[serverName];
+          const key = s?.env?.GASFREE_API_KEY;
+          const secret = s?.env?.GASFREE_API_SECRET;
+          if (key && secret) return { apiKey: key, apiSecret: secret };
+        }
+      }
+    } catch (e) { /* ignore */ }
+  }
+  return undefined;
+}
+
 async function main() {
   const args = process.argv.slice(2);
   const options: Record<string, string> = {};
@@ -132,6 +170,16 @@ async function main() {
   const tronKey = await findPrivateKey('tron');
   const evmKey = await findPrivateKey('evm');
   const apiKey = await findApiKey();
+  const gasFreeCredentials = await findGasFreeCredentials();
+
+  // Ensure signer/library internals can pick up keys from env
+  if (apiKey && !process.env.TRON_GRID_API_KEY) {
+    process.env.TRON_GRID_API_KEY = apiKey;
+  }
+  if (gasFreeCredentials) {
+    if (!process.env.GASFREE_API_KEY) process.env.GASFREE_API_KEY = gasFreeCredentials.apiKey;
+    if (!process.env.GASFREE_API_SECRET) process.env.GASFREE_API_SECRET = gasFreeCredentials.apiSecret;
+  }
 
   if (options.check === 'true' || options.status === 'true') {
     if (tronKey) {
@@ -143,7 +191,7 @@ async function main() {
       const signer = new EvmClientSigner(evmKey);
       console.error(`[OK] EVM Wallet: ${signer.getAddress()}`);
     }
-    if (process.env.GASFREE_API_KEY && process.env.GASFREE_API_SECRET) {
+    if (gasFreeCredentials) {
       console.error(`[OK] GasFree API credentials configured (will prefer exact_gasfree).`);
     } else {
       console.error(`[--] GasFree API credentials not configured (GASFREE_API_KEY / GASFREE_API_SECRET).`);
@@ -168,7 +216,6 @@ async function main() {
     if (networkName === 'shasta') tronWebOptions.fullHost = 'https://api.shasta.trongrid.io';
     if (apiKey) tronWebOptions.headers = { 'TRON-PRO-API-KEY': apiKey };
 
-    const tw = new TronWeb(tronWebOptions);
     const signer = new TronClientSigner(tronKey);
 
     // Build GasFree API clients per network
@@ -197,9 +244,7 @@ async function main() {
   client.registerPolicy(new SufficientBalancePolicy(client));
 
   // Prefer exact_gasfree when GasFree API credentials are configured
-  const gasFreeApiKey = process.env.GASFREE_API_KEY;
-  const gasFreeApiSecret = process.env.GASFREE_API_SECRET;
-  if (gasFreeApiKey && gasFreeApiSecret) {
+  if (gasFreeCredentials) {
     client.registerPolicy({
       apply(requirements: any[]) {
         const gasfree = requirements.filter((r: any) => r.scheme === 'exact_gasfree');
