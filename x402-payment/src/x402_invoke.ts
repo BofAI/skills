@@ -123,6 +123,7 @@ async function main() {
     ExactEvmClientMechanism,
     ExactPermitTronClientMechanism,
     ExactPermitEvmClientMechanism,
+    ExactGasFreeClientMechanism,
     SufficientBalancePolicy
   } = await import('@bankofai/x402');
 
@@ -167,8 +168,9 @@ async function main() {
       const networkId = net === '*' ? 'tron:*' : `tron:${net}`;
       client.register(networkId, new ExactTronClientMechanism(signer));
       client.register(networkId, new ExactPermitTronClientMechanism(signer));
+      client.register(networkId, new ExactGasFreeClientMechanism(signer));
     }
-    console.error(`[x402] TRON mechanisms enabled.`);
+    console.error(`[x402] TRON mechanisms enabled (exact, exact_permit, exact_gasfree).`);
   }
 
   if (evmKey) {

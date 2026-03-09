@@ -2,56 +2,77 @@
 import { createRequire as __WEBPACK_EXTERNAL_createRequire } from "module";
 /******/ var __webpack_modules__ = ({
 
-/***/ 2613:
+/***/ 42613:
 /***/ ((module) => {
 
 module.exports = __WEBPACK_EXTERNAL_createRequire(import.meta.url)("assert");
 
 /***/ }),
 
-/***/ 6982:
+/***/ 20181:
+/***/ ((module) => {
+
+module.exports = __WEBPACK_EXTERNAL_createRequire(import.meta.url)("buffer");
+
+/***/ }),
+
+/***/ 76982:
 /***/ ((module) => {
 
 module.exports = __WEBPACK_EXTERNAL_createRequire(import.meta.url)("crypto");
 
 /***/ }),
 
-/***/ 4434:
+/***/ 24434:
 /***/ ((module) => {
 
 module.exports = __WEBPACK_EXTERNAL_createRequire(import.meta.url)("events");
 
 /***/ }),
 
-/***/ 9896:
+/***/ 79896:
 /***/ ((module) => {
 
 module.exports = __WEBPACK_EXTERNAL_createRequire(import.meta.url)("fs");
 
 /***/ }),
 
-/***/ 8611:
+/***/ 58611:
 /***/ ((module) => {
 
 module.exports = __WEBPACK_EXTERNAL_createRequire(import.meta.url)("http");
 
 /***/ }),
 
-/***/ 5692:
+/***/ 65692:
 /***/ ((module) => {
 
 module.exports = __WEBPACK_EXTERNAL_createRequire(import.meta.url)("https");
 
 /***/ }),
 
-/***/ 7598:
+/***/ 69278:
+/***/ ((module) => {
+
+module.exports = __WEBPACK_EXTERNAL_createRequire(import.meta.url)("net");
+
+/***/ }),
+
+/***/ 77598:
 /***/ ((module) => {
 
 module.exports = __WEBPACK_EXTERNAL_createRequire(import.meta.url)("node:crypto");
 
 /***/ }),
 
-/***/ 6928:
+/***/ 70857:
+/***/ ((module) => {
+
+module.exports = __WEBPACK_EXTERNAL_createRequire(import.meta.url)("os");
+
+/***/ }),
+
+/***/ 16928:
 /***/ ((module) => {
 
 module.exports = __WEBPACK_EXTERNAL_createRequire(import.meta.url)("path");
@@ -65,21 +86,28 @@ module.exports = __WEBPACK_EXTERNAL_createRequire(import.meta.url)("stream");
 
 /***/ }),
 
-/***/ 7016:
+/***/ 64756:
+/***/ ((module) => {
+
+module.exports = __WEBPACK_EXTERNAL_createRequire(import.meta.url)("tls");
+
+/***/ }),
+
+/***/ 87016:
 /***/ ((module) => {
 
 module.exports = __WEBPACK_EXTERNAL_createRequire(import.meta.url)("url");
 
 /***/ }),
 
-/***/ 9023:
+/***/ 39023:
 /***/ ((module) => {
 
 module.exports = __WEBPACK_EXTERNAL_createRequire(import.meta.url)("util");
 
 /***/ }),
 
-/***/ 3106:
+/***/ 43106:
 /***/ ((module) => {
 
 module.exports = __WEBPACK_EXTERNAL_createRequire(import.meta.url)("zlib");
@@ -100,8 +128,8 @@ module.exports = __WEBPACK_EXTERNAL_createRequire(import.meta.url)("zlib");
 /******/ 	}
 /******/ 	// Create a new module (and put it into the cache)
 /******/ 	var module = __webpack_module_cache__[moduleId] = {
-/******/ 		// no module.id needed
-/******/ 		// no module.loaded needed
+/******/ 		id: moduleId,
+/******/ 		loaded: false,
 /******/ 		exports: {}
 /******/ 	};
 /******/ 
@@ -114,6 +142,9 @@ module.exports = __WEBPACK_EXTERNAL_createRequire(import.meta.url)("zlib");
 /******/ 		if(threw) delete __webpack_module_cache__[moduleId];
 /******/ 	}
 /******/ 
+/******/ 	// Flag the module as loaded
+/******/ 	module.loaded = true;
+/******/ 
 /******/ 	// Return the exports of the module
 /******/ 	return module.exports;
 /******/ }
@@ -122,6 +153,18 @@ module.exports = __WEBPACK_EXTERNAL_createRequire(import.meta.url)("zlib");
 /******/ __nccwpck_require__.m = __webpack_modules__;
 /******/ 
 /************************************************************************/
+/******/ /* webpack/runtime/compat get default export */
+/******/ (() => {
+/******/ 	// getDefaultExport function for compatibility with non-harmony modules
+/******/ 	__nccwpck_require__.n = (module) => {
+/******/ 		var getter = module && module.__esModule ?
+/******/ 			() => (module['default']) :
+/******/ 			() => (module);
+/******/ 		__nccwpck_require__.d(getter, { a: getter });
+/******/ 		return getter;
+/******/ 	};
+/******/ })();
+/******/ 
 /******/ /* webpack/runtime/create fake namespace object */
 /******/ (() => {
 /******/ 	var getProto = Object.getPrototypeOf ? (obj) => (Object.getPrototypeOf(obj)) : (obj) => (obj.__proto__);
@@ -202,6 +245,15 @@ module.exports = __WEBPACK_EXTERNAL_createRequire(import.meta.url)("zlib");
 /******/ 	};
 /******/ })();
 /******/ 
+/******/ /* webpack/runtime/node module decorator */
+/******/ (() => {
+/******/ 	__nccwpck_require__.nmd = (module) => {
+/******/ 		module.paths = [];
+/******/ 		if (!module.children) module.children = [];
+/******/ 		return module;
+/******/ 	};
+/******/ })();
+/******/ 
 /******/ /* webpack/runtime/compat */
 /******/ 
 /******/ if (typeof __nccwpck_require__ !== 'undefined') __nccwpck_require__.ab = new URL('.', import.meta.url).pathname.slice(import.meta.url.match(/^file:\/\/\/\w:/) ? 1 : 0, -1) + "/";
@@ -271,14 +323,12 @@ module.exports = __WEBPACK_EXTERNAL_createRequire(import.meta.url)("zlib");
 /******/ 
 /************************************************************************/
 var __webpack_exports__ = {};
-
-// EXTERNAL MODULE: external "fs"
-var external_fs_ = __nccwpck_require__(9896);
-// EXTERNAL MODULE: external "path"
-var external_path_ = __nccwpck_require__(6928);
-;// CONCATENATED MODULE: external "os"
-const external_os_namespaceObject = __WEBPACK_EXTERNAL_createRequire(import.meta.url)("os");
-;// CONCATENATED MODULE: ./src/x402_invoke.ts
+/* harmony import */ var fs__WEBPACK_IMPORTED_MODULE_0__ = __nccwpck_require__(79896);
+/* harmony import */ var fs__WEBPACK_IMPORTED_MODULE_0___default = /*#__PURE__*/__nccwpck_require__.n(fs__WEBPACK_IMPORTED_MODULE_0__);
+/* harmony import */ var path__WEBPACK_IMPORTED_MODULE_1__ = __nccwpck_require__(16928);
+/* harmony import */ var path__WEBPACK_IMPORTED_MODULE_1___default = /*#__PURE__*/__nccwpck_require__.n(path__WEBPACK_IMPORTED_MODULE_1__);
+/* harmony import */ var os__WEBPACK_IMPORTED_MODULE_2__ = __nccwpck_require__(70857);
+/* harmony import */ var os__WEBPACK_IMPORTED_MODULE_2___default = /*#__PURE__*/__nccwpck_require__.n(os__WEBPACK_IMPORTED_MODULE_2__);
 
 
 
@@ -298,13 +348,13 @@ async function findPrivateKey(type) {
         return process.env.PRIVATE_KEY;
     // 2. Check local config files
     const configFiles = [
-        external_path_.join(process.cwd(), 'x402-config.json'),
-        external_path_.join(external_os_namespaceObject.homedir(), '.x402-config.json')
+        path__WEBPACK_IMPORTED_MODULE_1__.join(process.cwd(), 'x402-config.json'),
+        path__WEBPACK_IMPORTED_MODULE_1__.join(os__WEBPACK_IMPORTED_MODULE_2__.homedir(), '.x402-config.json')
     ];
     for (const file of configFiles) {
-        if (external_fs_.existsSync(file)) {
+        if (fs__WEBPACK_IMPORTED_MODULE_0__.existsSync(file)) {
             try {
-                const config = JSON.parse(external_fs_.readFileSync(file, 'utf8'));
+                const config = JSON.parse(fs__WEBPACK_IMPORTED_MODULE_0__.readFileSync(file, 'utf8'));
                 if (type === 'tron') {
                     const key = config.tron_private_key || config.private_key;
                     if (key)
@@ -320,10 +370,10 @@ async function findPrivateKey(type) {
         }
     }
     // 3. Check mcporter config
-    const mcporterPath = external_path_.join(external_os_namespaceObject.homedir(), '.mcporter', 'mcporter.json');
-    if (external_fs_.existsSync(mcporterPath)) {
+    const mcporterPath = path__WEBPACK_IMPORTED_MODULE_1__.join(os__WEBPACK_IMPORTED_MODULE_2__.homedir(), '.mcporter', 'mcporter.json');
+    if (fs__WEBPACK_IMPORTED_MODULE_0__.existsSync(mcporterPath)) {
         try {
-            const config = JSON.parse(external_fs_.readFileSync(mcporterPath, 'utf8'));
+            const config = JSON.parse(fs__WEBPACK_IMPORTED_MODULE_0__.readFileSync(mcporterPath, 'utf8'));
             if (config.mcpServers) {
                 for (const serverName in config.mcpServers) {
                     const s = config.mcpServers[serverName];
@@ -345,13 +395,13 @@ async function findApiKey() {
     if (process.env.TRON_GRID_API_KEY)
         return process.env.TRON_GRID_API_KEY;
     const configFiles = [
-        external_path_.join(process.cwd(), 'x402-config.json'),
-        external_path_.join(external_os_namespaceObject.homedir(), '.x402-config.json')
+        path__WEBPACK_IMPORTED_MODULE_1__.join(process.cwd(), 'x402-config.json'),
+        path__WEBPACK_IMPORTED_MODULE_1__.join(os__WEBPACK_IMPORTED_MODULE_2__.homedir(), '.x402-config.json')
     ];
     for (const file of configFiles) {
-        if (external_fs_.existsSync(file)) {
+        if (fs__WEBPACK_IMPORTED_MODULE_0__.existsSync(file)) {
             try {
-                const config = JSON.parse(external_fs_.readFileSync(file, 'utf8'));
+                const config = JSON.parse(fs__WEBPACK_IMPORTED_MODULE_0__.readFileSync(file, 'utf8'));
                 const key = config.tron_grid_api_key || config.api_key;
                 if (key)
                     return key;
@@ -359,10 +409,10 @@ async function findApiKey() {
             catch (e) { /* ignore */ }
         }
     }
-    const mcporterPath = external_path_.join(external_os_namespaceObject.homedir(), '.mcporter', 'mcporter.json');
-    if (external_fs_.existsSync(mcporterPath)) {
+    const mcporterPath = path__WEBPACK_IMPORTED_MODULE_1__.join(os__WEBPACK_IMPORTED_MODULE_2__.homedir(), '.mcporter', 'mcporter.json');
+    if (fs__WEBPACK_IMPORTED_MODULE_0__.existsSync(mcporterPath)) {
         try {
-            const config = JSON.parse(external_fs_.readFileSync(mcporterPath, 'utf8'));
+            const config = JSON.parse(fs__WEBPACK_IMPORTED_MODULE_0__.readFileSync(mcporterPath, 'utf8'));
             if (config.mcpServers) {
                 for (const serverName in config.mcpServers) {
                     const s = config.mcpServers[serverName];
@@ -399,9 +449,9 @@ async function main() {
     const networkName = options.network || 'nile';
     // Use dynamic imports
     // @ts-ignore
-    const { TronWeb } = await __nccwpck_require__.e(/* import() */ 270).then(__nccwpck_require__.bind(__nccwpck_require__, 2270));
+    const { TronWeb } = await __nccwpck_require__.e(/* import() */ 270).then(__nccwpck_require__.bind(__nccwpck_require__, 52270));
     global.TronWeb = TronWeb;
-    const { TronClientSigner, EvmClientSigner, X402Client, X402FetchClient, ExactTronClientMechanism, ExactEvmClientMechanism, ExactPermitTronClientMechanism, ExactPermitEvmClientMechanism, SufficientBalancePolicy } = await Promise.all(/* import() */[__nccwpck_require__.e(270), __nccwpck_require__.e(942)]).then(__nccwpck_require__.bind(__nccwpck_require__, 4942));
+    const { TronClientSigner, EvmClientSigner, X402Client, X402FetchClient, ExactTronClientMechanism, ExactEvmClientMechanism, ExactPermitTronClientMechanism, ExactPermitEvmClientMechanism, ExactGasFreeClientMechanism, SufficientBalancePolicy } = await Promise.all(/* import() */[__nccwpck_require__.e(270), __nccwpck_require__.e(667), __nccwpck_require__.e(914)]).then(__nccwpck_require__.bind(__nccwpck_require__, 68667));
     const tronKey = await findPrivateKey('tron');
     const evmKey = await findPrivateKey('evm');
     const apiKey = await findApiKey();
@@ -441,8 +491,9 @@ async function main() {
             const networkId = net === '*' ? 'tron:*' : `tron:${net}`;
             client.register(networkId, new ExactTronClientMechanism(signer));
             client.register(networkId, new ExactPermitTronClientMechanism(signer));
+            client.register(networkId, new ExactGasFreeClientMechanism(signer));
         }
-        console.error(`[x402] TRON mechanisms enabled.`);
+        console.error(`[x402] TRON mechanisms enabled (exact, exact_permit, exact_gasfree).`);
     }
     if (evmKey) {
         const signer = new EvmClientSigner(evmKey);
@@ -491,12 +542,12 @@ async function main() {
         }
         else if (contentType.includes('image/') || contentType.includes('application/octet-stream')) {
             const buffer = Buffer.from(await response.arrayBuffer());
-            const tmpDir = external_os_namespaceObject.tmpdir();
+            const tmpDir = os__WEBPACK_IMPORTED_MODULE_2__.tmpdir();
             const isImage = contentType.includes('image/');
             const ext = isImage ? contentType.split('/')[1]?.split(';')[0] || 'bin' : 'bin';
             const fileName = `x402_${isImage ? 'image' : 'binary'}_${Date.now()}_${Math.random().toString(36).substring(7)}.${ext}`;
-            const filePath = external_path_.join(tmpDir, fileName);
-            external_fs_.writeFileSync(filePath, buffer);
+            const filePath = path__WEBPACK_IMPORTED_MODULE_1__.join(tmpDir, fileName);
+            fs__WEBPACK_IMPORTED_MODULE_0__.writeFileSync(filePath, buffer);
             console.error(`[x402] Binary data saved to: ${filePath}`);
             responseBody = { file_path: filePath, content_type: contentType, bytes: buffer.length };
         }
