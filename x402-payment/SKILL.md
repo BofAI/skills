@@ -42,7 +42,9 @@ The `x402-payment` skill enables agents to interact with paid API endpoints. Whe
   - **EVM**: Set `EVM_PRIVATE_KEY` or `ETH_PRIVATE_KEY` for ERC20 payments (USDT/USDC).
   - The skill also searches for keys in `x402-config.json` and `~/.mcporter/mcporter.json`.
 - **TronGrid API Key**: Required for **Mainnet** to avoid rate limits (`TRON_GRID_API_KEY`).
+- **GasFree** (optional): Set `GASFREE_API_KEY` and `GASFREE_API_SECRET` to enable gasless TRC20 payments. When configured, the tool will prefer the `exact_gasfree` scheme over `exact_permit`. Requires a GasFree account that is **activated** with **sufficient token balance** in the GasFree wallet.
 - **Tool**: The `x402_invoke.js` script must be built and available in `dist/`.
+- All keys can also be set in `x402-config.json` or `~/.mcporter/mcporter.json`.
 
 ## Usage Instructions
 
