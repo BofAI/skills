@@ -36,12 +36,15 @@ async function apiGet(endpointKey, params = {}) {
   if (!url) fatal(`Unknown endpoint key: ${endpointKey}`);
   log(`GET ${url}`, params);
   const res = await client.get(url, { params });
+  // Some endpoints return empty string for no results — normalize to empty object
+  if (res.data === '' || res.data == null) return { data: [], total: 0 };
   return res.data;
 }
 
 async function apiGetRaw(urlPath, params = {}) {
   log(`GET ${urlPath}`, params);
   const res = await client.get(urlPath, { params });
+  if (res.data === '' || res.data == null) return { data: [], total: 0 };
   return res.data;
 }
 
