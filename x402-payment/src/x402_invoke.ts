@@ -3,6 +3,52 @@ import * as fs from 'fs';
 import * as path from 'path';
 import * as os from 'os';
 
+interface AgentWalletConfig {
+  tronWalletName?: string;
+  evmWalletName?: string;
+  secretsDir: string;
+  password: string;
+}
+
+function expandHomePath(inputPath: string): string {
+  if (inputPath === '~') return os.homedir();
+  if (inputPath.startsWith('~/')) return path.join(os.homedir(), inputPath.slice(2));
+  return inputPath;
+}
+
+function findAgentWalletConfig(): AgentWalletConfig | undefined {
+  const tronName = process.env.TRON_AGENT_WALLET_NAME;
+  const evmName = process.env.EVM_AGENT_WALLET_NAME || process.env.BSC_AGENT_WALLET_NAME;
+  const secretsDir = expandHomePath(process.env.AGENT_WALLET_SECRETS_DIR || '~/.agent-wallet');
+  const password = process.env.AGENT_WALLET_PASSWORD || '';
+
+  if (!tronName && !evmName) {
+    // Check config files
+    const configFiles = [
+      path.join(process.cwd(), 'x402-config.json'),
+      path.join(os.homedir(), '.x402-config.json')
+    ];
+    for (const file of configFiles) {
+      if (fs.existsSync(file)) {
+        try {
+          const config = JSON.parse(fs.readFileSync(file, 'utf8'));
+          if (config.agent_wallet) {
+            return {
+              tronWalletName: config.agent_wallet.tron_wallet_name,
+              evmWalletName: config.agent_wallet.evm_wallet_name || config.agent_wallet.bsc_wallet_name,
+              secretsDir: expandHomePath(config.agent_wallet.secrets_dir || secretsDir),
+              password: config.agent_wallet.password || password,
+            };
+          }
+        } catch (e) { /* ignore */ }
+      }
+    }
+    return undefined;
+  }
+
+  return { tronWalletName: tronName, evmWalletName: evmName, secretsDir, password };
+}
+
 async function findPrivateKey(type: 'tron' | 'evm'): Promise<string | undefined> {
   // 1. Check environment variables
   if (type === 'tron') {
@@ -88,6 +134,14 @@ async function findApiKey(): Promise<string | undefined> {
   return undefined;
 }
 
+async function hasPrivateKeyConfig(): Promise<boolean> {
+  return Boolean((await findPrivateKey('tron')) || (await findPrivateKey('evm')));
+}
+
+function hasAgentWalletConfig(config?: AgentWalletConfig): boolean {
+  return Boolean(config && Boolean(config.password));
+}
+
 async function main() {
   const args = process.argv.slice(2);
   const options: Record<string, string> = {};
@@ -123,22 +177,40 @@ async function main() {
     ExactEvmClientMechanism,
     ExactPermitTronClientMechanism,
     ExactPermitEvmClientMechanism,
+    AgentWalletAdapter,
     SufficientBalancePolicy
   } = await import('@bankofai/x402');
 
-  const tronKey = await findPrivateKey('tron');
-  const evmKey = await findPrivateKey('evm');
   const apiKey = await findApiKey();
+  const agentWalletConfig = findAgentWalletConfig();
+  const hasAgentWallet = hasAgentWalletConfig(agentWalletConfig);
+  const hasPrivateKey = await hasPrivateKeyConfig();
+  const useAgentWallet = hasAgentWallet;
 
   if (options.check === 'true' || options.status === 'true') {
-    if (tronKey) {
-      const signer = new TronClientSigner(tronKey);
-      console.error(`[OK] TRON Wallet: ${signer.getAddress()}`);
-      if (apiKey) console.error(`[OK] TRON_GRID_API_KEY is configured.`);
-    }
-    if (evmKey) {
-      const signer = new EvmClientSigner(evmKey);
-      console.error(`[OK] EVM Wallet: ${signer.getAddress()}`);
+    console.error(`[x402] Wallet mode: ${useAgentWallet ? 'agent_wallet' : 'private_key'} (auto-detected)`);
+    console.error(`[x402] Agent wallet available: ${hasAgentWallet ? 'yes' : 'no'}`);
+    console.error(`[x402] Private key available: ${hasPrivateKey ? 'yes' : 'no'}`);
+    if (useAgentWallet) {
+      if (agentWalletConfig) {
+        if (agentWalletConfig.tronWalletName) console.error(`[OK] TRON Agent Wallet: ${agentWalletConfig.tronWalletName}`);
+        if (agentWalletConfig.evmWalletName) console.error(`[OK] EVM Agent Wallet: ${agentWalletConfig.evmWalletName}`);
+        console.error(`[OK] Secrets dir: ${agentWalletConfig.secretsDir}`);
+      } else {
+        console.error(`[WARN] No agent wallet configuration found.`);
+      }
+    } else {
+      const tronKey = await findPrivateKey('tron');
+      const evmKey = await findPrivateKey('evm');
+      if (tronKey) {
+        const signer = TronClientSigner.fromPrivateKey(tronKey);
+        console.error(`[OK] TRON Wallet: ${signer.getAddress()}`);
+        if (apiKey) console.error(`[OK] TRON_GRID_API_KEY is configured.`);
+      }
+      if (evmKey) {
+        const signer = EvmClientSigner.fromPrivateKey(evmKey);
+        console.error(`[OK] EVM Wallet: ${signer.getAddress()}`);
+      }
     }
     process.exit(0);
   }
@@ -153,29 +225,84 @@ async function main() {
   console.log = console.error;
 
   const client = new X402Client();
+  console.error(`[x402] Using wallet mode: ${useAgentWallet ? 'agent_wallet' : 'private_key'} (auto-detected)`);
 
-  if (tronKey) {
-    const tronWebOptions: any = { fullHost: 'https://nile.trongrid.io', privateKey: tronKey };
-    if (networkName === 'mainnet') tronWebOptions.fullHost = 'https://api.trongrid.io';
-    if (networkName === 'shasta') tronWebOptions.fullHost = 'https://api.shasta.trongrid.io';
-    if (apiKey) tronWebOptions.headers = { 'TRON-PRO-API-KEY': apiKey };
-
-    const tw = new TronWeb(tronWebOptions);
-    const signer = new TronClientSigner(tronKey);
-    const networks = ['mainnet', 'nile', 'shasta', '*'];
-    for (const net of networks) {
-      const networkId = net === '*' ? 'tron:*' : `tron:${net}`;
-      client.register(networkId, new ExactTronClientMechanism(signer));
-      client.register(networkId, new ExactPermitTronClientMechanism(signer));
+  if (useAgentWallet) {
+    // --- Agent Wallet Mode ---
+    const awConfigCandidate = agentWalletConfig;
+    if (!awConfigCandidate || (!awConfigCandidate.tronWalletName && !awConfigCandidate.evmWalletName)) {
+      console.error('Error: Agent wallet configuration not found. Set TRON_AGENT_WALLET_NAME / EVM_AGENT_WALLET_NAME together with AGENT_WALLET_PASSWORD, or configure agent_wallet in x402-config.json.');
+      process.exit(1);
     }
-    console.error(`[x402] TRON mechanisms enabled.`);
-  }
+    const awPassword = awConfigCandidate!.password;
+    if (!awPassword) {
+      console.error('Error: AGENT_WALLET_PASSWORD is required for agent wallet mode.');
+      process.exit(1);
+    }
+    const awConfig = awConfigCandidate!;
 
-  if (evmKey) {
-    const signer = new EvmClientSigner(evmKey);
-    client.register('eip155:*', new ExactEvmClientMechanism(signer));
-    client.register('eip155:*', new ExactPermitEvmClientMechanism(signer));
-    console.error(`[x402] EVM mechanisms enabled.`);
+    let WalletFactory: any;
+    try {
+      ({ WalletFactory } = await import('@bankofai/agent-wallet'));
+    } catch {
+      console.error('Error: Agent wallet mode requires `@bankofai/agent-wallet` package.');
+      process.exit(1);
+    }
+
+    const provider = WalletFactory({
+      secretsDir: awConfig.secretsDir,
+      password: awPassword,
+    });
+
+    if (awConfig.tronWalletName) {
+      const agentWallet = await provider.getWallet(awConfig.tronWalletName);
+      const wallet = await AgentWalletAdapter.create(agentWallet);
+      const signer = TronClientSigner.fromWallet(wallet);
+      const networks = ['mainnet', 'nile', 'shasta', '*'];
+      for (const net of networks) {
+        const networkId = net === '*' ? 'tron:*' : `tron:${net}`;
+        client.register(networkId, new ExactTronClientMechanism(signer));
+        client.register(networkId, new ExactPermitTronClientMechanism(signer));
+      }
+      console.error(`[x402] TRON mechanisms enabled (agent wallet: ${awConfig.tronWalletName}).`);
+    }
+
+    if (awConfig.evmWalletName) {
+      const agentWallet = await provider.getWallet(awConfig.evmWalletName);
+      const wallet = await AgentWalletAdapter.create(agentWallet);
+      const signer = EvmClientSigner.fromWallet(wallet);
+      client.register('eip155:*', new ExactEvmClientMechanism(signer));
+      client.register('eip155:*', new ExactPermitEvmClientMechanism(signer));
+      console.error(`[x402] EVM mechanisms enabled (agent wallet: ${awConfig.evmWalletName}).`);
+    }
+  } else {
+    // --- Private Key Mode ---
+    const tronKey = await findPrivateKey('tron');
+    const evmKey = await findPrivateKey('evm');
+
+    if (tronKey) {
+      const tronWebOptions: any = { fullHost: 'https://nile.trongrid.io', privateKey: tronKey };
+      if (networkName === 'mainnet') tronWebOptions.fullHost = 'https://api.trongrid.io';
+      if (networkName === 'shasta') tronWebOptions.fullHost = 'https://api.shasta.trongrid.io';
+      if (apiKey) tronWebOptions.headers = { 'TRON-PRO-API-KEY': apiKey };
+
+      const tw = new TronWeb(tronWebOptions);
+      const signer = TronClientSigner.fromPrivateKey(tronKey);
+      const networks = ['mainnet', 'nile', 'shasta', '*'];
+      for (const net of networks) {
+        const networkId = net === '*' ? 'tron:*' : `tron:${net}`;
+        client.register(networkId, new ExactTronClientMechanism(signer));
+        client.register(networkId, new ExactPermitTronClientMechanism(signer));
+      }
+      console.error(`[x402] TRON mechanisms enabled.`);
+    }
+
+    if (evmKey) {
+      const signer = EvmClientSigner.fromPrivateKey(evmKey);
+      client.register('eip155:*', new ExactEvmClientMechanism(signer));
+      client.register('eip155:*', new ExactPermitEvmClientMechanism(signer));
+      console.error(`[x402] EVM mechanisms enabled.`);
+    }
   }
 
   client.registerPolicy(new SufficientBalancePolicy(client));
@@ -240,6 +367,8 @@ async function main() {
     let stack = error.stack || '';
 
     // Sanitize any potential private key leaks in error messages/stacks
+    const tronKey = await findPrivateKey('tron');
+    const evmKey = await findPrivateKey('evm');
     const keys = [tronKey, evmKey].filter(Boolean) as string[];
     for (const key of keys) {
       const escapedKey = key.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');

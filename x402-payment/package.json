@@ -12,8 +12,9 @@
     "typescript": "^5.9.3"
   },
   "dependencies": {
-    "@bankofai/x402": "0.3.1",
+    "@bankofai/x402": "0.3.2-beta.1",
     "tronweb": "^6.0.0",
-    "ts-node": "^10.9.1"
+    "ts-node": "^10.9.1",
+    "@bankofai/agent-wallet": "2.0.0"
   }
 }

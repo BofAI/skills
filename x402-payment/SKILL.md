@@ -1,7 +1,7 @@
 ---
 name: x402-payment
 description: "Pay for x402-enabled Agent endpoints using ERC20 tokens (USDT/USDC) on EVM or TRC20 tokens (USDT/USDD) on TRON."
-version: 1.3.0
+version: 1.5.0
 author: bankofai
 homepage: https://x402.org
 tags: [crypto, payments, x402, agents, api, usdt, usdd, usdc, tron, ethereum, evm, erc20, trc20]
@@ -37,24 +37,36 @@ The `x402-payment` skill enables agents to interact with paid API endpoints. Whe
 
 ## Prerequisites
 
-- **Wallet Configuration**:
-  - **TRON**: Set `TRON_PRIVATE_KEY` for TRC20 payments (USDT/USDD).
-  - **EVM**: Set `EVM_PRIVATE_KEY` or `ETH_PRIVATE_KEY` for ERC20 payments (USDT/USDC).
-  - The skill also searches for keys in `x402-config.json` and `~/.mcporter/mcporter.json`.
-- **TronGrid API Key**: Required for **Mainnet** to avoid rate limits (`TRON_GRID_API_KEY`).
 - **Tool**: The `x402_invoke.js` script must be built and available in `dist/`.
+- **TronGrid API Key**: Required for **Mainnet** to avoid rate limits (`TRON_GRID_API_KEY`).
+- **Auto Detection**: If `AGENT_WALLET_PASSWORD` or `agent_wallet.password` is configured, the tool uses agent wallet mode. Otherwise it falls back to private key mode.
+
+### Mode 1: Private Key
+- **TRON**: Set `TRON_PRIVATE_KEY` for TRC20 payments (USDT/USDD).
+- **EVM**: Set `EVM_PRIVATE_KEY` or `ETH_PRIVATE_KEY` for ERC20 payments (USDT/USDC).
+- The skill also searches for keys in `x402-config.json` and `~/.mcporter/mcporter.json`.
+
+### Mode 2: Agent Wallet
+- **Package**: `@bankofai/agent-wallet` must be installed.
+- **TRON**: Set `TRON_AGENT_WALLET_NAME` to the agent wallet name for TRON.
+- **EVM**: Set `EVM_AGENT_WALLET_NAME` (or `BSC_AGENT_WALLET_NAME`) for EVM.
+- **Password**: Set `AGENT_WALLET_PASSWORD` to unlock the wallet.
+- **Secrets Dir**: Optionally set `AGENT_WALLET_SECRETS_DIR` (default: `~/.agent-wallet`).
+- Alternatively, configure via `x402-config.json` under the `agent_wallet` key.
 
 ## Usage Instructions
 
 ### 1. Verification
 Before making payments, verify your wallet status:
 ```bash
+# Auto-detect wallet mode
 node x402-payment/dist/x402_invoke.js --check
 ```
 
 ### 2. Invoking an Agent (v2)
 Most modern x402 agents use the v2 "invoke" pattern:
 ```bash
+# Auto-detect wallet mode
 node x402-payment/dist/x402_invoke.js \
   --url https://api.example.com \
   --entrypoint chat \
@@ -96,6 +108,7 @@ node x402-payment/dist/x402_invoke.js \
 - **No Export Commands**: DO NOT execute shell commands containing the private key as a literal string.
 - **Silent Environment Checks**: Use `[[ -n $TRON_PRIVATE_KEY ]] && echo "Configured" || echo "Missing"` to verify configuration without leaking secrets.
 - **Use the Check Tool**: Use `node x402_invoke.js --check` to safely verify addresses.
+- **Agent Wallet Selection**: If `AGENT_WALLET_PASSWORD` is configured, the tool uses agent wallet mode instead of private keys.
 
 ## Binary and Image Handling
 
@@ -112,5 +125,22 @@ If allowance is insufficient, the tool will automatically attempt an "infinite a
 ### Insufficient Balance
 Ensure you have enough USDT/USDC/USDD in your wallet on the specified network.
 
+## Agent Wallet Configuration (x402-config.json)
+
+You can configure agent wallet settings in `x402-config.json` or `~/.x402-config.json`:
+```json
+{
+  "agent_wallet": {
+    "tron_wallet_name": "my-tron-wallet",
+    "evm_wallet_name": "my-evm-wallet",
+    "secrets_dir": "~/.agent-wallet",
+    "password": "..."
+  }
+}
+```
+
+> [!WARNING]
+> Storing the password in a config file is less secure than using the `AGENT_WALLET_PASSWORD` environment variable.
+
 ---
-*Last Updated: 2026-02-11*
+*Last Updated: 2026-03-09*
