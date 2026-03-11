@@ -1,7 +1,7 @@
 ---
 name: x402-payment
 description: "Pay for x402-enabled Agent endpoints using ERC20 tokens (USDT/USDC) on EVM or TRC20 tokens (USDT/USDD) on TRON."
-version: 1.4.0
+version: 2.6.0
 author: bankofai
 homepage: https://bankofai.io
 tags: [crypto, payments, x402, agents, api, usdt, usdd, usdc, tron, ethereum, evm, erc20, trc20]
@@ -30,6 +30,12 @@ dependencies:
 # x402 Payment Skill
 
 Invoke x402-enabled AI agent endpoints with automatic token payments on both TRON (TRC20) and EVM-compatible (ERC20) chains.
+
+## Status
+
+- The repo's current v2 demo acceptance path is `x402-demo` on `tron:nile`.
+- This skill remains a broader invoke helper and still includes compatibility logic for legacy schemes such as `exact_permit` and `exact_gasfree`.
+- For validating the new demo server, prefer the dedicated [x402-payment-demo](/Users/bobo/code/x402/skills/x402-payment-demo/SKILL.md) flow.
 
 ## Overview
 
