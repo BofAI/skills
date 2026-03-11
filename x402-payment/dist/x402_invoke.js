@@ -2,84 +2,98 @@
 import { createRequire as __WEBPACK_EXTERNAL_createRequire } from "module";
 /******/ var __webpack_modules__ = ({
 
-/***/ 2613:
+/***/ 42613:
 /***/ ((module) => {
 
 module.exports = __WEBPACK_EXTERNAL_createRequire(import.meta.url)("assert");
 
 /***/ }),
 
-/***/ 6982:
+/***/ 20181:
+/***/ ((module) => {
+
+module.exports = __WEBPACK_EXTERNAL_createRequire(import.meta.url)("buffer");
+
+/***/ }),
+
+/***/ 76982:
 /***/ ((module) => {
 
 module.exports = __WEBPACK_EXTERNAL_createRequire(import.meta.url)("crypto");
 
 /***/ }),
 
-/***/ 4434:
+/***/ 24434:
 /***/ ((module) => {
 
 module.exports = __WEBPACK_EXTERNAL_createRequire(import.meta.url)("events");
 
 /***/ }),
 
-/***/ 9896:
+/***/ 79896:
 /***/ ((module) => {
 
 module.exports = __WEBPACK_EXTERNAL_createRequire(import.meta.url)("fs");
 
 /***/ }),
 
-/***/ 8611:
+/***/ 58611:
 /***/ ((module) => {
 
 module.exports = __WEBPACK_EXTERNAL_createRequire(import.meta.url)("http");
 
 /***/ }),
 
-/***/ 5675:
+/***/ 85675:
 /***/ ((module) => {
 
 module.exports = __WEBPACK_EXTERNAL_createRequire(import.meta.url)("http2");
 
 /***/ }),
 
-/***/ 5692:
+/***/ 65692:
 /***/ ((module) => {
 
 module.exports = __WEBPACK_EXTERNAL_createRequire(import.meta.url)("https");
 
 /***/ }),
 
-/***/ 7598:
+/***/ 69278:
+/***/ ((module) => {
+
+module.exports = __WEBPACK_EXTERNAL_createRequire(import.meta.url)("net");
+
+/***/ }),
+
+/***/ 77598:
 /***/ ((module) => {
 
 module.exports = __WEBPACK_EXTERNAL_createRequire(import.meta.url)("node:crypto");
 
 /***/ }),
 
-/***/ 3024:
+/***/ 73024:
 /***/ ((module) => {
 
 module.exports = __WEBPACK_EXTERNAL_createRequire(import.meta.url)("node:fs");
 
 /***/ }),
 
-/***/ 8161:
+/***/ 48161:
 /***/ ((module) => {
 
 module.exports = __WEBPACK_EXTERNAL_createRequire(import.meta.url)("node:os");
 
 /***/ }),
 
-/***/ 6760:
+/***/ 76760:
 /***/ ((module) => {
 
 module.exports = __WEBPACK_EXTERNAL_createRequire(import.meta.url)("node:path");
 
 /***/ }),
 
-/***/ 6928:
+/***/ 16928:
 /***/ ((module) => {
 
 module.exports = __WEBPACK_EXTERNAL_createRequire(import.meta.url)("path");
@@ -93,21 +107,28 @@ module.exports = __WEBPACK_EXTERNAL_createRequire(import.meta.url)("stream");
 
 /***/ }),
 
-/***/ 7016:
+/***/ 64756:
+/***/ ((module) => {
+
+module.exports = __WEBPACK_EXTERNAL_createRequire(import.meta.url)("tls");
+
+/***/ }),
+
+/***/ 87016:
 /***/ ((module) => {
 
 module.exports = __WEBPACK_EXTERNAL_createRequire(import.meta.url)("url");
 
 /***/ }),
 
-/***/ 9023:
+/***/ 39023:
 /***/ ((module) => {
 
 module.exports = __WEBPACK_EXTERNAL_createRequire(import.meta.url)("util");
 
 /***/ }),
 
-/***/ 3106:
+/***/ 43106:
 /***/ ((module) => {
 
 module.exports = __WEBPACK_EXTERNAL_createRequire(import.meta.url)("zlib");
@@ -128,8 +149,8 @@ module.exports = __WEBPACK_EXTERNAL_createRequire(import.meta.url)("zlib");
 /******/ 	}
 /******/ 	// Create a new module (and put it into the cache)
 /******/ 	var module = __webpack_module_cache__[moduleId] = {
-/******/ 		// no module.id needed
-/******/ 		// no module.loaded needed
+/******/ 		id: moduleId,
+/******/ 		loaded: false,
 /******/ 		exports: {}
 /******/ 	};
 /******/ 
@@ -141,6 +162,9 @@ module.exports = __WEBPACK_EXTERNAL_createRequire(import.meta.url)("zlib");
 /******/ 	} finally {
 /******/ 		if(threw) delete __webpack_module_cache__[moduleId];
 /******/ 	}
+/******/ 
+/******/ 	// Flag the module as loaded
+/******/ 	module.loaded = true;
 /******/ 
 /******/ 	// Return the exports of the module
 /******/ 	return module.exports;
@@ -230,6 +254,15 @@ module.exports = __WEBPACK_EXTERNAL_createRequire(import.meta.url)("zlib");
 /******/ 	};
 /******/ })();
 /******/ 
+/******/ /* webpack/runtime/node module decorator */
+/******/ (() => {
+/******/ 	__nccwpck_require__.nmd = (module) => {
+/******/ 		module.paths = [];
+/******/ 		if (!module.children) module.children = [];
+/******/ 		return module;
+/******/ 	};
+/******/ })();
+/******/ 
 /******/ /* webpack/runtime/compat */
 /******/ 
 /******/ if (typeof __nccwpck_require__ !== 'undefined') __nccwpck_require__.ab = new URL('.', import.meta.url).pathname.slice(import.meta.url.match(/^file:\/\/\/\w:/) ? 1 : 0, -1) + "/";
@@ -301,9 +334,9 @@ module.exports = __WEBPACK_EXTERNAL_createRequire(import.meta.url)("zlib");
 var __webpack_exports__ = {};
 
 // EXTERNAL MODULE: external "fs"
-var external_fs_ = __nccwpck_require__(9896);
+var external_fs_ = __nccwpck_require__(79896);
 // EXTERNAL MODULE: external "path"
-var external_path_ = __nccwpck_require__(6928);
+var external_path_ = __nccwpck_require__(16928);
 ;// CONCATENATED MODULE: external "os"
 const external_os_namespaceObject = __WEBPACK_EXTERNAL_createRequire(import.meta.url)("os");
 ;// CONCATENATED MODULE: ./src/x402_invoke.ts
@@ -471,9 +504,9 @@ async function main() {
     const networkName = options.network || 'nile';
     // Use dynamic imports
     // @ts-ignore
-    const { TronWeb } = await __nccwpck_require__.e(/* import() */ 624).then(__nccwpck_require__.bind(__nccwpck_require__, 6624));
+    const { TronWeb } = await __nccwpck_require__.e(/* import() */ 624).then(__nccwpck_require__.bind(__nccwpck_require__, 86624));
     global.TronWeb = TronWeb;
-    const { TronClientSigner, EvmClientSigner, X402Client, X402FetchClient, ExactTronClientMechanism, ExactEvmClientMechanism, ExactPermitTronClientMechanism, ExactPermitEvmClientMechanism, AgentWalletAdapter, SufficientBalancePolicy } = await Promise.all(/* import() */[__nccwpck_require__.e(624), __nccwpck_require__.e(607), __nccwpck_require__.e(358)]).then(__nccwpck_require__.bind(__nccwpck_require__, 7358));
+    const { TronClientSigner, EvmClientSigner, X402Client, X402FetchClient, ExactTronClientMechanism, ExactEvmClientMechanism, ExactPermitTronClientMechanism, ExactPermitEvmClientMechanism, AgentWalletAdapter, SufficientBalancePolicy } = await Promise.all(/* import() */[__nccwpck_require__.e(624), __nccwpck_require__.e(607), __nccwpck_require__.e(106), __nccwpck_require__.e(914)]).then(__nccwpck_require__.bind(__nccwpck_require__, 22106));
     const apiKey = await findApiKey();
     const agentWalletConfig = findAgentWalletConfig();
     const hasAgentWallet = hasAgentWalletConfig(agentWalletConfig);
@@ -535,7 +568,7 @@ async function main() {
         const awConfig = awConfigCandidate;
         let WalletFactory;
         try {
-            ({ WalletFactory } = await Promise.all(/* import() */[__nccwpck_require__.e(607), __nccwpck_require__.e(155)]).then(__nccwpck_require__.bind(__nccwpck_require__, 6155)));
+            ({ WalletFactory } = await Promise.all(/* import() */[__nccwpck_require__.e(607), __nccwpck_require__.e(155)]).then(__nccwpck_require__.bind(__nccwpck_require__, 16155)));
         }
         catch {
             console.error('Error: Agent wallet mode requires `@bankofai/agent-wallet` package.');
