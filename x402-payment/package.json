@@ -1,6 +1,6 @@
 {
   "name": "x402-payment-skill",
-  "version": "1.2.0",
+  "version": "1.4.0",
   "description": "x402 payment skill for TRON and EVM",
   "type": "module",
   "scripts": {
