@@ -72,7 +72,8 @@ skills/
 │   └── examples/          # Usage examples
 ├── x402-payment/          # x402 Payment Protocol skill
 │   ├── SKILL.md           # Main instruction file
-│   └── dist/              # Compiled tool scripts
+│   ├── package.json       # Dependencies (run npm install before use)
+│   └── src/               # TypeScript source (run via npx tsx)
 └── x402-payment-demo/     # x402 Payment Demo skill
     └── SKILL.md           # Main instruction file
 ```
@@ -83,7 +84,7 @@ skills/
 
 - **[SunSwap Skills](sunswap/README.md)**: DEX Trading (TRON token swaps)
 - **[8004 Trustless Agents](8004-skill/README.md)**: On-chain identity, reputation, and validation for AI agents (supports TRON & BSC)
-- **[x402-payment](x402-payment/SKILL.md)**: TRC20 Payments for AI Agents (USDT/USDD)
+- **[x402-payment](x402-payment/SKILL.md)**: TRC20/ERC20 Payments for AI Agents (USDT/USDD/USDC) with GasFree support
 - **[x402-payment-demo](x402-payment-demo/SKILL.md)**: Demo of x402 payment protocol (Protected Content Acquisition)
 
 ## How to Use Skills
@@ -224,5 +225,5 @@ MIT License - see [LICENSE](LICENSE) file for details
 ---
 
 **Repository**: [BofAI/skills](https://github.com/BofAI/skills)  
-**Last Updated**: 2026-02-11  
+**Last Updated**: 2026-03-11  
 **Maintainer**: Bank of AI Team
