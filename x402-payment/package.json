@@ -4,16 +4,14 @@
   "description": "x402 payment skill for TRON and EVM",
   "type": "module",
   "scripts": {
-    "build": "npx @vercel/ncc build src/x402_invoke.ts -o dist && mv dist/index.js dist/x402_invoke.js",
-    "start": "node dist/x402_invoke.js"
+    "start": "npx tsx src/x402_invoke.ts"
   },
   "devDependencies": {
-    "@vercel/ncc": "^0.38.1",
+    "tsx": "^4.21.0",
     "typescript": "^5.9.3"
   },
   "dependencies": {
-    "@bankofai/x402": "0.3.1",
-    "tronweb": "^6.0.0",
-    "ts-node": "^10.9.1"
+    "@bankofai/x402": "0.4.1",
+    "tronweb": "^6.0.0"
   }
 }
