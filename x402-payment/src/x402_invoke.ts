@@ -102,8 +102,8 @@ async function findGasFreeCredentials(): Promise<{ apiKey: string; apiSecret: st
     if (fs.existsSync(file)) {
       try {
         const config = JSON.parse(fs.readFileSync(file, 'utf8'));
-        const key = config.gasfree_api_key;
-        const secret = config.gasfree_api_secret;
+        const key = (config.gasfree_api_key || '').trim();
+        const secret = (config.gasfree_api_secret || '').trim();
         if (key && secret) return { apiKey: key, apiSecret: secret };
       } catch (e) { /* ignore */ }
     }
@@ -116,14 +116,288 @@ async function findGasFreeCredentials(): Promise<{ apiKey: string; apiSecret: st
       if (config.mcpServers) {
         for (const serverName in config.mcpServers) {
           const s = config.mcpServers[serverName];
-          const key = s?.env?.GASFREE_API_KEY;
-          const secret = s?.env?.GASFREE_API_SECRET;
+          const key = (s?.env?.GASFREE_API_KEY || '').trim();
+          const secret = (s?.env?.GASFREE_API_SECRET || '').trim();
           if (key && secret) return { apiKey: key, apiSecret: secret };
         }
       }
     } catch (e) { /* ignore */ }
   }
   return undefined;
+}
+
+const TRON_RPC_URLS: Record<string, string> = {
+  mainnet: 'https://api.trongrid.io',
+  nile: 'https://nile.trongrid.io',
+  shasta: 'https://api.shasta.trongrid.io',
+};
+
+async function waitForTxConfirmation(tronWeb: any, txId: string, timeoutMs = 60000, intervalMs = 3000): Promise<boolean> {
+  const start = Date.now();
+  while (Date.now() - start < timeoutMs) {
+    try {
+      const info = await tronWeb.trx.getTransactionInfo(txId);
+      if (info && info.id) return true;
+    } catch (_) { /* not confirmed yet */ }
+    await new Promise((resolve) => setTimeout(resolve, intervalMs));
+  }
+  return false;
+}
+
+async function handleGasFreeInfo(
+  options: Record<string, string>,
+  deps: {
+    tronKey: string | undefined;
+    gasFreeCredentials: { apiKey: string; apiSecret: string } | undefined;
+    TronClientSigner: any;
+    GasFreeAPIClient: any;
+    GASFREE_API_BASE_URLS: Record<string, string>;
+  },
+): Promise<void> {
+  const { tronKey, gasFreeCredentials, TronClientSigner, GasFreeAPIClient, GASFREE_API_BASE_URLS } = deps;
+
+  if (!gasFreeCredentials) {
+    console.error('Error: GasFree API credentials (GASFREE_API_KEY / GASFREE_API_SECRET) are required for --gasfree-info');
+    process.exit(1);
+  }
+
+  let walletAddress: string;
+  if (options['wallet']) {
+    walletAddress = options['wallet'];
+  } else if (tronKey) {
+    const signer = new TronClientSigner(tronKey);
+    walletAddress = signer.getAddress();
+  } else {
+    console.error('Error: Provide --wallet <address> or set TRON_PRIVATE_KEY');
+    process.exit(1);
+  }
+
+  const gasfreeNetwork = options.network || 'mainnet';
+  const networkKey = `tron:${gasfreeNetwork}`;
+  const baseUrl = GASFREE_API_BASE_URLS[networkKey];
+
+  if (!baseUrl) {
+    console.error(`Error: GasFree is not supported on network "${gasfreeNetwork}". Supported: mainnet, nile, shasta`);
+    process.exit(1);
+  }
+
+  const gasFreeClient = new GasFreeAPIClient(baseUrl);
+  console.error(`[gasfree] Querying GasFree info for ${walletAddress} on ${gasfreeNetwork}...`);
+
+  try {
+    const info = await gasFreeClient.getAddressInfo(walletAddress);
+    const result = {
+      network: gasfreeNetwork,
+      accountAddress: info.accountAddress,
+      gasFreeAddress: info.gasFreeAddress,
+      active: info.active,
+      allowSubmit: info.allowSubmit,
+      nonce: info.nonce,
+      assets: (info.assets || []).map((asset: any) => ({
+        tokenSymbol: asset.tokenSymbol,
+        tokenAddress: asset.tokenAddress,
+        balance: asset.balance,
+        frozen: asset.frozen,
+        decimal: asset.decimal,
+        activateFee: asset.activateFee,
+        transferFee: asset.transferFee,
+      })),
+    };
+    process.stdout.write(JSON.stringify(result, null, 2) + '\n');
+  } catch (error: any) {
+    console.error(`[gasfree] Error: ${error.message || 'Unknown error'}`);
+    process.stdout.write(JSON.stringify({ error: error.message || 'Unknown error' }, null, 2) + '\n');
+    process.exit(1);
+  }
+}
+
+async function handleGasFreeActivate(
+  options: Record<string, string>,
+  deps: {
+    tronKey: string;
+    apiKey: string | undefined;
+    gasFreeCredentials: { apiKey: string; apiSecret: string };
+    TronWeb: any;
+    TronClientSigner: any;
+    GasFreeAPIClient: any;
+    GASFREE_API_BASE_URLS: Record<string, string>;
+    getChainId: (networkKey: string) => string;
+  },
+): Promise<void> {
+  const { tronKey, apiKey, TronWeb, TronClientSigner, GasFreeAPIClient, GASFREE_API_BASE_URLS, getChainId } = deps;
+
+  const tokenSymbol = (options.token || 'USDT').toUpperCase();
+  const gasfreeNetwork = options.network || 'nile';
+  const networkKey = `tron:${gasfreeNetwork}`;
+  const baseUrl = GASFREE_API_BASE_URLS[networkKey];
+
+  if (!baseUrl) {
+    console.error(`Error: GasFree not supported on "${gasfreeNetwork}". Supported: mainnet, nile, shasta`);
+    process.exit(1);
+  }
+
+  const tronWebOpts: any = { fullHost: TRON_RPC_URLS[gasfreeNetwork], privateKey: tronKey };
+  if (apiKey) tronWebOpts.headers = { 'TRON-PRO-API-KEY': apiKey };
+  const tronWeb = new TronWeb(tronWebOpts);
+
+  const signer = new TronClientSigner(tronKey);
+  const walletAddress = signer.getAddress();
+  const gasFreeClient = new GasFreeAPIClient(baseUrl);
+
+  // @ts-ignore - CJS module with named exports
+  const { TronGasFree } = await import('@gasfree/gasfree-sdk');
+
+  // Step 1: Query account info
+  console.error(`[gasfree-activate] Network: ${gasfreeNetwork}, Wallet: ${walletAddress}, Token: ${tokenSymbol}`);
+  const accountInfo = await gasFreeClient.getAddressInfo(walletAddress);
+  const gasFreeAddr = accountInfo.gasFreeAddress;
+
+  console.error(`[gasfree-activate] GasFree address: ${gasFreeAddr}`);
+  console.error(`[gasfree-activate] Active: ${accountInfo.active}, AllowSubmit: ${accountInfo.allowSubmit}, Nonce: ${accountInfo.nonce}`);
+
+  if (accountInfo.active) {
+    const result = { status: 'already_active', network: gasfreeNetwork, wallet: walletAddress, gasFreeAddress: gasFreeAddr };
+    process.stdout.write(JSON.stringify(result, null, 2) + '\n');
+    return;
+  }
+
+  if (!accountInfo.allowSubmit) {
+    console.error('[gasfree-activate] Error: Account not active and allowSubmit is false.');
+    process.exit(1);
+  }
+
+  const asset = accountInfo.assets.find((a: any) => a.tokenSymbol === tokenSymbol);
+  if (!asset) {
+    console.error(`[gasfree-activate] Error: Token ${tokenSymbol} not found. Available: ${accountInfo.assets.map((a: any) => a.tokenSymbol).join(', ')}`);
+    process.exit(1);
+  }
+
+  const tokenAddress = asset.tokenAddress;
+  const decimals = asset.decimal;
+  const activateFee = BigInt(asset.activateFee || 0);
+  const transferFee = BigInt(asset.transferFee || 0);
+  const totalFees = activateFee + transferFee;
+  const oneUnit = BigInt(10 ** decimals);
+  const transferAmount = totalFees + oneUnit;
+
+  const fmt = (v: bigint) => `${Number(v) / 10 ** decimals} ${tokenSymbol}`;
+  console.error(`[gasfree-activate] activateFee=${fmt(activateFee)}, transferFee=${fmt(transferFee)}, total to send=${fmt(transferAmount)}`);
+
+  // Step 2: Check wallet balance
+  const contract = await tronWeb.contract().at(tokenAddress);
+  const walletBalance = BigInt((await contract.methods.balanceOf(walletAddress).call()).toString());
+  console.error(`[gasfree-activate] Wallet balance: ${fmt(walletBalance)}`);
+
+  if (walletBalance < transferAmount) {
+    console.error(`[gasfree-activate] Error: Insufficient balance. Need ${fmt(transferAmount)}, have ${fmt(walletBalance)}`);
+    process.exit(1);
+  }
+
+  // Step 3: Transfer tokens to GasFree address
+  console.error(`[gasfree-activate] Transferring ${fmt(transferAmount)} to GasFree address ${gasFreeAddr}...`);
+  const txn = await contract.methods.transfer(gasFreeAddr, transferAmount.toString()).send();
+  const txId = typeof txn === 'string' ? txn : txn.txid || txn;
+  console.error(`[gasfree-activate] TRC20 transfer tx: ${txId}`);
+
+  console.error(`[gasfree-activate] Waiting for on-chain confirmation...`);
+  const confirmed = await waitForTxConfirmation(tronWeb, txId);
+  if (!confirmed) {
+    console.error('[gasfree-activate] Warning: Tx confirmation timed out, proceeding anyway...');
+  }
+
+  // Verify GasFree address balance
+  const gfBalance = BigInt((await contract.methods.balanceOf(gasFreeAddr).call()).toString());
+  console.error(`[gasfree-activate] GasFree address balance: ${fmt(gfBalance)}`);
+
+  // Step 4: GasFree transfer back to wallet
+  const updatedInfo = await gasFreeClient.getAddressInfo(walletAddress);
+  const nonce = updatedInfo.nonce;
+
+  const providers = await gasFreeClient.getProviders();
+  if (!providers || providers.length === 0) {
+    console.error('[gasfree-activate] Error: No GasFree service providers available');
+    process.exit(1);
+  }
+  const provider = providers[0];
+  console.error(`[gasfree-activate] Provider: ${provider.address} (${provider.name})`);
+
+  const returnValue = gfBalance - totalFees;
+  if (returnValue <= 0n) {
+    console.error(`[gasfree-activate] Error: GasFree balance (${fmt(gfBalance)}) not enough to cover fees (${fmt(totalFees)})`);
+    process.exit(1);
+  }
+
+  const maxFee = totalFees;
+  const deadline = Math.floor(Date.now() / 1000) + 3600;
+
+  console.error(`[gasfree-activate] Return: ${fmt(returnValue)}, maxFee: ${fmt(maxFee)}, nonce: ${nonce}`);
+
+  const chainId = getChainId(networkKey);
+  const gasFree = new TronGasFree({ chainId });
+
+  const { domain, types, message } = gasFree.assembleGasFreeTransactionJson({
+    token: tokenAddress,
+    serviceProvider: provider.address,
+    user: walletAddress,
+    receiver: walletAddress,
+    value: returnValue.toString(),
+    maxFee: maxFee.toString(),
+    deadline: deadline.toString(),
+    version: '1',
+    nonce: nonce.toString(),
+  });
+
+  const signature = await signer.signTypedData(domain, types, message, 'GasFreeTransaction');
+
+  console.error('[gasfree-activate] Submitting GasFree transaction...');
+  const traceId = await gasFreeClient.submit(domain, message, signature);
+  console.error(`[gasfree-activate] Trace ID: ${traceId}`);
+
+  // Step 5: Wait for completion
+  console.error('[gasfree-activate] Waiting for transaction to complete...');
+  const txResult = await gasFreeClient.waitForSuccess(traceId, 180000, 5000);
+
+  // Final verification
+  const finalInfo = await gasFreeClient.getAddressInfo(walletAddress);
+
+  const result = {
+    status: 'activated',
+    network: gasfreeNetwork,
+    wallet: walletAddress,
+    gasFreeAddress: gasFreeAddr,
+    active: finalInfo.active,
+    nonce: finalInfo.nonce,
+    depositTxId: txId,
+    gasFreeTraceId: traceId,
+    gasFreeState: txResult.state,
+    gasFreeTxHash: txResult.txnHash || null,
+  };
+  process.stdout.write(JSON.stringify(result, null, 2) + '\n');
+}
+
+function handleCheck(deps: {
+  tronKey: string | undefined;
+  evmKey: string | undefined;
+  apiKey: string | undefined;
+  gasFreeCredentials: { apiKey: string; apiSecret: string } | undefined;
+  TronClientSigner: any;
+  EvmClientSigner: any;
+}): void {
+  const { tronKey, evmKey, apiKey, gasFreeCredentials, TronClientSigner, EvmClientSigner } = deps;
+  if (tronKey) {
+    const signer = new TronClientSigner(tronKey);
+    console.error(`[OK] TRON Wallet: ${signer.getAddress()}`);
+    if (apiKey) console.error(`[OK] TRON_GRID_API_KEY is configured.`);
+  }
+  if (evmKey) {
+    const signer = new EvmClientSigner(evmKey);
+    console.error(`[OK] EVM Wallet: ${signer.getAddress()}`);
+  }
+  if (gasFreeCredentials) {
+    console.error(`[OK] GasFree API credentials configured (will prefer exact_gasfree).`);
+  } else {
+    console.error(`[--] GasFree API credentials not configured (GASFREE_API_KEY / GASFREE_API_SECRET).`);
+  }
 }
 
 async function main() {
@@ -164,7 +438,8 @@ async function main() {
     ExactGasFreeClientMechanism,
     GasFreeAPIClient,
     GASFREE_API_BASE_URLS,
-    SufficientBalancePolicy
+    SufficientBalancePolicy,
+    getChainId,
   } = await import('@bankofai/x402');
 
   const tronKey = await findPrivateKey('tron');
@@ -181,20 +456,41 @@ async function main() {
     if (!process.env.GASFREE_API_SECRET) process.env.GASFREE_API_SECRET = gasFreeCredentials.apiSecret;
   }
 
-  if (options.check === 'true' || options.status === 'true') {
-    if (tronKey) {
-      const signer = new TronClientSigner(tronKey);
-      console.error(`[OK] TRON Wallet: ${signer.getAddress()}`);
-      if (apiKey) console.error(`[OK] TRON_GRID_API_KEY is configured.`);
+  if (options.check || options.status) {
+    handleCheck({
+      tronKey, evmKey, apiKey, gasFreeCredentials,
+      TronClientSigner, EvmClientSigner,
+    });
+    process.exit(0);
+  }
+
+  if (options['gasfree-info']) {
+    await handleGasFreeInfo(options, {
+      tronKey, gasFreeCredentials, TronClientSigner, GasFreeAPIClient,
+      GASFREE_API_BASE_URLS: GASFREE_API_BASE_URLS as Record<string, string>,
+    });
+    process.exit(0);
+  }
+
+  if (options['gasfree-activate']) {
+    if (!tronKey) {
+      console.error('Error: TRON_PRIVATE_KEY is required for --gasfree-activate');
+      process.exit(1);
     }
-    if (evmKey) {
-      const signer = new EvmClientSigner(evmKey);
-      console.error(`[OK] EVM Wallet: ${signer.getAddress()}`);
+    if (!gasFreeCredentials) {
+      console.error('Error: GasFree API credentials (GASFREE_API_KEY / GASFREE_API_SECRET) are required for --gasfree-activate');
+      process.exit(1);
     }
-    if (gasFreeCredentials) {
-      console.error(`[OK] GasFree API credentials configured (will prefer exact_gasfree).`);
-    } else {
-      console.error(`[--] GasFree API credentials not configured (GASFREE_API_KEY / GASFREE_API_SECRET).`);
+    try {
+      await handleGasFreeActivate(options, {
+        tronKey, apiKey, gasFreeCredentials, TronWeb, TronClientSigner, GasFreeAPIClient,
+        GASFREE_API_BASE_URLS: GASFREE_API_BASE_URLS as Record<string, string>,
+        getChainId,
+      });
+    } catch (error: any) {
+      console.error(`[gasfree-activate] Error: ${error.message || 'Unknown error'}`);
+      process.stdout.write(JSON.stringify({ error: error.message || 'Unknown error' }, null, 2) + '\n');
+      process.exit(1);
     }
     process.exit(0);
   }
@@ -211,9 +507,7 @@ async function main() {
   const client = new X402Client();
 
   if (tronKey) {
-    const tronWebOptions: any = { fullHost: 'https://nile.trongrid.io', privateKey: tronKey };
-    if (networkName === 'mainnet') tronWebOptions.fullHost = 'https://api.trongrid.io';
-    if (networkName === 'shasta') tronWebOptions.fullHost = 'https://api.shasta.trongrid.io';
+    const tronWebOptions: any = { fullHost: TRON_RPC_URLS[networkName] || TRON_RPC_URLS.nile, privateKey: tronKey };
     if (apiKey) tronWebOptions.headers = { 'TRON-PRO-API-KEY': apiKey };
 
     const signer = new TronClientSigner(tronKey);

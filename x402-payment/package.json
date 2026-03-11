@@ -4,11 +4,10 @@
   "description": "x402 payment skill for TRON and EVM",
   "type": "module",
   "scripts": {
-    "build": "esbuild src/x402_invoke.ts --bundle --platform=node --format=esm --outfile=dist/x402_invoke.js --banner:js=\"import{createRequire}from'module';const require=createRequire(import.meta.url);\"",
-    "start": "node dist/x402_invoke.js"
+    "start": "npx tsx src/x402_invoke.ts"
   },
   "devDependencies": {
-    "esbuild": "^0.27.3",
+    "tsx": "^4.21.0",
     "typescript": "^5.9.3"
   },
   "dependencies": {
