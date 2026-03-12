@@ -1,146 +1,186 @@
 # Skills Repository
 
-AI Agent Skills Library - Reusable capability modules for AI agents
+Reusable skills for AI agents that support MCP (Model Context Protocol).
 
-[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 [![GitHub](https://img.shields.io/badge/GitHub-BofAI%2Fskills-blue)](https://github.com/BofAI/skills)
 
-## What is a Skill?
+## Overview
 
-A **Skill** is a document containing detailed instructions that teaches AI agents how to accomplish specific tasks.
+This repository contains task-oriented skills that AI agents can load and follow. Each skill is defined by a `SKILL.md` file and may include examples, resources, and helper scripts.
 
-**Analogy**: Like providing an "operation manual" to AI, telling it how to use tools to get work done.
+The goal is simple:
 
-```
-User: "Help me swap USDT for TRX"
-  ↓
-AI Agent reads SunSwap Skill
-  ↓
-AI Agent follows SKILL.md instructions
-  ↓
-Calls mcp-server-tron tools
-  ↓
-Completes DEX trade
-```
+- give AI agents reusable operating instructions
+- connect those instructions to MCP servers and local tooling
+- make common workflows repeatable across different AI platforms
 
----
+## How It Works
 
-## Quick Start
+A skill is an instruction package for an AI agent. It tells the agent:
 
-### 1. Browse Available Skills
+- what the skill does
+- which tools or MCP servers it depends on
+- what steps to follow
+- how to handle common errors
 
-Currently available:
-- **sunswap/** - SunSwap DEX trading skill for TRON token swaps
-- **8004-skill/** - 8004 Trustless Agents (TRC-8004 / BSC implementation)
-- **x402-payment/** - Enables agent payments on TRON network (x402 protocol)
-- **x402-payment-demo/** - Demo of x402 payment protocol
+Typical flow:
 
-### 2. Use a Skill
+1. A user asks the agent to perform a task.
+2. The agent identifies the matching skill.
+3. The agent reads the corresponding `SKILL.md`.
+4. The agent follows the instructions and calls tools or scripts.
+5. The agent returns the result.
 
-Tell your AI Agent:
-```
-Please read sunswap/SKILL.md and help me check how much TRX I can get for 100 USDT
-```
+In practice, a skill acts like an operating manual, while an MCP server provides the executable tools.
 
-The AI Agent will:
-1. Read SKILL.md
-2. Call appropriate tools following instructions
-3. Return results
+## Compatible Platforms
 
----
+These skills are designed for AI agents and developer tools that support MCP, including:
 
-## Repository Structure
-
-```
-skills/
-├── README.md              # This file - Overview
-├── LICENSE                # MIT License
-├── CONTRIBUTING.md        # Contribution guidelines
-├── AGENTS.md              # Developer guide (how to create new skills)
-├── sunswap/               # SunSwap DEX Trading skill
-│   ├── README.md          # Skill description
-│   ├── SKILL.md           # Main instruction file (AI Agent reads this)
-│   ├── examples/          # Usage examples
-│   ├── resources/         # Configuration files (contract addresses, token lists, etc.)
-│   └── scripts/           # Helper scripts
-├── 8004-skill/            # 8004 Trustless Agents skill
-│   ├── README.md          # Skill description
-│   ├── SKILL.md           # Main instruction file
-│   ├── lib/               # Contract ABIs and configurations
-│   ├── scripts/           # Node.js scripts for agent operations
-│   ├── templates/         # Registration templates
-│   └── examples/          # Usage examples
-├── x402-payment/          # x402 Payment Protocol skill
-│   ├── SKILL.md           # Main instruction file
-│   └── dist/              # Compiled tool scripts
-└── x402-payment-demo/     # x402 Payment Demo skill
-    └── SKILL.md           # Main instruction file
-```
-
----
+- OpenClaw
+- ClawdCode
+- OpenCode
+- other MCP-compatible AI agent platforms
 
 ## Available Skills
 
-- **[SunSwap Skills](sunswap/README.md)**: DEX Trading (TRON token swaps)
-- **[8004 Trustless Agents](8004-skill/README.md)**: On-chain identity, reputation, and validation for AI agents (supports TRON & BSC)
-- **[x402-payment](x402-payment/SKILL.md)**: TRC20 Payments for AI Agents (USDT/USDD)
-- **[x402-payment-demo](x402-payment-demo/SKILL.md)**: Demo of x402 payment protocol (Protected Content Acquisition)
+- [`sunswap`](./sunswap)
+  SunSwap DEX skill for balances, quotes, swaps, and liquidity-related workflows.
+- [`8004-skill`](./8004-skill)
+  ERC-8004 skill for on-chain agent identity, trust, verification, and registration workflows.
+- [`x402-payment`](./x402-payment)
+  x402 payment skill for calling paid agents and paid APIs on supported chains.
+- [`x402-payment-demo`](./x402-payment-demo)
+  Demo workflow for end-to-end x402 protected resource access.
+- [`ainft-skill`](./ainft-skill)
+  Local AINFT skill for balance lookup and account-related queries.
 
-## How to Use Skills
+## How To Use Skills
 
-### Compatible AI Agents
+You can use a skill in two ways.
 
-These Skills can be used with various AI agent platforms that support MCP (Model Context Protocol), including:
-- **ClawdCode** - AI coding assistant
-- **OpenCode** - Open-source AI development environment
-- **OpenClaw** - AI agent framework
-- And other MCP-compatible AI agents
+### Explicit Use
 
-### Installation Example (Using OpenClaw)
+Tell the agent exactly which skill to read:
 
-1. ✅ Install AI Agent (e.g., OpenClaw)
-2. ✅ Install **OpenClaw Extension** 
-   ```bash
-   curl -fsSL https://raw.githubusercontent.com/BofAI/openclaw-extension/refs/heads/main/install.sh | bash
-   ```
+```text
+Please read skills/sunswap/SKILL.md and tell me how much TRX I can get for 100 USDT on SunSwap.
+```
 
-That's it! The installer will set up everything you need.
+This is useful when:
 
-### For Other AI Agent Platforms
+- you already know which skill you want
+- you are debugging a workflow
+- you want deterministic behavior
 
-If you're using other MCP-compatible AI agents (ClawdCode, OpenCode, etc.):
+### Implicit Use
 
-1. ✅ Install your AI Agent
-2. ✅ Configure MCP servers manually (see respective MCP server documentation)
-3. ✅ Clone this Skills repository to your local machine:
-   ```bash
-   git clone https://github.com/BofAI/skills.git
-   ```
-4. ✅ Point your AI agent to the Skills directory or reference specific SKILL.md files when needed
+Describe the task and let the agent match the skill:
 
----
+```text
+Check how much TRX 100 USDT can swap to on SunSwap right now.
+```
 
-## For Developers
+This is useful when:
 
-### Creating a New Skill
+- the skills are already installed
+- the task intent is clear
+- you want the agent to select the best match automatically
 
-See [AGENTS.md](AGENTS.md) for how to create new skills.
+## Usage Examples By Skill
 
-**Quick Template**:
+### `sunswap`
+
+```text
+Please read skills/sunswap/SKILL.md and check how much TRX I can get for 100 USDT on SunSwap.
+```
+
+### `8004-skill`
+
+```text
+Please read skills/8004-skill/SKILL.md and look up the on-chain registration details for agent 1:8 on TRON mainnet.
+```
+
+### `x402-payment`
+
+```text
+Please read skills/x402-payment/SKILL.md and call this paid agent endpoint using x402.
+```
+
+### `x402-payment-demo`
+
+```text
+Please read skills/x402-payment-demo/SKILL.md and run a demo x402 payment flow end to end.
+```
+
+### `ainft-skill`
+
+```text
+Please read skills/ainft-skill/SKILL.md and check the current AINFT balance and recent orders for this account.
+```
+
+## Installation
+
+### Option 1: OpenClaw Extension
+
+If you use OpenClaw, the fastest path is to install the OpenClaw extension:
+
 ```bash
-# 1. Create directory
-mkdir -p my-skill/{examples,resources,scripts}
+curl -fsSL https://raw.githubusercontent.com/BofAI/openclaw-extension/refs/heads/main/install.sh | bash
+```
 
-# 2. Create SKILL.md
-cat > my-skill/SKILL.md << 'EOF'
+The extension helps with:
+
+- cloning the skills repository
+- setting up common MCP servers
+- configuring supported skills
+
+### Option 2: Manual Installation
+
+For ClawdCode, OpenCode, or any other MCP-compatible platform:
+
+1. Install your AI agent platform.
+2. Configure the MCP servers required by your workflows.
+3. Clone this repository.
+4. Point your agent to the `skills/` directory or reference a specific `SKILL.md` directly.
+
+```bash
+git clone https://github.com/BofAI/skills.git
+cd skills/skills
+```
+
+## Quick Start
+
+1. Install an MCP-capable AI agent such as OpenClaw.
+2. Clone this repository or install the OpenClaw extension.
+3. Pick a skill from the list above.
+4. Ask the agent to read that skill's `SKILL.md`.
+5. Provide the required parameters in your prompt.
+
+Example:
+
+```text
+Please read skills/x402-payment/SKILL.md and use it to call this paid endpoint with x402 on mainnet.
+```
+
+## Creating A New Skill
+
+Read [AGENTS.md](./AGENTS.md) before creating a new skill. It defines the expected structure and writing standards.
+
+Recommended minimum layout:
+
+```bash
+mkdir -p my-skill/{examples,resources,scripts}
+```
+
+Then create `my-skill/SKILL.md`:
+
+```md
 ---
 name: My Skill
 description: What this skill does
 version: 1.0.0
-dependencies:
-  - required-tool
-tags:
-  - category
 ---
 
 # My Skill
@@ -151,78 +191,35 @@ tags:
 ## Usage Instructions
 1. Step 1
 2. Step 2
-EOF
 ```
 
-### Skill Specification
+A good skill should include:
 
-Each skill must include:
-- ✅ **SKILL.md** - Main instruction file (with YAML frontmatter)
-- ✅ **README.md** - Quick description
-- ⚠️ **examples/** - Usage examples (recommended)
-- ⚠️ **resources/** - Configuration files (optional)
-- ⚠️ **scripts/** - Helper scripts (optional)
+- `SKILL.md`
+- a clear overview
+- dependency and prerequisite notes
+- usage examples
+- error-handling guidance when relevant
 
-See [AGENTS.md](AGENTS.md) for details.
+## Repository Structure
 
----
-
-## FAQ
-
-### Q: Do skills need separate installation?
-
-**A**: ❌ No. Skills are just documents that AI agents read directly.
-
-### Q: What's the difference between Skills and MCP Servers?
-
-**A**: 
-- **Skill** = Instruction document (teaches AI how to do something)
-- **MCP Server** = Tool service (provides actual capabilities)
-
-Skills tell AI how to use MCP Server tools.
-
-### Q: How do I know what dependencies a skill needs?
-
-**A**: Check the YAML frontmatter in SKILL.md:
-```yaml
-dependencies:
-  - mcp-server-tron
+```text
+skills/
+├── README.md
+├── LICENSE
+├── CONTRIBUTING.md
+├── AGENTS.md
+├── sunswap/
+├── 8004-skill/
+├── ainft-skill/
+├── x402-payment/
+└── x402-payment-demo/
 ```
-
-### Q: What if AI Agent can't find the skill?
-
-**A**: Tell it explicitly:
-```
-Please read sunswap/SKILL.md
-```
-
-### Q: Can I modify skills?
-
-**A**: ✅ Yes! Edit SKILL.md directly, AI Agent will read the latest version.
-
----
 
 ## Contributing
 
-Contributions of new skills are welcome!
-
-See [CONTRIBUTING.md](CONTRIBUTING.md) for guidelines.
-
----
-
-## Related Resources
-
-- **[AGENTS.md](AGENTS.md)** - Skill development guide
-- **[OpenClaw Extension](https://github.com/BofAI/openclaw-extension)** - TRON MCP Server & Tools
-
----
+See [CONTRIBUTING.md](./CONTRIBUTING.md).
 
 ## License
 
-MIT License - see [LICENSE](LICENSE) file for details
-
----
-
-**Repository**: [BofAI/skills](https://github.com/BofAI/skills)  
-**Last Updated**: 2026-02-11  
-**Maintainer**: Bank of AI Team
+This repository is released under the [MIT License](./LICENSE).
