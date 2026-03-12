@@ -21,7 +21,7 @@ This skill demonstrates the x402 payment protocol using the SDK v2 TypeScript de
 Current acceptance scope:
 - `tron:nile`
 - `exact` scheme
-- `tip712` and `permit2`
+- `eip3009` and `permit2`
 - optional `eip155:97`
 - `exact` with EIP-3009 compatible test asset (`DHLU`)
 
@@ -73,7 +73,7 @@ cd x402-demo && ./start.sh ts-server
     - replays the request with the payment payload
 3. Confirm the server returns `200 OK` and a `payment-response` header containing the settlement transaction hash.
 
-If the server starts before the facilitator is ready, restart the server once after the facilitator is up.
+If the server starts before the facilitator is ready, the current TypeScript demo retries facilitator synchronization automatically.
 
 ## Example
 
