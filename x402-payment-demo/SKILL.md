@@ -16,89 +16,22 @@ arguments:
 
 # x402 Payment Demo Skill
 
-This skill demonstrates the x402 payment protocol using the SDK v2 TypeScript demo stack on TRON, with an optional BSC testnet endpoint.
-
-Current acceptance scope:
-- `tron:nile`
-- `exact` scheme
-- `eip3009` and `permit2`
-- optional `eip155:97`
-- `exact` with EIP-3009 compatible test asset (`DHLU`)
+This skill demonstrates the x402 payment protocol on the TRON and BSC networks.
 
 ## Usage
 
 Simply tell the Agent:
+
 - "demo x402-payment"
-
-## Prerequisites
-
-The v2 TypeScript demo in `x402-demo/` must be configured and running locally.
-
-Copy [`.env.sample`](/Users/bobo/code/x402/x402-demo/.env.sample) to `.env` inside `x402-demo/` and fill in:
-- `TRON_CLIENT_PRIVATE_KEY`
-- `TRON_FACILITATOR_PRIVATE_KEY`
-- `PAY_TO_ADDRESS`
-- optional BSC values if you want the BSC endpoint:
-  - `BSC_CLIENT_PRIVATE_KEY`
-  - `BSC_FACILITATOR_PRIVATE_KEY`
-  - `BSC_PAY_TO`
-  - `BSC_TESTNET_RPC_URL`
-  - `BSC_TEST_ASSET`
-
-Before first run, bootstrap the local SDK packages used by the demo:
-
-```bash
-cd x402-demo && npm run bootstrap:local-sdk
-```
-
-Then start the TypeScript facilitator and server:
-
-```bash
-# Terminal 1: Start facilitator
-cd x402-demo && ./start.sh ts-facilitator
-
-# Terminal 2: Start server
-cd x402-demo && ./start.sh ts-server
-```
+- "demo x402-payment on bsc-testnet"
 
 ## Workflow
 
-1. Request one of the protected endpoints:
-   - TRON: `http://localhost:8010/protected-nile`
-   - BSC: `http://localhost:8010/protected-bsc-testnet`
-   - Multi-network: `http://localhost:8010/protected-multi`
-2. Use the v2 TypeScript client in `x402-demo/ts/client.ts` to handle the payment flow:
-   - receives `402 Payment Required`
-    - creates an `exact` payment payload
-    - replays the request with the payment payload
-3. Confirm the server returns `200 OK` and a `payment-response` header containing the settlement transaction hash.
-
-If the server starts before the facilitator is ready, the current TypeScript demo retries facilitator synchronization automatically.
-
-## Example
-
-```bash
-# Terminal 3: Run the v2 TypeScript client against the demo server
-cd x402-demo && ./start.sh ts-client
-```
-
-For BSC testnet:
-
-```bash
-cd x402-demo && ENDPOINT=/protected-bsc-testnet ./start.sh ts-client
-```
-
-For a single endpoint that advertises both TRON and BSC, let the client choose with `PREFERRED_NETWORK`:
-
-```bash
-cd x402-demo && ENDPOINT=/protected-multi PREFERRED_NETWORK=tron:nile ./start.sh ts-client
-```
-
-```bash
-cd x402-demo && ENDPOINT=/protected-multi PREFERRED_NETWORK=eip155:97 ./start.sh ts-client
-```
-
-Expected result:
-- initial request returns `402`
-- replayed request returns `200`
-- output includes a settlement transaction hash
+1. **Request Resource**: When triggered, follow the instructions provided by the x402-payment skill to fetch the protected resource. Use Tron Nile by default:
+   - Tron Nile (Default): `https://x402-demo.bankofai.io/protected-nile`
+   - Tron Shasta: `https://x402-demo.bankofai.io/protected-shasta`
+   - Tron Mainnet: `https://x402-demo.bankofai.io/protected-mainnet`
+   - BSC Mainnet: `https://x402-demo.bankofai.io/protected-bsc-mainnet`
+   - BSC Testnet: `https://x402-demo.bankofai.io/protected-bsc-testnet`
+2. **Handle Payment**: Perform the payment and resource acquisition automatically as guided by the protocol (handling 402 Payment Required, signing permits, etc.).
+3. **Display & Cleanup**: Once the image is retrieved, present / send it to the user. Immediately delete the local temporary file after the image has been displayed.
