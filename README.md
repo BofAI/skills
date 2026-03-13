@@ -24,7 +24,6 @@ A curated collection of practical, DeFi-focused utility skills developed by the 
   - [Cursor](#cursor)
 - [Available Skills](#available-skills)
   - [DeFi & DEX](#defi--dex)
-  - [Identity & Reputation](#identity--reputation)
   - [Payments & x402](#payments--x402)
   - [AI & NFT](#ai--nft)
   - [Data & Analytics](#data--analytics)
@@ -39,7 +38,7 @@ A curated collection of practical, DeFi-focused utility skills developed by the 
 
 ## What are BankOfAI Skills?
 
-BankOfAI Skills are reusable, task-oriented capabilities that teach AI agents how to perform specific blockchain workflows. Each skill encapsulates domain knowledge (like SunSwap pathfinding or ERC-8004 validation) and provides step-by-step instructions for the agent to follow.
+BankOfAI Skills are reusable, task-oriented capabilities that teach AI agents how to perform specific blockchain workflows. Each skill encapsulates domain knowledge (like SunSwap pathfinding) and provides step-by-step instructions for the agent to follow.
 
 ## Installation
 
@@ -79,10 +78,6 @@ curl -fsSL https://raw.githubusercontent.com/BofAI/openclaw-extension/refs/heads
 ### DeFi & DEX
 
 - [**sunswap**](./sunswap) - SunSwap DEX integration for TRON. Supports price quotes, token swaps, and balance checks.
-
-### Identity & Reputation
-
-- [**8004-skill**](./8004-skill) - ERC-8004 implementation for AI agent identity, registration, and reputation on TRON/BSC.
 
 ### Payments & x402
 
