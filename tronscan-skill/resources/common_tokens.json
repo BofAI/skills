@@ -1,0 +1,90 @@
+{
+  "mainnet": {
+    "TRX": {
+      "symbol": "TRX",
+      "name": "Tronix",
+      "address": "_",
+      "decimals": 6,
+      "type": "native"
+    },
+    "USDT": {
+      "symbol": "USDT",
+      "name": "Tether USD",
+      "address": "TR7NHqjeKQxGTCi8q8ZY4pL8otSzgjLj6t",
+      "decimals": 6,
+      "type": "trc20"
+    },
+    "USDC": {
+      "symbol": "USDC",
+      "name": "USD Coin",
+      "address": "TEkxiTehnzSmSe2XqrBj4w32RUN966rdz8",
+      "decimals": 6,
+      "type": "trc20"
+    },
+    "USDD": {
+      "symbol": "USDD",
+      "name": "Decentralized USD",
+      "address": "TPYmHEhy5n8TCEfYGqW2rPxsghSfzghPDn",
+      "decimals": 18,
+      "type": "trc20"
+    },
+    "WTRX": {
+      "symbol": "WTRX",
+      "name": "Wrapped TRX",
+      "address": "TNUC9Qb1rRpS5CbWLmNMxXBjyFoydXjWFR",
+      "decimals": 6,
+      "type": "trc20"
+    },
+    "BTT": {
+      "symbol": "BTT",
+      "name": "BitTorrent",
+      "address": "TAFjULxiVgT4qWk6UZwjqwZXTSaGaqnVp4",
+      "decimals": 18,
+      "type": "trc20"
+    },
+    "JST": {
+      "symbol": "JST",
+      "name": "JUST",
+      "address": "TCFLL5dx5ZJdKnWuesXxi1VPwjLVmWZZy9",
+      "decimals": 18,
+      "type": "trc20"
+    },
+    "SUN": {
+      "symbol": "SUN",
+      "name": "SUN",
+      "address": "TSSMHYeV2uE9qYH95DqyoCuNCzEL1NvU3S",
+      "decimals": 18,
+      "type": "trc20"
+    },
+    "WIN": {
+      "symbol": "WIN",
+      "name": "WINkLink",
+      "address": "TLa2f6VPqDgRE67v1736s7bJ8Ray5wYjU7",
+      "decimals": 6,
+      "type": "trc20"
+    },
+    "NFT": {
+      "symbol": "NFT",
+      "name": "APENFT",
+      "address": "TFczxzPhnThNSqr5by8tvxsdCFRRz6cPNq",
+      "decimals": 6,
+      "type": "trc20"
+    }
+  },
+  "nile": {
+    "TRX": {
+      "symbol": "TRX",
+      "name": "Tronix",
+      "address": "_",
+      "decimals": 6,
+      "type": "native"
+    },
+    "USDT": {
+      "symbol": "USDT",
+      "name": "Tether USD (Nile)",
+      "address": "TXLAQ63Xg1NAzckPwKHvzw7CSEmLMEqcdj",
+      "decimals": 6,
+      "type": "trc20"
+    }
+  }
+}
