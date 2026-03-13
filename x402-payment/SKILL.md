@@ -83,7 +83,7 @@ x402 balance
 
 ```bash
 x402 pay \
-  http://localhost:8010/protected-multi \
+  https://x402-demo.bankofai.io/protected-nile \
   --network nile \
   --asset USDT
 ```
@@ -104,9 +104,17 @@ x402 pay <url> \
 
 ```bash
 x402 pay \
-  http://localhost:8010/protected-multi \
+  https://x402-demo.bankofai.io/protected-nile \
   --pair tron:nile:USDT
 ```
+
+### Hosted demo endpoints
+
+The hosted demo URLs currently used by the companion `x402-payment-demo` skill are:
+
+- `https://x402-demo.bankofai.io/protected-nile`
+- `https://x402-demo.bankofai.io/protected-bsc-testnet`
+- `https://x402-demo.bankofai.io/protected-multi`
 
 ## Behavior
 
@@ -126,4 +134,4 @@ If a response returns binary data, it is written to a temporary file and the fil
 
 - This skill is now aligned to the **v2 exact** flow only.
 - Legacy `exact_permit` and `exact_gasfree` behavior is not part of this skill anymore.
-- For the dedicated local demo flow, use [x402-payment-demo](/Users/bobo/code/x402/skills/x402-payment-demo/SKILL.md).
+- For the hosted demo flow, use [x402-payment-demo](/Users/bobo/code/x402/skills/x402-payment-demo/SKILL.md).
