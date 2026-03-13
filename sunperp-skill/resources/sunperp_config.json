@@ -1,0 +1,117 @@
+{
+  "api": {
+    "base_url": "https://api.sunx.io",
+    "api_manage_url": "https://www.sunperp.com/futures/api-manage/",
+    "signature_version": "2",
+    "signature_methods": ["HmacSHA256", "Ed25519"],
+    "timestamp_format": "YYYY-MM-DDThh:mm:ss",
+    "timestamp_validity_window_seconds": 300,
+    "wallet_header": {
+      "CLOUD-EXCHANGE": "6X2K9L4V1C"
+    }
+  },
+  "rate_limits": {
+    "public_non_market": "240 requests / 3 seconds / IP",
+    "public_market": "800 requests / second / IP",
+    "private_read": "72 requests / 3 seconds / UID",
+    "private_trade": "72 requests / 3 seconds / UID",
+    "private_general": "144 requests / 3 seconds / UID",
+    "wallet": "20 requests / 2 seconds"
+  },
+  "endpoints": {
+    "public": {
+      "contract_info": "GET /sapi/v1/public/contract_info",
+      "index_price": "GET /sapi/v1/public/index",
+      "risk_limit": "GET /sapi/v1/public/risk/limit",
+      "funding_rate": "GET /sapi/v1/public/funding_rate",
+      "funding_rate_history": "GET /sapi/v1/public/funding_rate_history",
+      "price_limit": "GET /sapi/v1/public/price_limit"
+    },
+    "market": {
+      "depth": "GET /sapi/v1/market/depth",
+      "kline": "GET /sapi/v1/market/history/kline",
+      "ticker": "GET /sapi/v1/market/detail/merged",
+      "last_trade": "GET /sapi/v1/market/trade",
+      "bbo": "GET /sapi/v1/market/bbo",
+      "trade_history": "GET /sapi/v1/market/history/trade",
+      "mark_price_kline": "GET /sapi/v1/index/market/history/linear_swap_mark_price_kline",
+      "premium_index_kline": "GET /sapi/v1/index/market/history/linear_swap_premium_index_kline",
+      "estimated_rate_kline": "GET /sapi/v1/index/market/history/linear_swap_estimated_rate_kline"
+    },
+    "account": {
+      "balance": "GET /sapi/v1/account/balance",
+      "bill_record": "POST /sapi/v1/account/bill_record",
+      "fee_rate": "POST /sapi/v1/account/fee_rate"
+    },
+    "trade": {
+      "order": "POST /sapi/v1/trade/order",
+      "batch_orders": "POST /sapi/v1/trade/batch_orders",
+      "cancel_order": "POST /sapi/v1/trade/cancel_order",
+      "cancel_batch_orders": "POST /sapi/v1/trade/cancel_batch_orders",
+      "cancel_all_orders": "POST /sapi/v1/trade/cancel_all_orders",
+      "close_position": "POST /sapi/v1/trade/position",
+      "close_all_positions": "POST /sapi/v1/trade/position_all",
+      "open_orders": "GET /sapi/v1/trade/order/opens",
+      "order_details": "GET /sapi/v1/trade/order/details",
+      "order_history": "GET /sapi/v1/trade/order/history",
+      "order_info": "GET /sapi/v1/trade/order"
+    },
+    "position": {
+      "open_positions": "GET /sapi/v1/trade/position/opens",
+      "get_leverage": "GET /sapi/v1/position/lever",
+      "set_leverage": "POST /sapi/v1/position/lever",
+      "get_position_mode": "GET /sapi/v1/position/mode",
+      "set_position_mode": "POST /sapi/v1/position/mode",
+      "risk_limit": "GET /sapi/v1/position/risk/limit",
+      "position_limit": "POST /sapi/v1/position/position_limit"
+    },
+    "wallet": {
+      "withdraw_apply": "POST /sapi/v1/sunx/dw/withdraw/apply",
+      "withdraw_confirm": "POST /sapi/v1/sunx/dw/withdraw/confirm",
+      "deposit_withdraw_records": "GET /sapi/v1/sunperp/dw/query/deposit-withdraw"
+    }
+  },
+  "popular_contracts": [
+    "BTC-USDT",
+    "ETH-USDT",
+    "TRX-USDT",
+    "SOL-USDT",
+    "SUN-USDT",
+    "JST-USDT",
+    "WIN-USDT",
+    "BTT-USDT",
+    "DOGE-USDT",
+    "XRP-USDT"
+  ],
+  "contract_code_format": {
+    "perpetual_swap": "{SYMBOL}-USDT",
+    "dated_futures": "{SYMBOL}-USDT-{YYMMDD}",
+    "current_week": "{SYMBOL}-USDT-CW",
+    "next_week": "{SYMBOL}-USDT-NW",
+    "current_quarter": "{SYMBOL}-USDT-CQ",
+    "next_quarter": "{SYMBOL}-USDT-NQ"
+  },
+  "order_types": {
+    "limit": "Limit order with specific price",
+    "market": "Market order at best available price",
+    "post_only": "Maker-only order, rejected if would take"
+  },
+  "time_in_force": {
+    "GTC": "Good-Til-Canceled (default)",
+    "FOK": "Fill-Or-Kill",
+    "IOC": "Immediate-Or-Cancel"
+  },
+  "position_modes": {
+    "single_side": "One-way mode: use position_side='both'",
+    "dual_side": "Hedge mode: specify position_side='long' or 'short'"
+  },
+  "kline_periods": [
+    "1min", "5min", "15min", "30min", "60min",
+    "4hour", "1day", "1mon"
+  ],
+  "depth_types": {
+    "150_levels": ["step0", "step1", "step2", "step3", "step4", "step5"],
+    "20_levels": ["step6", "step7", "step8", "step9", "step10", "step11", "step12", "step13"],
+    "note": "step0/step6 = unmerged; higher numbers = more price aggregation"
+  }
+}
