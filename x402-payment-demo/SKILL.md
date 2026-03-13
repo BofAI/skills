@@ -24,7 +24,7 @@ Simply tell the Agent:
 
 ## Workflow
 
-1. **Resolve Endpoint**: Use `https://x402-demo.bankofai.io` and append the network path:
+1. **Resolve Endpoint**: Use `https://tn-x402-demo.bankofai.io` and append the network path:
    - Tron Nile (default): `/protected-nile`
    - BSC Testnet: `/protected-bsc-testnet`
    - Multi-network: `/protected-multi`
@@ -34,16 +34,16 @@ Simply tell the Agent:
 
 ## Hosted endpoints
 
-- Tron Nile (Default): `https://x402-demo.bankofai.io/protected-nile`
-- BSC Testnet: `https://x402-demo.bankofai.io/protected-bsc-testnet`
-- Multi-network: `https://x402-demo.bankofai.io/protected-multi`
+- Tron Nile (Default): `https://tn-x402-demo.bankofai.io/protected-nile`
+- BSC Testnet: `https://tn-x402-demo.bankofai.io/protected-bsc-testnet`
+- Multi-network: `https://tn-x402-demo.bankofai.io/protected-multi`
 
 ## Examples
 
 ```bash
-x402 pay https://x402-demo.bankofai.io/protected-nile --network nile
+x402 pay https://tn-x402-demo.bankofai.io/protected-nile --network nile
 ```
 
 ```bash
-x402 pay https://x402-demo.bankofai.io/protected-bsc-testnet --network bsc-testnet
+x402 pay https://tn-x402-demo.bankofai.io/protected-bsc-testnet --network bsc-testnet
 ```

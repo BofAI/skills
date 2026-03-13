@@ -83,7 +83,7 @@ x402 balance
 
 ```bash
 x402 pay \
-  https://x402-demo.bankofai.io/protected-nile \
+  https://tn-x402-demo.bankofai.io/protected-nile \
   --network nile \
   --asset USDT
 ```
@@ -104,7 +104,7 @@ x402 pay <url> \
 
 ```bash
 x402 pay \
-  https://x402-demo.bankofai.io/protected-nile \
+  https://tn-x402-demo.bankofai.io/protected-nile \
   --pair tron:nile:USDT
 ```
 
@@ -112,9 +112,9 @@ x402 pay \
 
 The hosted demo URLs currently used by the companion `x402-payment-demo` skill are:
 
-- `https://x402-demo.bankofai.io/protected-nile`
-- `https://x402-demo.bankofai.io/protected-bsc-testnet`
-- `https://x402-demo.bankofai.io/protected-multi`
+- `https://tn-x402-demo.bankofai.io/protected-nile`
+- `https://tn-x402-demo.bankofai.io/protected-bsc-testnet`
+- `https://tn-x402-demo.bankofai.io/protected-multi`
 
 ### Local demo endpoints
 
