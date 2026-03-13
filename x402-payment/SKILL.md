@@ -5,7 +5,7 @@ version: 2.6.0
 author: bankofai
 homepage: https://bankofai.io
 tags: [x402, payment, tron, bsc, exact, eip3009, permit2, skill]
-requires_tools: [x402_invoke, x402]
+requires_tools: [x402]
 arguments:
   url:
     description: "Base URL of the agent (for --entrypoint) or a direct endpoint URL."
@@ -68,7 +68,7 @@ Configure wallet keys with environment variables, `x402-config.json`, or `~/.x40
 Check that the skill can discover your local wallet configuration:
 
 ```bash
-x402 check
+x402 status
 ```
 
 Show currently configured native balances:
@@ -98,26 +98,6 @@ x402 pay <url> \
   -h '{"X-App":"demo"}' \
   --max-amount 100000 \
   --network bsc-testnet
-```
-
-### Direct endpoint
-
-```bash
-x402 invoke \
-  http://localhost:8010/protected-multi \
-  --network nile \
-  --asset USDT
-```
-
-### Entrypoint invoke
-
-```bash
-x402 invoke \
-  https://api.example.com \
-  --entrypoint chat \
-  -d '{"prompt":"hello"}' \
-  --network bsc-testnet \
-  --token 0x337610d27c682E347C9cD60BD4b3b107C9d34dDd
 ```
 
 ### Pair selection
