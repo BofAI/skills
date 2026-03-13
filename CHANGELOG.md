@@ -25,7 +25,7 @@
 - **[Skill] x402 Payment**: Seamless TRC20 payments for AI agent APIs with automatic 402 error handling.
 - **[Skill] x402 Demo**: Reference implementation for validating payment protocols.
 - **[Gas] Cost Optimization**: Implemented `MaxUint160` infinite approvals to minimize long-term transaction costs.
-- **[Documentation] Standardized Guides**: `AGENTS.md` and `PROJECT_STRUCTURE.md`.
+- **[Documentation] Standardized Guides**: `AGENTS.md` and `README.md`.
 
 ### Bug Fixes
 - Standardized project structure and naming conventions.

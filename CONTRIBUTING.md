@@ -7,9 +7,8 @@ Thank you for your interest in contributing to the Skills Repository!
 ### 1. Fork and Clone
 
 ```bash
-git fork https://github.com/open-aibank/skills-tron
-git clone https://github.com/your-username/skills-tron
-cd skills-tron
+git clone https://github.com/BofAI/skills.git
+cd skills
 ```
 
 ### 2. Create a New Skill
