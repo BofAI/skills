@@ -62,52 +62,41 @@ node scripts/balance.js TXYZopYRdj2D9XRtbG411XZZ3kM5VkAeBf
 
 ---
 
-### 2. Get Token USD Price
+### 2. Get Token Spot Price (Sun Open API)
 ```bash
-node scripts/price.js <TOKEN_SYMBOL_OR_ADDRESS> [--network nile|mainnet]
+node scripts/price.js <TOKEN_SYMBOL_OR_ADDRESS> [--currency USD]
 ```
 
 This script calls the public price API from Sun (`https://open.sun.io/apiv2/price`) using the token address.
 
 **Parameters:**
-- `TOKEN_SYMBOL_OR_ADDRESS`: Token symbol (e.g., TRX, USDT) or contract address (e.g., T9yD14Nj9j7xAB4dbGeiX9h8unkKHxuWwb)
-- `--network`: Network to use for symbol resolution (`nile` or `mainnet`, default: `nile`).  
-  This only affects how symbols are mapped to addresses using `resources/common_tokens.json`.  
-  The price API itself is address-based.
+- `TOKEN_SYMBOL_OR_ADDRESS`: Token symbol on **mainnet** (e.g., TRX, USDT) or contract address
+- `--currency`: Fiat currency code (default: `USD`)
 
 **Examples:**
 ```bash
-# Get TRX price on Nile (symbol → address via common_tokens.json)
+# TRX price by symbol (mainnet)
 node scripts/price.js TRX
 
-# Get TRX price on mainnet (symbol resolution uses mainnet section)
-node scripts/price.js TRX --network mainnet
-
-# Get price by explicit token address
+# TRX price by contract address (mainnet)
 node scripts/price.js T9yD14Nj9j7xAB4dbGeiX9h8unkKHxuWwb
+
+# USDT price with explicit currency
+node scripts/price.js USDT --currency USD
 ```
 
-**Output:** JSON to stdout with fields:
-- `token` - Input token symbol or address
-- `tokenAddress` - Resolved token address
-- `network` - Network used for symbol resolution
-- `priceUSD` - Latest price in USD
-- `lastUpdated` - Milliseconds timestamp from API
-- `source` - Price API endpoint (`https://open.sun.io/apiv2/price`)
+**Output (stdout JSON):**
+- `tokenSymbol` - Token symbol (if known)
+- `tokenAddress` - Token TRC20 address
+- `currency` - Fiat currency (e.g., USD)
+- `price` - Parsed numeric price
+- `priceRaw` - Raw string price from API
+- `lastUpdated` - Raw timestamp from API
+- `lastUpdatedISO` - Parsed ISO timestamp (if provided)
 
-Example JSON:
-```json
-{
-  "token": "TRX",
-  "tokenAddress": "T9yD14Nj9j7xAB4dbGeiX9h8unkKHxuWwb",
-  "network": "nile",
-  "priceUSD": 0.281424962354,
-  "lastUpdated": 1771928248488,
-  "source": "https://open.sun.io/apiv2/price"
-}
-```
-
-The script also prints a human-readable summary to stderr for logging.
+**Notes:**
+- This script uses `https://open.sun.io/apiv2/price?tokenAddress=...`
+- Symbol resolution uses the `mainnet` section of `resources/common_tokens.json`
 
 ---
 
@@ -137,45 +126,6 @@ node scripts/quote.js USDT TRX 50 --network mainnet
 ```
 
 **Output:** JSON with price, route, and price impact
-
----
-
-### 3. Get Token Spot Price (Sun Open API)
-
-```bash
-node scripts/price.js <TOKEN_SYMBOL_OR_ADDRESS> [--currency USD]
-```
-
-**Parameters:**
-- `TOKEN_SYMBOL_OR_ADDRESS`: Token symbol on **mainnet** (e.g., TRX, USDT) or contract address
-- `--currency`: Fiat currency code (default: `USD`)
-
-**Examples:**
-```bash
-# TRX price by symbol (mainnet)
-node scripts/price.js TRX
-
-# TRX price by contract address (mainnet)
-node scripts/price.js T9yD14Nj9j7xAB4dbGeiX9h8unkKHxuWwb
-
-# USDT price with explicit currency
-node scripts/price.js USDT --currency USD
-```
-
-**Output (stdout JSON):**
-- `tokenSymbol` - Token symbol (if known)
-- `tokenAddress` - Token TRC20 address
-- `currency` - Fiat currency (e.g., USD)
-- `price` - Parsed numeric price
-- `priceRaw` - Raw string price from API
-- `lastUpdated` - Raw timestamp from API
-- `lastUpdatedISO` - Parsed ISO timestamp (if provided)
-
-**Notes:**
-- This script uses **Sun Open API** endpoint `https://open.sun.io/apiv2/price?tokenAddress=...`  
-- Only **mainnet** token prices are supported (symbol resolution uses `mainnet` section of `resources/common_tokens.json`)
-
----
 
 ### 4. Execute Swap (Flexible Workflow)
 ```bash

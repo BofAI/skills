@@ -44,12 +44,12 @@ npm install
 
 ### Check Balance
 ```bash
-node scripts/balance.js USDT nile
+node scripts/balance.js USDT --network nile
 ```
 
 ### Get Quote
 ```bash
-node scripts/quote.js TRX USDT 100 nile
+node scripts/quote.js TRX USDT 100 --network nile
 ```
 
 ### Get Token Price (Sun Open API)
@@ -104,24 +104,24 @@ node scripts/position.js collect --position-id 12345 --execute
 
 ### Execute Swap (Full Workflow)
 ```bash
-node scripts/swap.js TRX USDT 100 nile --execute
+node scripts/swap.js TRX USDT 100 --network nile --execute
 ```
 
 ### Execute Swap (Step-by-Step)
 ```bash
 # 1. Check only (balance + allowance)
-node scripts/swap.js TRX USDT 100 nile --check-only
+node scripts/swap.js TRX USDT 100 --network nile --check-only
 
 # 2. Approve only (if needed)
-node scripts/swap.js TRX USDT 100 nile --approve-only
+node scripts/swap.js TRX USDT 100 --network nile --approve-only
 
 # 3. Swap only (assumes already approved)
-node scripts/swap.js TRX USDT 100 nile --swap-only
+node scripts/swap.js TRX USDT 100 --network nile --swap-only
 ```
 
 ## Dependencies
 
-- Node.js 14+
+- Node.js 18+
 - tronweb
 - axios
 
@@ -142,9 +142,7 @@ npm run test:position
 
 ## Version
 
-2.0.0 (2026-02-13) - Script-based approach
-
-See [CHANGELOG.md](CHANGELOG.md) for migration notes.
+See [package.json](package.json) and [CHANGELOG.md](CHANGELOG.md) for current version details and migration notes.
 
 ## License
 

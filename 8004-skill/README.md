@@ -1,6 +1,6 @@
 # ERC-8004: Trustless Agents on TRON & BSC
 
-On-chain identity, reputation, and validation for autonomous agents on TRON blockchain.
+On-chain identity, reputation, and validation for autonomous agents on TRON and BSC.
 
 **Now live on TRON Mainnet + BSC Mainnet! Multi-chain support: TRON ✅ | BSC ✅**
 
@@ -83,7 +83,7 @@ node scripts/register.js --uri "ipfs://..." --chain bsc --network testnet
 # Install Node.js and npm
 # https://nodejs.org/
 
-# Install dependencies (from skills-tron/8004-skill directory)
+# Install dependencies (from the repository `skills/8004-skill` directory)
 npm install
 
 # Configure private key (works for both TRON and BSC):
@@ -270,4 +270,4 @@ CC0 - Public Domain
 
 ---
 
-*Part of the TRON Skills ecosystem*
+*Part of the BofAI Skills repository*
