@@ -27,6 +27,7 @@ A curated collection of practical, DeFi-focused utility skills developed by the 
   - [Identity & Reputation](#identity--reputation)
   - [Payments & x402](#payments--x402)
   - [AI & NFT](#ai--nft)
+  - [Data & Analytics](#data--analytics)
 - [Usage Tips](#usage-tips)
   - [Explicit Invocation](#explicit-invocation)
   - [Implicit Triggering](#implicit-triggering)
@@ -91,6 +92,10 @@ curl -fsSL https://raw.githubusercontent.com/BofAI/openclaw-extension/refs/heads
 ### AI & NFT
 
 - [**ainft-skill**](./ainft-skill) - Specialized skill for AINFT balance queries and recharging.
+
+### Data & Analytics
+
+- [**tronscan-skill**](./tronscan-skill) - Comprehensive TRON blockchain data lookup via TronScan API. Supports accounts, transactions, tokens, blocks, and network-wide statistics.
 
 ---
 
