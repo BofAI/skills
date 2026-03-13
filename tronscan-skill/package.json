@@ -1,0 +1,19 @@
+{
+  "name": "@bankofai/tronscan-skill",
+  "version": "1.0.0",
+  "description": "AI Agent skill for querying TRON blockchain data via the TronScan API",
+  "license": "MIT",
+  "scripts": {
+    "search": "node scripts/search.js",
+    "account": "node scripts/account.js",
+    "transaction": "node scripts/transaction.js",
+    "token": "node scripts/token.js",
+    "block": "node scripts/block.js",
+    "contract": "node scripts/contract.js",
+    "transfer": "node scripts/transfer.js",
+    "overview": "node scripts/overview.js"
+  },
+  "dependencies": {
+    "axios": "^1.6.0"
+  }
+}
