@@ -1,36 +1,34 @@
 # Skills Repository
 
-Reusable skills for AI agents that support MCP (Model Context Protocol).
+Reusable skills for OpenClaw and other MCP-capable AI agents.
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 [![GitHub](https://img.shields.io/badge/GitHub-BofAI%2Fskills-blue)](https://github.com/BofAI/skills)
 
 ## 1. Overview
 
-This repository contains reusable, task-oriented skills for AI agents. Each skill is defined by a `SKILL.md` file and may include examples, resources, and helper scripts.
+This is the skills repository used by the BofAI/OpenClaw ecosystem. It contains the installable skill packages pulled by OpenClaw Extension and referenced directly by other local AI agent setups.
 
-A skill is the instruction layer for an AI agent. It tells the agent:
+Each skill lives in its own directory and is centered around a `SKILL.md` file, with optional `scripts/`, `resources/`, and `examples/` directories when the workflow needs them.
 
-- what the skill does
-- what tools or MCP servers it depends on
-- which workflow to follow
-- how to handle common failures
+## 2. Available Skills
 
-In practice:
+Current skills in this repository:
 
-- `Skill` = workflow and operating instructions
-- `MCP Server` = executable tool layer
-- AI agent = the runtime that reads the skill and performs the task
+| Skill | Description |
+|-------|-------------|
+| [`sunswap`](./sunswap) | SunSwap DEX skill for balance checks, quotes, pricing, swaps, and other token workflows on TRON. |
+| [`x402-payment`](./x402-payment) | x402 payment skill for calling paid agents and APIs on supported chains. |
+| [`x402-payment-demo`](./x402-payment-demo) | Demo skill for an end-to-end x402 protected resource access flow. |
+| [`ainft-skill`](./ainft-skill) | Local AINFT skill for balance and order queries. |
 
-This repository currently focuses on blockchain, x402 payment, and AINFT-related workflows.
+## 3. Quick Start
 
-## 2. Quick Start
+This section uses `OpenClaw + OpenClaw Extension`, which is the primary installation path for this repository.
 
-This section uses `OpenClaw + OpenClaw Extension` as the shortest path to get started.
+### 3.1 Installation
 
-### 2.1 Installation
-
-Install the OpenClaw Extension first. It installs the integration layer, connects MCP servers, and pulls this skills repository.
+Install the OpenClaw Extension first. It installs the integration layer, connects MCP servers, and installs the skills from this repository.
 
 OpenClaw Extension:
 
@@ -49,7 +47,7 @@ cd openclaw-extension
 ./install.sh
 ```
 
-### 2.2 Verification
+### 3.2 Verification
 
 After installation, verify that the skills repository is available and that your agent can read a skill.
 
@@ -75,7 +73,7 @@ Then verify in OpenClaw by asking a direct prompt such as:
 Read the sunswap skill and tell me what this skill can do.
 ```
 
-### 2.3 First Use
+### 3.3 First Use
 
 Start with a narrow, read-only workflow.
 
@@ -95,9 +93,9 @@ Read the 8004-skill and look up the on-chain registration details for agent 1:8 
 Read the x402-payment skill and use it to call this paid endpoint with x402 on nile.
 ```
 
-## 3. Installation and Usage on Other Platforms
+## 4. Installation and Usage on Other Platforms
 
-The common pattern is the same across platforms:
+If you are not using OpenClaw, the common pattern is:
 
 1. install or configure the AI agent
 2. configure required MCP servers for your workflow
@@ -106,7 +104,7 @@ The common pattern is the same across platforms:
 
 If a platform does not support a dedicated skills directory, explicitly reference the `SKILL.md` file in your prompt.
 
-### 3.1 Claude Code
+### 4.1 Claude Code
 
 Clone the repository locally:
 
@@ -122,7 +120,7 @@ Please read ~/.bofai/skills/skills/sunswap/SKILL.md and check how much TRX I can
 
 If you need blockchain or payment workflows, make sure the corresponding MCP servers and credentials are already configured in your local environment.
 
-### 3.2 Claude Desktop
+### 4.2 Claude Desktop
 
 Use Claude Desktop only if your local setup can expose the needed MCP servers to it. Then clone the repository:
 
@@ -142,7 +140,7 @@ Example prompt:
 Please read ~/.bofai/skills/skills/8004-skill/SKILL.md and summarize how to query an agent on TRON mainnet.
 ```
 
-### 3.3 Cursor
+### 4.3 Cursor
 
 Clone the repository:
 
@@ -161,7 +159,7 @@ Example:
 Please read skills/x402-payment/SKILL.md and explain the required environment variables.
 ```
 
-### 3.4 OpenClaw
+### 4.4 OpenClaw
 
 OpenClaw is the recommended path because the extension already wires skills and common MCP dependencies together.
 
@@ -173,7 +171,7 @@ curl -fsSL https://raw.githubusercontent.com/BofAI/openclaw-extension/refs/heads
 
 Then ask for a skill explicitly or describe the task in natural language.
 
-### 3.5 Manual Installation (Generic)
+### 4.5 Manual Installation (Generic)
 
 If your platform is MCP-compatible but has no dedicated installer, use the generic flow:
 
@@ -192,21 +190,6 @@ Generic example:
 ```text
 Please read ~/.bofai/skills/skills/x402-payment-demo/SKILL.md and run the demo flow on nile.
 ```
-
-## 4. Available Skills
-
-Current skills in this repository:
-
-- [`sunswap`](./sunswap)
-  SunSwap DEX skill for balance checks, quotes, prices, swaps, and token workflows on TRON.
-- [`8004-skill`](./8004-skill)
-  ERC-8004 skill for agent identity, registration, reputation, validation, and search workflows on TRON and BSC.
-- [`x402-payment`](./x402-payment)
-  x402 payment skill for calling paid agents and paid APIs on supported chains.
-- [`x402-payment-demo`](./x402-payment-demo)
-  Demo workflow for end-to-end x402 protected resource access.
-- [`ainft-skill`](./ainft-skill)
-  Local AINFT skill for balance and order queries.
 
 ## 5. Usage Tips
 
