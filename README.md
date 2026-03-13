@@ -1,34 +1,15 @@
 # Skills Repository
 
-Reusable skills for AI agents that support MCP (Model Context Protocol).
-
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 [![GitHub](https://img.shields.io/badge/GitHub-BofAI%2Fskills-blue)](https://github.com/BofAI/skills)
 
 ## 1. Overview
 
-This repository contains reusable, task-oriented skills for AI agents. Each skill is defined by a `SKILL.md` file and may include examples, resources, and helper scripts.
-
-A skill is the instruction layer for an AI agent. It tells the agent:
-
-- what the skill does
-- what tools or MCP servers it depends on
-- which workflow to follow
-- how to handle common failures
-
-In practice:
-
-- `Skill` = workflow and operating instructions
-- `MCP Server` = executable tool layer
-- AI agent = the runtime that reads the skill and performs the task
-
-This repository currently focuses on blockchain, x402 payment, and AINFT-related workflows.
+This repository contains reusable, task-oriented DeFi skills for AI agents. Team BankOfAI currently focuses on blockchain, x402 payment, and AINFT-related workflows.
 
 ## 2. Quick Start
 
-This section uses `OpenClaw + OpenClaw Extension` as the shortest path to get started.
-
-### 2.1 Installation
+### 2.1 Installation for OpenClaw
 
 Install the OpenClaw Extension first. It installs the integration layer, connects MCP servers, and pulls this skills repository.
 
