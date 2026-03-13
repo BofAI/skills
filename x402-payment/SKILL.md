@@ -116,6 +116,16 @@ The hosted demo URLs currently used by the companion `x402-payment-demo` skill a
 - `https://x402-demo.bankofai.io/protected-bsc-testnet`
 - `https://x402-demo.bankofai.io/protected-multi`
 
+### Local demo endpoints
+
+If you are running `x402-demo` locally, this skill can call it directly:
+
+- `http://127.0.0.1:8000/protected-nile`
+- `http://127.0.0.1:8000/protected-bsc-testnet`
+- `http://127.0.0.1:8000/protected-multi`
+
+Replace `8000` with your local server port if you started the demo on a different port.
+
 ## Behavior
 
 1. Make the initial HTTP request.
@@ -129,6 +139,8 @@ The hosted demo URLs currently used by the companion `x402-payment-demo` skill a
 5. Print the final HTTP response as JSON.
 
 If a response returns binary data, it is written to a temporary file and the file path is returned.
+
+That includes the current `x402-demo` protected image flow, which returns `openclaw.jpg` after successful payment.
 
 ## Notes
 
