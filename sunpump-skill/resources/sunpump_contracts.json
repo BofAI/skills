@@ -1,0 +1,174 @@
+{
+  "networks": {
+    "mainnet": {
+      "sunpump_launcher": {
+        "address": "TTfvyrAz86hbZk5iDpKD78pqLGgi8C7AAw",
+        "description": "SunPump bonding-curve launcher — handles token creation, purchase, and sale"
+      },
+      "sunswap_v2_router": {
+        "address": "TKzxdSv2FZKQrEqkKVgp5DcwEXBEKMg2Ax",
+        "description": "SunSwap V2 router — tokens migrate here after bonding curve completes"
+      },
+      "trongrid_api": "https://api.trongrid.io"
+    },
+    "nile": {
+      "sunpump_launcher": {
+        "address": "TTfvyrAz86hbZk5iDpKD78pqLGgi8C7AAw",
+        "description": "SunPump launcher on Nile testnet (verify before use)"
+      },
+      "trongrid_api": "https://nile.trongrid.io"
+    }
+  },
+  "abi": {
+    "purchaseToken": {
+      "type": "function",
+      "name": "purchaseToken",
+      "inputs": [
+        { "name": "token", "type": "address" },
+        { "name": "minTokensExpected", "type": "uint256" }
+      ],
+      "outputs": [],
+      "stateMutability": "payable",
+      "description": "Buy tokens by sending TRX as callValue. minTokensExpected provides slippage protection."
+    },
+    "saleToken": {
+      "type": "function",
+      "name": "saleToken",
+      "inputs": [
+        { "name": "token", "type": "address" },
+        { "name": "tokenAmount", "type": "uint256" },
+        { "name": "amountMin", "type": "uint256" }
+      ],
+      "outputs": [],
+      "stateMutability": "nonpayable",
+      "description": "Sell tokens for TRX. amountMin is minimum TRX to receive (slippage protection). Requires token approval first."
+    },
+    "getPrice": {
+      "type": "function",
+      "name": "getPrice",
+      "inputs": [
+        { "name": "token", "type": "address" }
+      ],
+      "outputs": [
+        { "name": "price", "type": "uint256" }
+      ],
+      "stateMutability": "view",
+      "description": "Returns current token price on the bonding curve."
+    },
+    "getTokenState": {
+      "type": "function",
+      "name": "getTokenState",
+      "inputs": [
+        { "name": "token", "type": "address" }
+      ],
+      "outputs": [
+        { "name": "state", "type": "uint256" }
+      ],
+      "stateMutability": "view",
+      "description": "Returns token lifecycle state (0=active on bonding curve, 1=migrated to SunSwap)."
+    },
+    "getTokenAmountByPurchaseWithFee": {
+      "type": "function",
+      "name": "getTokenAmountByPurchaseWithFee",
+      "inputs": [
+        { "name": "token", "type": "address" },
+        { "name": "trxAmount", "type": "uint256" }
+      ],
+      "outputs": [
+        { "name": "tokenAmount", "type": "uint256" },
+        { "name": "fee", "type": "uint256" }
+      ],
+      "stateMutability": "view",
+      "description": "Estimate tokens received and fee for a given TRX purchase amount."
+    },
+    "getTrxAmountBySaleWithFee": {
+      "type": "function",
+      "name": "getTrxAmountBySaleWithFee",
+      "inputs": [
+        { "name": "token", "type": "address" },
+        { "name": "tokenAmount", "type": "uint256" }
+      ],
+      "outputs": [
+        { "name": "trxAmount", "type": "uint256" },
+        { "name": "fee", "type": "uint256" }
+      ],
+      "stateMutability": "view",
+      "description": "Estimate TRX received and fee for selling a given token amount."
+    },
+    "getExactTrxAmountForSaleWithFee": {
+      "type": "function",
+      "name": "getExactTrxAmountForSaleWithFee",
+      "inputs": [
+        { "name": "token", "type": "address" },
+        { "name": "trxAmount", "type": "uint256" }
+      ],
+      "outputs": [
+        { "name": "tokenAmount", "type": "uint256" },
+        { "name": "fee", "type": "uint256" }
+      ],
+      "stateMutability": "view",
+      "description": "Calculate tokens needed to sell to receive an exact TRX amount."
+    },
+    "createAndInitPurchase": {
+      "type": "function",
+      "name": "createAndInitPurchase",
+      "inputs": [
+        { "name": "name", "type": "string" },
+        { "name": "symbol", "type": "string" },
+        { "name": "description", "type": "string" },
+        { "name": "tokenURI", "type": "string" },
+        { "name": "minTokensExpected", "type": "uint256" }
+      ],
+      "outputs": [],
+      "stateMutability": "payable",
+      "description": "Create a new meme token and optionally make an initial purchase. Requires mint fee (20 TRX) + optional purchase TRX as callValue."
+    },
+    "approve": {
+      "type": "function",
+      "name": "approve",
+      "inputs": [
+        { "name": "spender", "type": "address" },
+        { "name": "amount", "type": "uint256" }
+      ],
+      "outputs": [
+        { "name": "", "type": "bool" }
+      ],
+      "stateMutability": "nonpayable",
+      "description": "Standard TRC20 approve — must be called on the TOKEN contract (not SunPump) before selling."
+    },
+    "balanceOf": {
+      "type": "function",
+      "name": "balanceOf",
+      "inputs": [
+        { "name": "account", "type": "address" }
+      ],
+      "outputs": [
+        { "name": "", "type": "uint256" }
+      ],
+      "stateMutability": "view",
+      "description": "Standard TRC20 balanceOf — call on the TOKEN contract to check holdings."
+    },
+    "allowance": {
+      "type": "function",
+      "name": "allowance",
+      "inputs": [
+        { "name": "owner", "type": "address" },
+        { "name": "spender", "type": "address" }
+      ],
+      "outputs": [
+        { "name": "", "type": "uint256" }
+      ],
+      "stateMutability": "view",
+      "description": "Standard TRC20 allowance — check how much the SunPump contract can spend."
+    }
+  },
+  "notes": {
+    "trading_fee": "1% fee on all buys and sells on the bonding curve",
+    "token_decimals": "SunPump meme tokens typically use 18 decimals",
+    "trx_decimals": "TRX uses 6 decimals (1 TRX = 1,000,000 SUN)",
+    "bonding_curve_cap": "Bonding curve completes at ~$69,420 market cap, then tokens migrate to SunSwap V2",
+    "mint_fee": "Creating a token costs 20 TRX",
+    "approval_before_sell": "You MUST approve the SunPump launcher contract to spend your tokens before calling saleToken",
+    "slippage": "Always use slippage protection (minTokensExpected / amountMin). Recommended: 1-5% for stable trades, up to 10-15% for volatile new tokens"
+  }
+}
