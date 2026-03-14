@@ -38,6 +38,11 @@ Simply tell the Agent:
 - BSC Testnet: `https://tn-x402-demo.bankofai.io/protected-bsc-testnet`
 - Multi-network: `https://tn-x402-demo.bankofai.io/protected-multi`
 
+The BSC hosted demo accepts public BSC testnet stablecoins:
+
+- `USDT`
+- `USDC`
+
 ## Examples
 
 ```bash

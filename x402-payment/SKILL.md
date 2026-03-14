@@ -140,7 +140,7 @@ Replace `8000` with your local server port if you started the demo on a differen
 
 If a response returns binary data, it is written to a temporary file and the file path is returned.
 
-That includes the current `x402-demo` protected image flow, which returns `openclaw.jpg` after successful payment.
+That includes the current `x402-demo` protected image flow, which returns `protected.png` after successful payment.
 
 ## Notes
 
