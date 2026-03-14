@@ -28,14 +28,19 @@ Simply tell the Agent:
    - Tron Nile (default): `/protected-nile`
    - BSC Testnet: `/protected-bsc-testnet`
    - Multi-network: `/protected-multi`
-2. **Invoke Payment Flow**: Use the [x402-payment](/Users/bobo/code/x402/skills/x402-payment/SKILL.md) skill against the resolved URL.
+2. **Invoke Payment Flow**: Use the installed local launcher from [x402-payment](/Users/bobo/code/x402/skills/x402-payment/SKILL.md):
+
+```bash
+node "$HOME/.openclaw/skills/x402-payment/bin/x402.js" pay <resolved-url> --network <network>
+```
+
 3. **Default Selection**: If `network` is omitted, use `nile`.
 4. **Return Result**: Return the final paid response to the user. If the response is binary, report the temporary file path returned by the payment skill.
 
 If payment fails because Permit2 allowance is missing, call:
 
 ```bash
-x402 approve <resolved-url> --network <network>
+node "$HOME/.openclaw/skills/x402-payment/bin/x402.js" approve <resolved-url> --network <network>
 ```
 
 Then retry the demo payment once.
@@ -54,9 +59,9 @@ The BSC hosted demo accepts public BSC testnet stablecoins:
 ## Examples
 
 ```bash
-x402 pay https://tn-x402-demo.bankofai.io/protected-nile --network nile
+node "$HOME/.openclaw/skills/x402-payment/bin/x402.js" pay https://tn-x402-demo.bankofai.io/protected-nile --network nile
 ```
 
 ```bash
-x402 pay https://tn-x402-demo.bankofai.io/protected-bsc-testnet --network bsc-testnet
+node "$HOME/.openclaw/skills/x402-payment/bin/x402.js" pay https://tn-x402-demo.bankofai.io/protected-bsc-testnet --network bsc-testnet
 ```

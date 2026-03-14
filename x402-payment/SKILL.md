@@ -5,7 +5,6 @@ version: 2.6.0
 author: bankofai
 homepage: https://bankofai.io
 tags: [x402, payment, tron, bsc, exact, eip3009, permit2, skill]
-requires_tools: [x402]
 arguments:
   url:
     description: "Base URL of the agent (for --entrypoint) or a direct endpoint URL."
@@ -36,6 +35,14 @@ arguments:
 # x402 Payment Skill
 
 This skill uses the **v2 SDK** to invoke x402-protected HTTP endpoints with automatic payment handling.
+
+Use exactly one local launcher:
+
+```bash
+node "$HOME/.openclaw/skills/x402-payment/bin/x402.js" ...
+```
+
+Do not assume a global `x402` command exists. Do not use `npx x402`, `./bin/x402.js`, or `npm run cli` unless the caller explicitly asks for those forms.
 
 Supported payment paths:
 - `tron:*` with `exact`
@@ -68,19 +75,19 @@ Configure wallet keys with environment variables, `x402-config.json`, or `~/.x40
 Check that the skill can discover your local wallet configuration:
 
 ```bash
-x402 status
+node "$HOME/.openclaw/skills/x402-payment/bin/x402.js" status
 ```
 
 Show currently configured native balances:
 
 ```bash
-x402 balance
+node "$HOME/.openclaw/skills/x402-payment/bin/x402.js" balance
 ```
 
 If a Permit2 payment fails because the token has not approved Permit2 yet, approve once first:
 
 ```bash
-x402 approve https://tn-x402-demo.bankofai.io/protected-nile --network nile --asset USDT
+node "$HOME/.openclaw/skills/x402-payment/bin/x402.js" approve https://tn-x402-demo.bankofai.io/protected-nile --network nile --asset USDT
 ```
 
 ## Usage
@@ -88,7 +95,7 @@ x402 approve https://tn-x402-demo.bankofai.io/protected-nile --network nile --as
 ### Coinbase-style CLI
 
 ```bash
-x402 pay \
+node "$HOME/.openclaw/skills/x402-payment/bin/x402.js" pay \
   https://tn-x402-demo.bankofai.io/protected-nile \
   --network nile \
   --asset USDT
@@ -97,7 +104,7 @@ x402 pay \
 ### Common options
 
 ```bash
-x402 pay <url> \
+node "$HOME/.openclaw/skills/x402-payment/bin/x402.js" pay <url> \
   -X POST \
   -d '{"prompt":"hello"}' \
   -q '{"verbose":"true"}' \
@@ -109,17 +116,17 @@ x402 pay <url> \
 ### Pair selection
 
 ```bash
-x402 pay \
+node "$HOME/.openclaw/skills/x402-payment/bin/x402.js" pay \
   https://tn-x402-demo.bankofai.io/protected-nile \
   --pair tron:nile:USDT
 ```
 
 ### Permit2 approval
 
-`x402 approve` fetches the endpoint's `402 Payment Required` response, applies the same selection rules as `x402 pay`, and sends a Permit2 approval transaction for the selected asset.
+`approve` fetches the endpoint's `402 Payment Required` response, applies the same selection rules as `pay`, and sends a Permit2 approval transaction for the selected asset.
 
 ```bash
-x402 approve \
+node "$HOME/.openclaw/skills/x402-payment/bin/x402.js" approve \
   https://tn-x402-demo.bankofai.io/protected-bsc-testnet \
   --network bsc-testnet \
   --asset USDT
@@ -155,7 +162,7 @@ Replace `8000` with your local server port if you started the demo on a differen
 4. Retry the request with payment headers.
 5. Print the final HTTP response as JSON.
 
-If the selected payment option uses `permit2` and allowance is missing, run `x402 approve` once with the same URL/network/asset selectors, then retry `x402 pay`.
+If the selected payment option uses `permit2` and allowance is missing, run the same launcher with `approve` once using the same URL/network/asset selectors, then retry `pay`.
 
 If a response returns binary data, it is written to a temporary file and the file path is returned.
 
