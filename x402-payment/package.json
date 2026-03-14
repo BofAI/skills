@@ -1,17 +1,26 @@
 {
   "name": "x402-payment-skill",
-  "version": "1.4.0",
+  "version": "2.6.0",
   "description": "x402 payment skill for TRON and EVM",
   "type": "module",
-  "scripts": {
-    "start": "npx tsx src/x402_invoke.ts"
+  "bin": {
+    "x402": "./bin/x402.js"
   },
-  "devDependencies": {
-    "tsx": "^4.21.0",
-    "typescript": "^5.9.3"
+  "scripts": {
+    "bootstrap:local-sdk": "bash ./scripts/bootstrap-local-sdk.sh",
+    "start": "npx tsx src/x402_invoke.ts",
+    "cli": "node --import tsx ./src/cli.ts"
   },
   "dependencies": {
-    "@bankofai/x402": "0.4.2",
-    "tronweb": "^6.0.0"
+    "@bankofai/x402-core": "2.6.0",
+    "@bankofai/x402-evm": "2.6.0",
+    "@bankofai/x402-fetch": "2.6.0",
+    "@bankofai/x402-tron": "2.6.0",
+    "tsx": "^4.21.0",
+    "tronweb": "^6.0.0",
+    "viem": "^2.45.2"
+  },
+  "devDependencies": {
+    "typescript": "^5.9.3"
   }
 }

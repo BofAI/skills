@@ -1,160 +1,149 @@
 ---
 name: x402-payment
-description: "Pay for x402-enabled Agent endpoints using ERC20 tokens (USDT/USDC) on EVM or TRC20 tokens (USDT/USDD) on TRON."
-version: 1.4.0
+description: "Pay for x402-enabled endpoints with the v2 SDK on TRON or BSC. Triggers: 'pay with x402', 'invoke paid endpoint'."
+version: 2.6.0
 author: bankofai
 homepage: https://bankofai.io
-tags: [crypto, payments, x402, agents, api, usdt, usdd, usdc, tron, ethereum, evm, erc20, trc20]
-requires_tools: [x402_invoke]
-# Tool implementation mapping: x402_invoke -> src/x402_invoke.ts (run via npx tsx)
+tags: [x402, payment, tron, bsc, exact, eip3009, permit2, skill]
+requires_tools: [x402]
 arguments:
   url:
-    description: "Base URL of the agent (v2) or full URL (v1/Discovery)"
+    description: "Base URL of the agent (for --entrypoint) or a direct endpoint URL."
     required: true
   entrypoint:
-    description: "Entrypoint name to invoke (e.g., 'chat', 'search')"
+    description: "Entrypoint name to invoke, for example 'chat' or 'search'."
     required: false
   input:
-    description: "Input object to send to the entrypoint"
+    description: "JSON input object or raw string payload."
     required: false
   method:
-    description: "HTTP method (GET/POST). Default: POST (v2), GET (Direct)"
+    description: "HTTP method when calling a direct URL. Default: GET."
     required: false
   network:
-    description: "Network name (nile, mainnet, bsc-testnet, bsc)"
+    description: "Preferred network. Supported: nile, mainnet, shasta, bsc-testnet, bsc."
     required: false
-dependencies:
-  - mcp-server-tron
+  asset:
+    description: "Preferred asset or token address, for example USDT, USDD, 0x..., or T...."
+    required: false
+  token:
+    description: "Alias of --asset."
+    required: false
+  pair:
+    description: "Preferred network+asset pair, for example tron:nile:USDT or eip155:97/0x..."
+    required: false
 ---
 
 # x402 Payment Skill
 
-Invoke x402-enabled AI agent endpoints with automatic token payments on both TRON (TRC20) and EVM-compatible (ERC20) chains.
+This skill uses the **v2 SDK** to invoke x402-protected HTTP endpoints with automatic payment handling.
 
-## Overview
-
-The `x402-payment` skill enables agents to interact with paid API endpoints. When an agent receives a `402 Payment Required` response, this skill handles the negotiation, signing, and execution of the payment using the `x402_invoke` tool.
+Supported payment paths:
+- `tron:*` with `exact`
+  - `eip3009`
+  - `permit2`
+- `eip155:56`
+- `eip155:97`
 
 ## Prerequisites
 
-- **Wallet Configuration**:
-  - **TRON**: Set `TRON_PRIVATE_KEY` for TRC20 payments (USDT/USDD).
-  - **EVM**: Set `EVM_PRIVATE_KEY` or `ETH_PRIVATE_KEY` for ERC20 payments (USDT/USDC).
-  - The skill also searches for keys in `x402-config.json` and `~/.mcporter/mcporter.json`.
-- **TronGrid API Key**: Required for **Mainnet** to avoid rate limits (`TRON_GRID_API_KEY`).
-- **GasFree** (optional): Set `GASFREE_API_KEY` and `GASFREE_API_SECRET` to enable gasless TRC20 payments. When configured, the tool will prefer the `exact_gasfree` scheme over `exact_permit`. Requires a GasFree account that is **activated** with **sufficient token balance** in the GasFree wallet.
-- **Dependencies**: Run `npm install` in the `x402-payment/` directory before first use.
-- All keys can also be set in `x402-config.json` or `~/.mcporter/mcporter.json`.
+Before first use, install the local v2 SDK packages:
 
-## Usage Instructions
-
-### 1. Verification
-Before making payments, verify your wallet status:
 ```bash
-npx tsx x402-payment/src/x402_invoke.ts --check
+cd skills/x402-payment
+npm run bootstrap:local-sdk
 ```
 
-### 2. Invoking an Agent (v2)
-Most modern x402 agents use the v2 "invoke" pattern:
+Configure wallet keys with environment variables, `x402-config.json`, or `~/.x402-config.json`.
+
+- TRON:
+  - `TRON_PRIVATE_KEY`
+  - optional `TRON_GRID_API_KEY`
+- EVM:
+  - `EVM_PRIVATE_KEY` or `ETH_PRIVATE_KEY`
+  - optional `BSC_MAINNET_RPC_URL`
+  - optional `BSC_TESTNET_RPC_URL`
+
+## Verification
+
+Check that the skill can discover your local wallet configuration:
+
 ```bash
-npx tsx x402-payment/src/x402_invoke.ts \
-  --url https://api.example.com \
-  --entrypoint chat \
-  --input '{"prompt": "Your query here"}' \
-  --network nile
+x402 status
 ```
 
-### 3. Agent Discovery (Direct)
-- **Manifest**: Fetch agent metadata.
-  ```bash
-  npx tsx x402-payment/src/x402_invoke.ts --url https://api.example.com/.well-known/agent.json
-  ```
-- **List Entrypoints**: List available functions.
-  ```bash
-  npx tsx x402-payment/src/x402_invoke.ts --url https://api.example.com/entrypoints
-  ```
+Show currently configured native balances:
 
-### 4. GasFree Wallet Info
-Query GasFree wallet information (address, activation status, balance, nonce).
-Defaults: network=**mainnet**, wallet=**TRON_PRIVATE_KEY**.
 ```bash
-# Default: mainnet + TRON_PRIVATE_KEY wallet
-npx tsx x402-payment/src/x402_invoke.ts --gasfree-info
-
-# Specify wallet address
-npx tsx x402-payment/src/x402_invoke.ts --gasfree-info --wallet <YOUR_WALLET_ADDRESS>
-
-# Specify network
-npx tsx x402-payment/src/x402_invoke.ts --gasfree-info --network nile
-
-# Both
-npx tsx x402-payment/src/x402_invoke.ts --gasfree-info --wallet <YOUR_WALLET_ADDRESS> --network nile
+x402 balance
 ```
-Requires: `GASFREE_API_KEY`, `GASFREE_API_SECRET`. Without `--wallet`, requires `TRON_PRIVATE_KEY`. Returns JSON with `gasFreeAddress`, `active`, `allowSubmit`, `nonce`, and per-token `assets` (balance, fees).
 
-### 5. GasFree Account Activation
-Activate a GasFree account that has not been activated yet. Use `--gasfree-info` first to check activation status.
-Defaults: network=**nile**, token=**USDT**.
+## Usage
+
+### Coinbase-style CLI
+
 ```bash
-# Default: nile + USDT
-npx tsx x402-payment/src/x402_invoke.ts --gasfree-activate
-
-# Specify network
-npx tsx x402-payment/src/x402_invoke.ts --gasfree-activate --network mainnet
-
-# Specify network and token
-npx tsx x402-payment/src/x402_invoke.ts --gasfree-activate --network nile --token USDT
+x402 pay \
+  https://tn-x402-demo.bankofai.io/protected-nile \
+  --network nile \
+  --asset USDT
 ```
-Requires: `TRON_PRIVATE_KEY`, `GASFREE_API_KEY`, `GASFREE_API_SECRET`. Wallet must have enough tokens to cover activation fees (~3.05 USDT on nile). If the account is already activated, returns `{"status": "already_active"}` immediately.
 
-**Activation process:**
-1. Queries GasFree account info and checks activation status
-2. Transfers `activateFee + transferFee + 1 token` from wallet to gasFreeAddress (on-chain TRC20)
-3. Polls for on-chain confirmation (up to 60s)
-4. Submits a GasFree signed transaction to transfer tokens back to wallet (triggers activation)
-5. Polls until the GasFree transaction completes
+### Common options
 
-Returns JSON with `status`, `depositTxId`, `gasFreeTraceId`, `gasFreeState`, `gasFreeTxHash`, and final `active` status.
+```bash
+x402 pay <url> \
+  -X POST \
+  -d '{"prompt":"hello"}' \
+  -q '{"verbose":"true"}' \
+  -h '{"X-App":"demo"}' \
+  --max-amount 100000 \
+  --network bsc-testnet
+```
 
-### 6. Cross-Chain Support
-- **TRON (TRC20)**: Use `--network nile` (testnet) or `mainnet`.
-- **BSC (ERC20)**: Use `--network bsc-testnet` (testnet) or `bsc` (mainnet).
+### Pair selection
 
-## Supported Networks & Tokens
+```bash
+x402 pay \
+  https://tn-x402-demo.bankofai.io/protected-nile \
+  --pair tron:nile:USDT
+```
 
-| Chain | Network Name | Common Tokens | USDT Contract |
-|-------|--------------|---------------|---------------|
-| **TRON** | `mainnet` | USDT, USDD | `TR7NHqjeKQxGTCi8q8ZY4pL8otSzgjLj6t` |
-| **TRON** | `nile` | USDT, USDD | `TXYZopYRdj2D9XRtbG411XZZ3kM5VkAeBf` |
-| **BSC** | `bsc` | USDT, USDC | `0x55d398326f99059fF775485246999027B3197955` |
-| **BSC** | `bsc-testnet`| USDT, USDC, DHLU | `0x337610d27c682E347C9cD60BD4b3b107C9d34dDd` |
+### Hosted demo endpoints
 
-## Security Considerations & Rules
+The hosted demo URLs currently used by the companion `x402-payment-demo` skill are:
 
-> [!CAUTION]
-> **Private Key Safety**: NEVER output your private keys to the logs or console. The `x402_invoke` tool loads keys from environment variables internally.
+- `https://tn-x402-demo.bankofai.io/protected-nile`
+- `https://tn-x402-demo.bankofai.io/protected-bsc-testnet`
+- `https://tn-x402-demo.bankofai.io/protected-multi`
 
-### Agent Security Rules:
-- **No Private Key Output**: The Agent MUST NOT print, echo, or output any private key to the dialogue context.
-- **Internal Loading Only**: Rely on the tool to load keys internally.
-- **No Export Commands**: DO NOT execute shell commands containing the private key as a literal string.
-- **Silent Environment Checks**: Use `[[ -n $TRON_PRIVATE_KEY ]] && echo "Configured" || echo "Missing"` to verify configuration without leaking secrets.
-- **Use the Check Tool**: Use `npx tsx x402-payment/src/x402_invoke.ts --check` to safely verify addresses.
+### Local demo endpoints
 
-## Binary and Image Handling
+If you are running `x402-demo` locally, this skill can call it directly:
 
-If the endpoint returns an image or binary data:
-1. The data is saved to a temporary file (e.g., `/tmp/x402_image_...`).
-2. The tool returns JSON with `file_path`, `content_type`, and `bytes`.
-3. **Important**: The Agent is responsible for deleting the temporary file after use.
+- `http://127.0.0.1:8000/protected-nile`
+- `http://127.0.0.1:8000/protected-bsc-testnet`
+- `http://127.0.0.1:8000/protected-multi`
 
-## Error Handling
+Replace `8000` with your local server port if you started the demo on a different port.
 
-### Insufficient Allowance
-If allowance is insufficient, the tool will automatically attempt an "infinite approval" transaction. Ensure you have native tokens (TRX or BNB/ETH) for gas.
+## Behavior
 
-### Insufficient Balance
-Ensure you have enough USDT/USDC/USDD in your wallet on the specified network.
+1. Make the initial HTTP request.
+2. If the endpoint returns `402 Payment Required`, automatically select a matching payment option.
+   - priority: `network + pair/asset`
+   - then `network`
+   - then first available option
+   - if `--max-amount` is set, requirements above that atomic-unit amount are filtered out
+3. Create the payment payload using the v2 SDK.
+4. Retry the request with payment headers.
+5. Print the final HTTP response as JSON.
 
----
-*Last Updated: 2026-03-11*
+If a response returns binary data, it is written to a temporary file and the file path is returned.
+
+That includes the current `x402-demo` protected image flow, which returns `openclaw.jpg` after successful payment.
+
+## Notes
+
+- This skill is now aligned to the **v2 exact** flow only.
+- Legacy `exact_permit` and `exact_gasfree` behavior is not part of this skill anymore.
+- For the hosted demo flow, use [x402-payment-demo](/Users/bobo/code/x402/skills/x402-payment-demo/SKILL.md).
