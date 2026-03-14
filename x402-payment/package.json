@@ -12,10 +12,10 @@
     "cli": "node --import tsx ./src/cli.ts"
   },
   "dependencies": {
-    "@bankofai/x402-core": "2.6.0",
-    "@bankofai/x402-evm": "2.6.0",
-    "@bankofai/x402-fetch": "2.6.0",
-    "@bankofai/x402-tron": "2.6.0",
+    "@bankofai/x402-core": "2.6.0-beta.4",
+    "@bankofai/x402-evm": "2.6.0-beta.4",
+    "@bankofai/x402-fetch": "2.6.0-beta.4",
+    "@bankofai/x402-tron": "2.6.0-beta.4",
     "tsx": "^4.21.0",
     "tronweb": "^6.0.0",
     "viem": "^2.45.2"
