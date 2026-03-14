@@ -12,7 +12,7 @@
     "cli": "node --import tsx ./src/cli.ts"
   },
   "dependencies": {
-    "@bankofai/x402-mcp": "2.6.0-beta.6",
+    "@bankofai/x402-mcp": "2.6.0-beta.7",
     "tsx": "^4.21.0"
   },
   "devDependencies": {
