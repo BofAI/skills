@@ -32,6 +32,14 @@ Simply tell the Agent:
 3. **Default Selection**: If `network` is omitted, use `nile`.
 4. **Return Result**: Return the final paid response to the user. If the response is binary, report the temporary file path returned by the payment skill.
 
+If payment fails because Permit2 allowance is missing, call:
+
+```bash
+x402 approve <resolved-url> --network <network>
+```
+
+Then retry the demo payment once.
+
 ## Hosted endpoints
 
 - Tron Nile (Default): `https://tn-x402-demo.bankofai.io/protected-nile`

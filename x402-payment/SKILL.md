@@ -77,6 +77,12 @@ Show currently configured native balances:
 x402 balance
 ```
 
+If a Permit2 payment fails because the token has not approved Permit2 yet, approve once first:
+
+```bash
+x402 approve https://tn-x402-demo.bankofai.io/protected-nile --network nile --asset USDT
+```
+
 ## Usage
 
 ### Coinbase-style CLI
@@ -108,6 +114,17 @@ x402 pay \
   --pair tron:nile:USDT
 ```
 
+### Permit2 approval
+
+`x402 approve` fetches the endpoint's `402 Payment Required` response, applies the same selection rules as `x402 pay`, and sends a Permit2 approval transaction for the selected asset.
+
+```bash
+x402 approve \
+  https://tn-x402-demo.bankofai.io/protected-bsc-testnet \
+  --network bsc-testnet \
+  --asset USDT
+```
+
 ### Hosted demo endpoints
 
 The hosted demo URLs currently used by the companion `x402-payment-demo` skill are:
@@ -137,6 +154,8 @@ Replace `8000` with your local server port if you started the demo on a differen
 3. Create the payment payload using the v2 SDK.
 4. Retry the request with payment headers.
 5. Print the final HTTP response as JSON.
+
+If the selected payment option uses `permit2` and allowance is missing, run `x402 approve` once with the same URL/network/asset selectors, then retry `x402 pay`.
 
 If a response returns binary data, it is written to a temporary file and the file path is returned.
 

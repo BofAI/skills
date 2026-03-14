@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-import { parseCliOptions, runBalance, runCheck, runInvoke } from "./runtime.js";
+import { parseCliOptions, runApprove, runBalance, runCheck, runInvoke } from "./runtime.js";
 
 function printHelp(): void {
   process.stdout.write(
@@ -9,6 +9,8 @@ function printHelp(): void {
       "Usage:",
       "  x402 status",
       "  x402 balance",
+      "  x402 approve <url> [-X <method>] [-d <json>] [-q <params>] [-h <json>]",
+      "               [--network <network>] [--asset <asset>] [--pair <pair>] [--json]",
       "  x402 pay <url> [-X <method>] [-d <json>] [-q <params>] [-h <json>]",
       "           [--network <network>] [--asset <asset>] [--pair <pair>]",
       "           [--max-amount <atomic-units>] [--correlation-id <id>] [--json]",
@@ -36,6 +38,11 @@ async function main(): Promise<void> {
 
   if (command === "balance") {
     await runBalance();
+    return;
+  }
+
+  if (command === "approve") {
+    await runApprove(parseCliOptions(rest));
     return;
   }
 
