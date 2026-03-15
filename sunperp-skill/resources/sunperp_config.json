@@ -1,4 +1,14 @@
 {
+  "safety": {
+    "max_leverage": 20,
+    "stop_loss": {
+      "required": true,
+      "default_percent": 5,
+      "max_percent": 25,
+      "description": "Every new position order must include a stop-loss. If sl_trigger_price is omitted, one is auto-calculated at default_percent below entry (long) or above entry (short). Values beyond max_percent are rejected."
+    },
+    "description": "Agent safety limits. max_leverage caps the leverage the agent can set or trade with. stop_loss enforces automatic stop-loss on every order to prevent liquidation."
+  },
   "api": {
     "base_url": "https://api.sunx.io",
     "api_manage_url": "https://www.sunperp.com/futures/api-manage/",

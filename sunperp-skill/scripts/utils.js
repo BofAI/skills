@@ -13,6 +13,7 @@ const CONFIG = JSON.parse(
   readFileSync(join(__dirname, "..", "resources", "sunperp_config.json"), "utf8")
 );
 const BASE_URL = CONFIG.api.base_url;
+const SAFETY = CONFIG.safety;
 
 // ---------------------------------------------------------------------------
 // Environment helpers
@@ -237,4 +238,80 @@ export function parseArgs(argv, required = [], optional = []) {
   return args;
 }
 
-export { CONFIG, BASE_URL };
+// ---------------------------------------------------------------------------
+// Safety enforcement
+// ---------------------------------------------------------------------------
+
+/**
+ * Validate leverage against the configured max_leverage cap.
+ * Exits with an error if the requested leverage exceeds the limit.
+ */
+export function validateLeverage(leverRate) {
+  const max = SAFETY.max_leverage;
+  if (leverRate > max) {
+    exitWithError(
+      `Leverage ${leverRate}x exceeds the agent safety cap of ${max}x. ` +
+      `Adjust max_leverage in sunperp_config.json to raise this limit.`
+    );
+  }
+}
+
+/**
+ * Enforce mandatory stop-loss on position-opening orders.
+ * If sl_trigger_price is already set, validates it's within max_percent of the reference price.
+ * If omitted and required=true, auto-calculates one at default_percent from the reference price.
+ *
+ * @param {object} orderBody - the order body being built (mutated in place)
+ * @param {number|null} referencePrice - the limit price or current market price
+ */
+export function enforceStopLoss(orderBody, referencePrice) {
+  const sl = SAFETY.stop_loss;
+  if (!sl.required) return;
+
+  // Only enforce on position-opening orders (not reduce_only / close)
+  if (orderBody.reduce_only === 1) return;
+
+  const side = orderBody.side; // buy = long, sell = short
+  const price = orderBody.sl_trigger_price;
+
+  if (price != null) {
+    // Validate the user-supplied stop-loss is within max_percent
+    if (referencePrice) {
+      const distance = Math.abs(price - referencePrice) / referencePrice * 100;
+      if (distance > sl.max_percent) {
+        exitWithError(
+          `Stop-loss distance of ${distance.toFixed(1)}% exceeds the maximum allowed ${sl.max_percent}%. ` +
+          `Set a tighter sl_trigger_price.`
+        );
+      }
+    }
+    return;
+  }
+
+  // Auto-calculate stop-loss if omitted
+  if (!referencePrice) {
+    // For market orders without a reference price, we can't auto-calculate.
+    // The agent MUST provide sl_trigger_price for market orders.
+    exitWithError(
+      "Stop-loss is required for all position-opening orders. " +
+      "For market orders, provide sl_trigger_price explicitly (e.g., sl_trigger_price=90000)."
+    );
+    return;
+  }
+
+  const pct = sl.default_percent / 100;
+  if (side === "buy") {
+    // Long: stop-loss below entry
+    orderBody.sl_trigger_price = Math.round(referencePrice * (1 - pct) * 100) / 100;
+  } else {
+    // Short: stop-loss above entry
+    orderBody.sl_trigger_price = Math.round(referencePrice * (1 + pct) * 100) / 100;
+  }
+
+  console.error(
+    `AUTO STOP-LOSS: Set sl_trigger_price=${orderBody.sl_trigger_price} ` +
+    `(${sl.default_percent}% from reference price ${referencePrice})`
+  );
+}
+
+export { CONFIG, BASE_URL, SAFETY };

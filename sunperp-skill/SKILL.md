@@ -565,6 +565,69 @@ When a script returns an error:
 
 ---
 
+## Agent Safety Locks
+
+Two mandatory safety mechanisms are enforced at the script level to prevent catastrophic losses. Both are configured in `resources/sunperp_config.json` under the `safety` key.
+
+### 1. Max Leverage Cap
+
+| Parameter | Default | Description |
+|---|---|---|
+| `safety.max_leverage` | `20` | Maximum leverage the agent is allowed to use |
+
+The cap is enforced in two places:
+
+- **`position.js set_leverage`** — rejects any `lever_rate` above the cap before calling the API.
+- **`order.js place`** — if `lever_rate` is passed inline, it is validated before the order is submitted.
+
+If the agent attempts to exceed the cap, the script exits with a clear error:
+
+```
+ERROR: Leverage 50x exceeds the agent safety cap of 20x.
+Adjust max_leverage in sunperp_config.json to raise this limit.
+```
+
+To change the cap, edit `safety.max_leverage` in the config file. This is an operator-level setting — the agent cannot change it at runtime.
+
+### 2. Mandatory Stop-Loss
+
+| Parameter | Default | Description |
+|---|---|---|
+| `safety.stop_loss.required` | `true` | Whether every position-opening order must have a stop-loss |
+| `safety.stop_loss.default_percent` | `5` | Auto-calculated SL distance when `sl_trigger_price` is omitted |
+| `safety.stop_loss.max_percent` | `25` | Maximum allowed SL distance — rejects wider stop-losses |
+
+When `required` is `true`, **every position-opening order** (i.e., not `reduce_only`) must include a stop-loss:
+
+- **If `sl_trigger_price` is provided**: validated to be within `max_percent` of the reference price.
+- **If omitted on a limit order**: auto-calculated at `default_percent` below entry (long) or above entry (short).
+- **If omitted on a market order**: the script fetches the current market price and auto-calculates. If the price fetch fails, the order is rejected with an instruction to provide `sl_trigger_price` explicitly.
+
+Example — auto stop-loss on a limit long:
+
+```bash
+# Limit buy at $95,000 — SL auto-set to $90,250 (5% below)
+node scripts/order.js place contract_code=BTC-USDT side=buy type=limit volume=1 price=95000
+```
+
+Example — explicit stop-loss:
+
+```bash
+node scripts/order.js place contract_code=BTC-USDT side=buy type=market volume=1 sl_trigger_price=90000
+```
+
+Example — rejected (SL too wide):
+
+```bash
+# 30% distance exceeds max_percent of 25%
+node scripts/order.js place contract_code=BTC-USDT side=buy type=limit volume=1 price=95000 sl_trigger_price=66500
+```
+
+> [!NOTE]
+> The `reduce_only` flag (close-position orders) is exempt from the stop-loss requirement since those orders are already reducing risk.
+
+---
+
 ## Security Considerations
 
 > [!CAUTION]
@@ -584,6 +647,8 @@ When a script returns an error:
 - [ ] No secrets in command output or logs
 - [ ] Trade confirmations shown before execution
 - [ ] Leverage changes confirmed before applying
+- [ ] Leverage never exceeds `safety.max_leverage` cap
+- [ ] Every position-opening order has a stop-loss attached
 - [ ] Position mode changes confirmed before applying
 - [ ] Close-all operations require explicit user confirmation
 - [ ] Cancel-all operations require explicit user confirmation
@@ -598,7 +663,8 @@ When a script returns an error:
   Type: {type}
   Volume: {volume} contracts
   Price: {price or "market"}
-  Leverage: {lever_rate}x
+  Leverage: {lever_rate}x (cap: {max_leverage}x)
+  Stop-loss: ${sl_trigger_price}
   Est. margin: ~${margin}
 
 Proceed? (yes/no)

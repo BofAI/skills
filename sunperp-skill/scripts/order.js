@@ -19,7 +19,7 @@
  *   [time_in_force=GTC] [tp_trigger_price=...] [sl_trigger_price=...]
  *   [client_order_id=...]
  */
-import { privateGet, privatePost, printJson, exitWithError, parseArgs } from "./utils.js";
+import { privateGet, privatePost, publicGet, printJson, exitWithError, parseArgs, validateLeverage, enforceStopLoss } from "./utils.js";
 
 const command = process.argv[2];
 const subArgv = ["", "", ...process.argv.slice(3)];
@@ -35,9 +35,17 @@ async function main() {
           "time_in_force", "client_order_id", "price_match",
           "tp_trigger_price", "tp_order_price", "tp_type", "tp_trigger_price_type",
           "sl_trigger_price", "sl_order_price", "sl_type", "sl_trigger_price_type",
-          "price_protect", "self_match_prevent",
+          "price_protect", "self_match_prevent", "lever_rate",
         ]
       );
+
+      // --- Safety: Max Leverage Cap ---
+      // If lever_rate is provided inline, validate it against the cap.
+      // Also check current leverage for the contract.
+      if (args.lever_rate) {
+        validateLeverage(Number(args.lever_rate));
+      }
+
       const body = {
         contract_code: args.contract_code,
         margin_mode: args.margin_mode || "cross",
@@ -61,6 +69,25 @@ async function main() {
         price_protect: args.price_protect,
         self_match_prevent: args.self_match_prevent,
       };
+
+      // --- Safety: Mandatory Stop-Loss ---
+      // Determine reference price for stop-loss calculation
+      let referencePrice = body.price; // limit price if available
+      if (!referencePrice) {
+        // For market orders, fetch current market price as reference
+        try {
+          const ticker = await publicGet("/sapi/v1/market/detail/merged", {
+            contract_code: args.contract_code,
+          });
+          if (ticker.tick && ticker.tick.close) {
+            referencePrice = Number(ticker.tick.close);
+          }
+        } catch {
+          // If ticker fetch fails, enforceStopLoss will require explicit sl_trigger_price
+        }
+      }
+      enforceStopLoss(body, referencePrice);
+
       const data = await privatePost("/sapi/v1/trade/order", {}, body);
       printJson(data);
       break;

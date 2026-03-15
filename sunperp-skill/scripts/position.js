@@ -11,7 +11,7 @@
  *   risk_limit       [contract_code=BTC-USDT]     -- Get risk limits
  *   position_limit   [contract_code=BTC-USDT]     -- Get position limits
  */
-import { privateGet, privatePost, printJson, exitWithError, parseArgs } from "./utils.js";
+import { privateGet, privatePost, printJson, exitWithError, parseArgs, validateLeverage } from "./utils.js";
 
 const command = process.argv[2];
 const subArgv = ["", "", ...process.argv.slice(3)];
@@ -39,6 +39,7 @@ async function main() {
 
     case "set_leverage": {
       const args = parseArgs(subArgv, ["contract_code", "lever_rate"], ["margin_mode"]);
+      validateLeverage(Number(args.lever_rate));
       const data = await privatePost("/sapi/v1/position/lever", {}, {
         contract_code: args.contract_code,
         margin_mode: args.margin_mode || "cross",
