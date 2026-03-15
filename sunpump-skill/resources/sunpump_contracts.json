@@ -1,4 +1,11 @@
 {
+  "slippage": {
+    "default_percent": 5,
+    "min_percent": 0.1,
+    "max_percent": 50,
+    "warn_above_percent": 10,
+    "description": "Slippage tolerance controls the minimum acceptable output for a trade. Values above warn_above_percent trigger a warning. Values outside min/max are rejected."
+  },
   "networks": {
     "mainnet": {
       "sunpump_launcher": {

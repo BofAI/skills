@@ -17,6 +17,7 @@ const TRX_DECIMALS = 6;
 const TOKEN_DECIMALS = 18;
 const MAX_UINT256 =
   "115792089237316195423570985008687907853269984665640564039457584007913129639935";
+const SLIPPAGE = CONTRACTS.slippage;
 
 /**
  * Build a TronWeb instance from environment variables.
@@ -73,6 +74,27 @@ function fromSun(raw, decimals = TRX_DECIMALS) {
 }
 
 /**
+ * Validate and resolve slippage. Returns the effective slippage percent.
+ * Rejects values outside the configured [min, max] range.
+ * Logs a warning for values above warn_above_percent.
+ * @param {number|undefined} slippagePercent — user-supplied value, or undefined for default.
+ * @returns {number} effective slippage percent.
+ */
+function validateSlippage(slippagePercent) {
+  const pct = slippagePercent != null ? slippagePercent : SLIPPAGE.default_percent;
+  if (pct < SLIPPAGE.min_percent || pct > SLIPPAGE.max_percent) {
+    outputJSON({
+      error: `Slippage ${pct}% is outside the allowed range [${SLIPPAGE.min_percent}%, ${SLIPPAGE.max_percent}%]. Adjust your --slippage value.`,
+    });
+    process.exit(1);
+  }
+  if (pct > SLIPPAGE.warn_above_percent) {
+    log(`WARNING: Slippage is set to ${pct}%, which exceeds the recommended maximum of ${SLIPPAGE.warn_above_percent}%. Proceed with caution.`);
+  }
+  return pct;
+}
+
+/**
  * Apply slippage to an amount. Returns the minimum acceptable amount.
  * @param {bigint|string} amount - The expected amount.
  * @param {number} slippagePercent - e.g. 5 for 5%.
@@ -99,6 +121,7 @@ function log(msg) {
 
 module.exports = {
   CONTRACTS,
+  SLIPPAGE,
   TRX_DECIMALS,
   TOKEN_DECIMALS,
   MAX_UINT256,
@@ -106,6 +129,7 @@ module.exports = {
   getLauncherAddress,
   toSun,
   fromSun,
+  validateSlippage,
   applySlippage,
   outputJSON,
   log,

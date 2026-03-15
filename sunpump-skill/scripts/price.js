@@ -26,6 +26,8 @@ const {
   log,
 } = require("./utils");
 
+const NETWORK = (process.env.TRON_NETWORK || "mainnet").toLowerCase();
+
 async function main() {
   const args = process.argv.slice(2);
   if (args.length < 1) {
@@ -57,7 +59,7 @@ async function main() {
     launcher.getTokenState(tokenAddress).call(),
   ]);
 
-  const stateLabels = { 0: "active (bonding curve)", 1: "migrated (SunSwap)" };
+  const stateLabels = { 0: "active (bonding curve)", 1: "migrated (SunSwap V2)" };
   const result = {
     token: tokenAddress,
     price_raw: String(price),
@@ -65,6 +67,16 @@ async function main() {
     state: Number(state),
     state_label: stateLabels[Number(state)] || `unknown (${state})`,
   };
+
+  if (Number(state) !== 0) {
+    const sunswapRouter = CONTRACTS.networks[NETWORK].sunswap_v2_router;
+    result.migration = {
+      reason: "Token reached the ~$69,420 market cap threshold and liquidity was moved to SunSwap V2.",
+      sunswap_router: sunswapRouter ? sunswapRouter.address : null,
+      action: "Use the SunSwap skill to trade this token.",
+    };
+    log("WARNING: This token has migrated to SunSwap V2. Bonding-curve trading is no longer available.");
+  }
 
   // Optional buy estimate
   const buyIdx = args.indexOf("--buy");

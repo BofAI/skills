@@ -98,7 +98,7 @@ node scripts/price.js TTokenAddress123 --sell 50000
 |---|---|---|
 | `tokenAddress` | **Yes** | SunPump token address |
 | `trxAmount` | **Yes** | TRX to spend (human-readable, e.g. `100`) |
-| `--slippage <pct>` | No | Slippage tolerance, default `5` (percent) |
+| `--slippage <pct>` | No | Slippage tolerance (default: `5`%, range: `0.1`–`50`%) |
 | `--dry-run` | No | Estimate only, do not send transaction |
 
 ```bash
@@ -122,7 +122,7 @@ node scripts/buy.js TTokenAddress123 50 --slippage 10
 |---|---|---|
 | `tokenAddress` | **Yes** | SunPump token address |
 | `tokenAmount` | **Yes** | Tokens to sell (human-readable) or `all` |
-| `--slippage <pct>` | No | Slippage tolerance, default `5` (percent) |
+| `--slippage <pct>` | No | Slippage tolerance (default: `5`%, range: `0.1`–`50`%) |
 | `--dry-run` | No | Estimate only, do not send transaction |
 
 ```bash
@@ -198,6 +198,51 @@ When a user asks to trade on SunPump, follow this sequence:
 4. **Get explicit confirmation** before executing any transaction.
 5. **Execute** the trade and report the transaction ID.
 6. **Verify** the result by checking the balance after the trade.
+
+---
+
+## Slippage Tolerance Configuration
+
+Slippage parameters are defined in `resources/sunpump_contracts.json` under the `slippage` key:
+
+| Parameter | Value | Description |
+|---|---|---|
+| `default_percent` | `5` | Applied when `--slippage` is omitted |
+| `min_percent` | `0.1` | Minimum allowed slippage — rejects values below this |
+| `max_percent` | `50` | Maximum allowed slippage — rejects values above this |
+| `warn_above_percent` | `10` | Slippage above this triggers a warning to stderr |
+
+The `validateSlippage()` function in `utils.js` enforces these bounds. If a user-supplied slippage is outside `[min, max]`, the script exits with a structured error. If it exceeds `warn_above_percent`, a warning is logged but execution continues.
+
+```bash
+# Uses default 5% slippage
+node scripts/buy.js TTokenAddress123 100
+
+# Explicit 2% slippage
+node scripts/buy.js TTokenAddress123 100 --slippage 2
+
+# 15% slippage — logs a warning, but proceeds
+node scripts/buy.js TTokenAddress123 100 --slippage 15
+
+# 60% slippage — rejected (exceeds max_percent)
+node scripts/buy.js TTokenAddress123 100 --slippage 60
+```
+
+---
+
+## SunSwap V2 Migration Handling
+
+When a token reaches the ~$69,420 market cap threshold, SunPump automatically migrates its liquidity to **SunSwap V2**. The bonding curve closes and all buy/sell scripts will stop working for that token.
+
+All trading scripts (`buy.js`, `sell.js`) check `getTokenState()` before executing. If the token has migrated (state ≠ 0), the script exits with a structured error containing:
+
+- **`migration.reason`** — why the bonding curve is closed
+- **`migration.sunswap_router`** — the SunSwap V2 router address for the current network (if available)
+- **`migration.action`** — directs the agent to use the SunSwap skill instead
+
+`price.js` also reports migration status in its output when querying a migrated token, but does not exit with an error since it is a read-only query.
+
+**Agent behavior:** When a migration error is received, the agent should inform the user that the token has graduated from SunPump and offer to trade it via the SunSwap skill instead. Do not retry with SunPump scripts.
 
 ---
 

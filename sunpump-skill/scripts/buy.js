@@ -20,12 +20,14 @@
 
 const {
   CONTRACTS,
+  SLIPPAGE,
   TOKEN_DECIMALS,
   TRX_DECIMALS,
   getTronWeb,
   getLauncherAddress,
   toSun,
   fromSun,
+  validateSlippage,
   applySlippage,
   outputJSON,
   log,
@@ -43,8 +45,8 @@ async function main() {
   const tokenAddress = args[0];
   const trxAmountHuman = args[1];
   const slippageIdx = args.indexOf("--slippage");
-  const slippage =
-    slippageIdx !== -1 ? parseFloat(args[slippageIdx + 1]) : 5;
+  const slippageArg = slippageIdx !== -1 ? parseFloat(args[slippageIdx + 1]) : undefined;
+  const slippage = validateSlippage(slippageArg);
   const dryRun = args.includes("--dry-run");
 
   const tronWeb = getTronWeb();
@@ -65,9 +67,15 @@ async function main() {
 
   const state = await launcher.getTokenState(tokenAddress).call();
   if (Number(state) !== 0) {
+    const sunswapRouter = CONTRACTS.networks[(process.env.TRON_NETWORK || "mainnet").toLowerCase()].sunswap_v2_router;
     outputJSON({
-      error: "Token has migrated to SunSwap. Use SunSwap skill to trade.",
+      error: "Token has migrated to SunSwap V2. The bonding curve is closed.",
       state: Number(state),
+      migration: {
+        reason: "Token reached the ~$69,420 market cap threshold and liquidity was moved to SunSwap V2.",
+        sunswap_router: sunswapRouter ? sunswapRouter.address : null,
+        action: "Use the SunSwap skill to trade this token. The SunPump bonding-curve scripts will not work for migrated tokens.",
+      },
     });
     process.exit(1);
   }
