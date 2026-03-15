@@ -18,7 +18,7 @@ export TRON_PRIVATE_KEY="<key>"
 node scripts/info.js USDT
 node scripts/balance.js --batch USDT,USDD,SUN
 node scripts/transfer.js USDT TRecipient 10 --dry-run
-node scripts/approve.js USDT TSpender max
+node scripts/approve.js USDT TSpender 1000
 ```
 
 ## Dependencies

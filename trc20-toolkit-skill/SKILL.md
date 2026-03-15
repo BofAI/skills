@@ -82,9 +82,9 @@ node scripts/transfer.js USDT TRecipientAddress 10.5
 ### 4. `approve.js` — Manage Allowances
 
 ```bash
-# Set allowance
+# Set allowance (use the exact amount needed, never unlimited)
 node scripts/approve.js USDT TSpenderAddress 1000 --dry-run
-node scripts/approve.js USDT TSpenderAddress max
+node scripts/approve.js USDT TSpenderAddress 1000
 
 # Check current allowance
 node scripts/approve.js USDT TSpenderAddress --check
@@ -123,6 +123,7 @@ node scripts/balance.js --batch USDT,USDD,SUN,JST,BTT
 3. **Prevent self-transfers.** The script rejects transfers to the sender's own address.
 4. **Validate addresses.** Ensure all addresses start with `T` and are valid TRON base58 addresses.
 5. **Check balances before transfer.** The script validates sufficient balance automatically.
+6. **Never use unlimited approvals.** Always approve only the exact amount needed for the intended swap or transfer. Infinite (MAX_UINT256) approvals are rejected by the script. This prevents a compromised or malicious spender contract from draining the entire token balance.
 
 ---
 

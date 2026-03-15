@@ -4,7 +4,7 @@
  * approve.js — Approve TRC20 token allowance or check existing allowance.
  *
  * Usage:
- *   node approve.js <token> <spender> <amount|max> [--dry-run]
+ *   node approve.js <token> <spender> <amount> [--dry-run]
  *   node approve.js <token> <spender> --check [walletAddress]
  *
  * Environment:
@@ -47,14 +47,21 @@ async function main() {
 
   const amountArg = args[2];
   const dryRun = args.includes("--dry-run");
-  const amountRaw = amountArg.toLowerCase() === "max" ? MAX_UINT256 : String(toSun(amountArg, dec));
+
+  if (amountArg.toLowerCase() === "max") {
+    console.error("Error: Unlimited (MAX_UINT256) approvals are disabled for security.");
+    console.error("Approve only the exact amount needed for the intended swap or transfer.");
+    process.exit(1);
+  }
+
+  const amountRaw = String(toSun(amountArg, dec));
 
   const result = {
     action: "approve",
     token: tokenAddress,
     symbol: String(symbol),
     spender: spenderAddress,
-    amount: amountArg.toLowerCase() === "max" ? "unlimited" : amountArg,
+    amount: amountArg,
     amount_raw: amountRaw,
     dry_run: dryRun,
   };
