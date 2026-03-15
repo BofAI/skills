@@ -42,6 +42,7 @@ export TRON_NETWORK="mainnet"
 | `approve.js` | Add your signature to a pending proposal | **Write** |
 | `execute.js` | Broadcast a fully-signed transaction | **Write** |
 | `pending.js` | List pending multi-sig proposals | Read-only |
+| `review.js` | Human CLI: list, inspect, co-sign, and execute proposals in one tool | **Write** |
 
 ---
 
@@ -112,7 +113,30 @@ node scripts/execute.js prop_1709312400_a3f2
 node scripts/pending.js
 ```
 
-### Pattern 5: Scope Active Permission Operations
+### Pattern 5: Hybrid Signature (Human + Agent)
+
+The `review.js` script is a single CLI tool for humans to list, inspect, co-sign, and execute agent-created proposals. It uses `TRON_HUMAN_PRIVATE_KEY` (not `TRON_PRIVATE_KEY`) to avoid mixing up human and agent keys.
+
+```bash
+# Agent (Key B) proposes a transfer (uses TRON_PRIVATE_KEY):
+node scripts/propose.js transfer TRecipient... 500 --memo "Q1 vendor payment"
+# → Outputs proposal ID: prop_1710345600_b7e4
+
+# Human (Key A) reviews all pending proposals (no key needed):
+node scripts/review.js
+
+# Human inspects a specific proposal (read-only, no key needed):
+node scripts/review.js prop_1710345600_b7e4
+
+# Human co-signs after verifying details (uses TRON_HUMAN_PRIVATE_KEY):
+export TRON_HUMAN_PRIVATE_KEY="<human-key>"
+node scripts/review.js prop_1710345600_b7e4 --sign
+
+# Human co-signs AND broadcasts in one step:
+node scripts/review.js prop_1710345600_b7e4 --sign --execute
+```
+
+### Pattern 6: Scope Active Permission Operations
 
 ```bash
 # Restrict active permission to only TRX transfers and smart contract calls
@@ -193,7 +217,8 @@ The proposal needs more signatures. Check `pending.js` to see remaining weight n
 
 | Variable | Required | Description |
 |----------|----------|-------------|
-| `TRON_PRIVATE_KEY` | Yes (write ops) | Private key for signing |
+| `TRON_PRIVATE_KEY` | Yes (agent scripts) | Agent's private key for signing (used by `propose.js`, `approve.js`, etc.) |
+| `TRON_HUMAN_PRIVATE_KEY` | Yes (`review.js --sign`) | Human's private key for `review.js`. Must be set separately — does not fall back to `TRON_PRIVATE_KEY`. |
 | `TRON_NETWORK` | No (default: mainnet) | `mainnet`, `nile`, or `shasta` |
 | `TRONGRID_API_KEY` | No | TronGrid API key for higher rate limits |
 
