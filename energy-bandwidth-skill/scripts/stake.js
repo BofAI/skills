@@ -7,7 +7,7 @@
  *   node stake.js <amount> <ENERGY|BANDWIDTH> [--dry-run]
  */
 
-const { getTronWeb, toSun, fromSun, outputJSON, log } = require("./utils");
+const { getTronWeb, toSun, fromSun, outputJSON, log, checkReserve } = require("./utils");
 
 async function main() {
   const args = process.argv.slice(2);
@@ -30,6 +30,8 @@ async function main() {
     outputJSON({ error: `Insufficient TRX. Have ${fromSun(balance)}, need ${amountTrx}` });
     process.exit(1);
   }
+
+  checkReserve(balance, amountSun);
 
   const result = {
     action: "stake",

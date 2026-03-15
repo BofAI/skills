@@ -90,12 +90,24 @@ node scripts/delegate.js --undelegate TRecipient 100 ENERGY --dry-run
 
 ---
 
+## Safe Guard — Minimum Reserve Balance
+
+The toolkit enforces a minimum TRX reserve (default: **50 TRX**) to prevent the agent from accidentally bricking an account by staking its entire balance. Both `stake.js` and `delegate.js` will reject any operation that would drop the available TRX balance below this threshold.
+
+The reserve is configured in `resources/resource_config.json` under `safeguard.min_reserve_trx` and can be adjusted per deployment.
+
+> [!IMPORTANT]
+> **Never stake or delegate TRX if doing so would leave the account with less than the configured minimum reserve.** The account must always retain enough TRX to cover transaction fees (bandwidth burn, etc.).
+
+---
+
 ## Security Rules
 
 1. **Never display private keys.**
 2. **Always dry-run before staking/unstaking.** These operations lock TRX.
 3. **Warn about the 14-day unstake cooldown.** Users must understand the lockup.
 4. **Check resource status before operations** to avoid staking more than needed.
+5. **Respect the minimum reserve balance.** Never allow staking or delegation that would leave the account below the configured TRX reserve (default 50 TRX).
 
 ---
 

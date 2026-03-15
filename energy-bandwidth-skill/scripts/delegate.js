@@ -8,7 +8,7 @@
  *   node delegate.js --undelegate <fromAddress> <amount> <ENERGY|BANDWIDTH> [--dry-run]
  */
 
-const { getTronWeb, toSun, outputJSON, log } = require("./utils");
+const { getTronWeb, toSun, outputJSON, log, checkReserve } = require("./utils");
 
 async function main() {
   const args = process.argv.slice(2);
@@ -49,6 +49,9 @@ async function main() {
   const amountSun = Number(toSun(args[1]));
   const resource = args[2].toUpperCase();
   const result = { action: "delegate", to: toAddress, amount_trx: args[1], resource, dry_run: dryRun };
+
+  const balance = await tronWeb.trx.getBalance(tronWeb.defaultAddress.base58);
+  checkReserve(balance, amountSun);
 
   log(`Delegating ${args[1]} TRX ${resource} to ${toAddress} ...`);
   if (dryRun) { result.status = "dry_run"; outputJSON(result); return; }

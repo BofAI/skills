@@ -11,6 +11,7 @@ const CONFIG = JSON.parse(
 );
 
 const TRX_DECIMALS = 6;
+const MIN_RESERVE_SUN = BigInt(CONFIG.safeguard.min_reserve_trx) * BigInt(10 ** TRX_DECIMALS);
 
 function getTronWeb() {
   const network = (process.env.TRON_NETWORK || "mainnet").toLowerCase();
@@ -41,4 +42,15 @@ function fromSun(raw) {
 function outputJSON(data) { process.stdout.write(JSON.stringify(data, null, 2) + "\n"); }
 function log(msg) { process.stderr.write(msg + "\n"); }
 
-module.exports = { CONFIG, TRX_DECIMALS, getTronWeb, toSun, fromSun, outputJSON, log };
+function checkReserve(balanceSun, spendSun) {
+  const remaining = BigInt(balanceSun) - BigInt(spendSun);
+  if (remaining < MIN_RESERVE_SUN) {
+    const reserveTrx = CONFIG.safeguard.min_reserve_trx;
+    outputJSON({
+      error: `Safe guard: this operation would leave only ${fromSun(remaining)} TRX, which is below the minimum reserve of ${reserveTrx} TRX. Reduce the amount or top up your account.`,
+    });
+    process.exit(1);
+  }
+}
+
+module.exports = { CONFIG, TRX_DECIMALS, MIN_RESERVE_SUN, getTronWeb, toSun, fromSun, outputJSON, log, checkReserve };

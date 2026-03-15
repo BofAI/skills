@@ -1,4 +1,8 @@
 {
+  "safeguard": {
+    "min_reserve_trx": 50,
+    "description": "Minimum TRX balance that must remain unstaked to cover basic transaction fees. Staking and delegation operations will be rejected if they would drop the available balance below this threshold."
+  },
   "notes": {
     "energy": "Energy is consumed when executing smart contract calls. Each instruction costs a fixed amount of energy. Obtained by staking TRX.",
     "bandwidth": "Bandwidth is consumed by the byte-size of each transaction. Every account gets 600 free bandwidth points per day. Obtained by staking TRX.",
