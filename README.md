@@ -82,7 +82,6 @@ curl -fsSL https://raw.githubusercontent.com/BofAI/openclaw-extension/refs/heads
 ### Payments & x402
 
 - [**x402-payment**](./x402-payment) - Professional x402 payment protocol for calling paid APIs and agent resources.
-- [**x402-payment-demo**](./x402-payment-demo) - A step-by-step demo of the x402 payment workflow.
 
 ### AI & NFT
 
