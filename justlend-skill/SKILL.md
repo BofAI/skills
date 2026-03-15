@@ -42,14 +42,14 @@ node scripts/markets.js
 
 **Output:** `markets[]` (symbol, jToken, supply_apy, borrow_apy)
 
-### 2. `position.js` — Check Positions
+### 2. `position.js` — Check Positions & Health Factor
 
 ```bash
 node scripts/position.js
 node scripts/position.js TWalletAddress
 ```
 
-**Output:** `liquidity` (excess_liquidity_usd, shortfall_usd), `positions[]` (supplied, borrowed)
+**Output:** `liquidity` (excess_liquidity_usd, shortfall_usd), `health_factor` (health_factor, total_borrow_usd), `positions[]` (supplied, borrowed)
 
 ### 3. `supply.js` — Supply Assets
 
@@ -76,7 +76,7 @@ node scripts/borrow.js USDT 100
 ```
 
 > [!WARNING]
-> Borrowing creates a debt position. If your collateral value drops below the required threshold, your position may be **liquidated**. Always check `position.js` for health before borrowing.
+> Borrowing creates a debt position. If your collateral value drops below the required threshold, your position may be **liquidated**. The script automatically estimates the post-borrow health factor and blocks the transaction if it would fall below the safety threshold (default: 1.2).
 
 ### 6. `repay.js` — Repay Borrowed Assets
 
@@ -102,9 +102,9 @@ node scripts/position.js                     # Verify
 
 ```bash
 node scripts/supply.js TRX 5000             # Supply collateral
-node scripts/position.js                     # Check liquidity
-node scripts/borrow.js USDT 100 --dry-run    # Estimate borrow
-node scripts/borrow.js USDT 100              # Execute
+node scripts/position.js                     # Check liquidity & health factor
+node scripts/borrow.js USDT 100 --dry-run    # Estimate borrow (includes health factor projection)
+node scripts/borrow.js USDT 100              # Execute (blocked if health factor < 1.2)
 ```
 
 ### Repay and Withdraw
@@ -130,13 +130,66 @@ node scripts/withdraw.js TRX all             # Withdraw collateral
 
 ---
 
+## Health Factor Monitoring
+
+The **health factor** measures how close a position is to liquidation:
+
+```
+Health Factor = Total Collateral Value (USD, adjusted by collateral factors) / Total Borrow Value (USD)
+```
+
+| Health Factor | Status | Action |
+|---|---|---|
+| > 1.5 | Safe | No action needed |
+| 1.2 – 1.5 | Warning | Script logs a warning; consider reducing borrow or adding collateral |
+| < 1.2 | Blocked | `borrow.js` refuses to execute — too close to liquidation |
+| < 1.0 | Liquidatable | Position can be liquidated by anyone |
+
+### Configuration
+
+Thresholds are defined in `resources/justlend_contracts.json` under the `health_factor` key:
+
+| Parameter | Default | Description |
+|---|---|---|
+| `min_threshold` | `1.2` | Borrows below this are blocked |
+| `warn_threshold` | `1.5` | Borrows below this emit a warning |
+
+### How It Works
+
+1. **Before every borrow**, `borrow.js` calls `estimateHealthFactorAfterBorrow()` which:
+   - Reads current account liquidity from the Comptroller (`getAccountLiquidity`)
+   - Fetches the oracle price for the borrow asset (`getUnderlyingPrice`)
+   - Computes total existing borrows in USD across all markets
+   - Calculates the projected health factor after adding the new borrow
+   - Blocks the transaction if the result is below `min_threshold`
+
+2. **`position.js`** includes the current health factor in its output via `getHealthFactor()`, with warnings when it drops below safe levels.
+
+3. **Dry-run mode** also estimates the health factor, so agents can preview the impact before committing.
+
+### Example: Borrow Blocked by Health Factor
+
+```bash
+$ node scripts/borrow.js USDT 5000 --dry-run
+```
+```json
+{
+  "error": "Health factor safeguard: Borrowing 5000 USDT would result in a health factor of 1.08, which is below the minimum threshold of 1.2. Reduce the borrow amount or supply more collateral.",
+  "estimated_health_factor": 1.08,
+  "min_threshold": 1.2
+}
+```
+
+---
+
 ## Security Rules
 
 1. **Never display private keys.**
 2. **Always dry-run before supplying or borrowing.**
-3. **Check position health before borrowing.** Monitor `excess_liquidity_usd` — if it reaches 0, liquidation risk is imminent.
+3. **Check position health before borrowing.** Monitor `health_factor` in `position.js` output — if it approaches 1.0, liquidation is imminent.
 4. **Repay borrows before withdrawing collateral** to avoid liquidation.
 5. **Warn about liquidation risk** whenever a user borrows or the health factor is low.
+6. **Never bypass the health factor safeguard.** If `borrow.js` blocks a transaction due to low health factor, do not attempt to call the contract directly.
 
 ---
 

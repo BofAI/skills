@@ -7,7 +7,7 @@
  *   node position.js [walletAddress]
  */
 
-const { CONTRACTS, getTronWeb, getMarkets, getComptroller, fromSun, outputJSON, log } = require("./utils");
+const { CONTRACTS, HEALTH_FACTOR, getTronWeb, getMarkets, getComptroller, fromSun, outputJSON, log, getHealthFactor } = require("./utils");
 
 async function main() {
   const tronWeb = getTronWeb();
@@ -73,7 +73,23 @@ async function main() {
     }
   }
 
-  outputJSON({ wallet: address, liquidity, positions });
+  // Compute health factor
+  let healthFactor = null;
+  try {
+    healthFactor = await getHealthFactor(tronWeb, address);
+    if (healthFactor.health_factor !== null && healthFactor.health_factor !== Infinity) {
+      log(`Health factor: ${healthFactor.health_factor}`);
+      if (healthFactor.health_factor < HEALTH_FACTOR.min_threshold) {
+        log(`CRITICAL: Health factor ${healthFactor.health_factor} is below minimum threshold ${HEALTH_FACTOR.min_threshold}. Liquidation risk is imminent!`);
+      } else if (healthFactor.health_factor < HEALTH_FACTOR.warn_threshold) {
+        log(`WARNING: Health factor ${healthFactor.health_factor} is below recommended safe level ${HEALTH_FACTOR.warn_threshold}.`);
+      }
+    }
+  } catch (e) {
+    healthFactor = { error: e.message };
+  }
+
+  outputJSON({ wallet: address, liquidity, health_factor: healthFactor, positions });
 }
 
 main().catch((e) => { outputJSON({ error: e.message }); process.exit(1); });

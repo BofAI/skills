@@ -1,6 +1,14 @@
 {
+  "health_factor": {
+    "min_threshold": 1.2,
+    "warn_threshold": 1.5,
+    "description": "Health factor = total collateral value (adjusted by collateral factors) / total borrow value. Borrowing is blocked if the estimated post-borrow health factor would fall below min_threshold. A warning is emitted if it falls below warn_threshold."
+  },
   "comptroller": {
     "mainnet": "TGjYzgCyPobsNS9n6WcbdLVR9dH7mWqFx7"
+  },
+  "price_oracle": {
+    "mainnet": "TYjSgFaoVCQFGRZPjhHUb3Mcs7SRqj9aYM"
   },
   "markets": {
     "mainnet": [
@@ -36,7 +44,12 @@
     "comptroller": {
       "enterMarkets": { "type": "function", "name": "enterMarkets", "inputs": [{ "name": "jTokens", "type": "address[]" }], "outputs": [{ "name": "", "type": "uint256[]" }], "stateMutability": "nonpayable" },
       "getAccountLiquidity": { "type": "function", "name": "getAccountLiquidity", "inputs": [{ "name": "account", "type": "address" }], "outputs": [{ "name": "", "type": "uint256" }, { "name": "", "type": "uint256" }, { "name": "", "type": "uint256" }], "stateMutability": "view" },
-      "getAllMarkets": { "type": "function", "name": "getAllMarkets", "inputs": [], "outputs": [{ "name": "", "type": "address[]" }], "stateMutability": "view" }
+      "getAllMarkets": { "type": "function", "name": "getAllMarkets", "inputs": [], "outputs": [{ "name": "", "type": "address[]" }], "stateMutability": "view" },
+      "oracle": { "type": "function", "name": "oracle", "inputs": [], "outputs": [{ "name": "", "type": "address" }], "stateMutability": "view" },
+      "markets": { "type": "function", "name": "markets", "inputs": [{ "name": "jToken", "type": "address" }], "outputs": [{ "name": "isListed", "type": "bool" }, { "name": "collateralFactorMantissa", "type": "uint256" }], "stateMutability": "view" }
+    },
+    "priceOracle": {
+      "getUnderlyingPrice": { "type": "function", "name": "getUnderlyingPrice", "inputs": [{ "name": "jToken", "type": "address" }], "outputs": [{ "name": "", "type": "uint256" }], "stateMutability": "view" }
     },
     "trc20": {
       "approve": { "type": "function", "name": "approve", "inputs": [{ "name": "spender", "type": "address" }, { "name": "amount", "type": "uint256" }], "outputs": [{ "name": "", "type": "bool" }], "stateMutability": "nonpayable" },
