@@ -89,6 +89,20 @@ node scripts/rewards.js --claim
 
 ---
 
+## TRON Stake 2.0 Compliance
+
+This skill is compatible with the **TRON Stake 2.0** data model and APIs:
+
+- **Account data:** Reads the Stake 2.0 `frozenV2[]` array to compute TRON Power and vote capacity (`status.js`, `vote.js`).
+- **Voting:** Uses `voteWitnessAccount` to cast votes with TRON Power obtained from Stake 2.0 frozen balances.
+- **Voting rewards:** Checks via `getReward` and claims via `withdrawBalance` (`rewards.js`). This is separate from unstake withdrawal.
+- **Staking/unstaking TRX** is handled by the companion **energy-bandwidth** skill (which uses `freezeBalanceV2`, `unfreezeBalanceV2`, and `withdrawExpireUnfreeze`).
+
+> [!CAUTION]
+> **14-Day Unbonding Period:** When TRX is unstaked (via the energy-bandwidth skill), it enters a 14-day cooldown during which it is **locked and earns no resources or voting power**. The agent must always warn the user about this delay before initiating an unstake. After the 14 days, the TRX does NOT automatically return — `withdrawExpireUnfreeze` must be called to reclaim it. **Unstaking also removes the corresponding TRON Power, which will invalidate any active votes that depend on it.**
+
+---
+
 ## Key Facts
 
 | Property | Value |
@@ -98,7 +112,8 @@ node scripts/rewards.js --claim
 | SR Partners | Ranks 28-127 |
 | Vote cycle | Every 6 hours |
 | Block reward | 128 TRX per cycle, proportional to votes |
-| Unstake cooldown | 14 days |
+| Unstake cooldown | **14 days (mandatory, Stake 2.0)** |
+| Unstake withdrawal | **Manual — must call `withdrawExpireUnfreeze`** |
 
 ---
 
@@ -108,6 +123,7 @@ node scripts/rewards.js --claim
 2. **Dry-run before voting.** Votes replace previous votes entirely.
 3. **Verify SR addresses** before voting — confirm via `sr-list.js`.
 4. **Understand that voting replaces all previous votes.** Each vote transaction sets the complete vote slate.
+5. **Always warn about the 14-day unbonding period before unstaking.** When the user wants to unstake (via the energy-bandwidth skill), they must understand that unstaked TRX is locked for 14 days, must be manually withdrawn, and that the lost TRON Power will invalidate votes.
 
 ---
 
