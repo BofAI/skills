@@ -194,14 +194,18 @@ async function main() {
       const template = CONFIG.templates[templateName];
       const keyMap = opts.keys || {};
 
-      // Resolve key roles to addresses
+      // Deduplicated ordered list of all roles across owner + active permissions
+      const allRoles = [...new Set([...template.owner.key_roles, ...template.active.flatMap(a => a.key_roles)])];
+
+      // Resolve key roles to addresses via --roleName or positional --keyN
       function resolveRole(role) {
-        // check --key1, --key2 etc by position, or by exact role name
+        // check exact role name match (e.g. --agent_key)
         for (const [flag, addr] of Object.entries(keyMap)) {
           if (flag === role.toLowerCase()) return addr;
         }
         // try positional: key1 = first role, key2 = second, etc.
-        const roleIndex = template.owner.key_roles.indexOf(role);
+        const roleIndex = allRoles.indexOf(role);
+        if (roleIndex === -1) throw new Error(`Role "${role}" not found in template "${templateName}".`);
         const posFlag = `key${roleIndex + 1}`;
         if (keyMap[posFlag]) return keyMap[posFlag];
         throw new Error(`Missing address for role "${role}". Provide --key${roleIndex + 1} <address>`);
@@ -213,9 +217,6 @@ async function main() {
         address: resolveRole(role),
         weight: template.owner.weights[i],
       }));
-
-      // Build active permissions
-      const allRoles = [...new Set([...template.owner.key_roles, ...template.active.flatMap(a => a.key_roles)])];
 
       actives.length = 0; // clear existing
       for (let i = 0; i < template.active.length; i++) {
