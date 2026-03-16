@@ -148,12 +148,14 @@ node scripts/update.js scope-active --id 2 \
 
 ## Permission Templates
 
-| Template | Config | Description |
-|----------|--------|-------------|
-| `basic-2of3` | 2-of-3 owner, 1-of-1 active (all ops) | Standard multi-sig |
-| `agent-restricted` | 2-of-2 owner (human+backup), 1-of-1 active (TriggerSmartContract only) | Agent can only call contracts |
-| `team-tiered` | 3-of-5 owner, 2-of-3 active (transfers + contracts) | Team with tiered access |
-| `weighted-authority` | Threshold 3: primary (weight 2) + two secondaries (weight 1) | Weighted key authority |
+Templates use `--keyN` flags to assign addresses to named roles. Keys are numbered **positionally across owner and active roles** (deduplicated, owner first). You can also use `--role_name` directly (e.g. `--agent_key TAddr...`).
+
+| Template | Config | Key mapping | Description |
+|----------|--------|-------------|-------------|
+| `basic-2of3` | 2-of-3 owner, 1-of-1 active (all ops) | `--key1`=KEY_1, `--key2`=KEY_2, `--key3`=KEY_3 | Standard multi-sig |
+| `agent-restricted` | 2-of-2 owner, 1-of-1 active (TriggerSmartContract only) | `--key1`=HUMAN_KEY, `--key2`=BACKUP_KEY, `--key3`=AGENT_KEY | Agent can only call contracts |
+| `team-tiered` | 3-of-5 owner, 2-of-3 active (transfers + contracts) | `--key1`..`--key5`=KEY_1..KEY_5 | Team with tiered access |
+| `weighted-authority` | Threshold 3: primary (wt 2) + secondaries (wt 1) | `--key1`=PRIMARY_KEY, `--key2`=SECONDARY_1, `--key3`=SECONDARY_2 | Weighted key authority |
 
 ---
 

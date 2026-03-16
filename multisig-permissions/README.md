@@ -34,12 +34,14 @@ node scripts/execute.js prop_xxxxx_xxxx
 
 ## Templates
 
-| Template | Description |
-|----------|-------------|
-| `basic-2of3` | Standard 2-of-3 multi-sig |
-| `agent-restricted` | Agent limited to smart contract calls only |
-| `team-tiered` | 3-of-5 owner, 2-of-3 active for daily ops |
-| `weighted-authority` | Primary key has extra weight |
+Keys are numbered positionally across all roles in the template (owner first, then active-only roles):
+
+| Template | Key mapping | Description |
+|----------|-------------|-------------|
+| `basic-2of3` | `--key1`..`--key3` (owner keys) | Standard 2-of-3 multi-sig |
+| `agent-restricted` | `--key1` HUMAN, `--key2` BACKUP (owner), `--key3` AGENT (active) | Agent limited to smart contract calls only |
+| `team-tiered` | `--key1`..`--key5` (owner keys, first 3 reused in active) | 3-of-5 owner, 2-of-3 active for daily ops |
+| `weighted-authority` | `--key1` PRIMARY (wt 2), `--key2`..`--key3` SECONDARY (wt 1) | Primary key has extra weight |
 
 ## Demo: Hybrid Signature Workflow (Human + Agent)
 
