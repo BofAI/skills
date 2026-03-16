@@ -39,6 +39,21 @@ function getTronWeb() {
   return new TronWeb(opts);
 }
 
+function getTronWebReadOnly() {
+  const network = (process.env.TRON_NETWORK || "mainnet").toLowerCase();
+  const hosts = { mainnet: "https://api.trongrid.io", nile: "https://nile.trongrid.io", shasta: "https://api.shasta.trongrid.io" };
+  const fullHost = hosts[network];
+  if (!fullHost) throw new Error(`Unknown network "${network}". Supported: ${Object.keys(hosts).join(", ")}`);
+  const opts = { fullHost };
+  if (process.env.TRONGRID_API_KEY) opts.headers = { "TRON-PRO-API-KEY": process.env.TRONGRID_API_KEY };
+  const tw = new TronWeb(opts);
+  tw.defaultAddress = {
+    hex: "410000000000000000000000000000000000000000",
+    base58: "T9yD14Nj9j7xAB4dbGeiX9h8unkKHxuWwb",
+  };
+  return tw;
+}
+
 function resolveToken(symbolOrAddress) {
   if (symbolOrAddress.startsWith("T") && symbolOrAddress.length >= 34) return symbolOrAddress;
   const network = (process.env.TRON_NETWORK || "mainnet").toLowerCase();
@@ -66,4 +81,4 @@ function fromSun(raw, decimals) {
 function outputJSON(data) { process.stdout.write(JSON.stringify(data, null, 2) + "\n"); }
 function log(msg) { process.stderr.write(msg + "\n"); }
 
-module.exports = { TOKENS, TRC20_ABI, MAX_UINT256, getTronWeb, resolveToken, toSun, fromSun, outputJSON, log };
+module.exports = { TOKENS, TRC20_ABI, MAX_UINT256, getTronWeb, getTronWebReadOnly, resolveToken, toSun, fromSun, outputJSON, log };

@@ -12,7 +12,7 @@
 ## Quick Start
 
 ```bash
-cd trc20-toolkit && npm install
+cd trc20-toolkit-skill && npm install
 export TRON_PRIVATE_KEY="<key>"
 
 node scripts/info.js USDT

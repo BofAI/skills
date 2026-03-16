@@ -23,7 +23,7 @@ Universal TRC20 token operations for AI agents on TRON. Check balances, transfer
 
 1. Install dependencies:
    ```bash
-   cd trc20-toolkit && npm install
+   cd trc20-toolkit-skill && npm install
    ```
 2. Set environment variables:
    ```bash

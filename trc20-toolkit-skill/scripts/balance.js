@@ -11,7 +11,7 @@
  *   TRON_PRIVATE_KEY, TRON_NETWORK (mainnet|nile), TRONGRID_API_KEY (optional)
  */
 
-const { TRC20_ABI, getTronWeb, resolveToken, fromSun, outputJSON, log } = require("./utils");
+const { TRC20_ABI, getTronWeb, getTronWebReadOnly, resolveToken, fromSun, outputJSON, log } = require("./utils");
 
 async function getTokenBalance(tronWeb, tokenAddress, walletAddress) {
   const contract = await tronWeb.contract(TRC20_ABI, tokenAddress);
@@ -34,18 +34,19 @@ async function main() {
   const args = process.argv.slice(2);
   if (args.length < 1) { console.error("Usage: node balance.js <token> [wallet] OR --batch <t1,t2,...> [wallet]"); process.exit(1); }
 
-  const tronWeb = getTronWeb();
   const isBatch = args[0] === "--batch";
+  const explicitWallet = isBatch ? args[2] : args[1];
+  const tronWeb = explicitWallet ? getTronWebReadOnly() : getTronWeb();
 
   let walletAddress;
   let tokens;
 
   if (isBatch) {
     tokens = args[1].split(",").map((t) => resolveToken(t.trim()));
-    walletAddress = args[2] || tronWeb.defaultAddress.base58;
+    walletAddress = explicitWallet || tronWeb.defaultAddress.base58;
   } else {
     tokens = [resolveToken(args[0])];
-    walletAddress = args[1] || tronWeb.defaultAddress.base58;
+    walletAddress = explicitWallet || tronWeb.defaultAddress.base58;
   }
 
   log(`Checking balances for ${walletAddress} ...`);

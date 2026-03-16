@@ -7,16 +7,17 @@
  *   node info.js <tokenAddressOrSymbol>
  *
  * Environment:
- *   TRON_PRIVATE_KEY, TRON_NETWORK (mainnet|nile), TRONGRID_API_KEY (optional)
+ *   TRON_NETWORK (mainnet|nile), TRONGRID_API_KEY (optional)
+ *   No private key required (read-only).
  */
 
-const { TRC20_ABI, getTronWeb, resolveToken, fromSun, outputJSON, log } = require("./utils");
+const { TRC20_ABI, getTronWebReadOnly, resolveToken, fromSun, outputJSON, log } = require("./utils");
 
 async function main() {
   const args = process.argv.slice(2);
   if (args.length < 1) { console.error("Usage: node info.js <tokenAddressOrSymbol>"); process.exit(1); }
 
-  const tronWeb = getTronWeb();
+  const tronWeb = getTronWebReadOnly();
   const tokenAddress = resolveToken(args[0]);
   log(`Fetching metadata for ${tokenAddress} ...`);
 
