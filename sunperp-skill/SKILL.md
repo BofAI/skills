@@ -51,7 +51,7 @@ All scripts communicate with the SunPerp REST API at `https://api.sunx.io`.
 Install Node.js dependencies from the skill directory:
 
 ```bash
-cd <skill_directory>
+cd sunperp-skill
 npm install
 ```
 
