@@ -22,7 +22,7 @@ Manage TRON's unique resource system. Energy is consumed by smart contract execu
 ## Quick Start
 
 ```bash
-cd energy-bandwidth && npm install
+cd energy-bandwidth-skill && npm install
 export TRON_PRIVATE_KEY="<your-private-key>"
 export TRON_NETWORK="mainnet"
 ```

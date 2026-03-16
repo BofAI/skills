@@ -13,7 +13,7 @@
 ## Quick Start
 
 ```bash
-cd energy-bandwidth && npm install
+cd energy-bandwidth-skill && npm install
 export TRON_PRIVATE_KEY="<key>"
 
 node scripts/status.js
