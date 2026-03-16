@@ -9,7 +9,7 @@
  *   node balance.js <tokenAddress> <wallet>  # token balance of specified wallet
  *
  * Environment:
- *   TRON_PRIVATE_KEY   — wallet private key (required)
+ *   TRON_PRIVATE_KEY   — wallet private key (required when no wallet address provided)
  *   TRON_NETWORK       — mainnet (default) | nile
  *   TRONGRID_API_KEY   — optional TronGrid API key
  */
@@ -19,6 +19,7 @@ const {
   TOKEN_DECIMALS,
   TRX_DECIMALS,
   getTronWeb,
+  getTronWebReadOnly,
   getLauncherAddress,
   fromSun,
   outputJSON,
@@ -27,9 +28,9 @@ const {
 
 async function main() {
   const args = process.argv.slice(2);
-  const tronWeb = getTronWeb();
-  const walletAddress =
-    args[1] || tronWeb.defaultAddress.base58;
+  const explicitWallet = args[1];
+  const tronWeb = explicitWallet ? getTronWebReadOnly() : getTronWeb();
+  const walletAddress = explicitWallet || tronWeb.defaultAddress.base58;
 
   log(`Checking balances for ${walletAddress} ...`);
 

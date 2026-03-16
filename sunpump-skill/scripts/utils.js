@@ -46,6 +46,33 @@ function getTronWeb() {
 }
 
 /**
+ * Build a read-only TronWeb instance (no private key required).
+ * Use this for queries that only read on-chain data (e.g. price, state).
+ */
+function getTronWebReadOnly() {
+  const network = (process.env.TRON_NETWORK || "mainnet").toLowerCase();
+  const net = CONTRACTS.networks[network];
+  if (!net) {
+    throw new Error(
+      `Unknown network "${network}". Supported: ${Object.keys(CONTRACTS.networks).join(", ")}`
+    );
+  }
+
+  const fullHost = net.trongrid_api;
+  const opts = { fullHost };
+  if (process.env.TRONGRID_API_KEY) {
+    opts.headers = { "TRON-PRO-API-KEY": process.env.TRONGRID_API_KEY };
+  }
+
+  const tw = new TronWeb(opts);
+  tw.defaultAddress = {
+    hex: "410000000000000000000000000000000000000000",
+    base58: "T9yD14Nj9j7xAB4dbGeiX9h8unkKHxuWwb",
+  };
+  return tw;
+}
+
+/**
  * Return the SunPump launcher address for the active network.
  */
 function getLauncherAddress() {
@@ -126,6 +153,7 @@ module.exports = {
   TOKEN_DECIMALS,
   MAX_UINT256,
   getTronWeb,
+  getTronWebReadOnly,
   getLauncherAddress,
   toSun,
   fromSun,

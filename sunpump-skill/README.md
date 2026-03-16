@@ -9,7 +9,7 @@ This skill provides AI agents with scripts to trade tokens on [SunPump](https://
 ## Files
 
 ```
-sunpump/
+sunpump-skill/
 ├── SKILL.md                          # Full agent instructions
 ├── README.md                         # This file
 ├── package.json                      # Node.js dependencies
@@ -34,7 +34,7 @@ sunpump/
 ## Quick Start
 
 ```bash
-cd sunpump && npm install
+cd sunpump-skill && npm install
 
 export TRON_PRIVATE_KEY="<your-key>"
 export TRON_NETWORK="mainnet"

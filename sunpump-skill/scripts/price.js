@@ -9,7 +9,6 @@
  *   node price.js <tokenAddress> --sell <tokenAmount>  # estimate sell
  *
  * Environment:
- *   TRON_PRIVATE_KEY   — wallet private key (required by TronWeb)
  *   TRON_NETWORK       — mainnet (default) | nile
  *   TRONGRID_API_KEY   — optional TronGrid API key
  */
@@ -18,7 +17,7 @@ const {
   CONTRACTS,
   TOKEN_DECIMALS,
   TRX_DECIMALS,
-  getTronWeb,
+  getTronWebReadOnly,
   getLauncherAddress,
   toSun,
   fromSun,
@@ -38,7 +37,7 @@ async function main() {
   }
 
   const tokenAddress = args[0];
-  const tronWeb = getTronWeb();
+  const tronWeb = getTronWebReadOnly();
   const launcherAddr = getLauncherAddress();
 
   log(`Querying SunPump for token ${tokenAddress} ...`);

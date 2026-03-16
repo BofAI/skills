@@ -29,7 +29,7 @@ Trade meme tokens on **SunPump** — the leading fair-launch bonding-curve platf
 1. **Node.js 18+** and **npm** installed.
 2. Install dependencies:
    ```bash
-   cd sunpump && npm install
+   cd sunpump-skill && npm install
    ```
 3. Set environment variables:
    ```bash
@@ -45,7 +45,7 @@ Trade meme tokens on **SunPump** — the leading fair-launch bonding-curve platf
 
 ## Available Scripts
 
-All scripts live in `sunpump/scripts/` and output structured JSON to **stdout**. Human-readable progress messages go to **stderr**.
+All scripts live in `sunpump-skill/scripts/` and output structured JSON to **stdout**. Human-readable progress messages go to **stderr**.
 
 ### 1. `balance.js` — Check Balances
 
@@ -309,7 +309,7 @@ Example JSON output from `buy.js --dry-run`:
 | `Token has migrated to SunSwap` | Token completed bonding curve | Use the **SunSwap** skill for trading |
 | `Transaction failed: OUT_OF_ENERGY` | Insufficient energy/bandwidth | Stake TRX for Energy or ensure enough TRX for bandwidth |
 | `Approval failed` | Token contract rejected approve | Check if the token address is correct |
-| `Cannot find module 'tronweb'` | Dependencies not installed | Run `npm install` in the sunpump directory |
+| `Cannot find module 'tronweb'` | Dependencies not installed | Run `npm install` in the sunpump-skill directory |
 | Unexpectedly low token amount | High slippage or price movement | Use `--dry-run` first; increase slippage if needed |
 
 ---
@@ -350,7 +350,7 @@ Example JSON output from `buy.js --dry-run`:
 
 ### Module installation
 ```bash
-cd sunpump && npm install
+cd sunpump-skill && npm install
 ```
 
 ### Network errors
