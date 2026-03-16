@@ -46,6 +46,7 @@ async function main() {
 
   const psmAddress = contracts.psm.address;
   const gemJoinAddress = contracts.psmGemJoin.address;
+  const usddJoinAddress = contracts.usddJoin.address;
   const usdtToken = resolveToken("USDT");
   const usddToken = resolveToken("USDD");
 
@@ -152,14 +153,14 @@ async function main() {
       return;
     }
 
-    // buyGem does dai.transferFrom(msg.sender, address(this), ...) directly,
-    // so approval must target the PSM contract itself.
-    log("Checking USDD allowance for PSM ...");
+    // buyGem calls usddJoin.join internally, which does transferFrom on USDD.
+    // Approval must target usddJoin, not the PSM contract.
+    log("Checking USDD allowance for UsddJoin ...");
     const approvalContract = await tronWeb.contract(
       [CONTRACTS.abi.trc20.allowance, CONTRACTS.abi.trc20.approve],
       usddToken.address
     );
-    const allowance = BigInt(await approvalContract.allowance(walletAddress, psmAddress).call());
+    const allowance = BigInt(await approvalContract.allowance(walletAddress, usddJoinAddress).call());
     result.current_allowance = fromSun(allowance, usddToken.decimals);
     result.needs_approval = allowance < usddNeeded;
 
@@ -172,8 +173,8 @@ async function main() {
 
     // Approve if needed
     if (allowance < usddNeeded) {
-      log("Approving PSM to spend USDD ...");
-      const approveTx = await approvalContract.approve(psmAddress, MAX_UINT256).send({
+      log("Approving UsddJoin to spend USDD ...");
+      const approveTx = await approvalContract.approve(usddJoinAddress, MAX_UINT256).send({
         feeLimit: 50_000_000,
         shouldPollResponse: false,
       });

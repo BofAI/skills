@@ -143,7 +143,8 @@ node scripts/vault-info.js --cdp 42               # Check specific CDP position
 |---|---|---|
 | USDD Token (v2) | `TXDk8mbtRbXeYuMNS83CfKPaYYT8XWv9Hz` | USDD TRC20 (18 decimals) |
 | UsddPsm | `TBXW4hS5KYjjbJXDpnrPf4zhkLwrpUjbyz` | PSM — buyGem/sellGem for 1:1 swaps |
-| PSM GemJoin | `TSUYvQ5tdd3DijCD1uGunGLpftHuSZ12sQ` | PSM USDT collateral adapter |
+| PSM GemJoin | `TSUYvQ5tdd3DijCD1uGunGLpftHuSZ12sQ` | PSM USDT collateral adapter (sellGem: approve USDT here) |
+| UsddJoin | `TUajR7CbXU6hX8n3XtNkitFAD25JvP99K6` | USDD join adapter (buyGem: approve USDD here) |
 | DssCdpManager | `TDDWjmQaquEtUn1Pa8wCd8dfWFPdQLGPYL` | CDP management (open, frob, flux) |
 | Vat | `TH5dhX7o39afSbfDT2e3c9k4itWjNKD4D9` | Core accounting engine |
 | USDT Token | `TR7NHqjeKQxGTCi8q8ZY4pL8otSzgjLj6t` | USDT TRC20 (6 decimals) |
