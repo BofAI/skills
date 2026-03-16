@@ -14,7 +14,7 @@
 ## Quick Start
 
 ```bash
-cd justlend && npm install
+cd justlend-skill && npm install
 export TRON_PRIVATE_KEY="<key>"
 
 node scripts/markets.js

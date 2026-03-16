@@ -15,14 +15,14 @@ tags:
 
 # JustLend DAO
 
-Supply assets to earn interest and borrow against collateral on **JustLend DAO** — TRON's largest lending protocol ($5.95B TVL). Supports TRX, USDT, USDC, USDD, SUN, BTT, and JST markets.
+Supply assets to earn interest and borrow against collateral on **JustLend DAO** — TRON's largest lending protocol ($5.95B TVL). Supports TRX, USDT, USDC, USDD, SUN, BTT, JST, WIN, and BTC markets.
 
 ---
 
 ## Quick Start
 
 ```bash
-cd justlend && npm install
+cd justlend-skill && npm install
 export TRON_PRIVATE_KEY="<your-private-key>"
 export TRON_NETWORK="mainnet"
 ```
@@ -120,13 +120,15 @@ node scripts/withdraw.js TRX all             # Withdraw collateral
 
 | Asset | jToken | Decimals |
 |---|---|---|
-| TRX | `TLeEu311Vrv2asMEqrEAFRyAZGU83RB27h` | 6 |
-| USDT | `TXJgMRrQHTzLMcKfSEZ4LRCWZkBq4iZ5EL` | 6 |
-| USDC | `TX7kybeP6UwTBRHLNPYmswFESHfyjm9bAS` | 6 |
-| USDD | `TX1x3z8wVJiSdVkFR2WdKtrqEQoRNYHoEW` | 18 |
-| SUN | `TPYfcPk9T5C5fqwzAGdzYDCiWKJpGSoFma` | 18 |
-| BTT | `TGkfRFBa3FKQP3YjibZL4kR1DuPcGS1eiS` | 18 |
-| JST | `TRgRMmyNoelaqA7Md23hLKfnr1FEQoSHcH` | 18 |
+| TRX | `TE2RzoSV3wFK99w6J9UnnZ4vLfXYoxvRwP` | 6 |
+| USDT | `TXJgMdjVX5dKiQaUi9QobwNxtSQaFqccvd` | 6 |
+| USDC | `TNSBA6KvSvMoTqQcEgpVK7VhHT3z7wifxy` | 6 |
+| USDD | `TKFRELGGoRgiayhwJTNNLqCNjFoLBh3Mnf` | 18 |
+| SUN | `TGBr8uh9jBVHJhhkwSJvQN2ZAKzVkxDmno` | 18 |
+| BTT | `TUaUHU9Dy8x5yNi1pKnFYqHWojot61Jfto` | 18 |
+| JST | `TWQhCXaWz4eHK4Kd1ErSDHjMFPoPc9czts` | 18 |
+| WIN | `TRg6MnpsFXc82ymUPgf5qbj59ibxiEDWvv` | 6 |
+| BTC | `TLeEu311Cbw63BcmMHDgDLu7fnk9fqGcqT` | 8 |
 
 ---
 

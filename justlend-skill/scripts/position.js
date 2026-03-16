@@ -7,11 +7,12 @@
  *   node position.js [walletAddress]
  */
 
-const { CONTRACTS, HEALTH_FACTOR, getTronWeb, getMarkets, getComptroller, fromSun, outputJSON, log, getHealthFactor } = require("./utils");
+const { CONTRACTS, HEALTH_FACTOR, getTronWeb, getTronWebReadOnly, getMarkets, getComptroller, fromSun, outputJSON, log, getHealthFactor } = require("./utils");
 
 async function main() {
-  const tronWeb = getTronWeb();
-  const address = process.argv[2] || tronWeb.defaultAddress.base58;
+  const addressArg = process.argv[2];
+  const tronWeb = addressArg ? getTronWebReadOnly() : getTronWeb();
+  const address = addressArg || tronWeb.defaultAddress.base58;
   const markets = getMarkets();
   const comptrollerAddr = getComptroller();
 

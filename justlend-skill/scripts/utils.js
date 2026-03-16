@@ -25,6 +25,21 @@ function getTronWeb() {
   return new TronWeb(opts);
 }
 
+function getTronWebReadOnly() {
+  const network = (process.env.TRON_NETWORK || "mainnet").toLowerCase();
+  const hosts = { mainnet: "https://api.trongrid.io", nile: "https://nile.trongrid.io", shasta: "https://api.shasta.trongrid.io" };
+  const fullHost = hosts[network];
+  if (!fullHost) throw new Error(`Unknown network "${network}".`);
+  const opts = { fullHost };
+  if (process.env.TRONGRID_API_KEY) opts.headers = { "TRON-PRO-API-KEY": process.env.TRONGRID_API_KEY };
+  const tw = new TronWeb(opts);
+  tw.defaultAddress = {
+    hex: "410000000000000000000000000000000000000000",
+    base58: "T9yD14Nj9j7xAB4dbGeiX9h8unkKHxuWwb",
+  };
+  return tw;
+}
+
 function getMarkets() {
   const network = (process.env.TRON_NETWORK || "mainnet").toLowerCase();
   return CONTRACTS.markets[network] || [];
@@ -225,4 +240,4 @@ function checkHealthFactorThreshold(hf, context) {
   }
 }
 
-module.exports = { CONTRACTS, HEALTH_FACTOR, getTronWeb, getMarkets, getComptroller, getPriceOracle, resolveMarket, toSun, fromSun, outputJSON, log, getHealthFactor, estimateHealthFactorAfterBorrow, checkHealthFactorThreshold };
+module.exports = { CONTRACTS, HEALTH_FACTOR, getTronWeb, getTronWebReadOnly, getMarkets, getComptroller, getPriceOracle, resolveMarket, toSun, fromSun, outputJSON, log, getHealthFactor, estimateHealthFactorAfterBorrow, checkHealthFactorThreshold };

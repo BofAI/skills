@@ -7,12 +7,12 @@
  *   node markets.js
  */
 
-const { CONTRACTS, getTronWeb, getMarkets, fromSun, outputJSON, log } = require("./utils");
+const { CONTRACTS, getTronWebReadOnly, getMarkets, fromSun, outputJSON, log } = require("./utils");
 
 const BLOCKS_PER_YEAR = 10_512_000;
 
 async function main() {
-  const tronWeb = getTronWeb();
+  const tronWeb = getTronWebReadOnly();
   const markets = getMarkets();
 
   log("Fetching JustLend market rates ...");
