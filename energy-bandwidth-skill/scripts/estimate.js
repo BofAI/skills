@@ -22,9 +22,20 @@ async function main() {
   const tronWeb = getTronWeb();
   const contractAddress = args[0];
   const functionSelector = args[1];
-  const parameters = args[2] ? args[2].split(",").map((p) => p.trim()) : [];
+  const paramValues = args[2] ? args[2].split(",").map((p) => p.trim()) : [];
   const callValue = args[3] ? Number(args[3]) : 0;
   const ownerAddress = tronWeb.defaultAddress.base58;
+
+  // Extract parameter types from function selector, e.g. "transfer(address,uint256)" -> ["address","uint256"]
+  const typeMatch = functionSelector.match(/\(([^)]*)\)/);
+  const paramTypes = typeMatch && typeMatch[1] ? typeMatch[1].split(",").map((t) => t.trim()) : [];
+
+  if (paramValues.length !== paramTypes.length) {
+    outputJSON({ error: `Parameter count mismatch: selector has ${paramTypes.length} params but ${paramValues.length} values provided.` });
+    process.exit(1);
+  }
+
+  const parameters = paramValues.map((value, i) => ({ type: paramTypes[i], value }));
 
   log(`Estimating energy for ${functionSelector} on ${contractAddress} ...`);
 
@@ -32,8 +43,8 @@ async function main() {
     const tx = await tronWeb.transactionBuilder.triggerConstantContract(
       contractAddress,
       functionSelector,
-      {},
-      parameters.map((p, i) => ({ type: "auto", value: p })),
+      { callValue },
+      parameters,
       ownerAddress
     );
 
