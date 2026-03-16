@@ -7,10 +7,10 @@
  *   node sr-list.js [--top <N>]     # default: top 27 (active SRs)
  */
 
-const { getTronWeb, outputJSON, log } = require("./utils");
+const { getTronWebReadOnly, outputJSON, log } = require("./utils");
 
 async function main() {
-  const tronWeb = getTronWeb();
+  const tronWeb = getTronWebReadOnly();
   const args = process.argv.slice(2);
   const topIdx = args.indexOf("--top");
   const topN = topIdx !== -1 ? parseInt(args[topIdx + 1], 10) : 27;
