@@ -22,7 +22,7 @@ Stake TRX to earn TRON Power, vote for Super Representatives (SRs), and claim vo
 ## Quick Start
 
 ```bash
-cd trx-staking && npm install
+cd trx-staking-skill && npm install
 export TRON_PRIVATE_KEY="<your-private-key>"
 export TRON_NETWORK="mainnet"
 ```

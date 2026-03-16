@@ -12,7 +12,7 @@
 ## Quick Start
 
 ```bash
-cd trx-staking && npm install
+cd trx-staking-skill && npm install
 export TRON_PRIVATE_KEY="<key>"
 
 node scripts/status.js
