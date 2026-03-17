@@ -329,6 +329,10 @@ async function main() {
 
     result.status = broadcast.result ? "submitted" : "failed";
     result.tx_id = broadcast.txid;
+    if (!broadcast.result) {
+      result.broadcast_error = broadcast.message || broadcast.code || "Unknown error";
+      log(`Broadcast failed: ${result.broadcast_error}`);
+    }
     log(`Transaction: ${broadcast.txid}`);
   } catch (e) {
     result.status = "failed";

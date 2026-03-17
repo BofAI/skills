@@ -1,6 +1,5 @@
 {
   "operation_codes": {
-    "0":  { "name": "AccountCreateContract",              "description": "Create a new account" },
     "1":  { "name": "TransferContract",                   "description": "Transfer TRX" },
     "2":  { "name": "TransferAssetContract",              "description": "Transfer TRC10 tokens" },
     "4":  { "name": "VoteWitnessContract",                "description": "Vote for Super Representatives" },

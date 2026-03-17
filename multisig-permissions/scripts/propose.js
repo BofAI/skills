@@ -149,9 +149,13 @@ async function main() {
       process.exit(1);
   }
 
-  // Extend transaction expiration for multi-sig (default ~10s is too short)
+  // Extend transaction expiration for multi-sig (default ~60s is too short).
+  // TronWeb builds transactions with expiration = now + 60s, and extendExpiration
+  // ADDS to that value. TRON's node enforces expiration <= head_block_time + 24h,
+  // so we subtract the default 60s to stay within the limit.
+  const TRON_DEFAULT_EXPIRY_S = 60;
   const expiryMs = (opts.expiryHours || 24) * 60 * 60 * 1000;
-  const expirySeconds = Math.floor(expiryMs / 1000);
+  const expirySeconds = Math.max(0, Math.floor(expiryMs / 1000) - TRON_DEFAULT_EXPIRY_S);
   tx = await tronWeb.transactionBuilder.extendExpiration(tx, expirySeconds);
 
   // Sign with caller's key using multiSign (which handles Permission_id internally)

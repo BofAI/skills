@@ -91,13 +91,13 @@ function decodeOperations(hexString) {
 function encodeOperations(operationNames) {
   const buf = Buffer.alloc(32, 0); // 256 bits
   if (operationNames === "all" || (Array.isArray(operationNames) && operationNames.includes("all"))) {
-    // set every known bit
-    for (const id of Object.keys(CONFIG.operation_codes)) {
-      const bitIndex = Number(id);
-      const byteIndex = Math.floor(bitIndex / 8);
-      const bitOffset = 7 - (bitIndex % 8);
-      buf[byteIndex] |= (1 << bitOffset);
-    }
+    // Use the canonical TRON active-permission "all ops" bitmask.
+    // Computing this from permission_config.json is unsafe: the config is
+    // an incomplete subset of TRON's operation registry, and including any
+    // bit that is not on TRON's ALLOWED_ACTIVE_PERMISSION whitelist (e.g.
+    // op 0 AccountCreateContract) causes the node to reject the transaction
+    // with "operation[N] is invalid".
+    return "7fff1fc0033efb0f000000000000000000000000000000000000000000000000";
   } else {
     // build name → id lookup
     const nameToId = {};
