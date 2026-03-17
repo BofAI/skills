@@ -3,10 +3,10 @@ name: x402-payment
 description: "Pay for x402-enabled Agent endpoints using ERC20 tokens (USDT/USDC) on EVM or TRC20 tokens (USDT/USDD) on TRON."
 version: 1.5.0
 author: bankofai
-homepage: https://x402.org
+homepage: https://bankofai.io
 tags: [crypto, payments, x402, agents, api, usdt, usdd, usdc, tron, ethereum, evm, erc20, trc20]
 requires_tools: [x402_invoke]
-# Tool implementation mapping: x402_invoke -> dist/x402_invoke.js
+# Tool implementation mapping: x402_invoke -> src/x402_invoke.ts (run via npx tsx)
 arguments:
   url:
     description: "Base URL of the agent (v2) or full URL (v1/Discovery)"
@@ -37,9 +37,10 @@ The `x402-payment` skill enables agents to interact with paid API endpoints. Whe
 
 ## Prerequisites
 
-- **Tool**: The `x402_invoke.js` script must be built and available in `dist/`.
+- **Tool**: The `x402_invoke.ts` script in `src/` (run via `npx tsx`).
 - **TronGrid API Key**: Required for **Mainnet** to avoid rate limits (`TRON_GRID_API_KEY`).
 - **Auto Detection**: If `AGENT_WALLET_PASSWORD` or `agent_wallet.password` is configured, the tool uses agent wallet mode. Otherwise it falls back to private key mode.
+- **Dependencies**: Run `npm install` in the `x402-payment/` directory before first use.
 
 ### Mode 1: Private Key
 - **TRON**: Set `TRON_PRIVATE_KEY` for TRC20 payments (USDT/USDD).
@@ -54,20 +55,24 @@ The `x402-payment` skill enables agents to interact with paid API endpoints. Whe
 - **Secrets Dir**: Optionally set `AGENT_WALLET_SECRETS_DIR` (default: `~/.agent-wallet`).
 - Alternatively, configure via `x402-config.json` under the `agent_wallet` key.
 
+### GasFree (Optional)
+- **Credentials**: Set `GASFREE_API_KEY` and `GASFREE_API_SECRET` to enable gasless TRC20 payments.
+- When configured, the tool will prefer the `exact_gasfree` scheme over `exact_permit`.
+- Requires a GasFree account that is **activated** with **sufficient token balance** in the GasFree wallet.
+- All keys can also be set in `x402-config.json` or `~/.mcporter/mcporter.json`.
+
 ## Usage Instructions
 
 ### 1. Verification
 Before making payments, verify your wallet status:
 ```bash
-# Auto-detect wallet mode
-node x402-payment/dist/x402_invoke.js --check
+npx tsx x402-payment/src/x402_invoke.ts --check
 ```
 
 ### 2. Invoking an Agent (v2)
 Most modern x402 agents use the v2 "invoke" pattern:
 ```bash
-# Auto-detect wallet mode
-node x402-payment/dist/x402_invoke.js \
+npx tsx x402-payment/src/x402_invoke.ts \
   --url https://api.example.com \
   --entrypoint chat \
   --input '{"prompt": "Your query here"}' \
@@ -77,14 +82,56 @@ node x402-payment/dist/x402_invoke.js \
 ### 3. Agent Discovery (Direct)
 - **Manifest**: Fetch agent metadata.
   ```bash
-  node x402-payment/dist/x402_invoke.js --url https://api.example.com/.well-known/agent.json
+  npx tsx x402-payment/src/x402_invoke.ts --url https://api.example.com/.well-known/agent.json
   ```
 - **List Entrypoints**: List available functions.
   ```bash
-  node x402-payment/dist/x402_invoke.js --url https://api.example.com/entrypoints
+  npx tsx x402-payment/src/x402_invoke.ts --url https://api.example.com/entrypoints
   ```
 
-### 4. Cross-Chain Support
+### 4. GasFree Wallet Info
+Query GasFree wallet information (address, activation status, balance, nonce).
+Defaults: network=**mainnet**, wallet=**TRON_PRIVATE_KEY**.
+```bash
+# Default: mainnet + TRON_PRIVATE_KEY wallet
+npx tsx x402-payment/src/x402_invoke.ts --gasfree-info
+
+# Specify wallet address
+npx tsx x402-payment/src/x402_invoke.ts --gasfree-info --wallet <YOUR_WALLET_ADDRESS>
+
+# Specify network
+npx tsx x402-payment/src/x402_invoke.ts --gasfree-info --network nile
+
+# Both
+npx tsx x402-payment/src/x402_invoke.ts --gasfree-info --wallet <YOUR_WALLET_ADDRESS> --network nile
+```
+Requires: `GASFREE_API_KEY`, `GASFREE_API_SECRET`. Without `--wallet`, requires `TRON_PRIVATE_KEY`. Returns JSON with `gasFreeAddress`, `active`, `allowSubmit`, `nonce`, and per-token `assets` (balance, fees).
+
+### 5. GasFree Account Activation
+Activate a GasFree account that has not been activated yet. Use `--gasfree-info` first to check activation status.
+Defaults: network=**nile**, token=**USDT**.
+```bash
+# Default: nile + USDT
+npx tsx x402-payment/src/x402_invoke.ts --gasfree-activate
+
+# Specify network
+npx tsx x402-payment/src/x402_invoke.ts --gasfree-activate --network mainnet
+
+# Specify network and token
+npx tsx x402-payment/src/x402_invoke.ts --gasfree-activate --network nile --token USDT
+```
+Requires: `TRON_PRIVATE_KEY`, `GASFREE_API_KEY`, `GASFREE_API_SECRET`. Wallet must have enough tokens to cover activation fees (~3.05 USDT on nile). If the account is already activated, returns `{"status": "already_active"}` immediately.
+
+**Activation process:**
+1. Queries GasFree account info and checks activation status
+2. Transfers `activateFee + transferFee + 1 token` from wallet to gasFreeAddress (on-chain TRC20)
+3. Polls for on-chain confirmation (up to 60s)
+4. Submits a GasFree signed transaction to transfer tokens back to wallet (triggers activation)
+5. Polls until the GasFree transaction completes
+
+Returns JSON with `status`, `depositTxId`, `gasFreeTraceId`, `gasFreeState`, `gasFreeTxHash`, and final `active` status.
+
+### 6. Cross-Chain Support
 - **TRON (TRC20)**: Use `--network nile` (testnet) or `mainnet`.
 - **BSC (ERC20)**: Use `--network bsc-testnet` (testnet) or `bsc` (mainnet).
 
@@ -107,7 +154,7 @@ node x402-payment/dist/x402_invoke.js \
 - **Internal Loading Only**: Rely on the tool to load keys internally.
 - **No Export Commands**: DO NOT execute shell commands containing the private key as a literal string.
 - **Silent Environment Checks**: Use `[[ -n $TRON_PRIVATE_KEY ]] && echo "Configured" || echo "Missing"` to verify configuration without leaking secrets.
-- **Use the Check Tool**: Use `node x402_invoke.js --check` to safely verify addresses.
+- **Use the Check Tool**: Use `npx tsx x402-payment/src/x402_invoke.ts --check` to safely verify addresses.
 - **Agent Wallet Selection**: If `AGENT_WALLET_PASSWORD` is configured, the tool uses agent wallet mode instead of private keys.
 
 ## Binary and Image Handling
