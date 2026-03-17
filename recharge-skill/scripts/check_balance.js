@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 
-const { getConfig } = require("./lib/ainft_config");
+const { getConfig } = require("./lib/bankofai_config");
 
 function parseArgs(argv) {
   const args = { format: "json" };
@@ -61,7 +61,7 @@ function trpcInput() {
 
 async function queryUserBalance(config) {
   if (!config.apiKey) {
-    throw new Error("missing AINFT_API_KEY or ainft-config.json api_key");
+    throw new Error("missing BANKOFAI_API_KEY or bankofai-config.json api_key");
   }
   const url = `${config.baseUrl}/trpc/lambda/usage.points?batch=1&input=${trpcInput()}`;
   return fetchJson(

@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 
-const { getConfig } = require("./lib/ainft_config");
+const { getConfig } = require("./lib/bankofai_config");
 
 function parseArgs(argv) {
   const args = {
@@ -102,7 +102,7 @@ async function main() {
     const args = parseArgs(process.argv.slice(2));
     const config = getConfig(args);
     if (!config.apiKey) {
-      throw new Error("missing AINFT_API_KEY or ainft-config.json api_key");
+      throw new Error("missing BANKOFAI_API_KEY or bankofai-config.json api_key");
     }
 
     const url = `${config.baseUrl}/trpc/lambda/order.listOrders?batch=1&input=${buildInput(args)}`;

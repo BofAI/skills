@@ -17,9 +17,9 @@ function loadJson(filePath) {
 
 function candidatePaths() {
   return [
-    path.resolve(process.cwd(), "ainft-config.json"),
-    path.join(os.homedir(), ".ainft", "config.json"),
-    path.join(os.homedir(), ".mcporter", "ainft-config.json"),
+    path.resolve(process.cwd(), "bankofai-config.json"),
+    path.join(os.homedir(), ".bankofai", "config.json"),
+    path.join(os.homedir(), ".mcporter", "bankofai-config.json"),
   ];
 }
 
@@ -38,9 +38,9 @@ function getConfig(overrides = {}) {
   const data = loaded.data || {};
   return {
     configPath: loaded.path,
-    apiKey: overrides.apiKey || process.env.AINFT_API_KEY || data.api_key || "",
-    baseUrl: (overrides.baseUrl || process.env.AINFT_BASE_URL || data.base_url || "https://chat.ainft.com").replace(/\/+$/, ""),
-    timeoutMs: Number(overrides.timeoutMs || process.env.AINFT_TIMEOUT_MS || data.timeout_ms || 15000),
+    apiKey: overrides.apiKey || process.env.BANKOFAI_API_KEY || data.api_key || "",
+    baseUrl: (overrides.baseUrl || process.env.BANKOFAI_BASE_URL || data.base_url || "https://chat.ainft.com").replace(/\/+$/, ""),
+    timeoutMs: Number(overrides.timeoutMs || process.env.BANKOFAI_TIMEOUT_MS || data.timeout_ms || 15000),
   };
 }
 

@@ -1,4 +1,4 @@
-<h1 align="center">BankOfAI Skills</h1>
+<h1 align="center">BANK OF AI Skills</h1>
 
 <p align="center">
   <a href="https://github.com/BofAI/skills">
@@ -9,7 +9,7 @@
   </a>
 </p>
 
-A curated collection of practical, DeFi-focused utility skills developed by the **BankOfAI team**. These skills enable AI agents to perform complex on-chain operations, payments, and identity management across various platforms.
+A curated collection of practical, DeFi-focused utility skills developed by the **BANK OF AI team**. These skills enable AI agents to perform complex on-chain operations, payments, and identity management across various platforms.
 
 > **Project Positioning:** We focus on delivering high-value DeFi utility skills that are platform-agnostic. Whether you use Claude Code, OpenClaw, Cursor, or your own agent framework, these skills provide the domain knowledge needed to interact with the TRON blockchain and beyond.
 
@@ -17,7 +17,7 @@ A curated collection of practical, DeFi-focused utility skills developed by the 
 
 ## Contents
 
-- [What are BankOfAI Skills?](#what-are-bankofai-skills)
+- [What are BANK OF AI Skills?](#what-are-bank-of-ai-skills)
 - [Installation](#installation)
   - [OpenClaw (Recommended)](#openclaw-recommended)
   - [Claude Code](#claude-code)
@@ -36,9 +36,9 @@ A curated collection of practical, DeFi-focused utility skills developed by the 
 
 ---
 
-## What are BankOfAI Skills?
+## What are BANK OF AI Skills?
 
-BankOfAI Skills are reusable, task-oriented capabilities that teach AI agents how to perform specific blockchain workflows. Each skill encapsulates domain knowledge (like SunSwap pathfinding) and provides step-by-step instructions for the agent to follow.
+BANK OF AI Skills are reusable, task-oriented capabilities that teach AI agents how to perform specific blockchain workflows. Each skill encapsulates domain knowledge (like SunSwap pathfinding) and provides step-by-step instructions for the agent to follow.
 
 ## Installation
 
@@ -86,7 +86,7 @@ curl -fsSL https://raw.githubusercontent.com/BofAI/openclaw-extension/refs/heads
 
 ### AI & Account Recharge
 
-- [**ainft-skill**](./ainft-skill) - BankOfAI account recharge and account query skill. Uses the remote MCP recharge service for supported payment flows.
+- [**recharge-skill**](./recharge-skill) - BANK OF AI account recharge and account query skill. Uses the remote MCP recharge service for supported payment flows.
 
 ### Data & Analytics
 
@@ -96,7 +96,7 @@ curl -fsSL https://raw.githubusercontent.com/BofAI/openclaw-extension/refs/heads
 
 ## Usage Tips
 
-When using BankOfAI Skills, you can choose between different invocation patterns depending on your needs.
+When using BANK OF AI Skills, you can choose between different invocation patterns depending on your needs.
 
 ### Explicit Invocation
 
@@ -144,6 +144,6 @@ This repository is licensed under the [MIT License](./LICENSE).
 ---
 
 <p align="center">
-  <b>Built with ❤️ by Team BankOfAI</b><br>
+  <b>Built with ❤️ by Team BANK OF AI</b><br>
   <i>Empowering AI Agents with DeFi Capabilities</i>
 </p>
