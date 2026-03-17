@@ -1,7 +1,7 @@
 ---
 name: x402-payment
 description: "Pay for x402-enabled Agent endpoints using ERC20 tokens (USDT/USDC) on EVM or TRC20 tokens (USDT/USDD) on TRON."
-version: 1.5.0
+version: 2.0.0
 author: bankofai
 homepage: https://bankofai.io
 tags: [crypto, payments, x402, agents, api, usdt, usdd, usdc, tron, ethereum, evm, erc20, trc20]
@@ -39,21 +39,33 @@ The `x402-payment` skill enables agents to interact with paid API endpoints. Whe
 
 - **Tool**: The `x402_invoke.ts` script in `src/` (run via `npx tsx`).
 - **TronGrid API Key**: Required for **Mainnet** to avoid rate limits (`TRON_GRID_API_KEY`).
-- **Auto Detection**: If `AGENT_WALLET_PASSWORD` or `agent_wallet.password` is configured, the tool uses agent wallet mode. Otherwise it falls back to private key mode.
+- **Auto Detection**: The tool automatically detects wallet mode based on environment variables.
 - **Dependencies**: Run `npm install` in the `x402-payment/` directory before first use.
 
-### Mode 1: Private Key
-- **TRON**: Set `TRON_PRIVATE_KEY` for TRC20 payments (USDT/USDD).
-- **EVM**: Set `EVM_PRIVATE_KEY` or `ETH_PRIVATE_KEY` for ERC20 payments (USDT/USDC).
-- The skill also searches for keys in `x402-config.json` and `~/.mcporter/mcporter.json`.
+### Wallet Configuration
 
-### Mode 2: Agent Wallet
-- **Package**: `@bankofai/agent-wallet` must be installed.
-- **TRON**: Set `TRON_AGENT_WALLET_NAME` to the agent wallet name for TRON.
-- **EVM**: Set `EVM_AGENT_WALLET_NAME` (or `BSC_AGENT_WALLET_NAME`) for EVM.
-- **Password**: Set `AGENT_WALLET_PASSWORD` to unlock the wallet.
-- **Secrets Dir**: Optionally set `AGENT_WALLET_SECRETS_DIR` (default: `~/.agent-wallet`).
-- Alternatively, configure via `x402-config.json` under the `agent_wallet` key.
+The tool supports **unified agent-wallet** integration with automatic multi-chain support:
+
+#### Option 1: Private Key (Recommended for Development)
+Set `AGENT_WALLET_PRIVATE_KEY` with your hex private key (without `0x` prefix):
+```bash
+export AGENT_WALLET_PRIVATE_KEY="your_private_key_here"
+```
+This single private key works for **both TRON and EVM chains** automatically.
+
+#### Option 2: Mnemonic Phrase
+Set `AGENT_WALLET_MNEMONIC` with your 12/24-word seed phrase:
+```bash
+export AGENT_WALLET_MNEMONIC="word1 word2 word3 ..."
+export AGENT_WALLET_MNEMONIC_ACCOUNT_INDEX="0"  # Optional, defaults to 0
+```
+
+#### Option 3: Local Encrypted Wallet
+Set `AGENT_WALLET_PASSWORD` to use encrypted local wallets:
+```bash
+export AGENT_WALLET_PASSWORD="your_password"
+export AGENT_WALLET_DIR="~/.agent-wallet"  # Optional, defaults to ~/.agent-wallet
+```
 
 ### GasFree (Optional)
 - **Credentials**: Set `GASFREE_API_KEY` and `GASFREE_API_SECRET` to enable gasless TRC20 payments.
@@ -91,9 +103,9 @@ npx tsx x402-payment/src/x402_invoke.ts \
 
 ### 4. GasFree Wallet Info
 Query GasFree wallet information (address, activation status, balance, nonce).
-Defaults: network=**mainnet**, wallet=**TRON_PRIVATE_KEY**.
+Defaults: network=**mainnet**, wallet=**active TRON agent-wallet**.
 ```bash
-# Default: mainnet + TRON_PRIVATE_KEY wallet
+# Default: mainnet + active TRON agent-wallet
 npx tsx x402-payment/src/x402_invoke.ts --gasfree-info
 
 # Specify wallet address
@@ -105,7 +117,7 @@ npx tsx x402-payment/src/x402_invoke.ts --gasfree-info --network nile
 # Both
 npx tsx x402-payment/src/x402_invoke.ts --gasfree-info --wallet <YOUR_WALLET_ADDRESS> --network nile
 ```
-Requires: `GASFREE_API_KEY`, `GASFREE_API_SECRET`. Without `--wallet`, requires `TRON_PRIVATE_KEY`. Returns JSON with `gasFreeAddress`, `active`, `allowSubmit`, `nonce`, and per-token `assets` (balance, fees).
+Requires: `GASFREE_API_KEY`, `GASFREE_API_SECRET`. Without `--wallet`, requires a configured TRON agent-wallet. Returns JSON with `gasFreeAddress`, `active`, `allowSubmit`, `nonce`, and per-token `assets` (balance, fees).
 
 ### 5. GasFree Account Activation
 Activate a GasFree account that has not been activated yet. Use `--gasfree-info` first to check activation status.
@@ -120,11 +132,11 @@ npx tsx x402-payment/src/x402_invoke.ts --gasfree-activate --network mainnet
 # Specify network and token
 npx tsx x402-payment/src/x402_invoke.ts --gasfree-activate --network nile --token USDT
 ```
-Requires: `TRON_PRIVATE_KEY`, `GASFREE_API_KEY`, `GASFREE_API_SECRET`. Wallet must have enough tokens to cover activation fees (~3.05 USDT on nile). If the account is already activated, returns `{"status": "already_active"}` immediately.
+Requires: a configured TRON agent-wallet plus `GASFREE_API_KEY` and `GASFREE_API_SECRET`. Wallet must have enough tokens to cover activation fees (~3.05 USDT on nile). If the account is already activated, returns `{"status": "already_active"}` immediately.
 
 **Activation process:**
 1. Queries GasFree account info and checks activation status
-2. Transfers `activateFee + transferFee + 1 token` from wallet to gasFreeAddress (on-chain TRC20)
+2. Builds an unsigned TRC20 transfer with `TronWeb`, signs it with agent-wallet, then broadcasts it on-chain to `gasFreeAddress`
 3. Polls for on-chain confirmation (up to 60s)
 4. Submits a GasFree signed transaction to transfer tokens back to wallet (triggers activation)
 5. Polls until the GasFree transaction completes
@@ -153,9 +165,9 @@ Returns JSON with `status`, `depositTxId`, `gasFreeTraceId`, `gasFreeState`, `ga
 - **No Private Key Output**: The Agent MUST NOT print, echo, or output any private key to the dialogue context.
 - **Internal Loading Only**: Rely on the tool to load keys internally.
 - **No Export Commands**: DO NOT execute shell commands containing the private key as a literal string.
-- **Silent Environment Checks**: Use `[[ -n $TRON_PRIVATE_KEY ]] && echo "Configured" || echo "Missing"` to verify configuration without leaking secrets.
+- **Silent Environment Checks**: Use `[[ -n $AGENT_WALLET_PRIVATE_KEY ]] && echo "Configured" || echo "Missing"` to verify configuration without leaking secrets.
 - **Use the Check Tool**: Use `npx tsx x402-payment/src/x402_invoke.ts --check` to safely verify addresses.
-- **Agent Wallet Selection**: If `AGENT_WALLET_PASSWORD` is configured, the tool uses agent wallet mode instead of private keys.
+- **Unified Wallet**: The tool only uses agent-wallet and resolves the active wallet from `AGENT_WALLET_PRIVATE_KEY`, `AGENT_WALLET_MNEMONIC`, or `AGENT_WALLET_PASSWORD`.
 
 ## Binary and Image Handling
 
@@ -172,22 +184,5 @@ If allowance is insufficient, the tool will automatically attempt an "infinite a
 ### Insufficient Balance
 Ensure you have enough USDT/USDC/USDD in your wallet on the specified network.
 
-## Agent Wallet Configuration (x402-config.json)
-
-You can configure agent wallet settings in `x402-config.json` or `~/.x402-config.json`:
-```json
-{
-  "agent_wallet": {
-    "tron_wallet_name": "my-tron-wallet",
-    "evm_wallet_name": "my-evm-wallet",
-    "secrets_dir": "~/.agent-wallet",
-    "password": "..."
-  }
-}
-```
-
-> [!WARNING]
-> Storing the password in a config file is less secure than using the `AGENT_WALLET_PASSWORD` environment variable.
-
 ---
-*Last Updated: 2026-03-09*
+*Last Updated: 2026-03-17*
