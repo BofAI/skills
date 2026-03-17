@@ -102,7 +102,7 @@ async function main() {
     const args = parseArgs(process.argv.slice(2));
     const config = getConfig(args);
     if (!config.apiKey) {
-      throw new Error("missing BankOfAI API key or ainft-config.json api_key");
+      throw new Error("missing AINFT_API_KEY or ainft-config.json api_key");
     }
 
     const url = `${config.baseUrl}/trpc/lambda/order.listOrders?batch=1&input=${buildInput(args)}`;

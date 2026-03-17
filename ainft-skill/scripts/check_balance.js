@@ -61,7 +61,7 @@ function trpcInput() {
 
 async function queryUserBalance(config) {
   if (!config.apiKey) {
-    throw new Error("missing BankOfAI API key or ainft-config.json api_key");
+    throw new Error("missing AINFT_API_KEY or ainft-config.json api_key");
   }
   const url = `${config.baseUrl}/trpc/lambda/usage.points?batch=1&input=${trpcInput()}`;
   return fetchJson(
