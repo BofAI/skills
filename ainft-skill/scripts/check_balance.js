@@ -61,7 +61,7 @@ function trpcInput() {
 
 async function queryUserBalance(config) {
   if (!config.apiKey) {
-    throw new Error("missing AINFT_API_KEY or ainft-config.json api_key");
+    throw new Error("missing BankOfAI API key or ainft-config.json api_key");
   }
   const url = `${config.baseUrl}/trpc/lambda/usage.points?batch=1&input=${trpcInput()}`;
   return fetchJson(
@@ -85,7 +85,7 @@ function normalizeResult(config, userResult) {
     return {
       ok: true,
       type: "user_points_balance",
-      summary: `AINFT points balance: ${pointsBalance}`,
+      summary: `BankOfAI points balance: ${pointsBalance}`,
       points_balance: pointsBalance,
       unit: "points",
       http_status: userResult.status,
@@ -96,7 +96,7 @@ function normalizeResult(config, userResult) {
   return {
     ok: false,
     type: "balance_query_failed",
-    summary: "Failed to query AINFT balance",
+    summary: "Failed to query BankOfAI balance",
     user_result: userResult,
     config_path: config.configPath,
   };

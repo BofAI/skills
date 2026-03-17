@@ -25,7 +25,7 @@ A curated collection of practical, DeFi-focused utility skills developed by the 
 - [Available Skills](#available-skills)
   - [DeFi & DEX](#defi--dex)
   - [Payments & x402](#payments--x402)
-  - [AI & NFT](#ai--nft)
+  - [AI & Account Recharge](#ai--account-recharge)
   - [Data & Analytics](#data--analytics)
 - [Usage Tips](#usage-tips)
   - [Explicit Invocation](#explicit-invocation)
@@ -78,14 +78,15 @@ curl -fsSL https://raw.githubusercontent.com/BofAI/openclaw-extension/refs/heads
 ### DeFi & DEX
 
 - [**sunswap**](./sunswap) - SunSwap DEX integration for TRON. Supports price quotes, token swaps, and balance checks.
+- [**sunperp-skill**](./sunperp-skill) - SunPerp perpetual futures trading skill for TRON. Supports market data, account queries, order placement, and position management.
 
 ### Payments & x402
 
 - [**x402-payment**](./x402-payment) - Professional x402 payment protocol for calling paid APIs and agent resources.
 
-### AI & NFT
+### AI & Account Recharge
 
-- [**ainft-skill**](./ainft-skill) - Specialized skill for AINFT balance queries and recharging.
+- [**ainft-skill**](./ainft-skill) - BankOfAI account recharge and account query skill. Uses the remote MCP recharge service for supported payment flows.
 
 ### Data & Analytics
 

@@ -1,5 +1,20 @@
 # Changelog
 
+## [1.4.13] - 2026-03-17
+
+### Features
+- **[Skill] SunPerp**: Added `sunperp-skill` for SunPerp perpetual futures trading on TRON, including market data, account queries, order placement, and position management.
+
+### Improvements
+- **README**: Added `sunperp-skill` to the available skills list and refreshed BankOfAI recharge wording for `ainft-skill`.
+- **ainft-skill**: Updated MCP endpoint and default product URLs to the current BankOfAI recharge service.
+
+### Contributors
+- M2M-TRC8004-Registry
+- bobo
+- Hades
+- leo.wu
+
 ## [1.4.0] - 2026-03-11
 
 ### Features
