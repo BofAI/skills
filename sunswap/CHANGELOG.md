@@ -2,6 +2,23 @@
 
 All notable changes to the SunSwap skill will be documented in this file.
 
+## [3.0.1] - 2026-03-18
+
+### Fixed
+
+Based on test report (134 cases, 7 failures), added documentation for CLI-level behaviors that require agent-side workarounds:
+
+- **Added "Agent Pre-Validation Checklist" section**: Mandatory checks before executing write operations (balance, same-token swap, fee tier, tick alignment, network, tx scan type)
+- **Added "Known Limitations" table**: Documents 7 CLI behaviors where `--dry-run` or invalid inputs don't produce errors
+- **Fixed `pair info` examples**: `--token` requires contract address, not symbol (TC_PAR_002)
+- **Updated V3 fee tier table**: Added "Full Range Ticks" column and validation warnings (TC_V3L_004, TC_V3L_005)
+- **Updated recommended swap workflow**: Now includes balance pre-check step and same-token validation (TC_SWP_006, TC_SCN_005)
+- **Updated V3 liquidity workflow**: Now includes fee/tick validation step before dry-run (TC_V3L_004, TC_V3L_005)
+- **Documented `--dry-run` limitations**: Clarified that dry-run only builds transaction preview, does NOT validate balances, fees, ticks, or same-token swaps (TC_SWP_006, TC_V2L_007, TC_V3L_004, TC_V3L_005, TC_SCN_005)
+- **Documented `--network` fallback behavior**: Invalid network names silently fall back to mainnet (TC_GEN_006)
+- **Documented `--type` fallback behavior**: Invalid tx scan types return empty results without error (TC_TXS_004)
+- **Strengthened security rules**: Replaced "Use Dry-Run for High-Value Operations" with "Validate Inputs Before Execution" + "Use Quote + Balance Check"
+
 ## [3.0.0] - 2026-03-15
 
 ### Changed - Major Architecture Shift

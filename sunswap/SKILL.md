@@ -1,7 +1,7 @@
 ---
 name: SunSwap DEX Trading
 description: Execute token swaps, manage liquidity, and query market data on SunSwap DEX via the sun-cli.
-version: 3.0.0
+version: 3.0.1
 dependencies:
   - "@bankofai/sun-cli"
 tags:
@@ -61,6 +61,63 @@ Always use these flags when calling `sun` from an AI agent:
 ```bash
 sun --json --yes [command] [args] [options]
 ```
+
+> **WARNING: `--network` only accepts `mainnet`, `nile`, or `shasta`.**
+> Invalid network names (e.g. `badnet`) will silently fall back to mainnet without error.
+> The AI agent must validate the network value before passing it.
+
+> **WARNING: `--dry-run` only builds a transaction preview.**
+> It does NOT check balances, validate fee tiers, verify tick alignment, or reject
+> same-token swaps. The agent must perform these validations before executing.
+> See [Agent Pre-Validation Checklist](#agent-pre-validation-checklist) below.
+
+---
+
+## Agent Pre-Validation Checklist
+
+Before executing any write operation (`swap`, `liquidity`, `contract send`), the AI agent **must** perform the following checks. The CLI's `--dry-run` does not validate these — it only builds a transaction preview.
+
+### Before Swap
+
+1. **Check balance is sufficient:**
+   ```bash
+   sun --json wallet balances
+   ```
+   Compare the token balance against the `amountIn`. Abort if insufficient.
+
+2. **Verify tokenIn ≠ tokenOut:**
+   Same-token swaps (e.g. TRX → TRX) are not rejected by `--dry-run`. The agent must check that the two tokens are different before executing.
+
+3. **Validate slippage is reasonable:**
+   Recommended range: 0.001 (0.1%) to 0.05 (5%). Warn the user if outside this range.
+
+### Before V3 Liquidity (Mint)
+
+1. **Use only valid fee tiers:** `100`, `500`, `3000`, or `10000`.
+   Invalid fee values (e.g. 9999) are not rejected by `--dry-run`.
+
+2. **Ensure ticks are aligned to tick spacing:**
+
+   | Fee Value | Tick Spacing | Valid tick examples |
+   |-----------|-------------|---------------------|
+   | 100       | 1           | any integer         |
+   | 500       | 10          | -10, 0, 10, 20     |
+   | 3000      | 60          | -120, -60, 0, 60   |
+   | 10000     | 200         | -400, -200, 0, 200 |
+
+   Both `--tick-lower` and `--tick-upper` must be exact multiples of the tick spacing.
+   Misaligned ticks are not rejected by `--dry-run` but will fail on-chain.
+
+3. **Check balance is sufficient** for both token0 and token1 amounts.
+
+### Before V2 Liquidity (Add)
+
+1. **Check balance is sufficient** for both token-a and token-b amounts.
+
+### General
+
+- **Validate `--network`** is one of: `mainnet`, `nile`, `shasta`. Invalid values silently fall back to mainnet.
+- **Validate `--type`** for `tx scan` is one of: `swap`, `add`, `withdraw`. Invalid values return empty results instead of errors.
 
 ---
 
@@ -205,14 +262,20 @@ sun --json --yes --dry-run liquidity v2:remove --token-a TRX --token-b USDT --li
 
 Manage concentrated liquidity positions on SunSwap V3.
 
-**Fee tiers:**
+**Fee tiers (only these values are valid):**
 
-| Fee Rate | Fee Value | Tick Spacing |
-|----------|-----------|-------------|
-| 0.01%    | 100       | 1           |
-| 0.05%    | 500       | 10          |
-| 0.3%     | 3000      | 60          |
-| 1%       | 10000     | 200         |
+| Fee Rate | Fee Value | Tick Spacing | Full Range Ticks |
+|----------|-----------|-------------|------------------|
+| 0.01%    | 100       | 1           | -887272 / 887272 |
+| 0.05%    | 500       | 10          | -887270 / 887270 |
+| 0.3%     | 3000      | 60          | -887220 / 887220 |
+| 1%       | 10000     | 200         | -887200 / 887200 |
+
+> **IMPORTANT:** `--fee` must be exactly one of: `100`, `500`, `3000`, `10000`.
+> Other values (e.g. 9999) are NOT rejected by `--dry-run` but will fail on-chain.
+>
+> `--tick-lower` and `--tick-upper` must be exact multiples of the tick spacing for the chosen fee tier.
+> Misaligned ticks are NOT rejected by `--dry-run` but will fail on-chain.
 
 #### Mint New Position
 ```bash
@@ -229,7 +292,7 @@ sun --json --yes liquidity v3:mint \
 # Mint with full-range defaults
 sun --json --yes liquidity v3:mint --token0 TRX --token1 USDT --amount0 1000000
 
-# Mint with specific fee and tick range
+# Mint with specific fee and tick range (ticks aligned to spacing=60 for fee=3000)
 sun --json --yes liquidity v3:mint \
   --token0 TRX --token1 USDT --fee 3000 \
   --tick-lower -887220 --tick-upper 887220 \
@@ -358,8 +421,14 @@ sun --json position tick <poolAddress>
 
 Resolve trading pair information.
 
+> **NOTE:** `pair info --token` requires a contract address, not a symbol.
+
 ```bash
+# By contract address (USDT)
 sun --json pair info --token TR7NHqjeKQxGTCi8q8ZY4pL8otSzgjLj6t
+
+# By contract address (TRX)
+sun --json pair info --token T9yD14Nj9j7xAB4dbGeiX9h8unkKHxuWwb
 ```
 
 ---
@@ -407,7 +476,9 @@ Scan DEX transaction activity.
 sun --json tx scan --type swap --token TR7NHqjeKQxGTCi8q8ZY4pL8otSzgjLj6t --start 2026-01-01 --end 2026-03-15
 ```
 
-Supported types: `swap`, `add`, `withdraw`.
+> **IMPORTANT:** `--type` must be exactly one of: `swap`, `add`, `withdraw`.
+> Invalid types (e.g. `invalidtype`) return empty results instead of an error.
+> The agent must validate the type value before passing it.
 
 ---
 
@@ -427,18 +498,23 @@ sun --json --yes contract send <address> <functionName> --args '["arg1","arg2"]'
 
 ## Recommended Workflow for AI Agents
 
-### Pattern 1: Quick Swap (Two-Step with Confirmation)
+### Pattern 1: Quick Swap (Three-Step with Validation)
 
 **Best for:** User-facing swap operations.
 
-**Step 1 — Get quote (read-only, show to user):**
+**Step 1 — Validate inputs (agent-side, no CLI call):**
+- Confirm tokenIn ≠ tokenOut (same-token swaps like TRX→TRX are not rejected by CLI)
+- Confirm `--network` is valid (`mainnet`, `nile`, or `shasta`)
+
+**Step 2 — Check balance and get quote:**
 ```bash
+sun --json wallet balances
 sun --json swap:quote TRX USDT 100000000
 ```
 
-Show the user: expected output amount, price impact, route.
+Verify balance ≥ amountIn. Show the user: expected output amount, price impact, route.
 
-**Step 2 — Execute after user confirms:**
+**Step 3 — Execute after user confirms:**
 ```bash
 sun --json --yes swap TRX USDT 100000000 --slippage 0.005
 ```
@@ -449,11 +525,18 @@ sun --json --yes swap TRX USDT 100000000 --slippage 0.005
 
 **Best for:** Large amounts or cautious operations.
 
+> **NOTE:** `--dry-run` only previews the transaction structure. It does NOT check
+> balances, validate fee tiers, or reject invalid parameters. Always check balances
+> separately before proceeding to actual execution.
+
 ```bash
-# Simulate
+# Check balance first
+sun --json wallet balances
+
+# Simulate (preview transaction structure)
 sun --json --yes --dry-run swap TRX USDT 100000000
 
-# Execute after reviewing dry-run result
+# Execute after reviewing dry-run result and confirming balance
 sun --json --yes swap TRX USDT 100000000
 ```
 
@@ -463,13 +546,21 @@ sun --json --yes swap TRX USDT 100000000
 
 **Best for:** Adding concentrated liquidity.
 
-**Step 1 — Check positions and pool info:**
+**Step 1 — Validate parameters (agent-side):**
+- Confirm `--fee` is one of: `100`, `500`, `3000`, `10000`
+- Confirm `--tick-lower` and `--tick-upper` are multiples of tick spacing (e.g. 60 for fee=3000)
+- Confirm token0 ≠ token1
+
+**Step 2 — Check balances and pool info:**
 ```bash
+sun --json wallet balances
 sun --json position list --owner TAddress --protocol V3
-sun --json pool search "TRX USDT" --protocol V3
+sun --json pool search "TRX USDT"
 ```
 
-**Step 2 — Dry-run mint:**
+Verify balance is sufficient for both amount0 and amount1.
+
+**Step 3 — Dry-run mint (preview only, does not validate balances or parameters):**
 ```bash
 sun --json --yes --dry-run liquidity v3:mint \
   --token0 TRX --token1 USDT --fee 3000 \
@@ -477,7 +568,7 @@ sun --json --yes --dry-run liquidity v3:mint \
   --amount0 1000000
 ```
 
-**Step 3 — Execute after user confirms:**
+**Step 4 — Execute after user confirms:**
 ```bash
 sun --json --yes liquidity v3:mint \
   --token0 TRX --token1 USDT --fee 3000 \
@@ -501,9 +592,12 @@ sun --json pool top-apy --page-size 10
 # "What are my positions?"
 sun --json position list --owner TAddress
 
-# "What's the best pair for USDT?"
-sun --json pair info --token USDT
+# "What pairs include USDT?"
+sun --json pair info --token TR7NHqjeKQxGTCi8q8ZY4pL8otSzgjLj6t
 ```
+
+> **NOTE:** `pair info --token` requires a contract address, not a symbol.
+> Use the [Supported Token Symbols](#supported-token-symbols) table to resolve symbols to addresses.
 
 ---
 
@@ -547,13 +641,23 @@ Any TRC20 token can also be referenced by its contract address directly.
 - After a successful transaction, mark it as done
 - Never retry a successful transaction
 
-### CRITICAL: Use Dry-Run for High-Value Operations
+### CRITICAL: Validate Inputs Before Execution
+
+The CLI does not validate all inputs in `--dry-run` mode. The agent must:
+- Verify tokenIn ≠ tokenOut before swap
+- Verify `--fee` is one of: 100, 500, 3000, 10000 before V3 mint
+- Verify tick values are aligned to tick spacing before V3 mint
+- Verify `--network` is one of: mainnet, nile, shasta
+- Check `wallet balances` to confirm sufficient funds before any write operation
+
+### CRITICAL: Use Quote + Balance Check for High-Value Operations
 
 ```bash
-sun --json --yes --dry-run swap TRX USDT 1000000000
+sun --json wallet balances
+sun --json swap:quote TRX USDT 1000000000
 ```
 
-Always dry-run first for amounts exceeding the user's comfort threshold.
+Always check balance and get a quote before executing. `--dry-run` only shows transaction structure and does NOT validate balances or parameters.
 
 ### CRITICAL: Confirm Before Write Operations
 
@@ -587,6 +691,22 @@ Swap completed!
 
 ---
 
+## Known Limitations
+
+These are CLI-level behaviors that the AI agent must work around:
+
+| Issue | Affected Commands | Behavior | Agent Workaround |
+|-------|-------------------|----------|------------------|
+| `--dry-run` doesn't check balances | `swap`, `liquidity v2:add`, all V3/V4 ops | Returns preview even if balance is insufficient | Check `wallet balances` before executing |
+| `--dry-run` doesn't validate V3 fee tiers | `liquidity v3:mint` | Accepts invalid fees like 9999 | Only pass `100`, `500`, `3000`, or `10000` |
+| `--dry-run` doesn't validate tick alignment | `liquidity v3:mint` | Accepts misaligned ticks | Ensure ticks are multiples of tick spacing |
+| Same-token swap not rejected | `swap` | Accepts TRX→TRX in dry-run | Verify tokenIn ≠ tokenOut before calling |
+| Invalid `--network` silently falls back | All commands | Unknown network names use mainnet | Only pass `mainnet`, `nile`, or `shasta` |
+| Invalid `--type` returns empty results | `tx scan` | Unknown types return empty list, no error | Only pass `swap`, `add`, or `withdraw` |
+| `pair info --token` needs address | `pair info` | Symbols cause API error | Use contract addresses, not symbols |
+
+---
+
 ## Troubleshooting
 
 ### "sun: command not found"
@@ -609,6 +729,6 @@ Set one of: `TRON_PRIVATE_KEY`, `TRON_MNEMONIC`, or `AGENT_WALLET_PASSWORD`.
 
 ---
 
-**Version**: 3.0.0 (sun-cli based)
-**Last Updated**: 2026-03-15
+**Version**: 3.0.1 (sun-cli based)
+**Last Updated**: 2026-03-18
 **Maintainer**: Bank of AI Team
