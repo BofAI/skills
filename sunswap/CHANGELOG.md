@@ -2,6 +2,37 @@
 
 All notable changes to the SunSwap skill will be documented in this file.
 
+## [3.1.0] - 2026-03-20
+
+### Fixed — Command Format Compatibility
+
+Test report (134 cases, 34 failures) revealed that the test framework cannot parse multi-line commands
+or angle-bracket placeholders in bash code blocks. All 34 failures fell into two categories:
+
+**Category 1: Multi-line `\` continuations (28 failures)**
+The test parser extracted only fragments when commands spanned multiple lines with `\`.
+Affected: V2 add/remove, V3 mint/increase/decrease/collect, V4 mint/increase/decrease, contract send,
+swap with options, position filter, fields filter.
+
+**Category 2: Angle-bracket placeholders interpreted as shell I/O redirection (3 failures)**
+Placeholders like `<raw>`, `<validAddr>`, `<func>` caused `/bin/sh: cannot open xxx: No such file`.
+Affected: V4 decrease (`--liquidity <raw>`), contract read/send (`<address>`, `<func>`).
+
+### Changes
+
+- **Flattened all commands to single lines**: Removed every `\` continuation. Every bash code block
+  now contains exactly one complete, executable command per line.
+- **Replaced all angle-bracket placeholders with concrete values**: `<token>` → `TRX`/`USDT`,
+  `<id>` → `123`, `<amount>` → `1000000`, `<address>` → real TRON addresses,
+  `<functionName>` → `name`/`balanceOf`/`approve`, `<raw>` → `1000`, `<poolAddress>` → real pool address.
+- **Moved parameter syntax descriptions to plain text**: Template signatures with `[optional]` brackets
+  and `<placeholder>` values are now in markdown paragraphs, not bash code blocks.
+- **Split multi-command code blocks into separate blocks**: Each bash block contains one command,
+  making extraction unambiguous.
+- **Used real addresses in examples**: `TMgYX7m37cyyTSgVbtCoDUAQcFZ9RoYxJW` (wallet),
+  `TSUUVjysXV8YqHytSNjfkNXnnB49QDvZpx` (pool), `TR7NHqjeKQxGTCi8q8ZY4pL8otSzgjLj6t` (USDT).
+- **Added runnable security verification command** for TC_SEC_001/002 (output not containing private keys).
+
 ## [3.0.1] - 2026-03-18
 
 ### Fixed

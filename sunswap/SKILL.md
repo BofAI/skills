@@ -1,7 +1,7 @@
 ---
 name: SunSwap DEX Trading
 description: Execute token swaps, manage liquidity, and query market data on SunSwap DEX via the sun-cli.
-version: 3.0.1
+version: 3.1.0
 dependencies:
   - "@bankofai/sun-cli"
 tags:
@@ -29,16 +29,13 @@ This skill enables AI agents to interact with SunSwap DEX on the TRON blockchain
 2. **Configure wallet** (required for write operations only):
    ```bash
    export TRON_PRIVATE_KEY="your_private_key_here"
-   # or
-   export TRON_MNEMONIC="word1 word2 word3 ..."
-   # or
-   export AGENT_WALLET_PASSWORD="your_agent_wallet_password"
    ```
+   Alternative wallet sources: `TRON_MNEMONIC` or `AGENT_WALLET_PASSWORD`.
 
 3. **Optional environment variables:**
    ```bash
-   export TRON_NETWORK=mainnet          # mainnet | nile | shasta (default: mainnet)
-   export TRONGRID_API_KEY=your_key     # recommended for mainnet
+   export TRON_NETWORK=mainnet
+   export TRONGRID_API_KEY=your_key
    ```
 
 Read-only commands (price, quote, pool list, etc.) work without wallet credentials.
@@ -54,16 +51,23 @@ Always use these flags when calling `sun` from an AI agent:
 | `--json` | Machine-readable JSON output to stdout |
 | `--yes` | Skip interactive confirmation prompts |
 | `--dry-run` | Simulate write operations without sending transactions |
-| `--fields <list>` | Limit output to specific fields (reduce token usage) |
-| `--network <net>` | Override network: `mainnet`, `nile`, `shasta` |
+| `--fields` | Limit output to specific comma-separated fields |
+| `--network` | Override network: `mainnet`, `nile`, `shasta` |
 
-**Standard agent invocation pattern:**
+Standard agent invocation pattern:
+
 ```bash
-sun --json --yes [command] [args] [options]
+sun --json price TRX
+```
+
+Write operations add `--yes` to skip prompts:
+
+```bash
+sun --json --yes swap TRX USDT 100000000
 ```
 
 > **WARNING: `--network` only accepts `mainnet`, `nile`, or `shasta`.**
-> Invalid network names (e.g. `badnet`) will silently fall back to mainnet without error.
+> Invalid network names silently fall back to mainnet without error.
 > The AI agent must validate the network value before passing it.
 
 > **WARNING: `--dry-run` only builds a transaction preview.**
@@ -128,14 +132,17 @@ Before executing any write operation (`swap`, `liquidity`, `contract send`), the
 Check wallet address and token balances.
 
 ```bash
-# Show wallet address
 sun --json wallet address
+```
 
-# Check all balances
+```bash
 sun --json wallet balances
+```
 
-# Check specific owner and tokens
-sun --json wallet balances --owner TAddress --tokens TRX,USDT
+Check balances for a specific owner address:
+
+```bash
+sun --json wallet balances --owner TDqSquXBgUCLYvYC4XZgrprLK589dkhSCf
 ```
 
 ---
@@ -145,14 +152,17 @@ sun --json wallet balances --owner TAddress --tokens TRX,USDT
 Fetch token prices from SUN.IO.
 
 ```bash
-# Price by symbol
 sun --json price TRX
+```
 
-# Price by address
-sun --json price --address TR7NHqjeKQxGTCi8q8ZY4pL8otSzgjLj6t
-
-# Multiple tokens
+```bash
 sun --json price USDT
+```
+
+Query by contract address:
+
+```bash
+sun --json price --address TR7NHqjeKQxGTCi8q8ZY4pL8otSzgjLj6t
 ```
 
 ---
@@ -161,24 +171,28 @@ sun --json price USDT
 
 Get a price quote without executing. No wallet required.
 
+**Parameters:** `tokenIn` and `tokenOut` accept token symbols (TRX, USDT) or TRC20 addresses. `amountIn` is in sun (smallest unit, e.g. 1000000 = 1 TRX).
+
 ```bash
-sun --json swap:quote <tokenIn> <tokenOut> <amountIn>
+sun --json swap:quote TRX USDT 100000000
 ```
 
-**Parameters:**
-- `tokenIn` / `tokenOut`: Token symbol (TRX, USDT, etc.) or TRC20 address
-- `amountIn`: Amount in sun (smallest unit, e.g. 1000000 = 1 TRX)
+Quote with all route details:
 
-**Examples:**
 ```bash
-# Quote 100 TRX → USDT
-sun --json swap:quote TRX USDT 100000000
-
-# Quote with all route details
 sun --json swap:quote TRX USDT 100000000 --all
+```
 
-# Quote on nile testnet
+Quote on a specific network:
+
+```bash
 sun --json swap:quote TRX USDT 100000000 --network nile
+```
+
+Reverse direction:
+
+```bash
+sun --json swap:quote USDT TRX 1000000
 ```
 
 ---
@@ -187,28 +201,34 @@ sun --json swap:quote TRX USDT 100000000 --network nile
 
 Execute a token swap through the SunSwap Universal Router.
 
+**Parameters:** `tokenIn` and `tokenOut` accept symbols or addresses. `amountIn` is in sun. `--slippage` is a decimal (default: 0.005 = 0.5%).
+
 ```bash
-sun --json --yes swap <tokenIn> <tokenOut> <amountIn> [--slippage <pct>]
+sun --json --yes swap TRX USDT 100000000
 ```
 
-**Parameters:**
-- `tokenIn` / `tokenOut`: Token symbol or TRC20 address
-- `amountIn`: Amount in sun (smallest unit)
-- `--slippage`: Slippage tolerance as decimal (default: 0.005 = 0.5%)
+Swap with custom slippage (1%):
 
-**Examples:**
 ```bash
-# Swap 100 TRX to USDT
-sun --json --yes swap TRX USDT 100000000
-
-# Swap with custom slippage
 sun --json --yes swap TRX USDT 100000000 --slippage 0.01
+```
 
-# Dry-run (simulate without sending)
+Dry-run (simulate without sending):
+
+```bash
 sun --json --yes --dry-run swap TRX USDT 100000000
+```
 
-# Use contract addresses
+Use contract addresses instead of symbols:
+
+```bash
 sun --json --yes swap T9yD14Nj9j7xAB4dbGeiX9h8unkKHxuWwb TR7NHqjeKQxGTCi8q8ZY4pL8otSzgjLj6t 100000000
+```
+
+Swap on nile testnet:
+
+```bash
+sun --json --yes swap TRX USDT 1000000 --network nile
 ```
 
 ---
@@ -217,42 +237,45 @@ sun --json --yes swap T9yD14Nj9j7xAB4dbGeiX9h8unkKHxuWwb TR7NHqjeKQxGTCi8q8ZY4pL
 
 Add or remove liquidity on SunSwap V2 AMM pools.
 
+**Parameters for add:** `--token-a` and `--token-b` accept symbols or addresses. `--amount-a` and `--amount-b` are in sun. Optional: `--min-a`, `--min-b`, `--to`, `--deadline`.
+
+**Parameters for remove:** `--token-a`, `--token-b`, `--liquidity` (raw LP amount). Optional: `--min-a`, `--min-b`, `--to`, `--deadline`.
+
 #### Add Liquidity
+
+Single-side (auto-calculate other):
+
 ```bash
-sun --json --yes liquidity v2:add \
-  --token-a <token> --token-b <token> \
-  --amount-a <amount> [--amount-b <amount>] \
-  [--min-a <min>] [--min-b <min>] \
-  [--to <recipient>] [--deadline <seconds>]
+sun --json --yes liquidity v2:add --token-a TRX --token-b USDT --amount-a 1000000
 ```
 
-**Examples:**
+Both sides:
+
 ```bash
-# Add TRX + USDT liquidity
 sun --json --yes liquidity v2:add --token-a TRX --token-b USDT --amount-a 1000000 --amount-b 290000
+```
 
-# Only specify one side (auto-calculate the other)
-sun --json --yes liquidity v2:add --token-a TRX --token-b USDT --amount-a 1000000
+Dry-run:
 
-# Dry-run first
+```bash
 sun --json --yes --dry-run liquidity v2:add --token-a TRX --token-b USDT --amount-a 1000000
 ```
 
-#### Remove Liquidity
+With minimum amounts and recipient:
+
 ```bash
-sun --json --yes liquidity v2:remove \
-  --token-a <token> --token-b <token> \
-  --liquidity <raw_amount> \
-  [--min-a <min>] [--min-b <min>] \
-  [--to <recipient>] [--deadline <seconds>]
+sun --json --yes liquidity v2:add --token-a TRX --token-b USDT --amount-a 1000000 --amount-b 290000 --min-a 950000 --min-b 275000
 ```
 
-**Examples:**
-```bash
-# Remove liquidity
-sun --json --yes liquidity v2:remove --token-a TRX --token-b USDT --liquidity 500000
+#### Remove Liquidity
 
-# Dry-run first
+```bash
+sun --json --yes liquidity v2:remove --token-a TRX --token-b USDT --liquidity 500000
+```
+
+Dry-run:
+
+```bash
 sun --json --yes --dry-run liquidity v2:remove --token-a TRX --token-b USDT --liquidity 500000
 ```
 
@@ -272,46 +295,61 @@ Manage concentrated liquidity positions on SunSwap V3.
 | 1%       | 10000     | 200         | -887200 / 887200 |
 
 > **IMPORTANT:** `--fee` must be exactly one of: `100`, `500`, `3000`, `10000`.
-> Other values (e.g. 9999) are NOT rejected by `--dry-run` but will fail on-chain.
+> Other values are NOT rejected by `--dry-run` but will fail on-chain.
 >
-> `--tick-lower` and `--tick-upper` must be exact multiples of the tick spacing for the chosen fee tier.
+> `--tick-lower` and `--tick-upper` must be exact multiples of the tick spacing.
 > Misaligned ticks are NOT rejected by `--dry-run` but will fail on-chain.
 
+**Parameters for mint:** `--token0`, `--token1` (symbol or address), `--fee`, `--tick-lower`, `--tick-upper`, `--amount0`, `--amount1`. Optional: `--recipient`, `--deadline`.
+
 #### Mint New Position
+
+Full-range with defaults:
+
 ```bash
-sun --json --yes liquidity v3:mint \
-  --token0 <token> --token1 <token> \
-  [--fee <100|500|3000|10000>] \
-  [--tick-lower <N>] [--tick-upper <N>] \
-  [--amount0 <amount>] [--amount1 <amount>] \
-  [--recipient <address>] [--deadline <seconds>]
+sun --json --yes liquidity v3:mint --token0 TRX --token1 USDT --amount0 1000000
 ```
 
-**Examples:**
-```bash
-# Mint with full-range defaults
-sun --json --yes liquidity v3:mint --token0 TRX --token1 USDT --amount0 1000000
+With specific fee and tick range (fee=3000, tick spacing=60):
 
-# Mint with specific fee and tick range (ticks aligned to spacing=60 for fee=3000)
-sun --json --yes liquidity v3:mint \
-  --token0 TRX --token1 USDT --fee 3000 \
-  --tick-lower -887220 --tick-upper 887220 \
-  --amount0 1000000
+```bash
+sun --json --yes liquidity v3:mint --token0 TRX --token1 USDT --fee 3000 --tick-lower -887220 --tick-upper 887220 --amount0 1000000
+```
+
+Dry-run:
+
+```bash
+sun --json --yes --dry-run liquidity v3:mint --token0 TRX --token1 USDT --amount0 1000000
+```
+
+With specific fee tier (fee=500, tick spacing=10):
+
+```bash
+sun --json --yes liquidity v3:mint --token0 TRX --token1 USDT --fee 500 --tick-lower -887270 --tick-upper 887270 --amount0 1000000
+```
+
+With recipient:
+
+```bash
+sun --json --yes liquidity v3:mint --token0 TRX --token1 USDT --fee 3000 --tick-lower -60 --tick-upper 60 --amount0 1000000 --recipient TMgYX7m37cyyTSgVbtCoDUAQcFZ9RoYxJW
 ```
 
 #### Increase Position
+
 ```bash
-sun --json --yes liquidity v3:increase --token-id <id> --amount0 <amount> [--amount1 <amount>]
+sun --json --yes liquidity v3:increase --token-id 123 --amount0 500000
 ```
 
 #### Decrease Position
+
 ```bash
-sun --json --yes liquidity v3:decrease --token-id <id> --liquidity <raw_amount> [--min0 <min>] [--min1 <min>]
+sun --json --yes liquidity v3:decrease --token-id 123 --liquidity 1000
 ```
 
 #### Collect Fees
+
 ```bash
-sun --json --yes liquidity v3:collect --token-id <id> [--recipient <address>]
+sun --json --yes liquidity v3:collect --token-id 123
 ```
 
 ---
@@ -320,39 +358,54 @@ sun --json --yes liquidity v3:collect --token-id <id> [--recipient <address>]
 
 Manage liquidity on SunSwap V4 pools (with hooks support).
 
+**Parameters for mint:** `--token0`, `--token1`, `--fee`, `--tick-lower`, `--tick-upper`, `--amount0`, `--amount1`. Optional: `--slippage`, `--recipient`, `--create-pool`.
+
 #### Mint New Position
+
 ```bash
-sun --json --yes liquidity v4:mint \
-  --token0 <token> --token1 <token> \
-  [--fee <fee>] \
-  [--tick-lower <N>] [--tick-upper <N>] \
-  [--amount0 <amount>] [--amount1 <amount>] \
-  [--slippage <pct>] [--recipient <address>] \
-  [--create-pool]
+sun --json --yes liquidity v4:mint --token0 TRX --token1 USDT --amount0 1000000
 ```
 
-**Examples:**
-```bash
-# Mint V4 position
-sun --json --yes liquidity v4:mint --token0 TRX --token1 USDT --amount0 1000000
+Create pool if it does not exist:
 
-# Create pool if not exists
+```bash
 sun --json --yes liquidity v4:mint --token0 TRX --token1 USDT --amount0 1000000 --create-pool
 ```
 
-#### Increase / Decrease / Collect
+With slippage:
+
 ```bash
-# Increase
-sun --json --yes liquidity v4:increase --token-id <id> --token0 TRX --token1 USDT --amount0 500000
+sun --json --yes liquidity v4:mint --token0 TRX --token1 USDT --amount0 1000000 --slippage 0.01
+```
 
-# Decrease
-sun --json --yes liquidity v4:decrease --token-id <id> --liquidity <raw> --token0 TRX --token1 USDT
+Dry-run:
 
-# Collect fees
-sun --json --yes liquidity v4:collect --token-id <id>
+```bash
+sun --json --yes --dry-run liquidity v4:mint --token0 TRX --token1 USDT --amount0 1000000
+```
 
-# Query position info
-sun --json liquidity v4:info --pm <positionManager> --token-id <id>
+#### Increase Position
+
+```bash
+sun --json --yes liquidity v4:increase --token-id 123 --token0 TRX --token1 USDT --amount0 500000
+```
+
+#### Decrease Position
+
+```bash
+sun --json --yes liquidity v4:decrease --token-id 123 --liquidity 1000 --token0 TRX --token1 USDT
+```
+
+#### Collect Fees
+
+```bash
+sun --json --yes liquidity v4:collect --token-id 123
+```
+
+#### Query Position Info
+
+```bash
+sun --json liquidity v4:info --pm TLSWrv7eC1AZCXkRjpqMZUmvgd99cj7pPF --token-id 123
 ```
 
 ---
@@ -361,23 +414,39 @@ sun --json liquidity v4:info --pm <positionManager> --token-id <id>
 
 Search and inspect liquidity pools.
 
+List pools by token address:
+
 ```bash
-# List pools by token
 sun --json pool list --token TR7NHqjeKQxGTCi8q8ZY4pL8otSzgjLj6t
+```
 
-# Search by keyword
+Search by keyword:
+
+```bash
 sun --json pool search "TRX USDT"
+```
 
-# Top APY pools
+Top APY pools:
+
+```bash
 sun --json pool top-apy --page-size 10
+```
 
-# Pool volume history
-sun --json pool vol-history <poolAddress> --start 2026-01-01 --end 2026-03-15
+Pool volume history (requires a pool address):
 
-# Pool liquidity history
-sun --json pool liq-history <poolAddress> --start 2026-01-01 --end 2026-03-15
+```bash
+sun --json pool vol-history TSUUVjysXV8YqHytSNjfkNXnnB49QDvZpx --start 2026-01-01 --end 2026-03-15
+```
 
-# Pool hooks (V4)
+Pool liquidity history:
+
+```bash
+sun --json pool liq-history TSUUVjysXV8YqHytSNjfkNXnnB49QDvZpx --start 2026-01-01 --end 2026-03-15
+```
+
+Pool hooks (V4):
+
+```bash
 sun --json pool hooks
 ```
 
@@ -388,13 +457,18 @@ sun --json pool hooks
 Search and list token metadata.
 
 ```bash
-# List all tokens
 sun --json token list
+```
 
-# Filter by protocol
+Filter by protocol:
+
+```bash
 sun --json token list --protocol V3
+```
 
-# Search by keyword
+Search by keyword:
+
+```bash
 sun --json token search USDT
 ```
 
@@ -404,15 +478,22 @@ sun --json token search USDT
 
 Query user liquidity positions.
 
+List all positions for an owner:
+
 ```bash
-# List all user positions
-sun --json position list --owner TAddress
+sun --json position list --owner TMgYX7m37cyyTSgVbtCoDUAQcFZ9RoYxJW
+```
 
-# Filter by pool or protocol
-sun --json position list --owner TAddress --protocol V3
+Filter by protocol:
 
-# Pool tick info
-sun --json position tick <poolAddress>
+```bash
+sun --json position list --owner TMgYX7m37cyyTSgVbtCoDUAQcFZ9RoYxJW --protocol V3
+```
+
+Pool tick info:
+
+```bash
+sun --json position tick TSUUVjysXV8YqHytSNjfkNXnnB49QDvZpx
 ```
 
 ---
@@ -424,10 +505,10 @@ Resolve trading pair information.
 > **NOTE:** `pair info --token` requires a contract address, not a symbol.
 
 ```bash
-# By contract address (USDT)
 sun --json pair info --token TR7NHqjeKQxGTCi8q8ZY4pL8otSzgjLj6t
+```
 
-# By contract address (TRX)
+```bash
 sun --json pair info --token T9yD14Nj9j7xAB4dbGeiX9h8unkKHxuWwb
 ```
 
@@ -438,14 +519,26 @@ sun --json pair info --token T9yD14Nj9j7xAB4dbGeiX9h8unkKHxuWwb
 Fetch protocol-level metrics.
 
 ```bash
-# Snapshot
 sun --json protocol info
+```
 
-# Historical metrics
+```bash
 sun --json protocol vol-history --start 2026-01-01 --end 2026-03-15
+```
+
+```bash
 sun --json protocol users-history --start 2026-01-01 --end 2026-03-15
+```
+
+```bash
 sun --json protocol tx-history --start 2026-01-01 --end 2026-03-15
+```
+
+```bash
 sun --json protocol pools-history --start 2026-01-01 --end 2026-03-15
+```
+
+```bash
 sun --json protocol liq-history --start 2026-01-01 --end 2026-03-15
 ```
 
@@ -456,14 +549,19 @@ sun --json protocol liq-history --start 2026-01-01 --end 2026-03-15
 Inspect SUN.IO farms.
 
 ```bash
-# List farms
 sun --json farm list
+```
 
-# Farm transactions
-sun --json farm tx --owner TAddress --type stake
+Farm transactions for a specific owner:
 
-# User farm positions
-sun --json farm positions --owner TAddress
+```bash
+sun --json farm tx --owner TMgYX7m37cyyTSgVbtCoDUAQcFZ9RoYxJW --type stake
+```
+
+User farm positions:
+
+```bash
+sun --json farm positions --owner TMgYX7m37cyyTSgVbtCoDUAQcFZ9RoYxJW
 ```
 
 ---
@@ -472,13 +570,20 @@ sun --json farm positions --owner TAddress
 
 Scan DEX transaction activity.
 
+> **IMPORTANT:** `--type` must be exactly one of: `swap`, `add`, `withdraw`.
+> Invalid types return empty results instead of an error.
+
 ```bash
 sun --json tx scan --type swap --token TR7NHqjeKQxGTCi8q8ZY4pL8otSzgjLj6t --start 2026-01-01 --end 2026-03-15
 ```
 
-> **IMPORTANT:** `--type` must be exactly one of: `swap`, `add`, `withdraw`.
-> Invalid types (e.g. `invalidtype`) return empty results instead of an error.
-> The agent must validate the type value before passing it.
+```bash
+sun --json tx scan --type add --start 2026-01-01 --end 2026-03-15
+```
+
+```bash
+sun --json tx scan --type withdraw --start 2026-01-01 --end 2026-03-15
+```
 
 ---
 
@@ -486,12 +591,20 @@ sun --json tx scan --type swap --token TR7NHqjeKQxGTCi8q8ZY4pL8otSzgjLj6t --star
 
 Read or send arbitrary TRON contract calls when higher-level commands are insufficient.
 
-```bash
-# Read (no wallet needed)
-sun --json contract read <address> <functionName> --args '["arg1","arg2"]'
+Read a contract (no wallet needed):
 
-# Send (requires wallet)
-sun --json --yes contract send <address> <functionName> --args '["arg1","arg2"]' --value 0
+```bash
+sun --json contract read TR7NHqjeKQxGTCi8q8ZY4pL8otSzgjLj6t name
+```
+
+```bash
+sun --json contract read TR7NHqjeKQxGTCi8q8ZY4pL8otSzgjLj6t balanceOf --args '["TMgYX7m37cyyTSgVbtCoDUAQcFZ9RoYxJW"]'
+```
+
+Send a contract call (requires wallet, use `--dry-run` to simulate):
+
+```bash
+sun --json --yes --dry-run contract send TR7NHqjeKQxGTCi8q8ZY4pL8otSzgjLj6t approve --args '["TKzxdSv2FZKQrEqkKVgp5DcwEXBEKMg2Ax","1000000"]' --value 0
 ```
 
 ---
@@ -507,14 +620,19 @@ sun --json --yes contract send <address> <functionName> --args '["arg1","arg2"]'
 - Confirm `--network` is valid (`mainnet`, `nile`, or `shasta`)
 
 **Step 2 — Check balance and get quote:**
+
 ```bash
 sun --json wallet balances
+```
+
+```bash
 sun --json swap:quote TRX USDT 100000000
 ```
 
 Verify balance ≥ amountIn. Show the user: expected output amount, price impact, route.
 
 **Step 3 — Execute after user confirms:**
+
 ```bash
 sun --json --yes swap TRX USDT 100000000 --slippage 0.005
 ```
@@ -526,17 +644,23 @@ sun --json --yes swap TRX USDT 100000000 --slippage 0.005
 **Best for:** Large amounts or cautious operations.
 
 > **NOTE:** `--dry-run` only previews the transaction structure. It does NOT check
-> balances, validate fee tiers, or reject invalid parameters. Always check balances
-> separately before proceeding to actual execution.
+> balances, validate fee tiers, or reject invalid parameters.
+
+Check balance first:
 
 ```bash
-# Check balance first
 sun --json wallet balances
+```
 
-# Simulate (preview transaction structure)
+Simulate (preview transaction structure):
+
+```bash
 sun --json --yes --dry-run swap TRX USDT 100000000
+```
 
-# Execute after reviewing dry-run result and confirming balance
+Execute after reviewing dry-run result and confirming balance:
+
+```bash
 sun --json --yes swap TRX USDT 100000000
 ```
 
@@ -552,28 +676,27 @@ sun --json --yes swap TRX USDT 100000000
 - Confirm token0 ≠ token1
 
 **Step 2 — Check balances and pool info:**
+
 ```bash
 sun --json wallet balances
-sun --json position list --owner TAddress --protocol V3
+```
+
+```bash
 sun --json pool search "TRX USDT"
 ```
 
 Verify balance is sufficient for both amount0 and amount1.
 
 **Step 3 — Dry-run mint (preview only, does not validate balances or parameters):**
+
 ```bash
-sun --json --yes --dry-run liquidity v3:mint \
-  --token0 TRX --token1 USDT --fee 3000 \
-  --tick-lower -887220 --tick-upper 887220 \
-  --amount0 1000000
+sun --json --yes --dry-run liquidity v3:mint --token0 TRX --token1 USDT --fee 3000 --tick-lower -887220 --tick-upper 887220 --amount0 1000000
 ```
 
 **Step 4 — Execute after user confirms:**
+
 ```bash
-sun --json --yes liquidity v3:mint \
-  --token0 TRX --token1 USDT --fee 3000 \
-  --tick-lower -887220 --tick-upper 887220 \
-  --amount0 1000000
+sun --json --yes liquidity v3:mint --token0 TRX --token1 USDT --fee 3000 --tick-lower -887220 --tick-upper 887220 --amount0 1000000
 ```
 
 ---
@@ -582,22 +705,35 @@ sun --json --yes liquidity v3:mint \
 
 **Best for:** Answering user questions about tokens, pools, prices.
 
+Query token price:
+
 ```bash
-# "What's the price of TRX?"
 sun --json price TRX
+```
 
-# "Show me the top APY pools"
+Top APY pools:
+
+```bash
 sun --json pool top-apy --page-size 10
+```
 
-# "What are my positions?"
-sun --json position list --owner TAddress
+User positions:
 
-# "What pairs include USDT?"
+```bash
+sun --json position list --owner TMgYX7m37cyyTSgVbtCoDUAQcFZ9RoYxJW
+```
+
+Pair info (requires contract address, not symbol):
+
+```bash
 sun --json pair info --token TR7NHqjeKQxGTCi8q8ZY4pL8otSzgjLj6t
 ```
 
-> **NOTE:** `pair info --token` requires a contract address, not a symbol.
-> Use the [Supported Token Symbols](#supported-token-symbols) table to resolve symbols to addresses.
+Limit output fields to reduce response size:
+
+```bash
+sun --json --fields address,network wallet address
+```
 
 ---
 
@@ -625,15 +761,17 @@ Any TRC20 token can also be referenced by its contract address directly.
 
 ### CRITICAL: Never Display Private Keys
 
-**FORBIDDEN:**
-- Private keys, seed phrases, mnemonics
-- Environment variable values containing secrets
-- Agent wallet passwords
+**FORBIDDEN:** private keys, seed phrases, mnemonics, environment variable values containing secrets, agent wallet passwords.
 
-**ALLOWED:**
-- Public wallet addresses
-- Transaction hashes
-- Token balances and prices
+**ALLOWED:** public wallet addresses, transaction hashes, token balances and prices.
+
+To verify no secrets leak in output:
+
+```bash
+sun --json wallet address
+```
+
+The output must not contain private key material.
 
 ### CRITICAL: Prevent Duplicate Transactions
 
@@ -654,6 +792,9 @@ The CLI does not validate all inputs in `--dry-run` mode. The agent must:
 
 ```bash
 sun --json wallet balances
+```
+
+```bash
 sun --json swap:quote TRX USDT 1000000000
 ```
 
@@ -729,6 +870,6 @@ Set one of: `TRON_PRIVATE_KEY`, `TRON_MNEMONIC`, or `AGENT_WALLET_PASSWORD`.
 
 ---
 
-**Version**: 3.0.1 (sun-cli based)
-**Last Updated**: 2026-03-18
+**Version**: 3.1.0 (sun-cli based)
+**Last Updated**: 2026-03-20
 **Maintainer**: Bank of AI Team
