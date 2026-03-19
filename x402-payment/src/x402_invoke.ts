@@ -81,19 +81,6 @@ async function findApiKey(): Promise<string | undefined> {
       } catch (e) { /* ignore */ }
     }
   }
-
-  const mcporterPath = path.join(os.homedir(), '.mcporter', 'mcporter.json');
-  if (fs.existsSync(mcporterPath)) {
-    try {
-      const config = JSON.parse(fs.readFileSync(mcporterPath, 'utf8'));
-      if (config.mcpServers) {
-        for (const serverName in config.mcpServers) {
-          const s = config.mcpServers[serverName];
-          if (s?.env?.TRON_GRID_API_KEY) return s.env.TRON_GRID_API_KEY;
-        }
-      }
-    } catch (e) { /* ignore */ }
-  }
   return undefined;
 }
 
@@ -116,21 +103,6 @@ async function findGasFreeCredentials(): Promise<{ apiKey: string; apiSecret: st
         if (key && secret) return { apiKey: key, apiSecret: secret };
       } catch (e) { /* ignore */ }
     }
-  }
-
-  const mcporterPath = path.join(os.homedir(), '.mcporter', 'mcporter.json');
-  if (fs.existsSync(mcporterPath)) {
-    try {
-      const config = JSON.parse(fs.readFileSync(mcporterPath, 'utf8'));
-      if (config.mcpServers) {
-        for (const serverName in config.mcpServers) {
-          const s = config.mcpServers[serverName];
-          const key = (s?.env?.GASFREE_API_KEY || '').trim();
-          const secret = (s?.env?.GASFREE_API_SECRET || '').trim();
-          if (key && secret) return { apiKey: key, apiSecret: secret };
-        }
-      }
-    } catch (e) { /* ignore */ }
   }
   return undefined;
 }

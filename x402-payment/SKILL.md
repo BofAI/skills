@@ -45,7 +45,7 @@ The `x402-payment` skill enables agents to interact with paid API endpoints. Whe
 - **TronGrid API Key (optional)**: `TRON_GRID_API_KEY` is optional. Recommended on **Mainnet** to reduce rate-limit issues.
 - **GasFree (optional)**: `GASFREE_API_KEY` and `GASFREE_API_SECRET` are only needed when using GasFree-related commands/flows. When configured, the tool will prefer the `exact_gasfree` scheme over `exact_permit`. GasFree also requires an account that is **activated** with **sufficient token balance** in the GasFree wallet.
 - **Dependencies**: Run `npm install` in the `x402-payment/` directory before first use.
-- `TRON_GRID_API_KEY`, `GASFREE_API_KEY`, and `GASFREE_API_SECRET` can also be set in `x402-config.json` or `~/.mcporter/mcporter.json`.
+- `TRON_GRID_API_KEY`, `GASFREE_API_KEY`, and `GASFREE_API_SECRET` can also be set in `x402-config.json`.
 
 ## Usage Instructions
 
