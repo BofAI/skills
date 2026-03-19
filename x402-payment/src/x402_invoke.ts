@@ -434,9 +434,12 @@ async function main() {
     ExactGasFreeClientMechanism,
     GasFreeAPIClient,
     GASFREE_API_BASE_URLS,
+    EVM_RPC_URLS,
     SufficientBalancePolicy,
     getChainId,
   } = await import('@bankofai/x402');
+
+  EVM_RPC_URLS['eip155:97'] = 'https://bsc-testnet-rpc.publicnode.com';
 
   const resolvedTronWallet = await resolveAgentWallet('tron');
   const resolvedEvmWallet = await resolveAgentWallet('eip155');
@@ -498,6 +501,10 @@ async function main() {
       process.exit(1);
     }
     process.exit(0);
+  }
+
+  if (!tronSigner && !evmSigner) {
+    console.error('[x402] Warning: no compatible agent-wallet signer resolved; payment-required endpoints may fail.');
   }
 
   if (!url) {
@@ -597,6 +604,30 @@ async function main() {
       responseBody = await response.text();
     }
 
+    const paymentResponseHeader = response.headers.get('payment-response');
+    if (paymentResponseHeader) {
+      try {
+        const decoded = Buffer.from(paymentResponseHeader, 'base64').toString('utf8');
+        const paymentResult = JSON.parse(decoded) as {
+          success?: boolean;
+          network?: string;
+          transaction?: string;
+          errorReason?: string | null;
+        };
+        const details = [
+          `success=${String(paymentResult.success)}`,
+          `network=${paymentResult.network || 'unknown'}`,
+          `tx=${paymentResult.transaction || 'n/a'}`,
+        ];
+        if (paymentResult.errorReason) details.push(`errorReason=${paymentResult.errorReason}`);
+        console.error(`[x402] Payment result: ${details.join(' ')}`);
+      } catch {
+        console.error('[x402] Payment result: unable to decode payment-response header');
+      }
+    } else {
+      console.error('[x402] Payment result: no payment-response header');
+    }
+
     process.stdout.write(JSON.stringify({
       status: response.status,
       headers: Object.fromEntries(response.headers.entries()),
@@ -604,12 +635,27 @@ async function main() {
     }, null, 2) + '\n');
   } catch (error: any) {
     const message = error.message || 'Unknown error';
-    const stack = error.stack || '';
-    console.error(`[x402] Error: ${message}`);
-    process.stdout.write(JSON.stringify({
+    const cause = error?.cause as any;
+    const debugEnabled = process.env.X402_DEBUG === '1';
+    const output: Record<string, unknown> = {
       error: message,
-      stack: stack
-    }, null, 2) + '\n');
+      request: {
+        method: finalMethod,
+        url: finalUrl,
+      },
+    };
+    if (cause?.shortMessage) output.cause = cause.shortMessage;
+    if (cause?.url) output.rpc_url = cause.url;
+    if (debugEnabled) output.stack = error.stack || '';
+
+    console.error(`[x402] Error: ${message}`);
+    if (typeof output.cause === 'string') {
+      console.error(`[x402] Cause: ${output.cause}`);
+    }
+    if (typeof output.rpc_url === 'string') {
+      console.error(`[x402] RPC URL: ${output.rpc_url}`);
+    }
+    process.stdout.write(JSON.stringify(output, null, 2) + '\n');
     process.exit(1);
   }
 }

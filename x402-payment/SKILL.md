@@ -158,5 +158,8 @@ If allowance is insufficient, the tool will automatically attempt an "infinite a
 ### Insufficient Balance
 Ensure you have enough USDT/USDC/USDD in your wallet on the specified network.
 
+### Debug Stack Trace
+Set `X402_DEBUG=1` to include full error stack traces in the JSON output when troubleshooting failures.
+
 ---
 *Last Updated: 2026-03-11*
