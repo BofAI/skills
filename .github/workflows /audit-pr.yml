@@ -1,0 +1,161 @@
+name: Audit PR
+
+on:
+  push:
+    branches:
+      - main
+  issue_comment:
+    types: [created]
+
+permissions:
+  contents: read
+  pull-requests: write
+  issues: write
+
+jobs:
+  audit-on-main:
+    name: Audit on main push
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    runs-on: [self-hosted, Linux, ARM64, audit-linux]
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Check required tools
+        run: |
+          which zip
+          which jq
+
+      - name: Create source archive
+        run: |
+          rm -f /tmp/code.zip
+          zip -r /tmp/code.zip .
+
+      - name: Call audit service
+        id: audit
+        shell: bash
+        run: |
+          RESPONSE=$(curl -s -X POST "${{ vars.AUDIT_SERVICE_URL }}/audit-pr/${{ vars.AUDIT_PR_SKILL }}" \
+            -H "X-API-Key: ${{ secrets.AUDIT_API_KEY }}" \
+            -F "file=@/tmp/code.zip" \
+            -F "from_branch=main" \
+            -F "to_branch=main")
+
+          echo "Audit response:"
+          echo "$RESPONSE" | jq .
+
+          REPORT_URL=$(echo "$RESPONSE" | jq -r '.report_url // empty')
+          STATUS_URL=$(echo "$RESPONSE" | jq -r '.status_url // empty')
+          STATUS=$(echo "$RESPONSE" | jq -r '.status // empty')
+
+          if [ -z "$REPORT_URL" ] && [ -z "$STATUS_URL" ]; then
+            echo "Audit service did not return report_url/status_url"
+            exit 1
+          fi
+
+          echo "report_url=$REPORT_URL" >> "$GITHUB_OUTPUT"
+          echo "status_url=$STATUS_URL" >> "$GITHUB_OUTPUT"
+          echo "status=$STATUS" >> "$GITHUB_OUTPUT"
+
+      - name: Write summary
+        run: |
+          {
+            echo "## Audit PR result"
+            echo ""
+            echo "- status: ${{ steps.audit.outputs.status }}"
+            echo "- report_path: ${{ steps.audit.outputs.report_url }}"
+            echo "- status_path: ${{ steps.audit.outputs.status_url }}"
+          } >> "$GITHUB_STEP_SUMMARY"
+
+  audit-by-comment:
+    name: Audit by PR comment
+    if: >
+      github.event_name == 'issue_comment' &&
+      github.event.issue.pull_request &&
+      github.event.comment.body == '/audit-pr' &&
+      contains(format(',{0},', vars.AUDIT_ALLOWED_USERS), format(',{0},', github.event.comment.user.login))
+    runs-on: [self-hosted, Linux, ARM64, audit-linux]
+
+    steps:
+      - name: Get PR info
+        id: pr
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const pr = await github.rest.pulls.get({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              pull_number: context.issue.number
+            });
+
+            core.setOutput('head_ref', pr.data.head.ref);
+            core.setOutput('base_ref', pr.data.base.ref);
+            core.setOutput('head_sha', pr.data.head.sha);
+
+      - name: Checkout PR head
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ steps.pr.outputs.head_sha }}
+          fetch-depth: 0
+
+      - name: Check required tools
+        run: |
+          which zip
+          which jq
+
+      - name: Create source archive
+        run: |
+          rm -f /tmp/code.zip
+          zip -r /tmp/code.zip .
+
+      - name: Call audit service
+        id: audit
+        shell: bash
+        run: |
+          RESPONSE=$(curl -s -X POST "${{ vars.AUDIT_SERVICE_URL }}/audit-pr/${{ vars.AUDIT_PR_SKILL }}" \
+            -H "X-API-Key: ${{ secrets.AUDIT_API_KEY }}" \
+            -F "file=@/tmp/code.zip" \
+            -F "from_branch=${{ steps.pr.outputs.base_ref }}" \
+            -F "to_branch=${{ steps.pr.outputs.head_ref }}")
+
+          echo "Audit response:"
+          echo "$RESPONSE" | jq .
+
+          REPORT_URL=$(echo "$RESPONSE" | jq -r '.report_url // empty')
+          STATUS_URL=$(echo "$RESPONSE" | jq -r '.status_url // empty')
+          STATUS=$(echo "$RESPONSE" | jq -r '.status // empty')
+
+          if [ -z "$REPORT_URL" ] && [ -z "$STATUS_URL" ]; then
+            echo "Audit service did not return report_url/status_url"
+            exit 1
+          fi
+
+          echo "report_url=$REPORT_URL" >> "$GITHUB_OUTPUT"
+          echo "status_url=$STATUS_URL" >> "$GITHUB_OUTPUT"
+          echo "status=$STATUS" >> "$GITHUB_OUTPUT"
+
+      - name: Comment result to PR
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const reportPath = `${{ steps.audit.outputs.report_url }}`;
+            const statusPath = `${{ steps.audit.outputs.status_url }}`;
+            const status = `${{ steps.audit.outputs.status }}`;
+
+            const body = [
+              `Audit PR triggered by @${context.payload.comment.user.login}`,
+              '',
+              `Status: ${status}`,
+              `Report path: ${reportPath}`,
+              `Status path: ${statusPath}`
+            ].join('\n');
+
+            await github.rest.issues.createComment({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: context.issue.number,
+              body
+            });
