@@ -434,12 +434,9 @@ async function main() {
     ExactGasFreeClientMechanism,
     GasFreeAPIClient,
     GASFREE_API_BASE_URLS,
-    EVM_RPC_URLS,
     SufficientBalancePolicy,
     getChainId,
   } = await import('@bankofai/x402');
-
-  EVM_RPC_URLS['eip155:97'] = 'https://bsc-testnet-rpc.publicnode.com';
 
   const resolvedTronWallet = await resolveAgentWallet('tron');
   const resolvedEvmWallet = await resolveAgentWallet('eip155');
