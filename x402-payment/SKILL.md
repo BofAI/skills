@@ -37,14 +37,15 @@ The `x402-payment` skill enables agents to interact with paid API endpoints. Whe
 
 ## Prerequisites
 
-- **Wallet Configuration**:
-  - **TRON**: Set `TRON_PRIVATE_KEY` for TRC20 payments (USDT/USDD).
-  - **EVM**: Set `EVM_PRIVATE_KEY` or `ETH_PRIVATE_KEY` for ERC20 payments (USDT/USDC).
-  - The skill also searches for keys in `x402-config.json` and `~/.mcporter/mcporter.json`.
-- **TronGrid API Key**: Required for **Mainnet** to avoid rate limits (`TRON_GRID_API_KEY`).
-- **GasFree** (optional): Set `GASFREE_API_KEY` and `GASFREE_API_SECRET` to enable gasless TRC20 payments. When configured, the tool will prefer the `exact_gasfree` scheme over `exact_permit`. Requires a GasFree account that is **activated** with **sufficient token balance** in the GasFree wallet.
+- **Wallet Configuration (agent-wallet)**:
+  - **Local mode (recommended)**: set `AGENT_WALLET_PASSWORD` (required), `AGENT_WALLET_DIR` (optional).
+  - **Static mode (env)**: set exactly one of `AGENT_WALLET_PRIVATE_KEY` / `AGENT_WALLET_MNEMONIC`.
+  - **Optional for mnemonic mode**: `AGENT_WALLET_MNEMONIC_ACCOUNT_INDEX`.
+  - Configure a TRON wallet for TRC20 payments (USDT/USDD) and/or an EVM wallet for ERC20 payments (USDT/USDC).
+- **TronGrid API Key (optional)**: `TRON_GRID_API_KEY` is optional. Recommended on **Mainnet** to reduce rate-limit issues.
+- **GasFree (optional)**: `GASFREE_API_KEY` and `GASFREE_API_SECRET` are only needed when using GasFree-related commands/flows. When configured, the tool will prefer the `exact_gasfree` scheme over `exact_permit`. GasFree also requires an account that is **activated** with **sufficient token balance** in the GasFree wallet.
 - **Dependencies**: Run `npm install` in the `x402-payment/` directory before first use.
-- All keys can also be set in `x402-config.json` or `~/.mcporter/mcporter.json`.
+- `TRON_GRID_API_KEY`, `GASFREE_API_KEY`, and `GASFREE_API_SECRET` can also be set in `x402-config.json` or `~/.mcporter/mcporter.json`.
 
 ## Usage Instructions
 
@@ -76,9 +77,9 @@ npx tsx x402-payment/src/x402_invoke.ts \
 
 ### 4. GasFree Wallet Info
 Query GasFree wallet information (address, activation status, balance, nonce).
-Defaults: network=**mainnet**, wallet=**TRON_PRIVATE_KEY**.
+Defaults: network=**mainnet**, wallet=**agent-wallet active TRON wallet**.
 ```bash
-# Default: mainnet + TRON_PRIVATE_KEY wallet
+# Default: mainnet + active TRON wallet
 npx tsx x402-payment/src/x402_invoke.ts --gasfree-info
 
 # Specify wallet address
@@ -90,7 +91,7 @@ npx tsx x402-payment/src/x402_invoke.ts --gasfree-info --network nile
 # Both
 npx tsx x402-payment/src/x402_invoke.ts --gasfree-info --wallet <YOUR_WALLET_ADDRESS> --network nile
 ```
-Requires: `GASFREE_API_KEY`, `GASFREE_API_SECRET`. Without `--wallet`, requires `TRON_PRIVATE_KEY`. Returns JSON with `gasFreeAddress`, `active`, `allowSubmit`, `nonce`, and per-token `assets` (balance, fees).
+Requires: `GASFREE_API_KEY`, `GASFREE_API_SECRET`. Without `--wallet`, requires a configured TRON wallet from agent-wallet. Returns JSON with `gasFreeAddress`, `active`, `allowSubmit`, `nonce`, and per-token `assets` (balance, fees).
 
 ### 5. GasFree Account Activation
 Activate a GasFree account that has not been activated yet. Use `--gasfree-info` first to check activation status.
@@ -105,7 +106,7 @@ npx tsx x402-payment/src/x402_invoke.ts --gasfree-activate --network mainnet
 # Specify network and token
 npx tsx x402-payment/src/x402_invoke.ts --gasfree-activate --network nile --token USDT
 ```
-Requires: `TRON_PRIVATE_KEY`, `GASFREE_API_KEY`, `GASFREE_API_SECRET`. Wallet must have enough tokens to cover activation fees (~3.05 USDT on nile). If the account is already activated, returns `{"status": "already_active"}` immediately.
+Requires: TRON wallet configured in agent-wallet, `GASFREE_API_KEY`, `GASFREE_API_SECRET`. Wallet must have enough tokens to cover activation fees (~3.05 USDT on nile). If the account is already activated, returns `{"status": "already_active"}` immediately.
 
 **Activation process:**
 1. Queries GasFree account info and checks activation status
@@ -132,13 +133,14 @@ Returns JSON with `status`, `depositTxId`, `gasFreeTraceId`, `gasFreeState`, `ga
 ## Security Considerations & Rules
 
 > [!CAUTION]
-> **Private Key Safety**: NEVER output your private keys to the logs or console. The `x402_invoke` tool loads keys from environment variables internally.
+> **Wallet Secret Safety**: NEVER output wallet private keys or mnemonic phrases to logs or console. Use agent-wallet managed configuration.
 
 ### Agent Security Rules:
 - **No Private Key Output**: The Agent MUST NOT print, echo, or output any private key to the dialogue context.
-- **Internal Loading Only**: Rely on the tool to load keys internally.
+- **No Mnemonic Output**: The Agent MUST NOT print or expose mnemonic phrases.
+- **Internal Loading Only**: Rely on the tool to load wallet credentials internally via agent-wallet.
 - **No Export Commands**: DO NOT execute shell commands containing the private key as a literal string.
-- **Silent Environment Checks**: Use `[[ -n $TRON_PRIVATE_KEY ]] && echo "Configured" || echo "Missing"` to verify configuration without leaking secrets.
+- **Silent Environment Checks**: Use `[[ -n $AGENT_WALLET_PASSWORD ]] && echo "Configured" || echo "Missing"` to verify local mode configuration without leaking secrets.
 - **Use the Check Tool**: Use `npx tsx x402-payment/src/x402_invoke.ts --check` to safely verify addresses.
 
 ## Binary and Image Handling
