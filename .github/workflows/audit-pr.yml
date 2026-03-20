@@ -6,6 +6,7 @@ on:
       - main
   issue_comment:
     types: [created]
+  workflow_dispatch:
 
 permissions:
   contents: read
@@ -30,9 +31,13 @@ jobs:
           which jq
 
       - name: Create source archive
+        id: archive
+        shell: bash
         run: |
-          rm -f /tmp/code.zip
-          zip -r /tmp/code.zip .
+          ARCHIVE_NAME="${{ github.event.repository.name }}.zip"
+          rm -f "/tmp/${ARCHIVE_NAME}"
+          zip -r "/tmp/${ARCHIVE_NAME}" .
+          echo "archive_name=${ARCHIVE_NAME}" >> "$GITHUB_OUTPUT"
 
       - name: Call audit service
         id: audit
@@ -40,7 +45,7 @@ jobs:
         run: |
           RESPONSE=$(curl -s -X POST "${{ vars.AUDIT_SERVICE_URL }}/audit-pr/${{ vars.AUDIT_PR_SKILL }}" \
             -H "X-API-Key: ${{ secrets.AUDIT_API_KEY }}" \
-            -F "file=@/tmp/code.zip" \
+            -F "file=@/tmp/${{ steps.archive.outputs.archive_name }}" \
             -F "from_branch=main" \
             -F "to_branch=main")
 
@@ -75,7 +80,7 @@ jobs:
     if: >
       github.event_name == 'issue_comment' &&
       github.event.issue.pull_request &&
-      github.event.comment.body == '/audit-pr' &&
+      contains(github.event.comment.body, '/audit-pr') &&
       contains(format(',{0},', vars.AUDIT_ALLOWED_USERS), format(',{0},', github.event.comment.user.login))
     runs-on: [self-hosted, Linux, ARM64, audit-linux]
 
@@ -107,9 +112,13 @@ jobs:
           which jq
 
       - name: Create source archive
+        id: archive
+        shell: bash
         run: |
-          rm -f /tmp/code.zip
-          zip -r /tmp/code.zip .
+          ARCHIVE_NAME="${{ github.event.repository.name }}.zip"
+          rm -f "/tmp/${ARCHIVE_NAME}"
+          zip -r "/tmp/${ARCHIVE_NAME}" .
+          echo "archive_name=${ARCHIVE_NAME}" >> "$GITHUB_OUTPUT"
 
       - name: Call audit service
         id: audit
@@ -117,7 +126,7 @@ jobs:
         run: |
           RESPONSE=$(curl -s -X POST "${{ vars.AUDIT_SERVICE_URL }}/audit-pr/${{ vars.AUDIT_PR_SKILL }}" \
             -H "X-API-Key: ${{ secrets.AUDIT_API_KEY }}" \
-            -F "file=@/tmp/code.zip" \
+            -F "file=@/tmp/${{ steps.archive.outputs.archive_name }}" \
             -F "from_branch=${{ steps.pr.outputs.base_ref }}" \
             -F "to_branch=${{ steps.pr.outputs.head_ref }}")
 
@@ -159,3 +168,4 @@ jobs:
               issue_number: context.issue.number,
               body
             });
+
