@@ -1,7 +1,7 @@
 ---
 name: SunSwap DEX Trading
 description: Execute token swaps, manage liquidity, and query market data on SunSwap DEX via the sun-cli.
-version: 3.1.0
+version: 3.2.0
 dependencies:
   - "@bankofai/sun-cli"
 tags:
@@ -114,6 +114,14 @@ Before executing any write operation (`swap`, `liquidity`, `contract send`), the
 
 3. **Check balance is sufficient** for both token0 and token1 amounts.
 
+### Before V3/V4 Position Operations (Increase/Decrease/Collect)
+
+1. **Verify token-id exists:** Query the user's positions first:
+   ```bash
+   sun --json position list --owner TMgYX7m37cyyTSgVbtCoDUAQcFZ9RoYxJW --protocol V3
+   ```
+   Confirm the target `--token-id` appears in the result. Passing a non-existent token-id may produce misleading errors (e.g. "amount required" instead of "position not found").
+
 ### Before V2 Liquidity (Add)
 
 1. **Check balance is sufficient** for both token-a and token-b amounts.
@@ -144,6 +152,14 @@ Check balances for a specific owner address:
 ```bash
 sun --json wallet balances --owner TDqSquXBgUCLYvYC4XZgrprLK589dkhSCf
 ```
+
+Filter by specific tokens (contract addresses only, symbols like TRX/USDT are NOT supported):
+
+```bash
+sun --json wallet balances --tokens TR7NHqjeKQxGTCi8q8ZY4pL8otSzgjLj6t,TNUC9Qb1rRpS5CbWLmNMxXBjyFoydXjWFR
+```
+
+> **WARNING:** `--tokens` only accepts contract addresses. Passing symbols (e.g. `TRX,USDT`) will return `Invalid contract address provided`. Use the address table in [Supported Token Symbols](#supported-token-symbols) to resolve symbols to addresses first.
 
 ---
 
@@ -502,11 +518,18 @@ sun --json position tick TSUUVjysXV8YqHytSNjfkNXnnB49QDvZpx
 
 Resolve trading pair information.
 
-> **NOTE:** `pair info --token` requires a contract address, not a symbol.
+> **WARNING:** `pair info --token` **only accepts contract addresses**. Passing a symbol
+> (e.g. `USDT`) will fail with an API error or return unexpected results.
+> Always resolve the symbol to a contract address first using the
+> [Supported Token Symbols](#supported-token-symbols) table or `token search`.
+
+Query by USDT contract address:
 
 ```bash
 sun --json pair info --token TR7NHqjeKQxGTCi8q8ZY4pL8otSzgjLj6t
 ```
+
+Query by WTRX contract address:
 
 ```bash
 sun --json pair info --token T9yD14Nj9j7xAB4dbGeiX9h8unkKHxuWwb
@@ -800,9 +823,37 @@ sun --json swap:quote TRX USDT 1000000000
 
 Always check balance and get a quote before executing. `--dry-run` only shows transaction structure and does NOT validate balances or parameters.
 
-### CRITICAL: Confirm Before Write Operations
+### CRITICAL: Always Preview Before Write Operations
 
-Always show the user what will happen (quote, dry-run) and get explicit confirmation before executing any write operation (swap, add/remove liquidity, contract send).
+The AI agent **must never** execute a write operation (`swap`, `liquidity add/remove/mint`, `contract send`) without first showing the user a preview. The correct sequence is:
+
+1. **Get a quote or dry-run** to show what will happen
+2. **Display the preview** to the user (amounts, route, price impact, fees)
+3. **Ask for explicit confirmation** from the user
+4. **Only then** execute with `--yes`
+
+> **WARNING:** Do not pass `--yes` on the first call. Use `--yes` only after the user
+> has reviewed a preview and confirmed. Skipping the preview violates the security protocol.
+
+**Correct pattern:**
+
+```bash
+sun --json swap:quote TRX USDT 100000000
+```
+
+Show results to user. After user confirms:
+
+```bash
+sun --json --yes swap TRX USDT 100000000
+```
+
+**For high-value operations (large amounts):** Always use `--dry-run` first in addition to the quote:
+
+```bash
+sun --json --yes --dry-run swap TRX USDT 1000000000
+```
+
+Then execute only after user reviews both the quote and the dry-run result.
 
 ---
 
@@ -844,7 +895,12 @@ These are CLI-level behaviors that the AI agent must work around:
 | Same-token swap not rejected | `swap` | Accepts TRX→TRX in dry-run | Verify tokenIn ≠ tokenOut before calling |
 | Invalid `--network` silently falls back | All commands | Unknown network names use mainnet | Only pass `mainnet`, `nile`, or `shasta` |
 | Invalid `--type` returns empty results | `tx scan` | Unknown types return empty list, no error | Only pass `swap`, `add`, or `withdraw` |
-| `pair info --token` needs address | `pair info` | Symbols cause API error | Use contract addresses, not symbols |
+| `pair info --token` needs address | `pair info` | Symbols cause API error or bad results | Use contract addresses, not symbols |
+| `--tokens` filter needs addresses | `wallet balances` | Symbols like `TRX,USDT` cause `Invalid contract address provided` | Resolve symbols to addresses before calling |
+| BigInt serialization in JSON output | `contract read` | Functions returning large integers (e.g. `totalSupply`) may crash with `Do not know how to serialize a BigInt` | Wrap result with `.toString()` client-side, or avoid `--json` for these calls |
+| V3 invalid `--token-id` error misleading | `v3:increase`, `v3:decrease`, `v3:collect` | Non-existent token-id may report "amount required" instead of "position not found" | Verify the token-id exists via `position list` before operating |
+| `AGENT_WALLET_PASSWORD` needs wallet store | `wallet address` | Fails if `~/.agent-wallet` directory is not initialized | Use `TRON_PRIVATE_KEY` or `TRON_MNEMONIC` instead, or initialize wallet store first |
+| Testnet transactions need bandwidth/energy | All write commands on nile/shasta | Real execution may fail with resource errors even if dry-run succeeds | Ensure test wallet has sufficient TRX staked for bandwidth and energy |
 
 ---
 
@@ -858,6 +914,11 @@ npm install -g @bankofai/sun-cli
 ### "Wallet not configured"
 Set one of: `TRON_PRIVATE_KEY`, `TRON_MNEMONIC`, or `AGENT_WALLET_PASSWORD`.
 
+> **NOTE on AGENT_WALLET_PASSWORD:** This mode requires an initialized wallet store
+> at `~/.agent-wallet`. If the directory does not exist, the CLI will fail with
+> `Secrets directory not found`. Use `TRON_PRIVATE_KEY` or `TRON_MNEMONIC` for
+> simpler setup. Only set one wallet source at a time.
+
 ### "Network error" or "Timeout"
 - Check internet connectivity
 - For mainnet, set `TRONGRID_API_KEY`
@@ -868,8 +929,14 @@ Set one of: `TRON_PRIVATE_KEY`, `TRON_MNEMONIC`, or `AGENT_WALLET_PASSWORD`.
 - Increase slippage: `--slippage 0.01`
 - Verify token balance with `sun --json wallet balances`
 
+### Testnet transaction fails with bandwidth/energy error
+- Nile and Shasta testnets require staked TRX for bandwidth and energy
+- Dry-run may succeed but real execution fails if the wallet lacks resources
+- Fund the test wallet with testnet TRX and stake for resources before testing
+- Use `--dry-run` to verify transaction structure even when resources are insufficient
+
 ---
 
-**Version**: 3.1.0 (sun-cli based)
+**Version**: 3.2.0 (sun-cli based)
 **Last Updated**: 2026-03-20
 **Maintainer**: Bank of AI Team

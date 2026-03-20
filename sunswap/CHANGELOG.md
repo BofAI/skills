@@ -2,6 +2,50 @@
 
 All notable changes to the SunSwap skill will be documented in this file.
 
+## [3.2.0] - 2026-03-20
+
+### Fixed — Documentation Issues from Test Report (134 cases, 18 failures)
+
+Full test coverage (134/134 cases executed, 116 passed, 18 failed) revealed documentation gaps
+and missing guidance in SKILL.md. Changes address the following failure categories:
+
+**Wallet & Token Filtering (TC_WLT_004, TC_WLT_007)**
+- Added documentation that `--tokens` filter on `wallet balances` only accepts contract addresses,
+  not symbols. Passing `TRX,USDT` returns `Invalid contract address provided`.
+- Added `AGENT_WALLET_PASSWORD` troubleshooting: requires `~/.agent-wallet` directory to be
+  initialized. Documented fallback to `TRON_PRIVATE_KEY` or `TRON_MNEMONIC`.
+
+**Contract Read BigInt (TC_CTR_002)**
+- Added BigInt serialization warning to Known Limitations: `contract read` functions returning
+  large integers (e.g. `totalSupply`) may crash JSON output.
+
+**Pair Info (TC_PAR_002, TC_PAR_003)**
+- Strengthened warning that `pair info --token` only accepts contract addresses. Symbols will
+  fail or return unexpected results.
+
+**V3 Parameter Validation (TC_V3L_004, TC_V3L_005, TC_V3L_010)**
+- Added pre-validation step for V3/V4 position operations: verify token-id exists via
+  `position list` before calling `increase`/`decrease`/`collect`.
+- Added known limitation for misleading error when token-id does not exist.
+
+**Security & Confirmation Workflow (TC_SEC_004, TC_SEC_005)**
+- Rewrote "Confirm Before Write Operations" section to enforce a strict preview-then-execute
+  protocol: agents must get a quote or dry-run, display it to the user, and obtain explicit
+  confirmation before passing `--yes`.
+
+**Testnet Execution (TC_SWP_002)**
+- Added troubleshooting guidance for testnet bandwidth/energy failures.
+
+### Known Limitations Added
+
+| Issue | Commands |
+|-------|----------|
+| `--tokens` needs contract addresses | `wallet balances` |
+| BigInt JSON serialization crash | `contract read` |
+| Misleading V3 token-id errors | `v3:increase/decrease/collect` |
+| `AGENT_WALLET_PASSWORD` needs store | `wallet address` |
+| Testnet resource requirements | All write commands on nile/shasta |
+
 ## [3.1.0] - 2026-03-20
 
 ### Fixed — Command Format Compatibility
