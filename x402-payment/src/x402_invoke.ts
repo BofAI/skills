@@ -438,14 +438,25 @@ async function main() {
     getChainId,
   } = await import('@bankofai/x402');
 
-  const resolvedTronWallet = await resolveAgentWallet('tron');
-  const resolvedEvmWallet = await resolveAgentWallet('eip155');
-  const tronSigner = resolvedTronWallet
-    ? new TronClientSigner(resolvedTronWallet.wallet, resolvedTronWallet.address)
-    : undefined;
-  const evmSigner = resolvedEvmWallet
-    ? new EvmClientSigner(resolvedEvmWallet.wallet, resolvedEvmWallet.address)
-    : undefined;
+  let tronSigner: InstanceType<typeof TronClientSigner> | undefined;
+  try {
+    tronSigner = await TronClientSigner.create();
+    if (!isTronAddress(tronSigner.getAddress())) {
+      tronSigner = undefined;
+    }
+  } catch (_) {
+    tronSigner = undefined;
+  }
+
+  let evmSigner: InstanceType<typeof EvmClientSigner> | undefined;
+  try {
+    evmSigner = await EvmClientSigner.create();
+    if (!isEvmAddress(evmSigner.getAddress())) {
+      evmSigner = undefined;
+    }
+  } catch (_) {
+    evmSigner = undefined;
+  }
   const apiKey = await findApiKey();
   const gasFreeCredentials = await findGasFreeCredentials();
 
@@ -474,6 +485,7 @@ async function main() {
   }
 
   if (options['gasfree-activate']) {
+    const resolvedTronWallet = await resolveAgentWallet('tron');
     if (!resolvedTronWallet || !tronSigner) {
       console.error('Error: A TRON wallet from agent-wallet is required for --gasfree-activate');
       process.exit(1);
