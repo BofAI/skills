@@ -1,9 +1,10 @@
 name: Audit PR
 
 on:
-  push:
+  pull_request:
     branches:
       - main
+    types: [opened, synchronize, reopened, ready_for_review]
   issue_comment:
     types: [created]
   workflow_dispatch:
@@ -13,22 +14,28 @@ permissions:
   pull-requests: write
   issues: write
 
+concurrency:
+  group: audit-pr-${{ github.event.pull_request.number || github.event.issue.number || github.ref }}
+  cancel-in-progress: true
+
 jobs:
-  audit-on-main:
-    name: Audit on main push
-    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+  audit-on-pr:
+    name: Audit on pull request
+    if: github.event_name == 'pull_request'
     runs-on: [self-hosted, Linux, ARM64, audit-linux]
 
     steps:
-      - name: Checkout repository
+      - name: Checkout PR head
         uses: actions/checkout@v4
         with:
+          ref: ${{ github.event.pull_request.head.sha }}
           fetch-depth: 0
 
       - name: Check required tools
         run: |
           which zip
           which jq
+          which python3
 
       - name: Create source archive
         id: archive
@@ -39,41 +46,113 @@ jobs:
           zip -r "/tmp/${ARCHIVE_NAME}" .
           echo "archive_name=${ARCHIVE_NAME}" >> "$GITHUB_OUTPUT"
 
-      - name: Call audit service
-        id: audit
+      - name: Submit audit job
+        id: submit
         shell: bash
         run: |
           RESPONSE=$(curl -s -X POST "${{ vars.AUDIT_SERVICE_URL }}/audit-pr/${{ vars.AUDIT_PR_SKILL }}" \
             -H "X-API-Key: ${{ secrets.AUDIT_API_KEY }}" \
             -F "file=@/tmp/${{ steps.archive.outputs.archive_name }}" \
-            -F "from_branch=main" \
-            -F "to_branch=main")
+            -F "from_branch=${{ github.event.pull_request.base.ref }}" \
+            -F "to_branch=${{ github.event.pull_request.head.ref }}")
 
-          echo "Audit response:"
+          echo "Submit response:"
           echo "$RESPONSE" | jq .
 
           REPORT_URL=$(echo "$RESPONSE" | jq -r '.report_url // empty')
-          STATUS_URL=$(echo "$RESPONSE" | jq -r '.status_url // empty')
-          STATUS=$(echo "$RESPONSE" | jq -r '.status // empty')
 
-          if [ -z "$REPORT_URL" ] && [ -z "$STATUS_URL" ]; then
-            echo "Audit service did not return report_url/status_url"
+          if [ -z "$REPORT_URL" ]; then
+            echo "Audit service did not return report_url"
             exit 1
           fi
 
           echo "report_url=$REPORT_URL" >> "$GITHUB_OUTPUT"
-          echo "status_url=$STATUS_URL" >> "$GITHUB_OUTPUT"
-          echo "status=$STATUS" >> "$GITHUB_OUTPUT"
 
-      - name: Write summary
+      - name: Poll report until ready
+        id: poll
+        shell: bash
         run: |
-          {
-            echo "## Audit PR result"
-            echo ""
-            echo "- status: ${{ steps.audit.outputs.status }}"
-            echo "- report_path: ${{ steps.audit.outputs.report_url }}"
-            echo "- status_path: ${{ steps.audit.outputs.status_url }}"
-          } >> "$GITHUB_STEP_SUMMARY"
+          REPORT_PATH="${{ steps.submit.outputs.report_url }}"
+          if [ -z "$REPORT_PATH" ]; then
+            echo "Missing report_url"
+            exit 1
+          fi
+
+          echo "Polling report URL: ${{ vars.AUDIT_SERVICE_URL }}${REPORT_PATH}"
+
+          for i in $(seq 1 20); do
+            HTTP_CODE=$(curl -s -o /tmp/audit-report.html -w "%{http_code}" "${{ vars.AUDIT_SERVICE_URL }}${REPORT_PATH}")
+            echo "Poll #$i HTTP_CODE=$HTTP_CODE"
+
+            if [ "$HTTP_CODE" = "200" ] && [ -s /tmp/audit-report.html ]; then
+              echo "Report is ready"
+              exit 0
+            fi
+
+            sleep 60
+          done
+
+          echo "Audit report did not become available within timeout"
+          exit 1
+
+      - name: Fetch markdown report
+        shell: bash
+        run: |
+          REPORT_PATH="${{ steps.submit.outputs.report_url }}"
+          MD_PATH="${REPORT_PATH%audit-report.html}audit-report.md"
+
+          echo "Markdown path: ${MD_PATH}"
+          HTTP_CODE=$(curl -s -o /tmp/audit-report.md -w "%{http_code}" "${{ vars.AUDIT_SERVICE_URL }}${MD_PATH}")
+          echo "Markdown fetch HTTP_CODE=$HTTP_CODE"
+
+          if [ "$HTTP_CODE" != "200" ] || [ ! -s /tmp/audit-report.md ]; then
+            echo "Failed to fetch markdown report"
+            exit 1
+          fi
+
+      - name: Normalize markdown for GitHub comment
+        shell: bash
+        run: |
+          python3 <<'PY'
+          import re
+          from pathlib import Path
+
+          p = Path("/tmp/audit-report.md")
+          text = p.read_text(encoding="utf-8", errors="ignore")
+
+          # 去掉首尾空白，压缩多余空行
+          text = re.sub(r'\n{3,}', '\n\n', text).strip() + '\n'
+
+          # 如果首行已经是一级标题，保留；否则不额外加头
+          Path("/tmp/audit-report-clean.md").write_text(text, encoding="utf-8")
+          PY
+
+      - name: Comment markdown report to PR
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const fs = require('fs');
+            const reportText = fs.readFileSync('/tmp/audit-report-clean.md', 'utf8').trim();
+
+            const limit = 60000;
+            const chunks = [];
+
+            for (let i = 0; i < reportText.length; i += limit) {
+              chunks.push(reportText.slice(i, i + limit));
+            }
+
+            for (let i = 0; i < chunks.length; i++) {
+              const body = chunks.length > 1
+                ? `${chunks[i]}\n\n---\nPart ${i + 1}/${chunks.length}`
+                : chunks[i];
+
+              await github.rest.issues.createComment({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                issue_number: context.payload.pull_request.number,
+                body
+              });
+            }
 
   audit-by-comment:
     name: Audit by PR comment
@@ -110,6 +189,7 @@ jobs:
         run: |
           which zip
           which jq
+          which python3
 
       - name: Create source archive
         id: archive
@@ -120,8 +200,8 @@ jobs:
           zip -r "/tmp/${ARCHIVE_NAME}" .
           echo "archive_name=${ARCHIVE_NAME}" >> "$GITHUB_OUTPUT"
 
-      - name: Call audit service
-        id: audit
+      - name: Submit audit job
+        id: submit
         shell: bash
         run: |
           RESPONSE=$(curl -s -X POST "${{ vars.AUDIT_SERVICE_URL }}/audit-pr/${{ vars.AUDIT_PR_SKILL }}" \
@@ -130,42 +210,98 @@ jobs:
             -F "from_branch=${{ steps.pr.outputs.base_ref }}" \
             -F "to_branch=${{ steps.pr.outputs.head_ref }}")
 
-          echo "Audit response:"
+          echo "Submit response:"
           echo "$RESPONSE" | jq .
 
           REPORT_URL=$(echo "$RESPONSE" | jq -r '.report_url // empty')
-          STATUS_URL=$(echo "$RESPONSE" | jq -r '.status_url // empty')
-          STATUS=$(echo "$RESPONSE" | jq -r '.status // empty')
 
-          if [ -z "$REPORT_URL" ] && [ -z "$STATUS_URL" ]; then
-            echo "Audit service did not return report_url/status_url"
+          if [ -z "$REPORT_URL" ]; then
+            echo "Audit service did not return report_url"
             exit 1
           fi
 
           echo "report_url=$REPORT_URL" >> "$GITHUB_OUTPUT"
-          echo "status_url=$STATUS_URL" >> "$GITHUB_OUTPUT"
-          echo "status=$STATUS" >> "$GITHUB_OUTPUT"
 
-      - name: Comment result to PR
+      - name: Poll report until ready
+        id: poll
+        shell: bash
+        run: |
+          REPORT_PATH="${{ steps.submit.outputs.report_url }}"
+          if [ -z "$REPORT_PATH" ]; then
+            echo "Missing report_url"
+            exit 1
+          fi
+
+          echo "Polling report URL: ${{ vars.AUDIT_SERVICE_URL }}${REPORT_PATH}"
+
+          for i in $(seq 1 20); do
+            HTTP_CODE=$(curl -s -o /tmp/audit-report.html -w "%{http_code}" "${{ vars.AUDIT_SERVICE_URL }}${REPORT_PATH}")
+            echo "Poll #$i HTTP_CODE=$HTTP_CODE"
+
+            if [ "$HTTP_CODE" = "200" ] && [ -s /tmp/audit-report.html ]; then
+              echo "Report is ready"
+              exit 0
+            fi
+
+            sleep 60
+          done
+
+          echo "Audit report did not become available within timeout"
+          exit 1
+
+      - name: Fetch markdown report
+        shell: bash
+        run: |
+          REPORT_PATH="${{ steps.submit.outputs.report_url }}"
+          MD_PATH="${REPORT_PATH%audit-report.html}audit-report.md"
+
+          echo "Markdown path: ${MD_PATH}"
+          HTTP_CODE=$(curl -s -o /tmp/audit-report.md -w "%{http_code}" "${{ vars.AUDIT_SERVICE_URL }}${MD_PATH}")
+          echo "Markdown fetch HTTP_CODE=$HTTP_CODE"
+
+          if [ "$HTTP_CODE" != "200" ] || [ ! -s /tmp/audit-report.md ]; then
+            echo "Failed to fetch markdown report"
+            exit 1
+          fi
+
+      - name: Normalize markdown for GitHub comment
+        shell: bash
+        run: |
+          python3 <<'PY'
+          import re
+          from pathlib import Path
+
+          p = Path("/tmp/audit-report.md")
+          text = p.read_text(encoding="utf-8", errors="ignore")
+
+          text = re.sub(r'\n{3,}', '\n\n', text).strip() + '\n'
+
+          Path("/tmp/audit-report-clean.md").write_text(text, encoding="utf-8")
+          PY
+
+      - name: Comment markdown report to PR
         uses: actions/github-script@v7
         with:
           script: |
-            const reportPath = `${{ steps.audit.outputs.report_url }}`;
-            const statusPath = `${{ steps.audit.outputs.status_url }}`;
-            const status = `${{ steps.audit.outputs.status }}`;
+            const fs = require('fs');
+            const reportText = fs.readFileSync('/tmp/audit-report-clean.md', 'utf8').trim();
 
-            const body = [
-              `Audit PR triggered by @${context.payload.comment.user.login}`,
-              '',
-              `Status: ${status}`,
-              `Report path: ${reportPath}`,
-              `Status path: ${statusPath}`
-            ].join('\n');
+            const limit = 60000;
+            const chunks = [];
 
-            await github.rest.issues.createComment({
-              owner: context.repo.owner,
-              repo: context.repo.repo,
-              issue_number: context.issue.number,
-              body
-            });
+            for (let i = 0; i < reportText.length; i += limit) {
+              chunks.push(reportText.slice(i, i + limit));
+            }
 
+            for (let i = 0; i < chunks.length; i++) {
+              const body = chunks.length > 1
+                ? `${chunks[i]}\n\n---\nPart ${i + 1}/${chunks.length}`
+                : chunks[i];
+
+              await github.rest.issues.createComment({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                issue_number: context.issue.number,
+                body
+              });
+            }
