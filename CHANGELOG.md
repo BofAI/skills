@@ -3,11 +3,12 @@
 ## [Unreleased]
 
 ### Improvements
-- **x402-payment**: Upgraded `@bankofai/x402` to `0.5.0-beta.4`.
+- **x402-payment**: Upgraded `@bankofai/x402` to `0.5.0`.
 - **x402-payment**: Switched to agent-wallet signer resolution (`TronClientSigner.create()` / `EvmClientSigner.create()`), with address validation and a warning when no signer is available.
 - **x402-payment**: GasFree activation now signs and broadcasts TRC20 transfers via agent-wallet, using a dummy TronWeb key for reads.
 - **x402-payment**: Added payment-response header decoding and clearer error output (optional stack with `X402_DEBUG=1`, plus RPC URL/cause).
 - **x402-payment**: Removed legacy `mcporter.json` credential lookup; docs updated to agent-wallet configuration and safer secret handling guidance.
+- **sunswap**: Migrated to `sun-cli` workflow with consolidated docs; removed legacy scripts/resources.
 
 ## [1.4.13] - 2026-03-17
 
