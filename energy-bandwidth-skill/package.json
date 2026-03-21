@@ -1,0 +1,9 @@
+{
+  "name": "@bankofai/energy-bandwidth-skill",
+  "version": "1.0.0",
+  "description": "TRON Energy & Bandwidth resource management skill for AI agents",
+  "license": "MIT",
+  "private": true,
+  "engines": { "node": ">=18.0.0" },
+  "dependencies": { "tronweb": "^6.0.0" }
+}
