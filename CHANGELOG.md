@@ -1,6 +1,6 @@
 # Changelog
 
-## [Unreleased]
+## [1.5.0] - 2026-03-21
 
 ### Improvements
 - **x402-payment**: Upgraded `@bankofai/x402` to `0.5.0`.
