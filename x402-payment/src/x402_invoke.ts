@@ -17,6 +17,7 @@ interface ResolvedWallet {
   address: string;
 }
 
+// Read-only TronWeb instantiation only; never use this key for signing.
 const DUMMY_TRON_PRIVATE_KEY = '0000000000000000000000000000000000000000000000000000000000000001';
 
 function isTronAddress(address: string): boolean {
@@ -48,6 +49,7 @@ function extractSignedTronTx(unsignedTx: Record<string, unknown>, signedResult: 
   };
 }
 
+// Used when we need the raw agent-wallet instance (e.g., TRON signTransaction in gasfree-activate).
 async function resolveAgentWallet(network: WalletNetwork): Promise<ResolvedWallet | undefined> {
   try {
     const { resolveWalletProvider } = await import('@bankofai/agent-wallet');
@@ -438,13 +440,16 @@ async function main() {
     getChainId,
   } = await import('@bankofai/x402');
 
+  let resolvedTronWallet: ResolvedWallet | undefined;
   let tronSigner: InstanceType<typeof TronClientSigner> | undefined;
   try {
+    resolvedTronWallet = await resolveAgentWallet('tron');
     tronSigner = await TronClientSigner.create();
     if (!isTronAddress(tronSigner.getAddress())) {
       tronSigner = undefined;
     }
-  } catch (_) {
+  } catch (err: any) {
+    console.error(`[x402] TronClientSigner.create() failed: ${err?.message || err}`);
     tronSigner = undefined;
   }
 
@@ -454,7 +459,8 @@ async function main() {
     if (!isEvmAddress(evmSigner.getAddress())) {
       evmSigner = undefined;
     }
-  } catch (_) {
+  } catch (err: any) {
+    console.error(`[x402] EvmClientSigner.create() failed: ${err?.message || err}`);
     evmSigner = undefined;
   }
   const apiKey = await findApiKey();
@@ -485,7 +491,8 @@ async function main() {
   }
 
   if (options['gasfree-activate']) {
-    const resolvedTronWallet = await resolveAgentWallet('tron');
+    // Reuse resolved wallet from signer init when available.
+    resolvedTronWallet = resolvedTronWallet ?? await resolveAgentWallet('tron');
     if (!resolvedTronWallet || !tronSigner) {
       console.error('Error: A TRON wallet from agent-wallet is required for --gasfree-activate');
       process.exit(1);
