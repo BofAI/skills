@@ -18,7 +18,8 @@ interface ResolvedWallet {
 }
 
 // Read-only TronWeb instantiation only; never use this key for signing.
-const DUMMY_TRON_PRIVATE_KEY = '0000000000000000000000000000000000000000000000000000000000000001';
+// If this key is ever used to sign, it will produce valid signatures for a known public address.
+const TRONWEB_READONLY_DUMMY_KEY = '0000000000000000000000000000000000000000000000000000000000000001';
 
 function isTronAddress(address: string): boolean {
   return /^T[1-9A-HJ-NP-Za-km-z]{33}$/.test(address);
@@ -216,7 +217,7 @@ async function handleGasFreeActivate(
     process.exit(1);
   }
 
-  const tronWebOpts: any = { fullHost: TRON_RPC_URLS[gasfreeNetwork], privateKey: DUMMY_TRON_PRIVATE_KEY };
+  const tronWebOpts: any = { fullHost: TRON_RPC_URLS[gasfreeNetwork], privateKey: TRONWEB_READONLY_DUMMY_KEY };
   if (apiKey) tronWebOpts.headers = { 'TRON-PRO-API-KEY': apiKey };
   const tronWeb = new TronWeb(tronWebOpts);
 
@@ -440,16 +441,16 @@ async function main() {
     getChainId,
   } = await import('@bankofai/x402');
 
-  let resolvedTronWallet: ResolvedWallet | undefined;
   let tronSigner: InstanceType<typeof TronClientSigner> | undefined;
   try {
-    resolvedTronWallet = await resolveAgentWallet('tron');
     tronSigner = await TronClientSigner.create();
     if (!isTronAddress(tronSigner.getAddress())) {
+      console.warn(`[x402] TronClientSigner returned unexpected address "${tronSigner.getAddress()}" — discarding signer.`);
       tronSigner = undefined;
     }
   } catch (err: any) {
-    console.error(`[x402] TronClientSigner.create() failed: ${err?.message || err}`);
+    const message = err?.message || err;
+    console.warn(`[x402] No TRON signer available: ${message}`);
     tronSigner = undefined;
   }
 
@@ -457,10 +458,12 @@ async function main() {
   try {
     evmSigner = await EvmClientSigner.create();
     if (!isEvmAddress(evmSigner.getAddress())) {
+      console.warn(`[x402] EvmClientSigner returned unexpected address "${evmSigner.getAddress()}" — discarding signer.`);
       evmSigner = undefined;
     }
   } catch (err: any) {
-    console.error(`[x402] EvmClientSigner.create() failed: ${err?.message || err}`);
+    const message = err?.message || err;
+    console.warn(`[x402] No EVM signer available: ${message}`);
     evmSigner = undefined;
   }
   const apiKey = await findApiKey();
@@ -491,10 +494,13 @@ async function main() {
   }
 
   if (options['gasfree-activate']) {
-    // Reuse resolved wallet from signer init when available.
-    resolvedTronWallet = resolvedTronWallet ?? await resolveAgentWallet('tron');
+    const resolvedTronWallet = await resolveAgentWallet('tron');
     if (!resolvedTronWallet || !tronSigner) {
       console.error('Error: A TRON wallet from agent-wallet is required for --gasfree-activate');
+      process.exit(1);
+    }
+    if (resolvedTronWallet.address !== tronSigner.getAddress()) {
+      console.error('[x402] Error: TRON wallet address mismatch between agent-wallet and TronClientSigner; aborting gasfree-activate.');
       process.exit(1);
     }
     if (!gasFreeCredentials) {

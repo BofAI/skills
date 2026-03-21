@@ -4,6 +4,15 @@ All notable changes to the SunSwap skill will be documented in this file.
 
 ## [3.2.0] - 2026-03-20
 
+### Breaking Changes
+- Removed legacy scripts/resources. Replace:
+  - `scripts/swap.js` → `sun --json --yes swap ...`
+  - `scripts/balance.js` → `sun --json wallet balances`
+  - `scripts/quote.js` → `sun --json quote ...`
+  - `scripts/price.js` → `sun --json price <TOKEN>`
+  - `scripts/liquidity.js` → `sun --json liquidity ...`
+  - `scripts/position.js` → `sun --json position ...`
+
 ### Fixed — Documentation Issues from Test Report (134 cases, 18 failures)
 
 Full test coverage (134/134 cases executed, 116 passed, 18 failed) revealed documentation gaps

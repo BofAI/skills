@@ -2,6 +2,9 @@
 
 ## [1.5.0] - 2026-03-21
 
+### Breaking Changes
+- **sunswap**: Removed legacy `scripts/*.js` and `resources/*.json` files. Use `sun-cli` commands instead (e.g., `sun --json --yes swap ...`, `sun --json quote ...`, `sun --json price <TOKEN>`).
+
 ### Improvements
 - **x402-payment**: Upgraded `@bankofai/x402` to `0.5.0`.
 - **x402-payment**: Switched to agent-wallet signer resolution (`TronClientSigner.create()` / `EvmClientSigner.create()`), with address validation and a warning when no signer is available.
