@@ -77,7 +77,7 @@ curl -fsSL https://raw.githubusercontent.com/BofAI/openclaw-extension/refs/heads
 
 ### DeFi & DEX
 
-- [**sunswap**](./sunswap) - SunSwap DEX integration for TRON. Supports price quotes, token swaps, and balance checks.
+- [**sunswap**](./sunswap) - SunSwap DEX integration for TRON via `sun-cli`. Supports price quotes, token swaps, liquidity and pool operations.
 - [**sunperp-skill**](./sunperp-skill) - SunPerp perpetual futures trading skill for TRON. Supports market data, account queries, order placement, and position management.
 
 ### Payments & x402
