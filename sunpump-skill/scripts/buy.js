@@ -66,16 +66,24 @@ async function main() {
   );
 
   const state = await launcher.getTokenState(tokenAddress).call();
-  if (Number(state) !== 0) {
+  const stateNum = Number(state);
+  if (stateNum !== 1) {
     const sunswapRouter = CONTRACTS.networks[(process.env.TRON_NETWORK || "mainnet").toLowerCase()].sunswap_v2_router;
+    const stateLabels = { 0: "not registered", 2: "pending migration", 3: "migrated (SunSwap V2)" };
+    const label = stateLabels[stateNum] || `unknown (${stateNum})`;
     outputJSON({
-      error: "Token has migrated to SunSwap V2. The bonding curve is closed.",
-      state: Number(state),
-      migration: {
-        reason: "Token reached the ~$69,420 market cap threshold and liquidity was moved to SunSwap V2.",
-        sunswap_router: sunswapRouter ? sunswapRouter.address : null,
-        action: "Use the SunSwap skill to trade this token. The SunPump bonding-curve scripts will not work for migrated tokens.",
-      },
+      error: stateNum === 3
+        ? "Token has migrated to SunSwap V2. The bonding curve is closed."
+        : `Token is not active on the bonding curve (state: ${label}).`,
+      state: stateNum,
+      state_label: label,
+      ...(stateNum === 3 && {
+        migration: {
+          reason: "Token reached the ~$69,420 market cap threshold and liquidity was moved to SunSwap V2.",
+          sunswap_router: sunswapRouter ? sunswapRouter.address : null,
+          action: "Use the SunSwap skill to trade this token. The SunPump bonding-curve scripts will not work for migrated tokens.",
+        },
+      }),
     });
     process.exit(1);
   }

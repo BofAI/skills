@@ -72,7 +72,7 @@
         { "name": "state", "type": "uint256" }
       ],
       "stateMutability": "view",
-      "description": "Returns token lifecycle state (0=active on bonding curve, 1=migrated to SunSwap)."
+      "description": "Returns token lifecycle state (0=not registered, 1=active on bonding curve, 2=pending migration, 3=migrated to SunSwap V2)."
     },
     "getTokenAmountByPurchaseWithFee": {
       "type": "function",
