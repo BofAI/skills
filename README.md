@@ -11,7 +11,7 @@
 
 A curated collection of practical, DeFi-focused utility skills developed by the **BANK OF AI team**. These skills enable AI agents to perform complex on-chain operations, payments, and identity management across various platforms.
 
-> **Project Positioning:** We focus on delivering high-value DeFi utility skills that are platform-agnostic. Whether you use Claude Code, OpenClaw, Cursor, or your own agent framework, these skills provide the domain knowledge needed to interact with the TRON blockchain and beyond.
+> **Project Positioning:** We focus on delivering high-value DeFi utility skills that are platform-agnostic. These skills provide the domain knowledge needed to interact with the TRON blockchain and beyond.
 
 ---
 
@@ -19,9 +19,7 @@ A curated collection of practical, DeFi-focused utility skills developed by the 
 
 - [What are BANK OF AI Skills?](#what-are-bank-of-ai-skills)
 - [Installation](#installation)
-  - [OpenClaw (Recommended)](#openclaw-recommended)
-  - [Claude Code](#claude-code)
-  - [Cursor](#cursor)
+  - [Agent Wallet (Required for Signing Skills)](#agent-wallet-required-for-signing-skills)
 - [Available Skills](#available-skills)
   - [DeFi & DEX](#defi--dex)
   - [Payments & x402](#payments--x402)
@@ -42,34 +40,15 @@ BANK OF AI Skills are reusable, task-oriented capabilities that teach AI agents 
 
 ## Installation
 
-### OpenClaw (Recommended)
-
-OpenClaw provides the most integrated experience, automatically wiring skills and MCP dependencies.
+Use the unified installer and follow the `npx` prompts to select the skills you want and the agentic platform you use. The installer will complete the setup automatically.
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/BofAI/openclaw-extension/refs/heads/main/install.sh | bash
+npx skills add https://github.com/BofAI/skills.git
 ```
 
-### Claude Code
+### Agent Wallet (Required for Signing Skills)
 
-1. Clone the repository:
-   ```bash
-   git clone https://github.com/BofAI/skills.git /tmp/bofai-skills
-   ```
-2. Copy the skills to your Claude Code configuration directory for automatic discovery:
-   ```bash
-   mkdir -p ~/.config/claude-code/skills
-   cp -r /tmp/bofai-skills/* ~/.config/claude-code/skills/
-   ```
-3. Claude Code will now automatically load these skills upon startup.
-
-### Cursor
-
-1. Clone the repository into your project's root:
-   ```bash
-   git clone https://github.com/BofAI/skills.git .cursor/skills
-   ```
-2. For project-wide availability, add the skill path to your `.cursorrules` or reference the specific `SKILL.md` file using the `@` symbol in Cursor Chat to provide the necessary context.
+Some skills require wallet signature operations and are built on Agent Wallet. Before using those skills, follow the [Agent Wallet Quick Start](https://github.com/BofAI/agent-wallet?tab=readme-ov-file#quick-start) to configure your environment.
 
 ---
 
