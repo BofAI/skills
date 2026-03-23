@@ -24,7 +24,9 @@ A curated collection of practical, DeFi-focused utility skills developed by the 
   - [DeFi & DEX](#defi--dex)
   - [Payments & x402](#payments--x402)
   - [AI & Account Recharge](#ai--account-recharge)
+  - [Security & Permissions](#security--permissions)
   - [Data & Analytics](#data--analytics)
+- [PR2 Validation](#pr2-validation)
 - [Usage Tips](#usage-tips)
   - [Explicit Invocation](#explicit-invocation)
   - [Implicit Triggering](#implicit-triggering)
@@ -67,9 +69,35 @@ Some skills require wallet signature operations and are built on Agent Wallet. B
 
 - [**recharge-skill**](./recharge-skill) - BANK OF AI account recharge and account query skill. Uses the remote MCP recharge service for supported payment flows.
 
+### Security & Permissions
+
+- [**multisig-permissions**](./multisig-permissions) - TRON native account permission and multi-signature workflow skill. Supports permission inspection, template-based updates, proposal creation, co-signing, review, and execution.
+
 ### Data & Analytics
 
 - [**tronscan-skill**](./tronscan-skill) - Comprehensive TRON blockchain data lookup via TronScan API. Supports accounts, transactions, tokens, blocks, and network-wide statistics.
+
+---
+
+## PR2 Validation
+
+PR #2 added the `multisig-permissions` skill and was validated on `TRON Nile Testnet` on `2026-03-23`.
+
+Validation coverage included:
+- dependency install and script discovery
+- read-only permission inspection
+- `basic-2of3` template dry-run
+- on-chain permission update
+- proposal creation, co-signing, dry-run execution, and final execution
+
+Validation result:
+- core multisig flow passed end to end
+- on-chain transactions executed successfully
+- one non-fatal workflow issue was identified: immediately creating a proposal after a permission update may briefly use stale threshold data
+
+Recommendation:
+- run `status.js` once after a permission update and confirm the new threshold before creating a proposal
+- keep this skill on testnet for validation until the post-update sync window is improved
 
 ---
 
