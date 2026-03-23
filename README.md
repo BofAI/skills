@@ -19,6 +19,7 @@ A curated collection of practical, DeFi-focused utility skills developed by the 
 
 - [What are BANK OF AI Skills?](#what-are-bank-of-ai-skills)
 - [Installation](#installation)
+  - [Agent Wallet (Required for Signing Skills)](#agent-wallet-required-for-signing-skills)
 - [Available Skills](#available-skills)
   - [DeFi & DEX](#defi--dex)
   - [Payments & x402](#payments--x402)
