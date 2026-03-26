@@ -150,7 +150,8 @@ async function reviewMode(proposalRef, doSign, doExecute) {
     process.exit(1);
   }
   const network = getNetwork();
-  const hosts = { mainnet: "https://api.trongrid.io", nile: "https://nile.trongrid.io", shasta: "https://api.shasta.trongrid.io" };
+  const mainnetHost = process.env.TRONGRID_API_KEY ? "https://api.trongrid.io" : "https://hptg.bankofai.io";
+  const hosts = { mainnet: mainnetHost, nile: "https://nile.trongrid.io", shasta: "https://api.shasta.trongrid.io" };
   const opts = { fullHost: hosts[network], privateKey: humanKey };
   if (process.env.TRONGRID_API_KEY) opts.headers = { "TRON-PRO-API-KEY": process.env.TRONGRID_API_KEY };
   const tronWeb = new TronWeb(opts);

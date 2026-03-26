@@ -18,7 +18,8 @@ const TRX_DECIMALS = 6;
 
 function getTronWeb() {
   const network = (process.env.TRON_NETWORK || "mainnet").toLowerCase();
-  const hosts = { mainnet: "https://api.trongrid.io", nile: "https://nile.trongrid.io", shasta: "https://api.shasta.trongrid.io" };
+  const mainnetHost = process.env.TRONGRID_API_KEY ? "https://api.trongrid.io" : "https://hptg.bankofai.io";
+  const hosts = { mainnet: mainnetHost, nile: "https://nile.trongrid.io", shasta: "https://api.shasta.trongrid.io" };
   const fullHost = hosts[network];
   if (!fullHost) throw new Error(`Unknown network "${network}".`);
   const privateKey = process.env.TRON_PRIVATE_KEY;
@@ -30,7 +31,8 @@ function getTronWeb() {
 
 function getTronWebReadOnly() {
   const network = (process.env.TRON_NETWORK || "mainnet").toLowerCase();
-  const hosts = { mainnet: "https://api.trongrid.io", nile: "https://nile.trongrid.io", shasta: "https://api.shasta.trongrid.io" };
+  const mainnetHost = process.env.TRONGRID_API_KEY ? "https://api.trongrid.io" : "https://hptg.bankofai.io";
+  const hosts = { mainnet: mainnetHost, nile: "https://nile.trongrid.io", shasta: "https://api.shasta.trongrid.io" };
   const fullHost = hosts[network];
   if (!fullHost) throw new Error(`Unknown network "${network}".`);
   const opts = { fullHost };

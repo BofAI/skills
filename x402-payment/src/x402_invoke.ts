@@ -111,7 +111,7 @@ async function findGasFreeCredentials(): Promise<{ apiKey: string; apiSecret: st
 }
 
 const TRON_RPC_URLS: Record<string, string> = {
-  mainnet: 'https://api.trongrid.io',
+  mainnet: process.env.TRON_GRID_API_KEY ? 'https://api.trongrid.io' : 'https://hptg.bankofai.io',
   nile: 'https://nile.trongrid.io',
   shasta: 'https://api.shasta.trongrid.io',
 };
