@@ -30,6 +30,9 @@ export TRON_NETWORK="mainnet"
 > [!CAUTION]
 > **Never display or log the private key.**
 
+> [!IMPORTANT]
+> **This skill is mainnet-only.** JustLend contract addresses and market configurations are defined for TRON Mainnet only. Nile and Shasta testnets are not supported.
+
 ---
 
 ## Available Scripts

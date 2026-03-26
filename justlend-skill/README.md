@@ -11,6 +11,10 @@
 - `borrow.js` — Borrow against collateral (with health factor safeguard)
 - `repay.js` — Repay borrowed assets
 
+## Network Support
+
+**Mainnet only.** JustLend contract addresses and market configurations are defined for TRON Mainnet. Nile and Shasta testnets are not supported.
+
 ## Quick Start
 
 ```bash
