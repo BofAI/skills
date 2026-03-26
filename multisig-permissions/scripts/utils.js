@@ -42,6 +42,96 @@ function getNetwork() {
   return (process.env.TRON_NETWORK || "mainnet").toLowerCase();
 }
 
+/* ---------- Account fetch helpers ---------- */
+
+async function getAccountInfo(tronWeb, address) {
+  const hexAddress = tronWeb.address.toHex(address);
+  try {
+    const account = await tronWeb.fullNode.request("wallet/getaccount", { address: hexAddress, visible: false }, "post");
+    if (account && account.address) return account;
+  } catch {}
+  return tronWeb.trx.getAccount(address);
+}
+
+function normalizePermissionShape(account) {
+  const owner = account.owner_permission || {};
+  const active = (account.active_permission || []).map((perm) => ({
+    id: perm.id,
+    permission_name: perm.permission_name,
+    threshold: perm.threshold,
+    operations: perm.operations || "",
+    keys: (perm.keys || []).map((key) => ({
+      address: key.address,
+      weight: key.weight || 1,
+    })),
+  }));
+  return {
+    owner: {
+      threshold: owner.threshold,
+      keys: (owner.keys || []).map((key) => ({
+        address: key.address,
+        weight: key.weight || 1,
+      })),
+    },
+    active,
+  };
+}
+
+function sameKeySet(left, right) {
+  if (left.length !== right.length) return false;
+  return left.every((item, index) =>
+    item.address === right[index].address && (item.weight || 1) === (right[index].weight || 1)
+  );
+}
+
+function permissionStateMatches(account, ownerPerm, activePerms) {
+  const normalized = normalizePermissionShape(account);
+  const expectedOwnerKeys = (ownerPerm.keys || []).map((key) => ({
+    address: key.address,
+    weight: key.weight || 1,
+  }));
+  const ownerMatches =
+    (normalized.owner.threshold || 1) === (ownerPerm.threshold || 1) &&
+    sameKeySet(normalized.owner.keys, expectedOwnerKeys);
+
+  const expectedActives = (activePerms || []).map((perm) => ({
+    id: perm.id,
+    permission_name: perm.permission_name,
+    threshold: perm.threshold,
+    operations: perm.operations || "",
+    keys: (perm.keys || []).map((key) => ({
+      address: key.address,
+      weight: key.weight || 1,
+    })),
+  }));
+
+  const activeMatches =
+    normalized.active.length === expectedActives.length &&
+    normalized.active.every((perm, index) => {
+      const expected = expectedActives[index];
+      return perm.id === expected.id &&
+        perm.permission_name === expected.permission_name &&
+        (perm.threshold || 1) === (expected.threshold || 1) &&
+        (perm.operations || "") === (expected.operations || "") &&
+        sameKeySet(perm.keys, expected.keys);
+    });
+
+  return ownerMatches && activeMatches;
+}
+
+async function waitForPermissionSync(tronWeb, address, ownerPerm, activePerms, options = {}) {
+  const attempts = options.attempts || 10;
+  const delayMs = options.delayMs || 1500;
+  for (let i = 0; i < attempts; i++) {
+    const account = await getAccountInfo(tronWeb, address);
+    if (account && account.address && permissionStateMatches(account, ownerPerm, activePerms)) {
+      return { synced: true, attempts: i + 1 };
+    }
+    await new Promise((resolve) => setTimeout(resolve, delayMs));
+  }
+  return { synced: false, attempts };
+}
+
 /* ---------- Sun / TRX conversions ---------- */
 
 function toSun(amount) {
@@ -77,7 +167,7 @@ function decodeOperations(hexString) {
   for (const [id, info] of Object.entries(CONFIG.operation_codes)) {
     const bitIndex = Number(id);
     const byteIndex = Math.floor(bitIndex / 8);
-    const bitOffset = 7 - (bitIndex % 8);
+    const bitOffset = bitIndex % 8;
     if (byteIndex < buf.length && (buf[byteIndex] & (1 << bitOffset)) !== 0) {
       names.push(info.name);
     }
@@ -108,11 +198,26 @@ function encodeOperations(operationNames) {
       const id = nameToId[name.toLowerCase()];
       if (id === undefined) throw new Error(`Unknown operation: "${name}". Available: ${Object.values(CONFIG.operation_codes).map(o => o.name).join(", ")}`);
       const byteIndex = Math.floor(id / 8);
-      const bitOffset = 7 - (id % 8);
+      const bitOffset = id % 8;
       buf[byteIndex] |= (1 << bitOffset);
     }
   }
   return buf.toString("hex");
+}
+
+function getEnabledOperationBitCount(hexString) {
+  if (!hexString) return 0;
+  const clean = hexString.replace(/^0x/i, "");
+  const buf = Buffer.from(clean, "hex");
+  let count = 0;
+  for (const byte of buf) {
+    let value = byte;
+    while (value) {
+      value &= value - 1;
+      count += 1;
+    }
+  }
+  return count;
 }
 
 /* ---------- Security analysis ---------- */
@@ -144,9 +249,19 @@ function classifySecurity(ownerPerm, activePerms) {
   // Active permission analysis
   if (activePerms && activePerms.length > 0) {
     for (const perm of activePerms) {
-      const ops = perm.operations ? decodeOperations(perm.operations) : [];
+      const opsHex = perm.operations || "";
+      const ops = opsHex ? decodeOperations(opsHex) : [];
+      const enabledBits = getEnabledOperationBitCount(opsHex);
       const permName = perm.permission_name || `active:${perm.id}`;
-      if (ops.length === 0 || ops.length >= Object.keys(CONFIG.operation_codes).length) {
+      if (enabledBits === 0) {
+        notes.push(`Active permission "${permName}" has no operations enabled`);
+        if (level === "good") level = "moderate";
+      } else if (ops.length === 0) {
+        notes.push(`Active permission "${permName}" has ${enabledBits} enabled operation bit(s), but none are recognized by this skill`);
+        if (level === "good") level = "moderate";
+      } else if (ops.includes("TriggerSmartContract") && enabledBits === 1) {
+        notes.push(`Active permission "${permName}" scoped to: TriggerSmartContract only`);
+      } else if (ops.length >= Object.keys(CONFIG.operation_codes).length) {
         notes.push(`Active permission "${permName}" has all operations enabled`);
         if (level === "good") level = "moderate";
       } else {
@@ -164,8 +279,10 @@ function classifySecurity(ownerPerm, activePerms) {
   // Upgrade to strong if owner is multi-sig with threshold >= 2 and active is scoped
   if (ownerThreshold >= 2 && level === "good") {
     const allScoped = (activePerms || []).every(p => {
-      const ops = p.operations ? decodeOperations(p.operations) : [];
-      return ops.length > 0 && ops.length < Object.keys(CONFIG.operation_codes).length;
+      const opsHex = p.operations || "";
+      const ops = opsHex ? decodeOperations(opsHex) : [];
+      const enabledBits = getEnabledOperationBitCount(opsHex);
+      return enabledBits > 0 && (ops.length > 0 || enabledBits === 1);
     });
     if (allScoped) level = "strong";
   }
@@ -238,12 +355,15 @@ module.exports = {
   getTronWeb,
   getTronWebReadOnly,
   getNetwork,
+  getAccountInfo,
+  waitForPermissionSync,
   toSun,
   fromSun,
   outputJSON,
   log,
   decodeOperations,
   encodeOperations,
+  getEnabledOperationBitCount,
   classifySecurity,
   getProposalDir,
   generateProposalId,

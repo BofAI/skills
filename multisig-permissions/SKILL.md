@@ -95,6 +95,11 @@ node scripts/update.js from-template basic-2of3 \
 # Agent key can only call smart contracts, humans retain 2-of-2 owner control
 node scripts/update.js from-template agent-restricted \
   --key1 THumanKey... --key2 TBackupKey... --key3 TAgentKey... --dry-run
+
+# If the current owner is already multi-sig, update.js creates a pending owner
+# proposal for the permission update instead of broadcasting with one key.
+node scripts/approve.js prop_xxxxx_xxxx
+node scripts/execute.js prop_xxxxx_xxxx
 ```
 
 ### Pattern 4: Multi-Sig Transaction Flow
@@ -118,9 +123,16 @@ node scripts/pending.js
 The `review.js` script is a single CLI tool for humans to list, inspect, co-sign, and execute agent-created proposals. It uses `TRON_HUMAN_PRIVATE_KEY` (not `TRON_PRIVATE_KEY`) to avoid mixing up human and agent keys.
 
 ```bash
-# Agent (Key B) proposes a transfer (uses TRON_PRIVATE_KEY):
+# Agent (Key B) proposes a transfer from its own account (uses TRON_PRIVATE_KEY):
 node scripts/propose.js transfer TRecipient... 500 --memo "Q1 vendor payment"
 # → Outputs proposal ID: prop_1710345600_b7e4
+
+# Agent (Key B) proposes an active-scoped contract call for a controlled
+# multi-sig account. --account identifies the controlled account.
+node scripts/propose.js contract-call TXLAQ63Xg1NAzckPwKHvzw7CSEmLMEqcdj \
+  "approve(address,uint256)" '["TSpender...","1000000"]' \
+  --permission active \
+  --account TControlledMultisig...
 
 # Human (Key A) reviews all pending proposals (no key needed):
 node scripts/review.js
