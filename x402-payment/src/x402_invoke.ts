@@ -29,6 +29,28 @@ function isEvmAddress(address: string): boolean {
   return /^0x[0-9a-fA-F]{40}$/.test(address);
 }
 
+function tronAddressToEvmHex(tronWeb: any, address: string): string {
+  if (!isTronAddress(address)) return address;
+  const hex41 = String(tronWeb.address.toHex(address));
+  return `0x${hex41.replace(/^41/i, '')}`;
+}
+
+function convertTypedDataAddresses(
+  tronWeb: any,
+  value: Record<string, unknown>,
+  fields: Array<{ name: string; type: string }>,
+): Record<string, unknown> {
+  const next = { ...value };
+  for (const field of fields) {
+    if (field.type !== 'address') continue;
+    const current = next[field.name];
+    if (typeof current === 'string') {
+      next[field.name] = tronAddressToEvmHex(tronWeb, current);
+    }
+  }
+  return next;
+}
+
 function normalizeHexSignature(signature: string): string {
   return signature.replace(/^0x/i, '');
 }
@@ -348,7 +370,14 @@ async function handleGasFreeActivate(
     nonce: nonce.toString(),
   });
 
-  const signature = await tronSigner.signTypedData(domain, types, message, 'GasFreeTransaction');
+  const domainForSig = Array.isArray(types?.EIP712Domain)
+    ? convertTypedDataAddresses(tronWeb, domain, types.EIP712Domain)
+    : domain;
+  const messageForSig = Array.isArray(types?.GasFreeTransaction)
+    ? convertTypedDataAddresses(tronWeb, message, types.GasFreeTransaction)
+    : message;
+
+  const signature = await tronSigner.signTypedData(domainForSig, types, messageForSig, 'GasFreeTransaction');
 
   console.error('[gasfree-activate] Submitting GasFree transaction...');
   const traceId = await gasFreeClient.submit(domain, message, signature);
