@@ -12,7 +12,7 @@
  */
 
 const {
-  getTronWeb, loadProposal, archiveProposal, outputJSON, log,
+  getTronWeb, loadProposal, waitForProposalThreshold, archiveProposal, outputJSON, log,
 } = require("./utils");
 
 async function main() {
@@ -28,7 +28,8 @@ async function main() {
   const tronWeb = getTronWeb();
 
   log(`Loading proposal "${proposalRef}" ...`);
-  const proposal = loadProposal(proposalRef);
+  const initialProposal = loadProposal(proposalRef);
+  const proposal = dryRun ? initialProposal : await waitForProposalThreshold(proposalRef);
 
   // Display summary
   log("");

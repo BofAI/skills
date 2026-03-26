@@ -307,7 +307,9 @@ function generateProposalId() {
 function saveProposal(proposal) {
   const dir = getProposalDir("pending");
   const filePath = path.join(dir, `${proposal.proposalId}.json`);
-  fs.writeFileSync(filePath, JSON.stringify(proposal, null, 2), "utf-8");
+  const tmpPath = path.join(dir, `.${proposal.proposalId}.${process.pid}.${Date.now()}.tmp`);
+  fs.writeFileSync(tmpPath, JSON.stringify(proposal, null, 2), "utf-8");
+  fs.renameSync(tmpPath, filePath);
   return filePath;
 }
 
@@ -322,6 +324,23 @@ function loadProposal(idOrPath) {
     return JSON.parse(fs.readFileSync(pendingPath, "utf-8"));
   }
   throw new Error(`Proposal not found: "${idOrPath}". Check ~/.clawdbot/multisig/pending/`);
+}
+
+async function waitForProposalThreshold(idOrPath, options = {}) {
+  const attempts = options.attempts || 5;
+  const delayMs = options.delayMs || 300;
+  let proposal = loadProposal(idOrPath);
+  for (let i = 0; i < attempts; i++) {
+    const collectedWeight = proposal.signers.reduce((sum, signer) => sum + (signer.weight || 1), 0);
+    if (collectedWeight >= proposal.threshold) {
+      return proposal;
+    }
+    if (i < attempts - 1) {
+      await new Promise((resolve) => setTimeout(resolve, delayMs));
+      proposal = loadProposal(idOrPath);
+    }
+  }
+  return proposal;
 }
 
 function archiveProposal(proposalId) {
@@ -369,6 +388,7 @@ module.exports = {
   generateProposalId,
   saveProposal,
   loadProposal,
+  waitForProposalThreshold,
   archiveProposal,
   listProposals,
   formatPermConfig,
