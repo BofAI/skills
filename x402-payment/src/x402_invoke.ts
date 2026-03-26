@@ -594,10 +594,42 @@ async function main() {
   // Prefer exact_gasfree when GasFree API credentials are configured
   if (gasFreeCredentials) {
     client.registerPolicy({
-      apply(requirements: any[]) {
+      async apply(requirements: any[]) {
         const gasfree = requirements.filter((r: any) => r.scheme === 'exact_gasfree');
         const others = requirements.filter((r: any) => r.scheme !== 'exact_gasfree');
-        return [...gasfree, ...others];
+
+        if (!gasfree.length || !tronSigner) return [...gasfree, ...others];
+
+        const affordable: any[] = [];
+        for (const req of gasfree) {
+          try {
+            const networkKey = req.network;
+            const baseUrl = GASFREE_API_BASE_URLS[networkKey];
+            if (!baseUrl) continue;
+            const apiClient = new GasFreeAPIClient(baseUrl);
+            const userAddress = tronSigner.getAddress();
+            const info = await apiClient.getAddressInfo(userAddress);
+            const gasfreeAddress = info.gasFreeAddress;
+            if (!gasfreeAddress) continue;
+            const balance = await tronSigner.checkBalance(req.asset, req.network, gasfreeAddress);
+            let needed = BigInt(req.amount);
+            if (req.extra?.fee?.feeAmount) {
+              needed += BigInt(req.extra.fee.feeAmount);
+            }
+            if (balance >= needed) {
+              affordable.push(req);
+            } else {
+              console.error(
+                `[x402] exact_gasfree skipped: GasFree balance ${balance.toString()} < needed ${needed.toString()} for ${gasfreeAddress}`,
+              );
+            }
+          } catch (_) {
+            // If we can't check, keep gasfree requirement as-is.
+            affordable.push(req);
+          }
+        }
+
+        return [...affordable, ...others];
       }
     });
     console.error(`[x402] GasFree priority policy enabled.`);
