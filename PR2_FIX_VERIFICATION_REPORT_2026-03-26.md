@@ -14,6 +14,7 @@ Covered in this pass:
 - `D1`: active permission operation bitmask decoding / security analysis
 - `D2`: `propose.js` support for `signer != controlled account`
 - `D3`: owner multi-sig follow-up permission updates through the repository scripts
+- `D4`: documentation alignment for the repaired signer / proposal / update flow
 - post-update state synchronization behavior
 - documentation alignment for the new proposal/update flow
 
@@ -25,6 +26,7 @@ Covered in this pass:
 - `multisig-permissions/scripts/update.js`
 - `multisig-permissions/SKILL.md`
 - `multisig-permissions/README.md`
+- `multisig-permissions/USE_CASES.md`
 
 ## Verification Summary
 
@@ -36,6 +38,7 @@ Covered in this pass:
 | D2: active proposal execution | Passed | proposal executed on-chain with `Permission_id = 2` |
 | D3: owner multi-sig permission update flow | Passed | `update.js` now creates a pending proposal instead of failing on single-sign broadcast |
 | D3: owner proposal approval + execution | Passed | approval and execution completed successfully on-chain |
+| D4: core documentation alignment | Passed | signer-role caveats, `--account`, and owner-proposal behavior are now documented |
 | Post-update account state reads | Passed | scripts now use raw account reads and return updated permission state consistently in verification |
 
 ## Test Environment
@@ -162,6 +165,28 @@ Conclusion:
 - the previous stale-read behavior is materially reduced for the tested flows
 - no false "old threshold" or "old active permission" state was observed in the final verification pass
 
+### 5. D4 Verification: documentation alignment
+
+The docs were re-checked against the repaired implementation and updated where earlier wording overstated or blurred the actual behavior.
+
+Updated documentation areas:
+
+- `SKILL.md`
+- `README.md`
+- `USE_CASES.md`
+
+What was aligned:
+
+- signer environment variables now explicitly state that the derived address, not the variable name, determines the effective owner / active role
+- `propose.js --account` is documented for controlled-account active flows
+- owner multi-sig permission changes are documented as proposal-based updates, not immediate one-step broadcasts
+- use cases that previously implied broader multi-active-id routing support were narrowed to match the current script surface
+
+Conclusion:
+
+- the earlier documentation mismatch is no longer a blocking issue for the repaired PR2 flow
+- remaining doc work is general polish rather than a known correctness gap
+
 ## Key On-Chain Records
 
 | Purpose | Transaction | Result |
@@ -177,6 +202,7 @@ The previously reported high-priority issues were successfully fixed and re-vali
 - `D1` fixed
 - `D2` fixed
 - `D3` fixed
+- `D4` fixed at the core workflow/documentation level
 
 The updated `multisig-permissions` implementation now supports:
 

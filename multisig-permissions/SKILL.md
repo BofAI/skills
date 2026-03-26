@@ -27,6 +27,8 @@ export TRON_PRIVATE_KEY="<your-private-key>"
 export TRON_NETWORK="mainnet"
 ```
 
+Before using any signer-specific command, derive the address from the configured key and confirm it matches the intended owner / active role on-chain. Variable names like `TRON_PRIVATE_KEY` and `TRON_HUMAN_PRIVATE_KEY` are only labels; the actual signer role is determined by the derived address in the current account permission set.
+
 > [!CAUTION]
 > Misconfiguring **owner permissions** can permanently lock an account with no recovery. Always use `--dry-run` first and verify you control enough keys to meet the new threshold.
 
@@ -92,12 +94,16 @@ node scripts/update.js from-template basic-2of3 \
 ### Pattern 3: Restrict Agent to DeFi Only
 
 ```bash
-# Agent key can only call smart contracts, humans retain 2-of-2 owner control
+# Preview the restricted owner + active configuration
 node scripts/update.js from-template agent-restricted \
   --key1 THumanKey... --key2 TBackupKey... --key3 TAgentKey... --dry-run
 
+# Apply it from a single-owner account
+node scripts/update.js from-template agent-restricted \
+  --key1 THumanKey... --key2 TBackupKey... --key3 TAgentKey...
+
 # If the current owner is already multi-sig, update.js creates a pending owner
-# proposal for the permission update instead of broadcasting with one key.
+# proposal instead of broadcasting directly. Finish it through the normal flow.
 node scripts/approve.js prop_xxxxx_xxxx
 node scripts/execute.js prop_xxxxx_xxxx
 ```
@@ -200,6 +206,7 @@ See `resources/permission_config.json` for the full list.
 3. **Verify key control**: Before changing owner permissions, confirm you have access to enough keys to meet the new threshold.
 4. **Scope active permissions**: Don't give agents all-operations access. Use `scope-active` to limit to `TriggerSmartContract`.
 5. **Proposals expire**: Default expiry is 24 hours. Expired proposals cannot be executed.
+6. **Check signer roles explicitly**: Before `approve.js`, `review.js --sign`, or any active-scoped `propose.js --account` call, confirm the configured private key derives to an address that actually appears in that permission block.
 
 ---
 
@@ -231,8 +238,8 @@ The proposal needs more signatures. Check `pending.js` to see remaining weight n
 
 | Variable | Required | Description |
 |----------|----------|-------------|
-| `TRON_PRIVATE_KEY` | Yes (agent scripts) | Agent's private key for signing (used by `propose.js`, `approve.js`, etc.) |
-| `TRON_HUMAN_PRIVATE_KEY` | Yes (`review.js --sign`) | Human's private key for `review.js`. Must be set separately — does not fall back to `TRON_PRIVATE_KEY`. |
+| `TRON_PRIVATE_KEY` | Yes (write scripts) | Private key used by `propose.js`, `approve.js`, `execute.js`, and `update.js`. The derived address must match the intended owner or active signer role. |
+| `TRON_HUMAN_PRIVATE_KEY` | Yes (`review.js --sign`) | Private key used by `review.js --sign`. This should be set to the human reviewer's key and validated by derived address, not by variable name alone. |
 | `TRON_NETWORK` | No (default: mainnet) | `mainnet`, `nile`, or `shasta` |
 | `TRONGRID_API_KEY` | No | TronGrid API key for higher rate limits |
 
