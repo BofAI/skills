@@ -55,7 +55,6 @@ async function main() {
 
   const network = options.network || 'nile';
   const tokenAddress = options.token || 'TXYZopYRdj2D9XRtbG411XZZ3kM5VkAeBf';
-  const toAddress = options.to || 'TXCxox5kcZiZNq4Ysv86m8icv4JfxXWkfe';
 
   const baseUrl = GASFREE_API_BASE_URLS[`tron:${network}`];
   if (!baseUrl) {
@@ -70,6 +69,7 @@ async function main() {
 
   const signer = await TronClientSigner.create();
   const userAddress = signer.getAddress();
+  const toAddress = options.to || userAddress;
   const gasFreeClient = new GasFreeAPIClient(baseUrl);
 
   console.error(`[gasfree-withdraw] Network: ${network}, User: ${userAddress}`);
