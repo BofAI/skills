@@ -29,6 +29,29 @@ function isEvmAddress(address: string): boolean {
   return /^0x[0-9a-fA-F]{40}$/.test(address);
 }
 
+function tronAddressToEvmHex(tronWeb: any, address: string): string {
+  if (!isTronAddress(address)) return address;
+  const hex41 = String(tronWeb.address.toHex(address));
+  return `0x${hex41.replace(/^41/i, '')}`;
+}
+
+function convertTronAddressesDeep(tronWeb: any, value: unknown): unknown {
+  if (typeof value === 'string') {
+    return isTronAddress(value) ? tronAddressToEvmHex(tronWeb, value) : value;
+  }
+  if (Array.isArray(value)) {
+    return value.map((v) => convertTronAddressesDeep(tronWeb, v));
+  }
+  if (value && typeof value === 'object') {
+    const next: Record<string, unknown> = {};
+    for (const [key, val] of Object.entries(value as Record<string, unknown>)) {
+      next[key] = convertTronAddressesDeep(tronWeb, val);
+    }
+    return next;
+  }
+  return value;
+}
+
 function normalizeHexSignature(signature: string): string {
   return signature.replace(/^0x/i, '');
 }
@@ -348,7 +371,10 @@ async function handleGasFreeActivate(
     nonce: nonce.toString(),
   });
 
-  const signature = await tronSigner.signTypedData(domain, types, message, 'GasFreeTransaction');
+  const domainForSig = convertTronAddressesDeep(tronWeb, domain) as Record<string, unknown>;
+  const messageForSig = convertTronAddressesDeep(tronWeb, message) as Record<string, unknown>;
+
+  const signature = await tronSigner.signTypedData(domainForSig, types, messageForSig, 'GasFreeTransaction');
 
   console.error('[gasfree-activate] Submitting GasFree transaction...');
   const traceId = await gasFreeClient.submit(domain, message, signature);
@@ -568,10 +594,42 @@ async function main() {
   // Prefer exact_gasfree when GasFree API credentials are configured
   if (gasFreeCredentials) {
     client.registerPolicy({
-      apply(requirements: any[]) {
+      async apply(requirements: any[]) {
         const gasfree = requirements.filter((r: any) => r.scheme === 'exact_gasfree');
         const others = requirements.filter((r: any) => r.scheme !== 'exact_gasfree');
-        return [...gasfree, ...others];
+
+        if (!gasfree.length || !tronSigner) return [...gasfree, ...others];
+
+        const affordable: any[] = [];
+        for (const req of gasfree) {
+          try {
+            const networkKey = req.network;
+            const baseUrl = GASFREE_API_BASE_URLS[networkKey];
+            if (!baseUrl) continue;
+            const apiClient = new GasFreeAPIClient(baseUrl);
+            const userAddress = tronSigner.getAddress();
+            const info = await apiClient.getAddressInfo(userAddress);
+            const gasfreeAddress = info.gasFreeAddress;
+            if (!gasfreeAddress) continue;
+            const balance = await tronSigner.checkBalance(req.asset, req.network, gasfreeAddress);
+            let needed = BigInt(req.amount);
+            if (req.extra?.fee?.feeAmount) {
+              needed += BigInt(req.extra.fee.feeAmount);
+            }
+            if (balance >= needed) {
+              affordable.push(req);
+            } else {
+              console.error(
+                `[x402] exact_gasfree skipped: GasFree balance ${balance.toString()} < needed ${needed.toString()} for ${gasfreeAddress}`,
+              );
+            }
+          } catch (_) {
+            // If we can't check, keep gasfree requirement as-is.
+            affordable.push(req);
+          }
+        }
+
+        return [...affordable, ...others];
       }
     });
     console.error(`[x402] GasFree priority policy enabled.`);
