@@ -35,20 +35,21 @@ function tronAddressToEvmHex(tronWeb: any, address: string): string {
   return `0x${hex41.replace(/^41/i, '')}`;
 }
 
-function convertTypedDataAddresses(
-  tronWeb: any,
-  value: Record<string, unknown>,
-  fields: Array<{ name: string; type: string }>,
-): Record<string, unknown> {
-  const next = { ...value };
-  for (const field of fields) {
-    if (field.type !== 'address') continue;
-    const current = next[field.name];
-    if (typeof current === 'string') {
-      next[field.name] = tronAddressToEvmHex(tronWeb, current);
-    }
+function convertTronAddressesDeep(tronWeb: any, value: unknown): unknown {
+  if (typeof value === 'string') {
+    return isTronAddress(value) ? tronAddressToEvmHex(tronWeb, value) : value;
   }
-  return next;
+  if (Array.isArray(value)) {
+    return value.map((v) => convertTronAddressesDeep(tronWeb, v));
+  }
+  if (value && typeof value === 'object') {
+    const next: Record<string, unknown> = {};
+    for (const [key, val] of Object.entries(value as Record<string, unknown>)) {
+      next[key] = convertTronAddressesDeep(tronWeb, val);
+    }
+    return next;
+  }
+  return value;
 }
 
 function normalizeHexSignature(signature: string): string {
@@ -370,12 +371,8 @@ async function handleGasFreeActivate(
     nonce: nonce.toString(),
   });
 
-  const domainForSig = Array.isArray(types?.EIP712Domain)
-    ? convertTypedDataAddresses(tronWeb, domain, types.EIP712Domain)
-    : domain;
-  const messageForSig = Array.isArray(types?.GasFreeTransaction)
-    ? convertTypedDataAddresses(tronWeb, message, types.GasFreeTransaction)
-    : message;
+  const domainForSig = convertTronAddressesDeep(tronWeb, domain) as Record<string, unknown>;
+  const messageForSig = convertTronAddressesDeep(tronWeb, message) as Record<string, unknown>;
 
   const signature = await tronSigner.signTypedData(domainForSig, types, messageForSig, 'GasFreeTransaction');
 
