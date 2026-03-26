@@ -45,7 +45,7 @@ async function main() {
   if (dryRun) { result.status = "dry_run"; outputJSON(result); return; }
 
   try {
-    const tx = await tronWeb.transactionBuilder.withdrawBalance(address);
+    const tx = await tronWeb.transactionBuilder.withdrawBlockRewards(address);
     const signed = await tronWeb.trx.sign(tx);
     const broadcast = await tronWeb.trx.sendRawTransaction(signed);
     result.status = broadcast.result ? "submitted" : "failed";

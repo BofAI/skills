@@ -16,12 +16,23 @@ const { getTronWeb, fromSun, outputJSON, log } = require("./utils");
 
 async function main() {
   const args = process.argv.slice(2);
-  if (args.length < 1) { console.error("Usage: node vote.js <srAddress> [--dry-run] OR --split <sr1:pct,...> [--dry-run]"); process.exit(1); }
+  const dryRun = args.includes("--dry-run");
+  const positional = args.filter((a) => !a.startsWith("--"));
+  const isSplit = args.includes("--split");
+  const splitIdx = args.indexOf("--split");
+  const splitArg = splitIdx !== -1 && args[splitIdx + 1] ? args[splitIdx + 1] : null;
+
+  if (!isSplit && positional.length < 1) {
+    console.error("Usage: node vote.js <srAddress> [--dry-run] OR --split <sr1:pct,...> [--dry-run]");
+    process.exit(1);
+  }
+  if (isSplit && !splitArg) {
+    console.error("Usage: node vote.js --split <sr1:pct,sr2:pct,...> [--dry-run]");
+    process.exit(1);
+  }
 
   const tronWeb = getTronWeb();
-  const dryRun = args.includes("--dry-run");
   const address = tronWeb.defaultAddress.base58;
-  const isSplit = args[0] === "--split";
 
   // Get TRON Power
   const account = await tronWeb.trx.getAccount(address);
@@ -37,7 +48,7 @@ async function main() {
   let votes = {};
 
   if (isSplit) {
-    const pairs = args[1].split(",");
+    const pairs = splitArg.split(",");
     let totalPct = 0;
     for (const pair of pairs) {
       const [sr, pct] = pair.split(":");
@@ -49,7 +60,7 @@ async function main() {
       log(`Warning: percentages sum to ${totalPct}%, not 100%`);
     }
   } else {
-    votes[args[0]] = tronPower;
+    votes[positional[0]] = tronPower;
   }
 
   const result = {
@@ -64,7 +75,7 @@ async function main() {
   if (dryRun) { result.status = "dry_run"; outputJSON(result); return; }
 
   try {
-    const tx = await tronWeb.transactionBuilder.voteWitnessAccount(address, votes);
+    const tx = await tronWeb.transactionBuilder.vote(votes, address);
     const signed = await tronWeb.trx.sign(tx);
     const broadcast = await tronWeb.trx.sendRawTransaction(signed);
     result.status = broadcast.result ? "submitted" : "failed";
