@@ -36,7 +36,8 @@ function getTronPrivateKey() {
 
 async function signContent(content) {
   const pk = getTronPrivateKey();
-  const tronWeb = new TronWeb({ fullHost: "https://api.trongrid.io", privateKey: pk });
+  const fullHost = process.env.TRONGRID_API_KEY ? "https://api.trongrid.io" : "https://hptg.bankofai.io";
+  const tronWeb = new TronWeb({ fullHost, privateKey: pk });
   const signed = await tronWeb.trx.signMessageV2(content);
   return signed;
 }
