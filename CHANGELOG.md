@@ -1,5 +1,16 @@
 # Changelog
 
+## [1.5.2] - 2026-03-27
+
+### Improvements
+- **x402-payment**: Added optional debug logging in `x402_invoke.ts` gated by `X402_DEBUG=1`.
+- **x402-payment**: Updated `package.json`.
+
+## [1.5.1] - 2026-03-27
+
+### Bug Fixes
+- **x402-payment**: Fixed GasFree typed-data address conversion for signing/verification.
+
 ## [1.5.0] - 2026-03-21
 
 ### Breaking Changes
