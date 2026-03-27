@@ -427,6 +427,11 @@ function handleCheck(deps: {
 }
 
 async function main() {
+  const debugEnabled = process.env.X402_DEBUG === '1';
+  const debug = (...args: any[]) => {
+    if (debugEnabled) console.error('[x402:debug]', ...args);
+  };
+
   const args = process.argv.slice(2);
   const options: Record<string, string> = {};
   for (let i = 0; i < args.length; i++) {
@@ -440,6 +445,9 @@ async function main() {
       } else { options[key] = 'true'; }
     }
   }
+
+  debug('argv', process.argv.slice(2));
+  debug('options', options);
 
   const url = options.url;
   const entrypoint = options.entrypoint;
@@ -494,6 +502,11 @@ async function main() {
   }
   const apiKey = await findApiKey();
   const gasFreeCredentials = await findGasFreeCredentials();
+
+  debug('tronSigner', tronSigner ? tronSigner.getAddress() : null);
+  debug('evmSigner', evmSigner ? evmSigner.getAddress() : null);
+  debug('apiKeyConfigured', Boolean(apiKey));
+  debug('gasFreeCredentialsConfigured', Boolean(gasFreeCredentials));
 
   // Ensure signer/library internals can pick up keys from env
   if (apiKey && !process.env.TRON_GRID_API_KEY) {
@@ -560,6 +573,10 @@ async function main() {
     process.exit(1);
   }
 
+  debug('entrypoint', entrypoint || null);
+  debug('methodArg', methodArg || null);
+  debug('inputRaw', inputRaw || null);
+
   // Redirect console.log to console.error to prevent library pollution of STDOUT
   const originalConsoleLog = console.log;
   console.log = console.error;
@@ -581,6 +598,8 @@ async function main() {
       client.register(networkId, new ExactGasFreeClientMechanism(tronSigner, gasFreeClients));
     }
     console.error(`[x402] TRON mechanisms enabled (exact, exact_permit, exact_gasfree).`);
+    debug('registeredTronNetworks', networks.map((n) => (n === '*' ? 'tron:*' : `tron:${n}`)));
+    debug('gasFreeApiNetworks', Object.keys(gasFreeClients));
   }
 
   if (evmSigner) {
@@ -595,6 +614,7 @@ async function main() {
   if (gasFreeCredentials) {
     client.registerPolicy({
       async apply(requirements: any[]) {
+        debug('policy.requirements', requirements.map((r: any) => ({ scheme: r.scheme, network: r.network, asset: r.asset, amount: r.amount })));
         const gasfree = requirements.filter((r: any) => r.scheme === 'exact_gasfree');
         const others = requirements.filter((r: any) => r.scheme !== 'exact_gasfree');
 
@@ -617,6 +637,7 @@ async function main() {
               needed += BigInt(req.extra.fee.feeAmount);
             }
             if (balance >= needed) {
+              debug('gasfree.affordable', { network: req.network, asset: req.asset, gasfreeAddress, balance: balance.toString(), needed: needed.toString() });
               affordable.push(req);
             } else {
               console.error(
@@ -625,6 +646,7 @@ async function main() {
             }
           } catch (_) {
             // If we can't check, keep gasfree requirement as-is.
+            debug('gasfree.check_failed', { network: req.network, asset: req.asset });
             affordable.push(req);
           }
         }
@@ -652,6 +674,8 @@ async function main() {
     if (methodArg) finalMethod = methodArg.toUpperCase();
     if (inputRaw) finalBody = inputRaw;
   }
+
+  debug('finalRequest', { method: finalMethod, url: finalUrl, bodyBytes: finalBody ? Buffer.byteLength(finalBody, 'utf8') : 0 });
 
   try {
     const fetchClient = new X402FetchClient(client);
