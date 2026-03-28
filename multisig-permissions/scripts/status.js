@@ -15,7 +15,7 @@
 
 const { TronWeb } = require("tronweb");
 const {
-  getTronWeb, getTronWebReadOnly, decodeOperations, classifySecurity,
+  getTronWeb, getTronWebReadOnly, getAccountInfo, decodeOperations, getEnabledOperationBitCount, classifySecurity,
   formatPermConfig, outputJSON, log,
 } = require("./utils");
 
@@ -46,7 +46,7 @@ async function main() {
 
   log(`Checking permissions for ${address} ...`);
 
-  const account = await tronWeb.trx.getAccount(address);
+  const account = await getAccountInfo(tronWeb, address);
   if (!account || !account.address) {
     outputJSON({ error: `Account not found or not activated: ${address}` });
     process.exit(1);
@@ -68,6 +68,7 @@ async function main() {
     const keys = formatKeys(p.keys);
     const threshold = p.threshold || 1;
     const ops = decodeOperations(p.operations);
+    const enabledBits = getEnabledOperationBitCount(p.operations);
     return {
       id: p.id,
       name: p.permission_name || `active:${p.id}`,
@@ -76,6 +77,8 @@ async function main() {
       is_multisig: threshold > 1 || keys.length > 1,
       config: formatPermConfig(keys, threshold),
       operations: ops,
+      operations_recognized: ops.length,
+      operations_enabled_bits: enabledBits,
       operations_hex: p.operations || null,
     };
   });
