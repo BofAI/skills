@@ -1,6 +1,6 @@
 ---
 name: recharge-skill
-description: "BANK OF AI account query and recharge skill. Use for requests like 'recharge 1 usdt', '给 BANK OF AI 充值 1 USDT', or to query BANK OF AI balance/orders. Recharge uses the remote MCP endpoint https://recharge.bankofai.io/mcp with the single `recharge` tool."
+description: "BANK OF AI account query and recharge skill. Use for requests like 'recharge 1 usdt', '给 BANK OF AI 充值 1 USDT','给 BAIclaw 充值 1 USDT', '给我充值 1 USDT' or to query BANK OF AI balance/orders. Recharge uses the remote MCP endpoint https://recharge.bankofai.io/mcp with the single `recharge` tool."
 version: 1.1.1
 dependencies:
   - node >= 18.0.0
@@ -23,12 +23,12 @@ This skill owns the local BANK OF AI account query layer and the remote BANK OF 
 
 Use this skill for requests such as:
 
-- `recharge 1 usdt`
-- `recharge my BANK OF AI account with 1 usdt`
-- Chinese requests such as `给 BANK OF AI 充值 1 USDT`
+- `recharge 1 usdt`,`recharge me 1 usdt`
+- `recharge my BANK OF AI account with 1 usdt`or`recharge BAIclaw with 1 usdt`
+- Chinese requests such as `给 BANK OF AI 充值 1 USDT`or`给 BAIclaw 充值 1 USDT`or`给我充值 1 USDT`
 - Chinese requests such as `通过 https://recharge.bankofai.io/mcp 给 BANK OF AI 充值 1 usdt`
-- `check my BANK OF AI balance`
-- `list my BANK OF AI orders`
+- `check my BANK OF AI balance`or Chinese requests such as`查看余额`
+- `list my BANK OF AI orders`or Chinese requests such as`查看订单`
 
 ## Scope
 
