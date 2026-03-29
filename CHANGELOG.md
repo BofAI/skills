@@ -1,5 +1,10 @@
 # Changelog
 
+## [1.5.5] - 2026-03-29
+
+### Improvements
+- **x402-payment**: Bumped `@bankofai/x402` to 0.5.6.
+
 ## [1.5.2] - 2026-03-27
 
 ### Improvements
