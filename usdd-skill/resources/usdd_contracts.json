@@ -1,0 +1,341 @@
+{
+  "tokens": {
+    "mainnet": {
+      "USDD": {
+        "address": "TXDk8mbtRbXeYuMNS83CfKPaYYT8XWv9Hz",
+        "symbol": "USDD",
+        "decimals": 18
+      },
+      "USDD_V1": {
+        "address": "TPYmHEhy5n8TCEfYGqW2rPxsghSfzghPDn",
+        "symbol": "USDD_V1",
+        "decimals": 18
+      },
+      "USDT": {
+        "address": "TR7NHqjeKQxGTCi8q8ZY4pL8otSzgjLj6t",
+        "symbol": "USDT",
+        "decimals": 6
+      },
+      "USDC": {
+        "address": "TEkxiTehnzSmSe2XqrBj4w32RUN966rdz8",
+        "symbol": "USDC",
+        "decimals": 6
+      },
+      "TRX": {
+        "address": null,
+        "symbol": "TRX",
+        "decimals": 6,
+        "is_native": true
+      },
+      "JST": {
+        "address": "TCFLL5dx5ZJdKnWuesXxi1VPwjLVmWZZy9",
+        "symbol": "JST",
+        "decimals": 18
+      }
+    }
+  },
+  "vaults": {
+    "mainnet": [
+      {
+        "name": "TRX-A",
+        "gemJoin": "TJ1VWPvFVq7sVsN7J7dWJVZz4SLT14qRUr",
+        "collateral": "TRX",
+        "collateral_decimals": 6,
+        "stability_fee_pct": 5,
+        "is_native": true
+      },
+      {
+        "name": "TRX-B",
+        "gemJoin": "TGQKnHDQNyc3QeHJ7YxH8wggdg89UVXyvX",
+        "collateral": "TRX",
+        "collateral_decimals": 6,
+        "stability_fee_pct": 5,
+        "is_native": true
+      },
+      {
+        "name": "TRX-C",
+        "gemJoin": "TPUPPLTYLdbW4jxwD5g2T7ystxsR9HL2mt",
+        "collateral": "TRX",
+        "collateral_decimals": 6,
+        "stability_fee_pct": 5,
+        "is_native": true
+      },
+      {
+        "name": "sTRX-A",
+        "gemJoin": "TKha7zcAXZMaaWzoVmUHtvVFqr9GeiChgJ",
+        "collateral": "sTRX",
+        "collateral_decimals": 18,
+        "stability_fee_pct": 1,
+        "is_native": false
+      },
+      {
+        "name": "USDT-A",
+        "gemJoin": "TDUkQbjrXs6xUbxGCLknWwJHxVTdysXBhy",
+        "collateral": "USDT",
+        "collateral_decimals": 6,
+        "stability_fee_pct": 0,
+        "is_native": false
+      }
+    ]
+  },
+  "contracts": {
+    "mainnet": {
+      "psm": {
+        "address": "TBXW4hS5KYjjbJXDpnrPf4zhkLwrpUjbyz",
+        "name": "UsddPsm",
+        "description": "Peg Stability Module — buyGem/sellGem for 1:1 USDT<->USDD swaps, zero fee"
+      },
+      "psmGemJoin": {
+        "address": "TSUYvQ5tdd3DijCD1uGunGLpftHuSZ12sQ",
+        "name": "PSM GemJoin (USDT)",
+        "description": "AuthGemJoin5 adapter for PSM USDT collateral. sellGem requires USDT approval here."
+      },
+      "usddJoin": {
+        "address": "TUajR7CbXU6hX8n3XtNkitFAD25JvP99K6",
+        "name": "UsddJoin",
+        "description": "USDD join adapter. buyGem requires USDD approval here (PSM calls usddJoin.join internally)."
+      },
+      "cdpManager": {
+        "address": "TDDWjmQaquEtUn1Pa8wCd8dfWFPdQLGPYL",
+        "name": "DssCdpManager",
+        "description": "CDP management — open, frob, flux, move, give"
+      },
+      "vat": {
+        "address": "TH5dhX7o39afSbfDT2e3c9k4itWjNKD4D9",
+        "name": "Vat",
+        "description": "Core accounting engine — urns (vault positions) and ilks (vault type params)"
+      },
+      "proxyActions": {
+        "address": "TEk9usYZsunkc5oYijyMte6sGurspik2Js",
+        "name": "DssProxyActions",
+        "description": "Bundled vault operations (requires DSProxy to call via delegatecall)"
+      }
+    }
+  },
+  "abi": {
+    "psm": {
+      "buyGem": {
+        "type": "function",
+        "name": "buyGem",
+        "inputs": [
+          { "name": "usr", "type": "address" },
+          { "name": "gemAmt", "type": "uint256" }
+        ],
+        "outputs": [],
+        "stateMutability": "nonpayable"
+      },
+      "sellGem": {
+        "type": "function",
+        "name": "sellGem",
+        "inputs": [
+          { "name": "usr", "type": "address" },
+          { "name": "gemAmt", "type": "uint256" }
+        ],
+        "outputs": [],
+        "stateMutability": "nonpayable"
+      },
+      "tin": {
+        "type": "function",
+        "name": "tin",
+        "inputs": [],
+        "outputs": [{ "name": "", "type": "uint256" }],
+        "stateMutability": "view"
+      },
+      "tout": {
+        "type": "function",
+        "name": "tout",
+        "inputs": [],
+        "outputs": [{ "name": "", "type": "uint256" }],
+        "stateMutability": "view"
+      },
+      "gemJoin": {
+        "type": "function",
+        "name": "gemJoin",
+        "inputs": [],
+        "outputs": [{ "name": "", "type": "address" }],
+        "stateMutability": "view"
+      },
+      "vat": {
+        "type": "function",
+        "name": "vat",
+        "inputs": [],
+        "outputs": [{ "name": "", "type": "address" }],
+        "stateMutability": "view"
+      }
+    },
+    "cdpManager": {
+      "open": {
+        "type": "function",
+        "name": "open",
+        "inputs": [
+          { "name": "ilk", "type": "bytes32" },
+          { "name": "usr", "type": "address" }
+        ],
+        "outputs": [{ "name": "cdpId", "type": "uint256" }],
+        "stateMutability": "nonpayable"
+      },
+      "frob": {
+        "type": "function",
+        "name": "frob",
+        "inputs": [
+          { "name": "cdp", "type": "uint256" },
+          { "name": "dink", "type": "int256" },
+          { "name": "dart", "type": "int256" }
+        ],
+        "outputs": [],
+        "stateMutability": "nonpayable"
+      },
+      "flux": {
+        "type": "function",
+        "name": "flux",
+        "inputs": [
+          { "name": "cdp", "type": "uint256" },
+          { "name": "dst", "type": "address" },
+          { "name": "wad", "type": "uint256" }
+        ],
+        "outputs": [],
+        "stateMutability": "nonpayable"
+      },
+      "move": {
+        "type": "function",
+        "name": "move",
+        "inputs": [
+          { "name": "cdp", "type": "uint256" },
+          { "name": "dst", "type": "address" },
+          { "name": "rad", "type": "uint256" }
+        ],
+        "outputs": [],
+        "stateMutability": "nonpayable"
+      },
+      "urns": {
+        "type": "function",
+        "name": "urns",
+        "inputs": [{ "name": "cdp", "type": "uint256" }],
+        "outputs": [{ "name": "", "type": "address" }],
+        "stateMutability": "view"
+      },
+      "ilks": {
+        "type": "function",
+        "name": "ilks",
+        "inputs": [{ "name": "cdp", "type": "uint256" }],
+        "outputs": [{ "name": "", "type": "bytes32" }],
+        "stateMutability": "view"
+      },
+      "owns": {
+        "type": "function",
+        "name": "owns",
+        "inputs": [{ "name": "cdp", "type": "uint256" }],
+        "outputs": [{ "name": "", "type": "address" }],
+        "stateMutability": "view"
+      },
+      "cdpi": {
+        "type": "function",
+        "name": "cdpi",
+        "inputs": [],
+        "outputs": [{ "name": "", "type": "uint256" }],
+        "stateMutability": "view"
+      }
+    },
+    "vat": {
+      "urns": {
+        "type": "function",
+        "name": "urns",
+        "inputs": [
+          { "name": "ilk", "type": "bytes32" },
+          { "name": "urn", "type": "address" }
+        ],
+        "outputs": [
+          { "name": "ink", "type": "uint256" },
+          { "name": "art", "type": "uint256" }
+        ],
+        "stateMutability": "view"
+      },
+      "ilks": {
+        "type": "function",
+        "name": "ilks",
+        "inputs": [{ "name": "ilk", "type": "bytes32" }],
+        "outputs": [
+          { "name": "Art", "type": "uint256" },
+          { "name": "rate", "type": "uint256" },
+          { "name": "spot", "type": "uint256" },
+          { "name": "line", "type": "uint256" },
+          { "name": "dust", "type": "uint256" }
+        ],
+        "stateMutability": "view"
+      }
+    },
+    "gemJoin": {
+      "join": {
+        "type": "function",
+        "name": "join",
+        "inputs": [
+          { "name": "usr", "type": "address" },
+          { "name": "wad", "type": "uint256" }
+        ],
+        "outputs": [],
+        "stateMutability": "nonpayable"
+      },
+      "exit": {
+        "type": "function",
+        "name": "exit",
+        "inputs": [
+          { "name": "usr", "type": "address" },
+          { "name": "wad", "type": "uint256" }
+        ],
+        "outputs": [],
+        "stateMutability": "nonpayable"
+      }
+    },
+    "trc20": {
+      "balanceOf": {
+        "type": "function",
+        "name": "balanceOf",
+        "inputs": [{ "name": "owner", "type": "address" }],
+        "outputs": [{ "name": "", "type": "uint256" }],
+        "stateMutability": "view"
+      },
+      "approve": {
+        "type": "function",
+        "name": "approve",
+        "inputs": [
+          { "name": "spender", "type": "address" },
+          { "name": "amount", "type": "uint256" }
+        ],
+        "outputs": [{ "name": "", "type": "bool" }],
+        "stateMutability": "nonpayable"
+      },
+      "allowance": {
+        "type": "function",
+        "name": "allowance",
+        "inputs": [
+          { "name": "owner", "type": "address" },
+          { "name": "spender", "type": "address" }
+        ],
+        "outputs": [{ "name": "", "type": "uint256" }],
+        "stateMutability": "view"
+      },
+      "totalSupply": {
+        "type": "function",
+        "name": "totalSupply",
+        "inputs": [],
+        "outputs": [{ "name": "", "type": "uint256" }],
+        "stateMutability": "view"
+      },
+      "decimals": {
+        "type": "function",
+        "name": "decimals",
+        "inputs": [],
+        "outputs": [{ "name": "", "type": "uint8" }],
+        "stateMutability": "view"
+      }
+    }
+  },
+  "notes": {
+    "psm": "UsddPsm allows 1:1 swaps between USDD and USDT. buyGem(usr, gemAmt) = spend USDD, receive USDT. sellGem(usr, gemAmt) = spend USDT, receive USDD. gemAmt is in USDT decimals (6). Fees (tin/tout) are currently 0.",
+    "psm_approval": "For sellGem: approve PSM GemJoin (psmGemJoin) to spend USDT. For buyGem: approve UsddJoin (usddJoin) to spend USDD.",
+    "vaults": "MakerDAO-style CDP system. GemJoin adapters handle join/exit of collateral. DssCdpManager manages CDP lifecycle. Vat is the core accounting engine.",
+    "ilk_encoding": "Vault type names (TRX-A, TRX-B, etc.) are encoded as bytes32 using ethers-style left-padded UTF-8.",
+    "decimals": "USDD uses 18 decimals. USDT/USDC use 6 decimals. TRX uses 6 decimals. JST uses 18 decimals. Vat uses RAY (10^27) and WAD (10^18) precision.",
+    "vat_math": "Actual debt = art * rate / RAY. Collateral value = ink * spot. Collat ratio = (ink * spot) / (art * rate / RAY)."
+  }
+}
