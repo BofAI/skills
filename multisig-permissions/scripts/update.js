@@ -22,8 +22,8 @@
 
 const { TronWeb } = require("tronweb");
 const {
-  CONFIG, getTronWeb, encodeOperations, decodeOperations,
-  classifySecurity, formatPermConfig, outputJSON, log,
+  CONFIG, getTronWeb, getAccountInfo, waitForPermissionSync, encodeOperations, decodeOperations,
+  classifySecurity, formatPermConfig, generateProposalId, saveProposal, outputJSON, log,
 } = require("./utils");
 
 function toBase58(addr) {
@@ -96,7 +96,7 @@ async function main() {
   const walletAddress = tronWeb.defaultAddress.base58;
 
   log(`Loading permissions for ${walletAddress} ...`);
-  const account = await tronWeb.trx.getAccount(walletAddress);
+  const account = await getAccountInfo(tronWeb, walletAddress);
   if (!account || !account.address) {
     outputJSON({ error: `Account not found or not activated: ${walletAddress}` });
     process.exit(1);
@@ -110,6 +110,12 @@ async function main() {
     wallet: walletAddress,
     dry_run: dryRun,
   };
+  const currentOwnerPerm = JSON.parse(JSON.stringify(account.owner_permission || {
+    type: 0,
+    permission_name: "owner",
+    threshold: 1,
+    keys: [{ address: walletAddress, weight: 1 }],
+  }));
 
   // ---- Apply the requested modification ----
 
@@ -324,7 +330,58 @@ async function main() {
       activesFormatted
     );
 
-    const signed = await tronWeb.trx.sign(tx);
+    const requiresOwnerMultisig = (currentOwnerPerm.threshold || 1) > 1;
+    const signed = requiresOwnerMultisig
+      ? await tronWeb.trx.multiSign(tx, undefined, 0)
+      : await tronWeb.trx.sign(tx);
+
+    if (requiresOwnerMultisig) {
+      const ownerKeys = (currentOwnerPerm.keys || []).map(k => ({
+        address: toBase58(k.address),
+        weight: k.weight || 1,
+      }));
+      const signerWeight = ownerKeys.find(k => k.address === walletAddress)?.weight || 1;
+      const proposalId = generateProposalId();
+      const expiresAt = new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString();
+      const proposal = {
+        proposalId,
+        description: `Update account permissions for ${walletAddress}`,
+        memo: `update.js ${opts.action}`,
+        permission: "owner",
+        permissionId: 0,
+        account: walletAddress,
+        threshold: currentOwnerPerm.threshold || 1,
+        signaturesCollected: 1,
+        createdAt: new Date().toISOString(),
+        expiresAt,
+        signers: [{ address: walletAddress, weight: signerWeight }],
+        allKeys: ownerKeys,
+        transaction: signed,
+        metadata: {
+          kind: "permission-update",
+          action: opts.action,
+          proposed_owner: result.proposed_owner,
+          proposed_active: result.proposed_active,
+          security_level: result.security_level,
+        },
+      };
+      const filePath = saveProposal(proposal);
+      result.status = "proposal_created";
+      result.proposal_id = proposalId;
+      result.saved_to = filePath;
+      result.signatures = {
+        collected: 1,
+        collected_weight: signerWeight,
+        required_weight: currentOwnerPerm.threshold || 1,
+        threshold_met: signerWeight >= (currentOwnerPerm.threshold || 1),
+      };
+      result.next_step = signerWeight >= (currentOwnerPerm.threshold || 1)
+        ? `Ready to execute: node scripts/execute.js ${proposalId}`
+        : `Collect more owner signatures: node scripts/approve.js ${proposalId}`;
+      outputJSON(result);
+      return;
+    }
+
     const broadcast = await tronWeb.trx.sendRawTransaction(signed);
 
     result.status = broadcast.result ? "submitted" : "failed";
@@ -332,6 +389,13 @@ async function main() {
     if (!broadcast.result) {
       result.broadcast_error = broadcast.message || broadcast.code || "Unknown error";
       log(`Broadcast failed: ${result.broadcast_error}`);
+    } else {
+      const sync = await waitForPermissionSync(tronWeb, walletAddress, owner, actives);
+      result.sync_confirmed = sync.synced;
+      result.sync_attempts = sync.attempts;
+      if (!sync.synced) {
+        result.sync_warning = "Permission update submitted, but the node did not reflect the new state within the confirmation window. Re-run status.js before the next write step.";
+      }
     }
     log(`Transaction: ${broadcast.txid}`);
   } catch (e) {

@@ -7,9 +7,9 @@
  * and saves it to ~/.clawdbot/multisig/pending/ for co-signers.
  *
  * Usage:
- *   node propose.js transfer <to> <amount> [--permission owner|active] [--memo "..."]
- *   node propose.js trc20-transfer <token> <to> <amount> [--permission owner|active] [--memo "..."]
- *   node propose.js contract-call <contract> <function-sig> <args-json> [--permission owner|active] [--memo "..."]
+ *   node propose.js transfer <to> <amount> [--permission owner|active] [--account <target>] [--memo "..."]
+ *   node propose.js trc20-transfer <token> <to> <amount> [--permission owner|active] [--account <target>] [--memo "..."]
+ *   node propose.js contract-call <contract> <function-sig> <args-json> [--permission owner|active] [--account <target>] [--memo "..."]
  *
  * Examples:
  *   node propose.js transfer TRecipient... 10000 --memo "Monthly budget"
@@ -19,7 +19,7 @@
 
 const { TronWeb } = require("tronweb");
 const {
-  getTronWeb, toSun, fromSun, generateProposalId, saveProposal,
+  getTronWeb, getAccountInfo, toSun, fromSun, generateProposalId, saveProposal,
   outputJSON, log,
 } = require("./utils");
 
@@ -40,6 +40,7 @@ function parseArgs() {
 
   for (let i = 1; i < args.length; i++) {
     if (args[i] === "--permission" && args[i + 1]) { flags.permission = args[++i]; continue; }
+    if (args[i] === "--account" && args[i + 1]) { flags.account = args[++i]; continue; }
     if (args[i] === "--memo" && args[i + 1]) { flags.memo = args[++i]; continue; }
     if (args[i] === "--expiry" && args[i + 1]) { flags.expiryHours = Number(args[++i]); continue; }
     if (!args[i].startsWith("--")) positional.push(args[i]);
@@ -51,16 +52,17 @@ function parseArgs() {
 async function main() {
   const opts = parseArgs();
   const tronWeb = getTronWeb();
-  const walletAddress = tronWeb.defaultAddress.base58;
+  const signerAddress = tronWeb.defaultAddress.base58;
+  const targetAccount = opts.account || signerAddress;
 
   // Determine permission ID
   const permissionId = opts.permission === "active" ? 2 : 0;
   const permLabel = permissionId === 0 ? "owner" : "active";
 
   // Fetch account to know threshold
-  const account = await tronWeb.trx.getAccount(walletAddress);
+  const account = await getAccountInfo(tronWeb, targetAccount);
   if (!account || !account.address) {
-    outputJSON({ error: `Account not found or not activated: ${walletAddress}` });
+    outputJSON({ error: `Account not found or not activated: ${targetAccount}` });
     process.exit(1);
   }
 
@@ -78,7 +80,7 @@ async function main() {
     permKeys = perm.keys || [];
   }
 
-  log(`Building ${opts.txType} transaction (permission: ${permLabel}, threshold: ${threshold}) ...`);
+  log(`Building ${opts.txType} transaction for ${targetAccount} (signer: ${signerAddress}, permission: ${permLabel}, threshold: ${threshold}) ...`);
 
   let tx;
   let description;
@@ -89,7 +91,7 @@ async function main() {
       const amountTrx = opts.positional[1];
       if (!to || !amountTrx) { outputJSON({ error: "Usage: node propose.js transfer <to> <amount>" }); process.exit(1); }
       const amountSun = Number(toSun(amountTrx));
-      tx = await tronWeb.transactionBuilder.sendTrx(to, amountSun, walletAddress);
+      tx = await tronWeb.transactionBuilder.sendTrx(to, amountSun, targetAccount);
       description = `Transfer ${amountTrx} TRX to ${to}`;
       break;
     }
@@ -109,7 +111,7 @@ async function main() {
       ];
       tx = await tronWeb.transactionBuilder.triggerSmartContract(
         tokenAddr, "transfer(address,uint256)", {},
-        parameter, walletAddress
+        parameter, targetAccount
       );
       tx = tx.transaction;
       description = `TRC20 transfer ${amount} of ${tokenAddr} to ${to}`;
@@ -137,7 +139,7 @@ async function main() {
 
       tx = await tronWeb.transactionBuilder.triggerSmartContract(
         contract, functionSig, {},
-        parameter, walletAddress
+        parameter, targetAccount
       );
       tx = tx.transaction;
       description = `Call ${functionSig} on ${contract}`;
@@ -172,11 +174,12 @@ async function main() {
     memo: opts.memo || "",
     permission: permLabel,
     permissionId,
+    account: targetAccount,
     threshold,
     signaturesCollected: 1,
     createdAt: new Date(now).toISOString(),
     expiresAt: new Date(now + expiryMs).toISOString(),
-    signers: [{ address: walletAddress, weight: permKeys.find(k => toBase58(k.address) === walletAddress)?.weight || 1 }],
+    signers: [{ address: signerAddress, weight: permKeys.find(k => toBase58(k.address) === signerAddress)?.weight || 1 }],
     allKeys: permKeys.map(k => ({ address: toBase58(k.address), weight: k.weight || 1 })),
     transaction: signed,
   };
@@ -192,6 +195,8 @@ async function main() {
     description,
     memo: opts.memo || "",
     permission: permLabel,
+    account: targetAccount,
+    signer: signerAddress,
     threshold,
     signatures: {
       collected: 1,

@@ -14,6 +14,7 @@
 - The agent can call DeFi contracts freely (swap, lend, stake) but **cannot** transfer TRX, change permissions, or do anything outside smart contract calls
 - If the agent's hot key is compromised, the attacker can interact with DeFi contracts but cannot drain TRX or change the wallet's security configuration
 - The operator retains full control through the 2-of-2 owner permission using offline keys
+- If the account is already owner-multisig when this change is applied, `update.js` creates a pending owner proposal and the operator completes it through `approve.js` and `execute.js`
 
 **Who benefits**:
 - **The agent operator** sleeps at night knowing a compromised agent key has limited blast radius
@@ -54,8 +55,8 @@
   - **Active:3 (transfers)**: Human's key, threshold 1, scoped to `TransferContract` + `TransferAssetContract` — only the human can send TRX or TRC10 tokens
   - **Owner**: Human's cold key, threshold 1 — full control reserved for the human
 - The agent handles daily yield optimization without needing the human's key
-- When the agent needs to move profits to cold storage, it creates a proposal via `propose.js transfer` with `--permission active` targeting the transfer permission, but this requires the human's signature via `approve.js`
-- The human reviews the proposal, approves if correct, and the transfer executes
+- When the agent needs to move profits to cold storage, the current repository scripts do not yet expose a permission-id selector beyond the default active id=2. In this layout, the human should create the transfer proposal with the transfer-scoped key, or the team should extend the tooling before relying on multi-active-id routing.
+- The human reviews the proposal, approves if correct, and the transfer executes through the standard proposal flow.
 
 **Who benefits**:
 - **The user** gets automated DeFi management without giving up control over fund movements
@@ -74,7 +75,7 @@
 - The agent switches to using the new key for all operations
 - After confirming the new key works: `update.js remove-key TOldAgentKey... --permission active` removes the old key
 - The wallet address never changes — all positions, approvals, and on-chain reputation are preserved
-- If using multi-sig owner, this entire process goes through the propose → approve → execute flow for safety
+- If owner is already multi-sig, these update operations become owner proposals and must go through `approve.js` and `execute.js`
 
 **Who benefits**:
 - **Security** improves through regular key rotation without operational disruption
@@ -89,7 +90,7 @@
 
 **How it works**:
 - **Phase 1 (Launch)**: Owner is a 2-of-3 multi-sig among the founding team. Active is a single agent key with all operations.
-- **Phase 2 (Growth)**: `update.js set-threshold 3 --permission owner` raises owner threshold to 3-of-3, requiring full team consensus for changes. Agent key gets scoped via `scope-active` to only DeFi operations.
+- **Phase 2 (Growth)**: `update.js set-threshold 3 --permission owner` creates an owner proposal that raises the owner threshold to 3-of-3 after co-sign + execute. Agent key gets scoped via `scope-active` to only DeFi operations.
 - **Phase 3 (Community)**: `update.js add-key TCommunityMultisig... --permission owner --weight 2` adds a community-controlled multi-sig to the owner permission with higher weight. Team members' weights stay at 1. Threshold increases to 3, meaning the community multi-sig (weight 2) plus any one team member (weight 1) can approve changes.
 - **Phase 4 (Full Decentralization)**: Team keys are removed. Owner permission is entirely controlled by community governance.
 - Each phase transition is documented through the proposal system, creating a verifiable decentralization timeline.
@@ -132,7 +133,7 @@
 - Owner: 4-of-5 multi-sig across all members (for security changes)
 - Active: 3-of-5 multi-sig across all members (for fund movements)
 - The AI agent has an advisory role — it analyzes opportunities and creates proposals:
-  - `propose.js contract-call TSunSwapRouter... "swapExactTokensForTokens(...)" '[...]' --memo "Rebalance: sell 20% ETH position for USDD at current price $3,200"`
+  - `propose.js contract-call TSunSwapRouter... "swapExactTokensForTokens(...)" '[...]' --permission owner --memo "Rebalance: sell 20% ETH position for USDD at current price $3,200"`
 - Members review proposals via `pending.js`, discuss the agent's reasoning, and sign with `approve.js`
 - When 3 members approve, any member or the agent can execute
 - Complete history is maintained in `~/.clawdbot/multisig/executed/` — every proposal, every signature, every execution

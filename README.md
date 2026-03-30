@@ -24,6 +24,7 @@ A curated collection of practical, DeFi-focused utility skills developed by the 
   - [DeFi & DEX](#defi--dex)
   - [Payments & x402](#payments--x402)
   - [AI & Account Recharge](#ai--account-recharge)
+  - [Security & Permissions](#security--permissions)
   - [Data & Analytics](#data--analytics)
 - [Usage Tips](#usage-tips)
   - [Explicit Invocation](#explicit-invocation)
@@ -66,6 +67,10 @@ Some skills require wallet signature operations and are built on Agent Wallet. B
 ### AI & Account Recharge
 
 - [**recharge-skill**](./recharge-skill) - BANK OF AI account recharge and account query skill. Uses the remote MCP recharge service for supported payment flows.
+
+### Security & Permissions
+
+- [**multisig-permissions**](./multisig-permissions) - TRON native account permission and multi-signature workflow skill. Supports permission inspection, template-based updates, proposal creation, co-signing, review, and execution.
 
 ### Data & Analytics
 

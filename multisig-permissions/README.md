@@ -16,11 +16,18 @@ node scripts/status.js
 node scripts/update.js from-template basic-2of3 \
   --key1 TKey1... --key2 TKey2... --key3 TKey3... --dry-run
 
+# If the current owner is already multi-sig, permission updates create a
+# pending owner proposal for co-signers instead of broadcasting immediately.
+node scripts/approve.js prop_xxxxx_xxxx
+node scripts/execute.js prop_xxxxx_xxxx
+
 # Multi-sig transaction flow
 node scripts/propose.js transfer TRecipient... 10000 --memo "Payment"
 node scripts/approve.js prop_xxxxx_xxxx
 node scripts/execute.js prop_xxxxx_xxxx
 ```
+
+Always derive the address from each private key and confirm it matches the intended owner / active role on-chain before signing. Environment variable names are only labels; permission authority comes from the derived address in the account configuration.
 
 ## Scripts
 
@@ -31,6 +38,8 @@ node scripts/execute.js prop_xxxxx_xxxx
 - **execute.js** — Broadcast a fully-signed transaction to the network
 - **pending.js** — List and filter pending multi-sig proposals
 - **review.js** — Human CLI: list, inspect, co-sign, and execute proposals in one tool
+
+For `propose.js`, use `--account <controlled-account>` when the signer key is acting through another account's active permission. For owner multi-sig permission changes, `update.js` will create a pending owner proposal that must be completed via `approve.js` and `execute.js`.
 
 ## Templates
 
