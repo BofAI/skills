@@ -1,6 +1,6 @@
 {
   "name": "x402-payment-skill",
-  "version": "1.5.5",
+  "version": "1.5.6",
   "description": "x402 payment skill for TRON and EVM",
   "type": "module",
   "scripts": {
@@ -11,7 +11,7 @@
     "typescript": "^5.9.3"
   },
   "dependencies": {
-    "@bankofai/x402": "0.5.6",
+    "@bankofai/x402": "0.5.7",
     "tronweb": "^6.0.0"
   }
 }
