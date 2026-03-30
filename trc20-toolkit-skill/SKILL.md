@@ -63,6 +63,8 @@ node scripts/balance.js --batch USDT,USDD TWalletAddress123
 
 **Output:** `trx_balance`, `tokens[]` (each with `symbol`, `balance`, `decimals`)
 
+**Behavior note:** In `--batch` mode, invalid token inputs are returned as per-item errors instead of aborting the entire batch.
+
 ### 3. `transfer.js` — Transfer Tokens
 
 | Parameter | Required | Description |
@@ -79,6 +81,8 @@ node scripts/transfer.js USDT TRecipientAddress 10.5
 
 **Output:** `status`, `tx_id`, `amount`, `symbol`
 
+**Validation rules:** Recipient addresses must be valid TRON addresses, self-transfers are rejected, and `amount` must be greater than `0` even in `--dry-run`.
+
 ### 4. `approve.js` — Manage Allowances
 
 ```bash
@@ -92,6 +96,8 @@ node scripts/approve.js USDT TSpenderAddress --check TWalletAddress
 ```
 
 **Output:** `allowance`, `is_max`, `status`, `tx_id`
+
+**Validation rules:** Spender and optional owner addresses must be valid TRON addresses, `amount` must be greater than `0`, and unlimited approvals remain disabled.
 
 ---
 
@@ -124,6 +130,7 @@ node scripts/balance.js --batch USDT,USDD,SUN,JST,BTT
 4. **Validate addresses.** Ensure all addresses start with `T` and are valid TRON base58 addresses.
 5. **Check balances before transfer.** The script validates sufficient balance automatically.
 6. **Never use unlimited approvals.** Always approve only the exact amount needed for the intended swap or transfer. Infinite (MAX_UINT256) approvals are rejected by the script. This prevents a compromised or malicious spender contract from draining the entire token balance.
+7. **Treat multi-permission wallets carefully.** These scripts assume a directly usable signing key; wallets that require explicit `permissionId` selection may need a different transaction flow.
 
 ---
 

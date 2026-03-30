@@ -21,6 +21,7 @@ A curated collection of practical, DeFi-focused utility skills developed by the 
 - [Installation](#installation)
   - [Agent Wallet (Required for Signing Skills)](#agent-wallet-required-for-signing-skills)
 - [Available Skills](#available-skills)
+  - [Engineering Workflow](#engineering-workflow)
   - [DeFi & DEX](#defi--dex)
   - [Payments & x402](#payments--x402)
   - [AI & Account Recharge](#ai--account-recharge)
@@ -55,6 +56,10 @@ Some skills require wallet signature operations and are built on Agent Wallet. B
 
 ## Available Skills
 
+### Engineering Workflow
+
+- [**spec-skill**](./spec-skill) - Spec-driven repository workflow skill for introducing or continuing constitution/spec/plan/tasks based development.
+
 ### DeFi & DEX
 
 - [**sunswap**](./sunswap) - SunSwap DEX integration for TRON via `sun-cli`. Supports price quotes, token swaps, liquidity and pool operations.
@@ -75,6 +80,7 @@ Some skills require wallet signature operations and are built on Agent Wallet. B
 ### Data & Analytics
 
 - [**tronscan-skill**](./tronscan-skill) - Comprehensive TRON blockchain data lookup via TronScan API. Supports accounts, transactions, tokens, blocks, and network-wide statistics.
+- [**trc20-toolkit-skill**](./trc20-toolkit-skill) - Universal TRC20 token toolkit for TRON. Supports metadata lookup, balance checks, transfers, and allowance management.
 
 ---
 
