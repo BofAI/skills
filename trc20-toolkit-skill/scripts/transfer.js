@@ -10,7 +10,7 @@
  *   TRON_PRIVATE_KEY, TRON_NETWORK (mainnet|nile), TRONGRID_API_KEY (optional)
  */
 
-const { TRC20_ABI, getTronWeb, resolveToken, toSun, fromSun, outputJSON, log } = require("./utils");
+const { TRC20_ABI, getTronWeb, resolveToken, validateAddress, parsePositiveAmount, fromSun, outputJSON, log } = require("./utils");
 
 async function main() {
   const args = process.argv.slice(2);
@@ -22,6 +22,8 @@ async function main() {
   const amountHuman = args[2];
   const dryRun = args.includes("--dry-run");
   const walletAddress = tronWeb.defaultAddress.base58;
+
+  validateAddress(tronWeb, toAddress, "recipient address");
 
   if (toAddress === walletAddress) {
     outputJSON({ error: "Cannot transfer to yourself." });
@@ -36,7 +38,7 @@ async function main() {
   ]);
 
   const dec = Number(decimals);
-  const amountRaw = String(toSun(amountHuman, dec));
+  const amountRaw = String(parsePositiveAmount(amountHuman, dec));
 
   if (BigInt(amountRaw) > BigInt(balance)) {
     outputJSON({ error: `Insufficient balance. Have ${fromSun(balance, dec)} ${symbol}, need ${amountHuman}` });

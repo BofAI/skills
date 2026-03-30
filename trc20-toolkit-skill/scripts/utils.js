@@ -66,6 +66,20 @@ function resolveToken(symbolOrAddress) {
   throw new Error(`Unknown token symbol "${symbolOrAddress}". Use a contract address or one of: ${net.map((t) => t.symbol).join(", ")}`);
 }
 
+function validateAddress(tronWeb, address, fieldName = "address") {
+  if (!tronWeb.isAddress(address)) {
+    throw new Error(`Invalid ${fieldName}: ${address}`);
+  }
+}
+
+function parsePositiveAmount(amount, decimals, fieldName = "amount") {
+  const raw = toSun(amount, decimals);
+  if (raw <= 0n) {
+    throw new Error(`${fieldName} must be greater than 0`);
+  }
+  return raw;
+}
+
 function toSun(amount, decimals) {
   const parts = String(amount).split(".");
   const whole = parts[0] || "0";
@@ -83,4 +97,17 @@ function fromSun(raw, decimals) {
 function outputJSON(data) { process.stdout.write(JSON.stringify(data, null, 2) + "\n"); }
 function log(msg) { process.stderr.write(msg + "\n"); }
 
-module.exports = { TOKENS, TRC20_ABI, MAX_UINT256, getTronWeb, getTronWebReadOnly, resolveToken, toSun, fromSun, outputJSON, log };
+module.exports = {
+  TOKENS,
+  TRC20_ABI,
+  MAX_UINT256,
+  getTronWeb,
+  getTronWebReadOnly,
+  resolveToken,
+  validateAddress,
+  parsePositiveAmount,
+  toSun,
+  fromSun,
+  outputJSON,
+  log,
+};
