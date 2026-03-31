@@ -58,8 +58,6 @@ Some skills require wallet signature operations and are built on Agent Wallet. B
 
 ### Engineering Workflow
 
-- [**spec-skill**](./spec-skill) - Spec-driven repository workflow skill for introducing or continuing constitution/spec/plan/tasks based development.
-
 ### DeFi & DEX
 
 - [**sunswap**](./sunswap) - SunSwap DEX integration for TRON via `sun-cli`. Supports price quotes, token swaps, liquidity and pool operations.

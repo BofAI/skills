@@ -1,6 +1,6 @@
 # Changelog
 
-## [Unreleased]
+## [1.5.6] - 2026-03-31
 
 ### Bug Fixes
 - **trc20-toolkit-skill**: Added stricter recipient/spender validation, rejected zero-value transfer/approve amounts, and made batch balance checks return per-token errors instead of aborting on the first invalid symbol.
