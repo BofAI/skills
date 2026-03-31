@@ -63,6 +63,20 @@ async function main() {
     votes[positional[0]] = tronPower;
   }
 
+  // Preflight: validate that every target address is a registered SR/witness
+  log("Validating SR addresses ...");
+  const witnesses = await tronWeb.trx.listSuperRepresentatives();
+  const witnessAddrs = new Set(witnesses.map((w) => tronWeb.address.fromHex(w.address)));
+  const invalid = Object.keys(votes).filter((sr) => !witnessAddrs.has(sr));
+  if (invalid.length > 0) {
+    outputJSON({
+      status: "failed",
+      error: `Invalid SR address(es): ${invalid.join(", ")}. Address is not a registered witness/SR on this network. Use sr-list.js to find valid SR addresses.`,
+      invalid_addresses: invalid,
+    });
+    process.exit(1);
+  }
+
   const result = {
     action: "vote",
     tron_power: tronPower,
@@ -80,6 +94,9 @@ async function main() {
     const broadcast = await tronWeb.trx.sendRawTransaction(signed);
     result.status = broadcast.result ? "submitted" : "failed";
     result.tx_id = broadcast.txid;
+    if (!broadcast.result) {
+      result.error = broadcast.code || "Transaction rejected by network";
+    }
   } catch (e) {
     result.status = "failed";
     result.error = e.message || String(e);
