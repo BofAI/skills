@@ -21,7 +21,6 @@ A curated collection of practical, DeFi-focused utility skills developed by the 
 - [Installation](#installation)
   - [Agent Wallet (Required for Signing Skills)](#agent-wallet-required-for-signing-skills)
 - [Available Skills](#available-skills)
-  - [Engineering Workflow](#engineering-workflow)
   - [DeFi & DEX](#defi--dex)
   - [Payments & x402](#payments--x402)
   - [AI & Account Recharge](#ai--account-recharge)
