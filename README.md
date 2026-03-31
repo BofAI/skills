@@ -56,8 +56,6 @@ Some skills require wallet signature operations and are built on Agent Wallet. B
 
 ## Available Skills
 
-### Engineering Workflow
-
 ### DeFi & DEX
 
 - [**sunswap**](./sunswap) - SunSwap DEX integration for TRON via `sun-cli`. Supports price quotes, token swaps, liquidity and pool operations.
