@@ -23,6 +23,23 @@ const { CONTRACTS, getTronWeb, getNetwork, getContracts, resolveToken, toSun, fr
 
 const MAX_UINT256 = "115792089237316195423570985008687907853269984665640564039457584007913129639935";
 
+/**
+ * Wait until on-chain allowance meets the required amount.
+ * Retries every `intervalMs` up to `maxRetries` times.
+ */
+async function waitForAllowance(approvalContract, owner, spender, requiredAmt, { decimals, intervalMs = 4000, maxRetries = 10 } = {}) {
+  for (let i = 0; i < maxRetries; i++) {
+    const current = BigInt(await approvalContract.allowance(owner, spender).call());
+    if (current >= requiredAmt) {
+      log(`Allowance confirmed: ${fromSun(current, decimals)}`);
+      return;
+    }
+    log(`Waiting for allowance confirmation (attempt ${i + 1}/${maxRetries}) ...`);
+    await new Promise((r) => setTimeout(r, intervalMs));
+  }
+  throw new Error(`Allowance not confirmed after ${maxRetries} retries`);
+}
+
 async function main() {
   const args = process.argv.slice(2);
   if (args.length < 2) {
@@ -110,7 +127,7 @@ async function main() {
       });
       result.approve_tx = approveTx;
       log(`Approval tx: ${approveTx}`);
-      await new Promise((r) => setTimeout(r, 4000));
+      await waitForAllowance(approvalContract, walletAddress, gemJoinAddress, gemAmtRaw, { decimals: usdtToken.decimals });
     }
 
     // Execute sellGem
@@ -153,14 +170,13 @@ async function main() {
       return;
     }
 
-    // buyGem calls usddJoin.join internally, which does transferFrom on USDD.
-    // Approval must target usddJoin, not the PSM contract.
-    log("Checking USDD allowance for UsddJoin ...");
+    // buyGem requires USDD approval for the PSM contract (which calls transferFrom).
+    log("Checking USDD allowance for PSM ...");
     const approvalContract = await tronWeb.contract(
       [CONTRACTS.abi.trc20.allowance, CONTRACTS.abi.trc20.approve],
       usddToken.address
     );
-    const allowance = BigInt(await approvalContract.allowance(walletAddress, usddJoinAddress).call());
+    const allowance = BigInt(await approvalContract.allowance(walletAddress, psmAddress).call());
     result.current_allowance = fromSun(allowance, usddToken.decimals);
     result.needs_approval = allowance < usddNeeded;
 
@@ -173,14 +189,14 @@ async function main() {
 
     // Approve if needed
     if (allowance < usddNeeded) {
-      log("Approving UsddJoin to spend USDD ...");
-      const approveTx = await approvalContract.approve(usddJoinAddress, MAX_UINT256).send({
+      log("Approving PSM to spend USDD ...");
+      const approveTx = await approvalContract.approve(psmAddress, MAX_UINT256).send({
         feeLimit: 50_000_000,
         shouldPollResponse: false,
       });
       result.approve_tx = approveTx;
       log(`Approval tx: ${approveTx}`);
-      await new Promise((r) => setTimeout(r, 4000));
+      await waitForAllowance(approvalContract, walletAddress, psmAddress, usddNeeded, { decimals: usddToken.decimals });
     }
 
     // Execute buyGem
