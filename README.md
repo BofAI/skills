@@ -70,6 +70,7 @@ Some skills require wallet signature operations and are built on Agent Wallet. B
 
 ### Security & Permissions
 
+- [**agent-wallet**](./agent-wallet) - Wallet management and signing skill for creating wallets, switching active wallets, resolving addresses, and signing transactions or messages on EVM and TRON.
 - [**multisig-permissions**](./multisig-permissions) - TRON native account permission and multi-signature workflow skill. Supports permission inspection, template-based updates, proposal creation, co-signing, review, and execution.
 
 ### Data & Analytics
