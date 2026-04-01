@@ -75,6 +75,7 @@ Some skills require wallet signature operations and are built on Agent Wallet. B
 ### Data & Analytics
 
 - [**tronscan-skill**](./tronscan-skill) - Comprehensive TRON blockchain data lookup via TronScan API. Supports accounts, transactions, tokens, blocks, and network-wide statistics.
+- [**trc20-toolkit-skill**](./trc20-toolkit-skill) - Universal TRC20 token toolkit for TRON. Supports metadata lookup, balance checks, transfers, and allowance management.
 
 ---
 

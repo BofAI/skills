@@ -11,7 +11,7 @@
  *   TRON_PRIVATE_KEY, TRON_NETWORK (mainnet|nile), TRONGRID_API_KEY (optional)
  */
 
-const { TRC20_ABI, getTronWeb, getTronWebReadOnly, resolveToken, fromSun, outputJSON, log } = require("./utils");
+const { TRC20_ABI, getTronWeb, getTronWebReadOnly, resolveToken, validateAddress, fromSun, outputJSON, log } = require("./utils");
 
 async function getTokenBalance(tronWeb, tokenAddress, walletAddress) {
   const contract = await tronWeb.contract(TRC20_ABI, tokenAddress);
@@ -42,22 +42,25 @@ async function main() {
   let tokens;
 
   if (isBatch) {
-    tokens = args[1].split(",").map((t) => resolveToken(t.trim()));
+    tokens = args[1].split(",").map((t) => t.trim()).filter(Boolean);
     walletAddress = explicitWallet || tronWeb.defaultAddress.base58;
   } else {
     tokens = [resolveToken(args[0])];
     walletAddress = explicitWallet || tronWeb.defaultAddress.base58;
   }
 
+  validateAddress(tronWeb, walletAddress, "wallet address");
+
   log(`Checking balances for ${walletAddress} ...`);
 
   const trxBalance = await tronWeb.trx.getBalance(walletAddress);
   const results = [];
-  for (const token of tokens) {
+  for (const tokenInput of tokens) {
     try {
+      const token = isBatch ? resolveToken(tokenInput) : tokenInput;
       results.push(await getTokenBalance(tronWeb, token, walletAddress));
     } catch (e) {
-      results.push({ token, error: e.message });
+      results.push({ token: tokenInput, error: e.message });
     }
   }
 

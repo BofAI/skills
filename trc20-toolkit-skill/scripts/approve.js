@@ -11,7 +11,7 @@
  *   TRON_PRIVATE_KEY, TRON_NETWORK (mainnet|nile), TRONGRID_API_KEY (optional)
  */
 
-const { TRC20_ABI, MAX_UINT256, getTronWeb, resolveToken, toSun, fromSun, outputJSON, log } = require("./utils");
+const { TRC20_ABI, MAX_UINT256, getTronWeb, resolveToken, validateAddress, parsePositiveAmount, fromSun, outputJSON, log } = require("./utils");
 
 async function main() {
   const args = process.argv.slice(2);
@@ -22,6 +22,8 @@ async function main() {
   const spenderAddress = args[1];
   const isCheck = args[2] === "--check";
 
+  validateAddress(tronWeb, spenderAddress, "spender address");
+
   const contract = await tronWeb.contract(TRC20_ABI, tokenAddress);
   const [decimals, symbol] = await Promise.all([
     contract.decimals().call(),
@@ -31,6 +33,7 @@ async function main() {
 
   if (isCheck) {
     const owner = args[3] || tronWeb.defaultAddress.base58;
+    validateAddress(tronWeb, owner, "owner address");
     const allowance = await contract.allowance(owner, spenderAddress).call();
     outputJSON({
       action: "check_allowance",
@@ -54,7 +57,7 @@ async function main() {
     process.exit(1);
   }
 
-  const amountRaw = String(toSun(amountArg, dec));
+  const amountRaw = String(parsePositiveAmount(amountArg, dec));
 
   const result = {
     action: "approve",
