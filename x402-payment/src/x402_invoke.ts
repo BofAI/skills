@@ -565,7 +565,7 @@ async function main() {
 
   client.registerPolicy(new SufficientBalancePolicy(client));
 
-  // Prefer exact_gasfree when GasFree API credentials are configured
+  // Always prefer exact_gasfree over other payment schemes when available
   client.registerPolicy({
     async apply(requirements: any[]) {
       debug('policy.requirements', requirements.map((r: any) => ({ scheme: r.scheme, network: r.network, asset: r.asset, amount: r.amount })));
