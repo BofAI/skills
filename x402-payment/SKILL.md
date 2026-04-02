@@ -1,7 +1,7 @@
 ---
 name: x402-payment
 description: "Pay for x402-enabled Agent endpoints using ERC20 tokens (USDT/USDC) on EVM or TRC20 tokens (USDT/USDD) on TRON."
-version: 1.5.6
+version: 1.5.7
 author: bankofai
 homepage: https://bankofai.io
 tags: [crypto, payments, x402, agents, api, usdt, usdd, usdc, tron, ethereum, evm, erc20, trc20]
@@ -43,9 +43,9 @@ The `x402-payment` skill enables agents to interact with paid API endpoints. Whe
   - **Optional for mnemonic mode**: `AGENT_WALLET_MNEMONIC_ACCOUNT_INDEX`.
   - Configure a TRON wallet for TRC20 payments (USDT/USDD) and/or an EVM wallet for ERC20 payments (USDT/USDC).
 - **TronGrid API Key (optional)**: `TRON_GRID_API_KEY` is optional. Recommended on **Mainnet** to reduce rate-limit issues.
-- **GasFree (optional)**: `GASFREE_API_KEY` and `GASFREE_API_SECRET` are only needed when using GasFree-related commands/flows. When configured, the tool will prefer the `exact_gasfree` scheme over `exact_permit`. GasFree also requires an account that is **activated** with **sufficient token balance** in the GasFree wallet.
+- **GasFree (optional)**: GasFree credentials are now managed internally by the `@bankofai/x402` library. The tool will prefer the `exact_gasfree` scheme over `exact_permit`. GasFree requires an account that is **activated** with **sufficient token balance** in the GasFree wallet.
 - **Dependencies**: Run `npm install` in the `x402-payment/` directory before first use.
-- `TRON_GRID_API_KEY`, `GASFREE_API_KEY`, and `GASFREE_API_SECRET` can also be set in `x402-config.json`.
+- `TRON_GRID_API_KEY` can also be set in `x402-config.json`.
 
 ## Usage Instructions
 
@@ -91,7 +91,7 @@ npx tsx x402-payment/src/x402_invoke.ts --gasfree-info --network nile
 # Both
 npx tsx x402-payment/src/x402_invoke.ts --gasfree-info --wallet <YOUR_WALLET_ADDRESS> --network nile
 ```
-Requires: `GASFREE_API_KEY`, `GASFREE_API_SECRET`. Without `--wallet`, requires a configured TRON wallet from agent-wallet. Returns JSON with `gasFreeAddress`, `active`, `allowSubmit`, `nonce`, and per-token `assets` (balance, fees).
+Without `--wallet`, requires a configured TRON wallet from agent-wallet. Returns JSON with `gasFreeAddress`, `active`, `allowSubmit`, `nonce`, and per-token `assets` (balance, fees).
 
 ### 5. GasFree Account Activation
 Activate a GasFree account that has not been activated yet. Use `--gasfree-info` first to check activation status.
@@ -106,7 +106,7 @@ npx tsx x402-payment/src/x402_invoke.ts --gasfree-activate --network mainnet
 # Specify network and token
 npx tsx x402-payment/src/x402_invoke.ts --gasfree-activate --network nile --token USDT
 ```
-Requires: TRON wallet configured in agent-wallet, `GASFREE_API_KEY`, `GASFREE_API_SECRET`. Wallet must have enough tokens to cover activation fees (~3.05 USDT on nile). If the account is already activated, returns `{"status": "already_active"}` immediately.
+Requires: TRON wallet configured in agent-wallet. Wallet must have enough tokens to cover activation fees (~3.05 USDT on nile). If the account is already activated, returns `{"status": "already_active"}` immediately.
 
 **Activation process:**
 1. Queries GasFree account info and checks activation status
