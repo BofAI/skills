@@ -1,7 +1,7 @@
 ---
 name: x402-payment
 description: "Pay for x402-enabled Agent endpoints using ERC20 tokens (USDT/USDC) on EVM or TRC20 tokens (USDT/USDD) on TRON."
-version: 1.5.6
+version: 1.5.7
 author: bankofai
 homepage: https://bankofai.io
 tags: [crypto, payments, x402, agents, api, usdt, usdd, usdc, tron, ethereum, evm, erc20, trc20]

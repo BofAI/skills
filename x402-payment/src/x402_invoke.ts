@@ -110,29 +110,6 @@ async function findApiKey(): Promise<string | undefined> {
   return undefined;
 }
 
-async function findGasFreeCredentials(): Promise<{ apiKey: string; apiSecret: string } | undefined> {
-  if (process.env.GASFREE_API_KEY && process.env.GASFREE_API_SECRET) {
-    return { apiKey: process.env.GASFREE_API_KEY, apiSecret: process.env.GASFREE_API_SECRET };
-  }
-
-  const configFiles = [
-    path.join(process.cwd(), 'x402-config.json'),
-    path.join(os.homedir(), '.x402-config.json')
-  ];
-
-  for (const file of configFiles) {
-    if (fs.existsSync(file)) {
-      try {
-        const config = JSON.parse(fs.readFileSync(file, 'utf8'));
-        const key = (config.gasfree_api_key || '').trim();
-        const secret = (config.gasfree_api_secret || '').trim();
-        if (key && secret) return { apiKey: key, apiSecret: secret };
-      } catch (e) { /* ignore */ }
-    }
-  }
-  return undefined;
-}
-
 const TRON_RPC_URLS: Record<string, string> = {
   mainnet: process.env.TRON_GRID_API_KEY ? 'https://api.trongrid.io' : 'https://hptg.bankofai.io',
   nile: 'https://nile.trongrid.io',
@@ -155,17 +132,11 @@ async function handleGasFreeInfo(
   options: Record<string, string>,
   deps: {
     tronSigner: any;
-    gasFreeCredentials: { apiKey: string; apiSecret: string } | undefined;
     GasFreeAPIClient: any;
     GASFREE_API_BASE_URLS: Record<string, string>;
   },
 ): Promise<void> {
-  const { tronSigner, gasFreeCredentials, GasFreeAPIClient, GASFREE_API_BASE_URLS } = deps;
-
-  if (!gasFreeCredentials) {
-    console.error('Error: GasFree API credentials (GASFREE_API_KEY / GASFREE_API_SECRET) are required for --gasfree-info');
-    process.exit(1);
-  }
+  const { tronSigner, GasFreeAPIClient, GASFREE_API_BASE_URLS } = deps;
 
   let walletAddress: string;
   if (options['wallet']) {
@@ -406,9 +377,8 @@ function handleCheck(deps: {
   tronSigner: any;
   evmSigner: any;
   apiKey: string | undefined;
-  gasFreeCredentials: { apiKey: string; apiSecret: string } | undefined;
 }): void {
-  const { tronSigner, evmSigner, apiKey, gasFreeCredentials } = deps;
+  const { tronSigner, evmSigner, apiKey } = deps;
   if (tronSigner) {
     console.error(`[OK] TRON Wallet: ${tronSigner.getAddress()}`);
     if (apiKey) console.error(`[OK] TRON_GRID_API_KEY is configured.`);
@@ -419,11 +389,7 @@ function handleCheck(deps: {
   if (!tronSigner && !evmSigner) {
     console.error(`[--] No compatible active wallet resolved from agent-wallet.`);
   }
-  if (gasFreeCredentials) {
-    console.error(`[OK] GasFree API credentials configured (will prefer exact_gasfree).`);
-  } else {
-    console.error(`[--] GasFree API credentials not configured (GASFREE_API_KEY / GASFREE_API_SECRET).`);
-  }
+  console.error(`[OK] GasFree API credentials configured (will prefer exact_gasfree).`);
 }
 
 async function main() {
@@ -474,6 +440,9 @@ async function main() {
     SufficientBalancePolicy,
     getChainId,
   } = await import('@bankofai/x402');
+  GASFREE_API_BASE_URLS['tron:mainnet'] = 'https://tn-facilitator.bankofai.io/mainnet';
+  GASFREE_API_BASE_URLS['tron:nile'] = 'https://tn-facilitator.bankofai.io/nile';
+  GASFREE_API_BASE_URLS['tron:shasta'] = 'https://tn-facilitator.bankofai.io/shasta';
 
   let tronSigner: InstanceType<typeof TronClientSigner> | undefined;
   try {
@@ -501,32 +470,26 @@ async function main() {
     evmSigner = undefined;
   }
   const apiKey = await findApiKey();
-  const gasFreeCredentials = await findGasFreeCredentials();
 
   debug('tronSigner', tronSigner ? tronSigner.getAddress() : null);
   debug('evmSigner', evmSigner ? evmSigner.getAddress() : null);
   debug('apiKeyConfigured', Boolean(apiKey));
-  debug('gasFreeCredentialsConfigured', Boolean(gasFreeCredentials));
 
   // Ensure signer/library internals can pick up keys from env
   if (apiKey && !process.env.TRON_GRID_API_KEY) {
     process.env.TRON_GRID_API_KEY = apiKey;
   }
-  if (gasFreeCredentials) {
-    if (!process.env.GASFREE_API_KEY) process.env.GASFREE_API_KEY = gasFreeCredentials.apiKey;
-    if (!process.env.GASFREE_API_SECRET) process.env.GASFREE_API_SECRET = gasFreeCredentials.apiSecret;
-  }
 
   if (options.check || options.status) {
     handleCheck({
-      tronSigner, evmSigner, apiKey, gasFreeCredentials,
+      tronSigner, evmSigner, apiKey,
     });
     process.exit(0);
   }
 
   if (options['gasfree-info']) {
     await handleGasFreeInfo(options, {
-      tronSigner, gasFreeCredentials, GasFreeAPIClient,
+      tronSigner, GasFreeAPIClient,
       GASFREE_API_BASE_URLS: GASFREE_API_BASE_URLS as Record<string, string>,
     });
     process.exit(0);
@@ -540,10 +503,6 @@ async function main() {
     }
     if (resolvedTronWallet.address !== tronSigner.getAddress()) {
       console.error('[x402] Error: TRON wallet address mismatch between agent-wallet and TronClientSigner; aborting gasfree-activate.');
-      process.exit(1);
-    }
-    if (!gasFreeCredentials) {
-      console.error('Error: GasFree API credentials (GASFREE_API_KEY / GASFREE_API_SECRET) are required for --gasfree-activate');
       process.exit(1);
     }
     try {
@@ -611,51 +570,16 @@ async function main() {
   client.registerPolicy(new SufficientBalancePolicy(client));
 
   // Prefer exact_gasfree when GasFree API credentials are configured
-  if (gasFreeCredentials) {
-    client.registerPolicy({
-      async apply(requirements: any[]) {
-        debug('policy.requirements', requirements.map((r: any) => ({ scheme: r.scheme, network: r.network, asset: r.asset, amount: r.amount })));
-        const gasfree = requirements.filter((r: any) => r.scheme === 'exact_gasfree');
-        const others = requirements.filter((r: any) => r.scheme !== 'exact_gasfree');
+  client.registerPolicy({
+    async apply(requirements: any[]) {
+      debug('policy.requirements', requirements.map((r: any) => ({ scheme: r.scheme, network: r.network, asset: r.asset, amount: r.amount })));
+      const gasfree = requirements.filter((r: any) => r.scheme === 'exact_gasfree');
+      const others = requirements.filter((r: any) => r.scheme !== 'exact_gasfree');
 
-        if (!gasfree.length || !tronSigner) return [...gasfree, ...others];
-
-        const affordable: any[] = [];
-        for (const req of gasfree) {
-          try {
-            const networkKey = req.network;
-            const baseUrl = GASFREE_API_BASE_URLS[networkKey];
-            if (!baseUrl) continue;
-            const apiClient = new GasFreeAPIClient(baseUrl);
-            const userAddress = tronSigner.getAddress();
-            const info = await apiClient.getAddressInfo(userAddress);
-            const gasfreeAddress = info.gasFreeAddress;
-            if (!gasfreeAddress) continue;
-            const balance = await tronSigner.checkBalance(req.asset, req.network, gasfreeAddress);
-            let needed = BigInt(req.amount);
-            if (req.extra?.fee?.feeAmount) {
-              needed += BigInt(req.extra.fee.feeAmount);
-            }
-            if (balance >= needed) {
-              debug('gasfree.affordable', { network: req.network, asset: req.asset, gasfreeAddress, balance: balance.toString(), needed: needed.toString() });
-              affordable.push(req);
-            } else {
-              console.error(
-                `[x402] exact_gasfree skipped: GasFree balance ${balance.toString()} < needed ${needed.toString()} for ${gasfreeAddress}`,
-              );
-            }
-          } catch (_) {
-            // If we can't check, keep gasfree requirement as-is.
-            debug('gasfree.check_failed', { network: req.network, asset: req.asset });
-            affordable.push(req);
-          }
-        }
-
-        return [...affordable, ...others];
-      }
-    });
-    console.error(`[x402] GasFree priority policy enabled.`);
-  }
+      return [...gasfree, ...others];
+    }
+  });
+  console.error(`[x402] GasFree priority policy enabled.`);
 
   let finalUrl = url;
   let finalMethod = methodArg || 'GET';
