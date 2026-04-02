@@ -11,7 +11,7 @@
     "typescript": "^5.9.3"
   },
   "dependencies": {
-    "@bankofai/x402": "0.5.8-beta.0",
+    "@bankofai/x402": "0.5.8",
     "tronweb": "^6.0.0"
   }
 }

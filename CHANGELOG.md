@@ -1,5 +1,11 @@
 # Changelog
 
+## [1.5.7] - 2026-04-02
+
+### Improvements
+- **x402-payment**: Bumped `@bankofai/x402` to 0.5.8.
+- **x402-payment**: Removed standalone GasFree credential lookup; credentials are now managed internally by the x402 library.
+
 ## [1.5.6] - 2026-03-31
 
 ### Bug Fixes
