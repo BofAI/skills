@@ -389,7 +389,7 @@ function handleCheck(deps: {
   if (!tronSigner && !evmSigner) {
     console.error(`[--] No compatible active wallet resolved from agent-wallet.`);
   }
-  console.error(`[OK] GasFree API credentials configured (will prefer exact_gasfree).`);
+  console.error(`[OK] GasFree gasless payments enabled (exact_gasfree preferred when available).`);
 }
 
 async function main() {
@@ -440,10 +440,6 @@ async function main() {
     SufficientBalancePolicy,
     getChainId,
   } = await import('@bankofai/x402');
-  GASFREE_API_BASE_URLS['tron:mainnet'] = 'https://tn-facilitator.bankofai.io/mainnet';
-  GASFREE_API_BASE_URLS['tron:nile'] = 'https://tn-facilitator.bankofai.io/nile';
-  GASFREE_API_BASE_URLS['tron:shasta'] = 'https://tn-facilitator.bankofai.io/shasta';
-
   let tronSigner: InstanceType<typeof TronClientSigner> | undefined;
   try {
     tronSigner = await TronClientSigner.create();

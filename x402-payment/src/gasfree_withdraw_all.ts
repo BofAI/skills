@@ -3,10 +3,6 @@ import { TronWeb } from 'tronweb';
 import { GasFreeAPIClient, GASFREE_API_BASE_URLS, getChainId, TronClientSigner } from '@bankofai/x402';
 
 const TRONWEB_READONLY_DUMMY_KEY = '0000000000000000000000000000000000000000000000000000000000000001';
-GASFREE_API_BASE_URLS['tron:mainnet'] = 'https://tn-facilitator.bankofai.io/mainnet';
-GASFREE_API_BASE_URLS['tron:nile'] = 'https://tn-facilitator.bankofai.io/nile';
-GASFREE_API_BASE_URLS['tron:shasta'] = 'https://tn-facilitator.bankofai.io/shasta';
-
 const TRON_RPC_URLS: Record<string, string> = {
   mainnet: 'https://api.trongrid.io',
   nile: 'https://nile.trongrid.io',
