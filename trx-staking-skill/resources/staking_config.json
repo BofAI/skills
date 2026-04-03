@@ -1,0 +1,12 @@
+{
+  "notes": {
+    "tron_power": "1 frozen TRX = 1 TRON Power (TP). TP is used to vote for Super Representatives.",
+    "sr_count": 27,
+    "sr_partner_count": 100,
+    "vote_cycle_hours": 6,
+    "block_reward_per_cycle": "128 TRX distributed proportionally to votes",
+    "sr_candidate_fee_trx": 9999,
+    "unstake_cooldown_days": 14,
+    "reward_claim": "Voting rewards accumulate and can be claimed at any time via withdrawBalance"
+  }
+}
