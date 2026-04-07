@@ -1,9 +1,6 @@
 ---
 name: bankofai-guide
-description: >
-  Use when: (1) user installs BofAI skills and needs onboarding guidance,
-  (2) user wants to create an AgentWallet,
-  (3) invoked by other skills when no wallet is configured.
+description: "Onboarding guide for BofAI skills — handles post-install setup, AgentWallet creation, and wallet guard when no wallet is configured."
 version: 1.0.0
 tags:
   - bankofai
