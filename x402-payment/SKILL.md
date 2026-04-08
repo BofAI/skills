@@ -37,6 +37,9 @@ The `x402-payment` skill enables agents to interact with paid API endpoints. Whe
 
 ## Prerequisites
 
+> **Wallet required:** Run `agent-wallet list` first.  
+> If no wallets exist, invoke `bankofai-guide` (Section C — Wallet Guard) before proceeding.
+
 - **Wallet Configuration (agent-wallet)**:
   - **Local mode (recommended)**: set `AGENT_WALLET_PASSWORD` (required), `AGENT_WALLET_DIR` (optional).
   - **Static mode (env)**: set exactly one of `AGENT_WALLET_PRIVATE_KEY` / `AGENT_WALLET_MNEMONIC`.

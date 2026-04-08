@@ -46,6 +46,9 @@ All scripts communicate with the SunPerp REST API at `https://api.sunx.io`.
 
 ## Prerequisites
 
+> **Wallet required:** Run `agent-wallet list` first.  
+> If no wallets exist, invoke `bankofai-guide` (Section C — Wallet Guard) before proceeding.
+
 ### 1. Environment Setup
 
 Install Node.js dependencies from the skill directory:
