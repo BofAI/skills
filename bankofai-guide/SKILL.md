@@ -55,7 +55,7 @@ Present two options:
 
 #### Quick setup path
 
-1. Run `node agent-wallet/scripts/generate-password.js` and capture the output as `<generated-password>`.
+1. Locate the `agent-wallet` skill directory (the folder containing the `agent-wallet` SKILL.md), then run `node <agent-wallet-skill-dir>/scripts/generate-password.js` and capture the output as `<generated-password>`.
 2. Run:
    ```bash
    agent-wallet start local_secure --override --save-runtime-secrets -g -w default_local_secure -p '<generated-password>'
