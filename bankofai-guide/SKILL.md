@@ -50,7 +50,7 @@ This skill handles three onboarding flows. Jump directly to the relevant section
 ### If no wallets exist
 
 Present two options:
-- **Quick setup**: fully automated, takes about 30 seconds
+- **Quick setup** (strongly recommended): fully automated, takes about 10 seconds
 - **Detailed setup**: step-by-step configuration (wallet type selection, custom password, etc.)
 
 #### Quick setup path
