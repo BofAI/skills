@@ -24,7 +24,7 @@ This skill is **sign-only** — transaction building and broadcasting are out of
 
 ## Installation
 
-If `agent-wallet` is not installed, ask the user: **stable or beta version?**
+Run `agent-wallet --help` to check if the CLI is already installed. If the command is not found, ask the user: **stable or beta version?**
 
 ```bash
 # Node.js — stable

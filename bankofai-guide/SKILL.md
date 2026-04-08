@@ -23,7 +23,7 @@ This skill handles three onboarding flows. Jump directly to the relevant section
 **Steps:**
 
 1. Announce that skills installation is complete.
-2. Run `agent-wallet --version` to check if the CLI is installed.
+2. Run `agent-wallet --help` to check if the CLI is installed.
    - **Not installed** → inform the user that Agent Wallet CLI is required for wallet features, and ask if they want to install it now.
    - **User confirms** → ask whether to install stable or beta version:
      - **stable** → run `npm install -g @bankofai/agent-wallet`
