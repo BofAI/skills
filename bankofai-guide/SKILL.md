@@ -62,7 +62,7 @@ Present two options:
    ```
 3. Run `agent-wallet resolve-address default_local_secure -p '<generated-password>'` to get the addresses.
 4. Display EVM + TRON addresses clearly.
-5. Show the generated password to the user. Inform them that the password has been auto-saved to `~/.agent-wallet/runtime_secrets.json`, but they should also memorize or securely store the password — if runtime secrets are deleted, the password is needed to restore access.
+5. Show the generated password to the user. Explain that this password encrypts the wallet's private key stored locally — it is required to sign transactions, resolve addresses, or perform any wallet operation. Inform them that the password has been auto-saved to `~/.agent-wallet/runtime_secrets.json` for convenience, but they should also memorize or securely store the password — if runtime secrets are deleted, the password is the only way to restore access to the wallet.
 6. Guide the user to deposit USDT (TRC20) to the displayed address, and let them know they can come back for transfers or swaps after depositing.
 
 #### Detailed setup path
