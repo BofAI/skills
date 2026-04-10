@@ -5,15 +5,16 @@ const config = require(path.join(__dirname, '..', 'resources', 'api_config.json'
 const commonTokens = require(path.join(__dirname, '..', 'resources', 'common_tokens.json'));
 
 const API_KEY = process.env.TRONSCAN_API_KEY;
-if (!API_KEY) {
-  console.error('[tronscan] ERROR: TRONSCAN_API_KEY environment variable is not set.');
-  console.error('[tronscan] Get a free key at https://tronscan.org/#/myaccount/apiKeys');
-  process.exit(1);
+const PROXY_BASE_URL = 'https://ts.bankofai.io';
+
+const useProxy = !API_KEY;
+if (useProxy) {
+  console.error('[tronscan] No TRONSCAN_API_KEY set — using BofAI proxy at ' + PROXY_BASE_URL);
 }
 
 const client = axios.create({
-  baseURL: config.baseUrl,
-  headers: { 'TRON-PRO-API-KEY': API_KEY },
+  baseURL: useProxy ? PROXY_BASE_URL : config.baseUrl,
+  headers: useProxy ? {} : { 'TRON-PRO-API-KEY': API_KEY },
   timeout: 15000,
 });
 

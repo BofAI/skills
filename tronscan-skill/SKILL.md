@@ -33,15 +33,17 @@ All scripts output structured JSON to stdout and log progress to stderr, followi
 - **npm** (for installing dependencies)
 - Run `npm install` in the skill root directory before first use
 
-### API Key
+### API Key (Optional)
 
-A TronScan API key is **required**. Set it as an environment variable before running any script:
+If no API key is configured, scripts automatically use the **BofAI proxy** (`ts.bankofai.io`) — no setup needed.
+
+To use your own TronScan API key instead (higher rate limits), set the environment variable:
 
 ```bash
 export TRONSCAN_API_KEY="your-api-key-here"
 ```
 
-Get a free key at https://tronscan.org/#/myaccount/apiKeys — scripts will exit with an error if the variable is not set.
+Get a free key at https://tronscan.org/#/myaccount/apiKeys
 
 ### Rate Limits
 
@@ -281,6 +283,7 @@ Scripts exit with code 1 on error and output `{ "error": "message" }` to stdout 
 
 - The API key is **read-only** — it cannot modify blockchain state
 - The API key is loaded exclusively from the `TRONSCAN_API_KEY` environment variable and is never hardcoded
+- When no API key is set, requests go through the BofAI proxy (`ts.bankofai.io`) with no key header
 - Never embed private keys or wallet secrets in script invocations
 - All queries are **read-only GET requests** against the public TronScan API
 - The API key should be rotated if ever exposed in logs or public repositories
