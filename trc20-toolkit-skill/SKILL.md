@@ -21,6 +21,9 @@ Universal TRC20 token operations for AI agents on TRON. Check balances, transfer
 
 ## Quick Start
 
+> **Wallet required:** Run `agent-wallet list` first.  
+> If no wallets exist, invoke `bankofai-guide` (Section C — Wallet Guard) before proceeding.
+
 1. Install dependencies:
    ```bash
    cd trc20-toolkit-skill && npm install

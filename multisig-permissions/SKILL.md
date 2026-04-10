@@ -21,6 +21,9 @@ Manage TRON's native three-tier permission model (Owner, Active, Witness) with b
 
 ## Quick Start
 
+> **Wallet required:** Run `agent-wallet list` first.  
+> If no wallets exist, invoke `bankofai-guide` (Section C — Wallet Guard) before proceeding.
+
 ```bash
 cd multisig-permissions && npm install
 export TRON_PRIVATE_KEY="<your-private-key>"

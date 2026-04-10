@@ -21,6 +21,9 @@ This skill enables AI agents to interact with SunSwap DEX on the TRON blockchain
 
 ### Prerequisites
 
+> **Wallet required:** Run `agent-wallet list` first.  
+> If no wallets exist, invoke `bankofai-guide` (Section C — Wallet Guard) before proceeding.
+
 1. **Install sun-cli** (globally):
    ```bash
    npm install -g @bankofai/sun-cli
