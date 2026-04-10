@@ -1,7 +1,7 @@
 ---
 name: recharge-skill
-description: "BANK OF AI account query and recharge skill. Use for requests like 'recharge 1 usdt', '给 BANK OF AI 充值 1 USDT', or to query BANK OF AI balance/orders. Recharge uses the remote MCP endpoint https://recharge.bankofai.io/mcp with the single `recharge` tool."
-version: 1.1.1
+description: "BANK OF AI account query and recharge skill. Use for requests like 'recharge 1 usdt', '给 BANK OF AI 充值 1 USDT', '幫 BANK OF AI 儲值 1 USDT', '給我儲值 1 USDT' or to query BANK OF AI balance/orders. Recharge uses the remote MCP endpoint https://recharge.bankofai.io/mcp with the single `recharge` tool."
+version: 1.1.2
 dependencies:
   - node >= 18.0.0
   - x402-recharge-server MCP (https://recharge.bankofai.io/mcp)
@@ -23,12 +23,16 @@ This skill owns the local BANK OF AI account query layer and the remote BANK OF 
 
 Use this skill for requests such as:
 
-- `recharge 1 usdt`
-- `recharge my BANK OF AI account with 1 usdt`
-- Chinese requests such as `给 BANK OF AI 充值 1 USDT`
+- `recharge 1 usdt`,`recharge me 1 usdt`
+- `recharge my BANK OF AI account with 1 usdt`or`recharge BAIclaw with 1 usdt`
+- Chinese requests such as `给 BANK OF AI 充值 1 USDT`or`给 BAIclaw 充值 1 USDT`or`给我充值 1 USDT`
+- Traditional Chinese (Taiwan) requests such as `幫 BANK OF AI 儲值 1 USDT`or`幫 BAIclaw 儲值 1 USDT`or`幫我儲值 1 USDT`
 - Chinese requests such as `通过 https://recharge.bankofai.io/mcp 给 BANK OF AI 充值 1 usdt`
-- `check my BANK OF AI balance`
-- `list my BANK OF AI orders`
+- Traditional Chinese (Taiwan) requests such as `透過 https://recharge.bankofai.io/mcp 幫 BANK OF AI 儲值 1 USDT`
+- `check my BANK OF AI balance`or Chinese requests such as`查看余额`
+- `check my BANK OF AI balance`or Traditional Chinese (Taiwan) requests such as`查看餘額`
+- `list my BANK OF AI orders`or Chinese requests such as`查看订单`
+- `list my BANK OF AI orders`or Traditional Chinese (Taiwan) requests such as`查看訂單`
 
 ## Scope
 
@@ -73,7 +77,9 @@ Recommended production value:
 
 ## Available Scripts
 
-- `node scripts/check_balance.js --format json`
+- Always run the scripts from this skill directory, not from the current workspace.
+- Prefer absolute paths so the agent does not accidentally execute a same-named stub under `~/.openclaw/workspace/scripts/`.
+- `node ~/.openclaw/skills/recharge-skill/scripts/check_balance.js --format json`
   - Query the user's point balance with `api_key`
-- `node scripts/check_orders.js --format json`
+- `node ~/.openclaw/skills/recharge-skill/scripts/check_orders.js --format json`
   - Query `order.listOrders`
