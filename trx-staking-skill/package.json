@@ -1,0 +1,9 @@
+{
+  "name": "@bankofai/trx-staking-skill",
+  "version": "1.0.0",
+  "description": "TRX staking and Super Representative voting skill for AI agents",
+  "license": "MIT",
+  "private": true,
+  "engines": { "node": ">=18.0.0" },
+  "dependencies": { "tronweb": "^6.0.0" }
+}
