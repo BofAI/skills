@@ -1,0 +1,13 @@
+{
+  "name": "@bankofai/sunpump-skill",
+  "version": "1.0.0",
+  "description": "SunPump bonding-curve trading skill for AI agents on TRON",
+  "license": "MIT",
+  "private": true,
+  "engines": {
+    "node": ">=18.0.0"
+  },
+  "dependencies": {
+    "tronweb": "^6.0.0"
+  }
+}
