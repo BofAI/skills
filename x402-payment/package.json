@@ -14,6 +14,7 @@
     "typescript": "^5.9.3"
   },
   "dependencies": {
+    "@bankofai/agent-wallet": "^2.4.0",
     "@bankofai/x402": "0.5.9",
     "tronweb": "^6.0.0"
   }

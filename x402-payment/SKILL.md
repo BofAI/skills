@@ -47,6 +47,7 @@ This release is aligned with `@bankofai/x402@0.5.9`, including Exact V2-compatib
   - **Static mode (env)**: set exactly one of `AGENT_WALLET_PRIVATE_KEY` / `AGENT_WALLET_MNEMONIC`.
   - **Optional for mnemonic mode**: `AGENT_WALLET_MNEMONIC_ACCOUNT_INDEX`.
   - Configure a TRON wallet for TRC20 payments (USDT/USDD) and/or an EVM wallet for ERC20 payments (USDT/USDC).
+- **Signing Model**: This skill resolves signers through `agent-wallet`. It does not scan raw private keys from generic config files or unrelated MCP server configs.
 - **TronGrid API Key (optional)**: `TRON_GRID_API_KEY` is optional. Recommended on **Mainnet** to reduce rate-limit issues.
 - **GasFree (optional)**: GasFree credentials are now managed internally by the `@bankofai/x402` library. The tool will prefer the `exact_gasfree` scheme over `exact_permit`. GasFree requires an account that is **activated** with **sufficient token balance** in the GasFree wallet.
 - **Node.js**: Use **Node 20+** to match the minimum runtime required by `@bankofai/x402@0.5.9`.

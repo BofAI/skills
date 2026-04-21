@@ -48,6 +48,7 @@ recharge(amount="1", token="USDT")
 
 - The skill must not store or print the user's BANK OF AI API key.
 - Recharge uses the remote MCP endpoint; local scripts are only for balance and order queries.
+- Recharge requests are sent over HTTPS to `https://recharge.bankofai.io/mcp`. Users should verify that endpoint before configuring credentials, because the BANK OF AI API key is transmitted to that service for recharge operations.
 
 ## License
 

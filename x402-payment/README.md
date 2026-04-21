@@ -32,6 +32,8 @@ This skill is aligned with `@bankofai/x402@0.5.9`, including Exact V2-compatible
 - Optional `TRON_GRID_API_KEY` for TRON mainnet reliability
 - Optional `X402_DEBUG=1` for expanded debug output
 
+This skill uses `agent-wallet` as its signing source. It does not read raw private keys from shared MCP config files.
+
 ## Usage Examples
 
 ### Check Wallet Resolution

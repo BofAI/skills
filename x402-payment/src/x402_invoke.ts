@@ -21,16 +21,6 @@ interface ResolvedWallet {
 // If this key is ever used to sign, it will produce valid signatures for a known public address.
 const TRONWEB_READONLY_DUMMY_KEY = '0000000000000000000000000000000000000000000000000000000000000001';
 
-function normalizePrivateKey(type: WalletNetwork, key: string): string {
-  if (type === 'tron' && key.startsWith('0x')) return key.slice(2);
-  return key;
-}
-
-function privateKeyToBytes(key: string): Uint8Array {
-  const normalized = key.startsWith('0x') ? key.slice(2) : key;
-  return Uint8Array.from(Buffer.from(normalized, 'hex'));
-}
-
 function isTronAddress(address: string): boolean {
   return /^T[1-9A-HJ-NP-Za-km-z]{33}$/.test(address);
 }
@@ -98,57 +88,6 @@ async function resolveAgentWallet(network: WalletNetwork): Promise<ResolvedWalle
   } catch (_) {
     return undefined;
   }
-}
-
-async function findPrivateKey(type: WalletNetwork): Promise<string | undefined> {
-  if (type === 'tron') {
-    if (process.env.TRON_PRIVATE_KEY) return normalizePrivateKey('tron', process.env.TRON_PRIVATE_KEY);
-  } else {
-    if (process.env.EVM_PRIVATE_KEY) return normalizePrivateKey('eip155', process.env.EVM_PRIVATE_KEY);
-    if (process.env.ETH_PRIVATE_KEY) return normalizePrivateKey('eip155', process.env.ETH_PRIVATE_KEY);
-  }
-  if (process.env.PRIVATE_KEY) return normalizePrivateKey(type, process.env.PRIVATE_KEY);
-  if (process.env.AGENT_WALLET_PRIVATE_KEY) return normalizePrivateKey(type, process.env.AGENT_WALLET_PRIVATE_KEY);
-
-  const configFiles = [
-    path.join(process.cwd(), 'x402-config.json'),
-    path.join(os.homedir(), '.x402-config.json'),
-  ];
-
-  for (const file of configFiles) {
-    if (!fs.existsSync(file)) continue;
-    try {
-      const config = JSON.parse(fs.readFileSync(file, 'utf8'));
-      if (type === 'tron') {
-        const key = config.tron_private_key || config.private_key;
-        if (key) return normalizePrivateKey('tron', key);
-      } else {
-        const key = config.evm_private_key || config.eth_private_key || config.private_key;
-        if (key) return normalizePrivateKey('eip155', key);
-      }
-    } catch (_) {
-      // ignore malformed optional config
-    }
-  }
-
-  const mcporterPath = path.join(os.homedir(), '.mcporter', 'mcporter.json');
-  if (fs.existsSync(mcporterPath)) {
-    try {
-      const config = JSON.parse(fs.readFileSync(mcporterPath, 'utf8'));
-      for (const serverName of Object.keys(config.mcpServers || {})) {
-        const env = config.mcpServers?.[serverName]?.env || {};
-        if (type === 'tron' && env.TRON_PRIVATE_KEY) return normalizePrivateKey('tron', env.TRON_PRIVATE_KEY);
-        if (type === 'eip155' && (env.EVM_PRIVATE_KEY || env.ETH_PRIVATE_KEY)) {
-          return normalizePrivateKey('eip155', env.EVM_PRIVATE_KEY || env.ETH_PRIVATE_KEY);
-        }
-        if (env.PRIVATE_KEY) return normalizePrivateKey(type, env.PRIVATE_KEY);
-      }
-    } catch (_) {
-      // ignore malformed optional config
-    }
-  }
-
-  return undefined;
 }
 
 async function findApiKey(): Promise<string | undefined> {
@@ -501,7 +440,6 @@ async function main() {
     SufficientBalancePolicy,
     getChainId,
   } = await import('@bankofai/x402');
-  const { LocalSigner } = await import('@bankofai/agent-wallet');
   let tronSigner: InstanceType<typeof TronClientSigner> | undefined;
   try {
     tronSigner = await TronClientSigner.create();
@@ -513,19 +451,6 @@ async function main() {
     const message = err?.message || err;
     console.warn(`[x402] No TRON signer available: ${message}`);
     tronSigner = undefined;
-  }
-  if (!tronSigner) {
-    const tronKey = await findPrivateKey('tron');
-    if (tronKey) {
-      try {
-        const wallet = new LocalSigner(privateKeyToBytes(tronKey), 'tron:nile');
-        tronSigner = new TronClientSigner(wallet);
-        tronSigner.setAddress(await wallet.getAddress());
-        debug('tronSignerFallback', tronSigner.getAddress());
-      } catch (err: any) {
-        console.warn(`[x402] TRON private-key fallback failed: ${err?.message || err}`);
-      }
-    }
   }
 
   let evmSigner: InstanceType<typeof EvmClientSigner> | undefined;
@@ -539,19 +464,6 @@ async function main() {
     const message = err?.message || err;
     console.warn(`[x402] No EVM signer available: ${message}`);
     evmSigner = undefined;
-  }
-  if (!evmSigner) {
-    const evmKey = await findPrivateKey('eip155');
-    if (evmKey) {
-      try {
-        const wallet = new LocalSigner(privateKeyToBytes(evmKey), 'eip155:97');
-        evmSigner = new EvmClientSigner(wallet);
-        evmSigner.setAddress(await wallet.getAddress());
-        debug('evmSignerFallback', evmSigner.getAddress());
-      } catch (err: any) {
-        console.warn(`[x402] EVM private-key fallback failed: ${err?.message || err}`);
-      }
-    }
   }
   const apiKey = await findApiKey();
 
