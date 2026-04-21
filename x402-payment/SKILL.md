@@ -1,7 +1,7 @@
 ---
 name: x402-payment
 description: "Pay for x402-enabled Agent endpoints using ERC20 tokens (USDT/USDC) on EVM or TRC20 tokens (USDT/USDD) on TRON."
-version: 1.5.7
+version: 1.5.8
 author: bankofai
 homepage: https://bankofai.io
 tags: [crypto, payments, x402, agents, api, usdt, usdd, usdc, tron, ethereum, evm, erc20, trc20]
@@ -35,6 +35,8 @@ Invoke x402-enabled AI agent endpoints with automatic token payments on both TRO
 
 The `x402-payment` skill enables agents to interact with paid API endpoints. When an agent receives a `402 Payment Required` response, this skill handles the negotiation, signing, and execution of the payment using the `x402_invoke` tool.
 
+This release is aligned with `@bankofai/x402@0.5.9`, including Exact V2-compatible payload generation for EVM and TRON.
+
 ## Prerequisites
 
 > **Wallet required:** Run `agent-wallet list` first.  
@@ -47,6 +49,7 @@ The `x402-payment` skill enables agents to interact with paid API endpoints. Whe
   - Configure a TRON wallet for TRC20 payments (USDT/USDD) and/or an EVM wallet for ERC20 payments (USDT/USDC).
 - **TronGrid API Key (optional)**: `TRON_GRID_API_KEY` is optional. Recommended on **Mainnet** to reduce rate-limit issues.
 - **GasFree (optional)**: GasFree credentials are now managed internally by the `@bankofai/x402` library. The tool will prefer the `exact_gasfree` scheme over `exact_permit`. GasFree requires an account that is **activated** with **sufficient token balance** in the GasFree wallet.
+- **Node.js**: Use **Node 20+** to match the minimum runtime required by `@bankofai/x402@0.5.9`.
 - **Dependencies**: Run `npm install` in the `x402-payment/` directory before first use.
 - `TRON_GRID_API_KEY` can also be set in `x402-config.json`.
 

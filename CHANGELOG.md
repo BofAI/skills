@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.5.8] - 2026-04-21
+
+### Improvements
+- **x402-payment**: Bumped `@bankofai/x402` from `0.5.8` to `0.5.9`.
+- **x402-payment**: Declared `Node.js >=20` in `package.json` to match the upstream SDK runtime requirement.
+- **README**: Updated the root skill catalog to reflect the current `origin/main` skill set and added missing per-skill README files.
+
 ## [1.5.7] - 2026-04-02
 
 ### Improvements

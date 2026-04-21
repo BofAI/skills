@@ -26,6 +26,8 @@ A curated collection of practical, DeFi-focused utility skills developed by the 
   - [AI & Account Recharge](#ai--account-recharge)
   - [Security & Permissions](#security--permissions)
   - [Data & Analytics](#data--analytics)
+  - [Guides & Onboarding](#guides--onboarding)
+  - [Skill Docs](#skill-docs)
 - [Usage Tips](#usage-tips)
   - [Explicit Invocation](#explicit-invocation)
   - [Implicit Triggering](#implicit-triggering)
@@ -57,26 +59,48 @@ Some skills require wallet signature operations and are built on Agent Wallet. B
 
 ### DeFi & DEX
 
-- [**sunswap**](./sunswap) - SunSwap DEX integration for TRON via `sun-cli`. Supports price quotes, token swaps, liquidity and pool operations.
-- [**sunperp-skill**](./sunperp-skill) - SunPerp perpetual futures trading skill for TRON. Supports market data, account queries, order placement, and position management.
+- [**sunswap**](./sunswap) - SunSwap DEX integration for TRON via `sun-cli`. Supports price quotes, token swaps, liquidity and pool operations. See [README](./sunswap/README.md).
+- [**sunperp-skill**](./sunperp-skill) - SunPerp perpetual futures trading skill for TRON. Supports market data, account queries, order placement, and position management. See [README](./sunperp-skill/README.md).
 
 ### Payments & x402
 
-- [**x402-payment**](./x402-payment) - Professional x402 payment protocol for calling paid APIs and agent resources.
+- [**x402-payment**](./x402-payment) - x402 payment skill for calling paid APIs and agent resources across TRON and EVM. Aligned with `@bankofai/x402@0.5.9`. See [README](./x402-payment/README.md).
 
 ### AI & Account Recharge
 
-- [**recharge-skill**](./recharge-skill) - BANK OF AI account recharge and account query skill. Uses the remote MCP recharge service for supported payment flows.
+- [**recharge-skill**](./recharge-skill) - BANK OF AI account recharge and account query skill. Uses the remote MCP recharge service for supported payment flows. See [README](./recharge-skill/README.md).
 
 ### Security & Permissions
 
-- [**agent-wallet**](./agent-wallet) - Wallet management and signing skill for creating wallets, switching active wallets, resolving addresses, and signing transactions or messages on EVM and TRON.
-- [**multisig-permissions**](./multisig-permissions) - TRON native account permission and multi-signature workflow skill. Supports permission inspection, template-based updates, proposal creation, co-signing, review, and execution.
+- [**agent-wallet**](./agent-wallet) - Wallet management and signing skill for creating wallets, switching active wallets, resolving addresses, and signing transactions or messages on EVM and TRON. See [README](./agent-wallet/README.md).
+- [**multisig-permissions**](./multisig-permissions) - TRON native account permission and multi-signature workflow skill. Supports permission inspection, template-based updates, proposal creation, co-signing, review, and execution. See [README](./multisig-permissions/README.md).
 
 ### Data & Analytics
 
-- [**tronscan-skill**](./tronscan-skill) - Comprehensive TRON blockchain data lookup via TronScan API. Supports accounts, transactions, tokens, blocks, and network-wide statistics.
-- [**trc20-toolkit-skill**](./trc20-toolkit-skill) - Universal TRC20 token toolkit for TRON. Supports metadata lookup, balance checks, transfers, and allowance management.
+- [**tronscan-skill**](./tronscan-skill) - Comprehensive TRON blockchain data lookup via TronScan API. Supports accounts, transactions, tokens, blocks, and network-wide statistics. See [README](./tronscan-skill/README.md).
+- [**trc20-toolkit-skill**](./trc20-toolkit-skill) - Universal TRC20 token toolkit for TRON. Supports metadata lookup, balance checks, transfers, and allowance management. See [README](./trc20-toolkit-skill/README.md).
+- [**trx-staking-skill**](./trx-staking-skill) - TRX staking workflow skill for Tron Power, vote delegation, reward queries, and SR operations. See [README](./trx-staking-skill/README.md).
+- [**usdd-skill**](./usdd-skill) - USDD toolkit for balance checks, PSM inspection, swaps, and vault information. See [README](./usdd-skill/README.md).
+
+### Guides & Onboarding
+
+- [**bankofai-guide**](./bankofai-guide) - Onboarding and wallet-guard guide for post-install setup and first wallet creation. See [README](./bankofai-guide/README.md).
+
+### Skill Docs
+
+Each current skill now has its own README for quick discovery:
+
+- [agent-wallet/README.md](./agent-wallet/README.md)
+- [bankofai-guide/README.md](./bankofai-guide/README.md)
+- [multisig-permissions/README.md](./multisig-permissions/README.md)
+- [recharge-skill/README.md](./recharge-skill/README.md)
+- [sunperp-skill/README.md](./sunperp-skill/README.md)
+- [sunswap/README.md](./sunswap/README.md)
+- [trc20-toolkit-skill/README.md](./trc20-toolkit-skill/README.md)
+- [tronscan-skill/README.md](./tronscan-skill/README.md)
+- [trx-staking-skill/README.md](./trx-staking-skill/README.md)
+- [usdd-skill/README.md](./usdd-skill/README.md)
+- [x402-payment/README.md](./x402-payment/README.md)
 
 ---
 
