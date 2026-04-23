@@ -52,6 +52,18 @@ Keys are numbered positionally across all roles in the template (owner first, th
 | `team-tiered` | `--key1`..`--key5` (owner keys, first 3 reused in active) | 3-of-5 owner, 2-of-3 active for daily ops |
 | `weighted-authority` | `--key1` PRIMARY (wt 2), `--key2`..`--key3` SECONDARY (wt 1) | Primary key has extra weight |
 
+## Important: Wait for On-Chain Confirmation After Permission Updates
+
+After running `update.js` to change account permissions, the new permission state is **not immediately available on-chain**. You must wait for the transaction to be confirmed and the node to reflect the updated state before creating proposals with `propose.js`.
+
+**Before creating any proposal after a permission update:**
+
+1. Run `node scripts/status.js` and verify the output shows the new keys, weights, and thresholds.
+2. If `status.js` still shows the old permissions, wait 10–30 seconds and check again.
+3. Only proceed with `propose.js` once `status.js` confirms the expected permission configuration.
+
+Skipping this step can cause `propose.js` to build transactions against stale permission data (wrong threshold, missing signers), which will fail at execution time.
+
 ## Demo: Hybrid Signature Workflow (Human + Agent)
 
 This walkthrough demonstrates a 2-of-2 multi-sig setup where **Key A** is held by a human and **Key B** is held by the agent. The agent initiates a TRX transfer proposal, and the human reviews and co-signs it before broadcast.
