@@ -1,0 +1,110 @@
+# SunPump Skill
+
+Trade meme tokens on **SunPump** and query token info, rankings, holders, portfolios, and trade history via `sun-cli`.
+
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](../LICENSE)
+[![TRON](https://img.shields.io/badge/Blockchain-TRON-red)](https://tron.network/)
+
+## Quick Start
+
+**Instructions**: Read [SKILL.md](SKILL.md) for complete usage instructions.
+
+## Approach
+
+This skill uses **sun-cli** (`@bankofai/sun-cli`) — a unified CLI for SUN.IO / SunSwap / SunPump on TRON. Trading auto-routes by token state: pre-launch (bonding curve) tokens go through `sun sunpump buy/sell`, post-launch (migrated to DEX) tokens go through `sun swap`. All SunPump data is read through the `sun sunpump *` subcommands with `--json` output for AI agent consumption.
+
+## Files
+
+- **[SKILL.md](SKILL.md)** - Complete skill documentation
+- **[CHANGELOG.md](CHANGELOG.md)** - Version history
+
+## Prerequisites
+
+```bash
+npm install -g @bankofai/sun-cli
+```
+
+A wallet (via `TRON_PRIVATE_KEY`, `TRON_MNEMONIC`, or `AGENT_WALLET_PASSWORD`) is required **only for trading**. All SunPump read endpoints work without one.
+
+## Networks
+
+| Network | API Host |
+|---------|----------|
+| **mainnet** (default) | `https://api-v2.sunpump.meme/pump-api` |
+| **nile** (testnet) | `https://tn-api.sunpump.meme/pump-api` |
+
+> Shasta is **not** supported by the SunPump API.
+
+## Feature Summary
+
+| # | Feature | Command |
+|---|---------|---------|
+| 1 | Post-launch buy / sell | `sun --json --yes swap <tokenIn> <tokenOut> <amount>` |
+| 2 | Pre-launch buy / sell | `sun --json --yes sunpump buy <addr> --trx <n>` · `sun --json --yes sunpump sell <addr> --amount <n>` |
+| 3 | Token state (route picker) | `sun --json sunpump state <contractAddress>` |
+| 4 | User position check | `sun --json sunpump portfolio <walletAddress>` |
+| 5 | Trade history | `sun --json sunpump tx user <walletAddress> --size 20` |
+| 6 | Token info | `sun --json sunpump token get <contractAddress>` |
+| 7 | Ranking | `sun --json sunpump token ranking --type MARKET_CAP --size 10` |
+| 8 | Top holders | `sun --json sunpump token holders <contractAddress> --size 20` |
+
+Ranking types: `MARKET_CAP`, `VOLUME_24H`, `PRICE_CHANGE_24H`.
+
+State values: `0 NOT_EXIST`, `1 TRADING`, `2 READY_TO_LAUNCH`, `3 LAUNCHED`.
+
+## Usage Examples
+
+### Buy a meme token (auto-routes pre/post-launch)
+```bash
+sun --json sunpump state TXYZ...                          # decide trade path
+sun --json sunpump token get TXYZ...                      # show metadata + holders
+
+# Pre-launch (state == 1 or 2):
+sun --json sunpump quote-buy TXYZ... --trx 10
+sun --json --yes sunpump buy TXYZ... --trx 10
+
+# Post-launch (state == 3):
+sun --json swap:quote TRX TXYZ... 100000000
+sun --json --yes swap TRX TXYZ... 100000000 --slippage 0.01
+```
+
+### Sell a position (auto-routes pre/post-launch)
+```bash
+sun --json sunpump portfolio T... --min-trx 1 --size 50
+sun --json sunpump state TXYZ...
+
+# Pre-launch:
+sun --json --yes sunpump sell TXYZ... --amount 1000 --decimals 18
+
+# Post-launch:
+sun --json --yes swap TXYZ... TRX <amount> --slippage 0.02
+```
+
+### Research a token
+```bash
+sun --json sunpump token ranking --type PRICE_CHANGE_24H --size 10
+sun --json sunpump token get TXYZ...
+sun --json sunpump token holders TXYZ... --size 20
+```
+
+### Audit a wallet
+```bash
+sun --json sunpump portfolio T... --sort valueInTrx,desc --size 50
+sun --json sunpump tx user T... --size 20
+```
+
+## Dependencies
+
+- `@bankofai/sun-cli` (installed globally)
+
+## Version
+
+1.1.0 (2026-05-20) — adds pre-launch bonding-curve trading (`sun sunpump buy/sell/quote-buy/quote-sell/state`)
+
+1.0.0 (2026-05-20) — initial release
+
+See [CHANGELOG.md](CHANGELOG.md) for history.
+
+## License
+
+MIT - see [LICENSE](../LICENSE) for details.
