@@ -1,7 +1,7 @@
 ---
 name: SunPump Meme Token Toolkit
 description: Trade meme tokens on SunPump — both pre-launch (bonding curve via `sun sunpump buy/sell`) and post-launch (SunSwap via `sun swap`) — and query token info, rankings, holders, portfolios, and trade history.
-version: 1.1.0
+version: 1.1.1
 dependencies:
   - "@bankofai/sun-cli"
 tags:
@@ -41,18 +41,31 @@ Always call `sun sunpump state <addr>` or `sun sunpump token get <addr>` first t
 > If no wallets exist, invoke `bankofai-guide` (Section C — Wallet Guard) before proceeding.
 > All read-only SunPump queries (portfolio, tx history, token info, ranking, holders) work without a wallet.
 
-1. **Install sun-cli** (globally):
+1. **Install this skill** (once, picked up by Claude Code / Cursor / Codex):
    ```bash
-   npm install -g @bankofai/sun-cli
+   # After PR is merged to main:
+   npx skills add BofAI/skills --skill sunpump-agent-skill -g -a claude-code -y
+
+   # Pre-merge (branch-pinned):
+   npx skills add https://github.com/BofAI/skills/tree/sunpump-add/sunpump-agent-skill -g -a claude-code -y
+   ```
+   If Claude Code can't see it after a global install, symlink (vercel-labs/skills [#851](https://github.com/vercel-labs/skills/issues/851)):
+   ```bash
+   ln -s ~/.agents/skills/sunpump-agent-skill ~/.claude/skills/sunpump-agent-skill
    ```
 
-2. **Configure wallet** (required for write commands — `sun swap`, `sun sunpump buy`, `sun sunpump sell`):
+2. **Install sun-cli** (≥ 1.2.0 required — earlier versions lack `sunpump buy/sell/state`):
+   ```bash
+   npm install -g @bankofai/sun-cli@^1.2.0
+   ```
+
+3. **Configure wallet** (required for write commands — `sun swap`, `sun sunpump buy`, `sun sunpump sell`):
    ```bash
    export TRON_PRIVATE_KEY="your_private_key_here"
    ```
    Alternative wallet sources: `TRON_MNEMONIC` or `AGENT_WALLET_PASSWORD`.
 
-3. **Optional environment variables:**
+4. **Optional environment variables:**
    ```bash
    export TRON_NETWORK=mainnet         # mainnet | nile
    export TRONGRID_API_KEY=your_key

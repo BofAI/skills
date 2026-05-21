@@ -2,6 +2,17 @@
 
 All notable changes to the SunPump skill will be documented in this file.
 
+## [1.1.1] - 2026-05-21
+
+### Docs
+
+- README and SKILL.md now document how to install the skill itself with
+  `npx skills add` (vercel-labs/skills CLI), including monorepo `--skill` selection,
+  branch-pinned tree-URL form for pre-merge installs, and the
+  [vercel-labs/skills#851](https://github.com/vercel-labs/skills/issues/851)
+  symlink workaround for `-g -a claude-code`.
+- Pinned the runtime CLI requirement to `@bankofai/sun-cli@^1.2.0`.
+
 ## [1.1.0] - 2026-05-20
 
 ### Added

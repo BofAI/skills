@@ -18,13 +18,49 @@ This skill uses **sun-cli** (`@bankofai/sun-cli`) — a unified CLI for SUN.IO /
 - **[SKILL.md](SKILL.md)** - Complete skill documentation
 - **[CHANGELOG.md](CHANGELOG.md)** - Version history
 
-## Prerequisites
+## Install
+
+Two pieces — the skill (loaded by Claude Code / Cursor / Codex) and the runtime CLI it shells out to.
+
+### 1. Install this skill
+
+Once this PR is merged to `main`:
 
 ```bash
-npm install -g @bankofai/sun-cli
+npx skills add BofAI/skills --skill sunpump-agent-skill -g -a claude-code -y
 ```
 
-A wallet (via `TRON_PRIVATE_KEY`, `TRON_MNEMONIC`, or `AGENT_WALLET_PASSWORD`) is required **only for trading**. All SunPump read endpoints work without one.
+Before the merge (branch-pinned):
+
+```bash
+npx skills add https://github.com/BofAI/skills/tree/sunpump-add/sunpump-agent-skill -g -a claude-code -y
+```
+
+> **Known bug** ([vercel-labs/skills#851](https://github.com/vercel-labs/skills/issues/851)) — `-g -a claude-code` installs to `~/.agents/skills/` but does **not** create the `~/.claude/skills/` symlink Claude Code reads from. Workaround:
+> ```bash
+> ln -s ~/.agents/skills/sunpump-agent-skill ~/.claude/skills/sunpump-agent-skill
+> ```
+
+Flag reference: `--skill <name>` (pick one skill from a monorepo) · `-a claude-code` (agent scope) · `-g` (global, not project) · `-y` (skip prompts) · `--list` (list skills in the repo).
+
+### 2. Install the runtime CLI
+
+```bash
+npm install -g @bankofai/sun-cli@^1.2.0
+```
+
+`@bankofai/sun-cli >= 1.2.0` is required (earlier versions lack `sun sunpump buy/sell/state`). The skills CLI does **not** auto-install npm dependencies.
+
+### 3. Configure a wallet (only for write commands)
+
+A wallet (`TRON_PRIVATE_KEY`, `TRON_MNEMONIC`, or `AGENT_WALLET_PASSWORD`) is required only for `sun swap` / `sun sunpump buy` / `sun sunpump sell`. All read endpoints work without one.
+
+### Verify
+
+```bash
+ls -l ~/.claude/skills/sunpump-agent-skill   # directory or symlink present
+sun sunpump --help                            # runtime CLI exposes buy/sell/state
+```
 
 ## Networks
 
@@ -98,6 +134,8 @@ sun --json sunpump tx user T... --size 20
 - `@bankofai/sun-cli` (installed globally)
 
 ## Version
+
+1.1.1 (2026-05-21) — docs: install via `npx skills add`, pin sun-cli ≥ 1.2.0
 
 1.1.0 (2026-05-20) — adds pre-launch bonding-curve trading (`sun sunpump buy/sell/quote-buy/quote-sell/state`)
 
