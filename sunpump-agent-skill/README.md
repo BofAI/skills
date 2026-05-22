@@ -24,8 +24,6 @@ Two pieces — the skill (loaded by Claude Code / Cursor / Codex) and the runtim
 
 ### 1. Install this skill
 
-Once this PR is merged to `main`:
-
 ```bash
 npx skills add BofAI/skills 
 ```
@@ -43,12 +41,6 @@ npm install -g @bankofai/sun-cli@^1.2.0
 
 A wallet (`TRON_PRIVATE_KEY`, `TRON_MNEMONIC`, or `AGENT_WALLET_PASSWORD`) is required only for `sun swap` / `sun sunpump buy` / `sun sunpump sell`. All read endpoints work without one.
 
-### Verify
-
-```bash
-ls -l ~/.claude/skills/sunpump-agent-skill   # directory or symlink present
-sun sunpump --help                            # runtime CLI exposes buy/sell/state
-```
 
 ## Network
 

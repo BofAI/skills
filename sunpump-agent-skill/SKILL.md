@@ -43,16 +43,9 @@ Always call `sun sunpump state <addr>` or `sun sunpump token get <addr>` first t
 
 1. **Install this skill** (once, picked up by Claude Code / Cursor / Codex):
    ```bash
-   # After PR is merged to main:
-   npx skills add BofAI/skills --skill sunpump-agent-skill -g -a claude-code -y
+   npx skills add BofAI/skills
+   ```
 
-   # Pre-merge (branch-pinned):
-   npx skills add https://github.com/BofAI/skills/tree/sunpump-add/sunpump-agent-skill -g -a claude-code -y
-   ```
-   If Claude Code can't see it after a global install, symlink (vercel-labs/skills [#851](https://github.com/vercel-labs/skills/issues/851)):
-   ```bash
-   ln -s ~/.agents/skills/sunpump-agent-skill ~/.claude/skills/sunpump-agent-skill
-   ```
 
 2. **Install sun-cli** (≥ 1.2.0 required — earlier versions lack `sunpump buy/sell/state`):
    ```bash
