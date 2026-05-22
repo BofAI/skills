@@ -27,21 +27,9 @@ Two pieces — the skill (loaded by Claude Code / Cursor / Codex) and the runtim
 Once this PR is merged to `main`:
 
 ```bash
-npx skills add BofAI/skills --skill sunpump-agent-skill -g -a claude-code -y
+npx skills add BofAI/skills 
 ```
 
-Before the merge (branch-pinned):
-
-```bash
-npx skills add https://github.com/BofAI/skills/tree/sunpump-add/sunpump-agent-skill -g -a claude-code -y
-```
-
-> **Known bug** ([vercel-labs/skills#851](https://github.com/vercel-labs/skills/issues/851)) — `-g -a claude-code` installs to `~/.agents/skills/` but does **not** create the `~/.claude/skills/` symlink Claude Code reads from. Workaround:
-> ```bash
-> ln -s ~/.agents/skills/sunpump-agent-skill ~/.claude/skills/sunpump-agent-skill
-> ```
-
-Flag reference: `--skill <name>` (pick one skill from a monorepo) · `-a claude-code` (agent scope) · `-g` (global, not project) · `-y` (skip prompts) · `--list` (list skills in the repo).
 
 ### 2. Install the runtime CLI
 
