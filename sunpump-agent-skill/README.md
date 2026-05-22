@@ -16,7 +16,6 @@ This skill uses **sun-cli** (`@bankofai/sun-cli`) — a unified CLI for SUN.IO /
 ## Files
 
 - **[SKILL.md](SKILL.md)** - Complete skill documentation
-- **[CHANGELOG.md](CHANGELOG.md)** - Version history
 
 ## Install
 
@@ -120,7 +119,6 @@ sun --json sunpump tx user T... --size 20
 
 1.0.0 (2026-05-20) — initial release
 
-See [CHANGELOG.md](CHANGELOG.md) for history.
 
 ## License
 
