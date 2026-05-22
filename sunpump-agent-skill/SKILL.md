@@ -1,7 +1,7 @@
 ---
 name: SunPump Meme Token Toolkit
 description: Trade meme tokens on SunPump — both pre-launch (bonding curve via `sun sunpump buy/sell`) and post-launch (SunSwap via `sun swap`) — and query token info, rankings, holders, portfolios, and trade history.
-version: 1.1.1
+version: 1.2.0
 dependencies:
   - "@bankofai/sun-cli"
 tags:
@@ -67,7 +67,7 @@ Always call `sun sunpump state <addr>` or `sun sunpump token get <addr>` first t
 
 4. **Optional environment variables:**
    ```bash
-   export TRON_NETWORK=mainnet         # mainnet | nile
+   export TRON_NETWORK=mainnet         # SunPump is mainnet only
    export TRONGRID_API_KEY=your_key
    export SUNPUMP_API_BASE_URL=...     # override the API host if needed
    ```
@@ -84,7 +84,7 @@ Always use these flags when calling `sun` from an AI agent:
 | `--yes` | Skip interactive confirmation prompts (write commands only) |
 | `--dry-run` | Simulate write operations without sending transactions |
 | `--fields` | Limit output to specific comma-separated fields |
-| `--network` | Override network: `mainnet` (default) or `nile` |
+| `--network` | Must be `mainnet` for SunPump — any other value is rejected fast |
 
 Standard agent invocation pattern (read-only):
 
@@ -98,10 +98,10 @@ Write operation (swap) with explicit confirmation skip:
 sun --json --yes swap TRX TXYZ... 100000000
 ```
 
-> **WARNING: `--network` for SunPump only accepts `mainnet` or `nile`.**
-> SunPump's nile testnet endpoint is `https://tn-api.sunpump.meme/pump-api`.
-> Mainnet is `https://api-v2.sunpump.meme/pump-api`.
-> The shasta network has no SunPump API — do not pass `--network shasta` to `sunpump` subcommands.
+> **WARNING: SunPump is mainnet only.**
+> Endpoint: `https://api-v2.sunpump.meme/pump-api`. The CLI throws
+> `SunPump is only available on mainnet (got "...")` for any other `--network` value
+> (including `nile` and `shasta`). Drop `--network` or pass `--network mainnet`.
 
 ---
 
@@ -225,16 +225,11 @@ sun --json --yes --dry-run sunpump sell TXYZ... --amount 1000
 
 Prints the resolved parameters (TRX/Sun scaling, computed `minOut`, slippage, network) without broadcasting. Useful for showing the user exactly what will be sent.
 
-#### Network selection
+#### Network
 
-Pre-launch trading works on **mainnet** and **nile** testnet:
-
-```bash
-sun --network nile sunpump quote-buy TXYZ... --trx 1                    # nile testnet
-sun --network nile --yes sunpump buy TXYZ... --trx 1
-```
-
-Mainnet router: `TTfvyrAz86hbZk5iDpKD78pqLGgi8C7AAw`. Nile router: `TLtTyEwqacNKc5CHLunKvxmqLB336R4Lrm`.
+SunPump is **mainnet only**. The CLI rejects any non-mainnet `--network` value with
+`SunPump is only available on mainnet (got "...")`. Router contract:
+`TTfvyrAz86hbZk5iDpKD78pqLGgi8C7AAw`.
 
 ---
 
@@ -448,7 +443,7 @@ sun --json sunpump state <memeTokenAddress>
 
 4. **Validate slippage** is in range 0.005–0.10 (0.5%–10%). Default is 5%, which suits meme tokens; reject anything outside this band without user confirmation.
 
-5. **Validate `--network`** is `mainnet` or `nile`. Shasta is not supported.
+5. **`--network` must be `mainnet`.** The CLI throws immediately on any other value.
 
 ### Before `sun swap` (post-launch path)
 
@@ -468,7 +463,7 @@ sun --json sunpump state <memeTokenAddress>
 
 4. **Validate slippage is reasonable.** Meme tokens often need 1–5% slippage; flag anything outside 0.001 (0.1%) – 0.10 (10%) for review.
 
-5. **Validate `--network`** is `mainnet` or `nile`. Other values silently fall back to mainnet.
+5. **Validate `--network`**. `sun swap` accepts `mainnet` / `nile` / `shasta` for general TRC20 pairs, but SunPump-migrated tokens are still mainnet-only — check the migration target before quoting on a non-mainnet network.
 
 ### Before Read-Only Calls
 
@@ -670,12 +665,10 @@ Swap completed.
 | `sunpump quote-buy/sell` ignores state | `sunpump quote-*` | Returns a price even on LAUNCHED tokens (quote-sell may revert) | Always call `sunpump state` before quoting |
 | sun-kit enum mislabels state 2 vs 3 | `sunpump.buyToken/sellToken` internal check | TS enum says `LAUNCHED=2` but contract returns 3 for launched | CLI relabels: trust the printed `LAUNCHED (3)` label, not raw int |
 | First sell needs TRC20 approve | `sunpump sell` | Two on-chain txs (approve + sell), only sell tx hash returned | Expected; subsequent sells use cached `MaxUint256` allowance |
-| Invalid `--network` silently falls back | All commands | Unknown values use mainnet | Only pass `mainnet` or `nile` |
+| SunPump is mainnet only | All `sunpump` subcommands | CLI throws `SunPump is only available on mainnet` on any other `--network` | Drop `--network` or pass `--network mainnet`; the nile/shasta API hosts aren't publicly reachable |
 | Invalid `--type` for ranking | `token ranking` | API rejects with non-obvious error | Only pass `MARKET_CAP`, `VOLUME_24H`, or `PRICE_CHANGE_24H` |
-| `--start-time` / `--end-time` are seconds, not ms | `tx user`, `tx token`, `kline *` | Ms values produce empty results | Use epoch seconds |
+| `--start-time` / `--end-time` are seconds, not ms | `tx user`, `tx token` | Ms values produce empty results | Use epoch seconds |
 | `percent` field magnitude differs by endpoint | `token holders` vs `token list` | Holders endpoint returns 38.51, list endpoint returns 0.3851 | The CLI normalizes, but check magnitude when consuming raw JSON |
-| Shasta unsupported | All `sunpump` subcommands | No API host on shasta | Use `mainnet` or `nile` only |
-| Ticker server cap | `tx ticker` | Server caps at ~15 rows regardless of N | Use `tx token` / `tx user` for larger history |
 
 ---
 
@@ -708,10 +701,10 @@ Set one of `TRON_PRIVATE_KEY`, `TRON_MNEMONIC`, or `AGENT_WALLET_PASSWORD`. Read
 ### Network error / timeout
 - Check internet
 - For mainnet, set `TRONGRID_API_KEY`
-- Try the nile testnet: `--network nile`
+- SunPump itself is mainnet-only — testnet API host is internal-only and not publicly reachable
 
 ---
 
-**Version**: 1.1.0 (sun-cli ≥ 1.2.0)
-**Last Updated**: 2026-05-20
+**Version**: 1.2.0 (drops nile testnet — SunPump is now mainnet-only)
+**Last Updated**: 2026-05-22
 **Maintainer**: Bank of AI Team

@@ -2,6 +2,37 @@
 
 All notable changes to the SunPump skill will be documented in this file.
 
+## [1.2.0] - 2026-05-22
+
+### Breaking
+
+- **Dropped nile testnet support.** The SunPump nile API host
+  (`https://tn-api.sunpump.meme/pump-api`) is internal-only and not publicly
+  reachable, so the runtime CLI now rejects every `sunpump` subcommand when
+  `--network` is anything other than `mainnet` (clear error:
+  `SunPump is only available on mainnet (got "...")`). The skill documentation
+  matches: the network table, pre-validation checklist, and trade examples now
+  only mention mainnet. The mainnet router is unchanged:
+  `TTfvyrAz86hbZk5iDpKD78pqLGgi8C7AAw`.
+
+### Other API surface reductions (in upstream `@bankofai/sun-cli`)
+
+These groups were also removed because they didn't fit the trading + discovery
+loop the skill targets — agents that referenced any of them must remove the
+calls:
+
+- `sunpump home` (`stats` / `data` / `banners`)
+- `sunpump tx ticker` — server-capped at ~15 rows anyway
+- `sunpump kline` (v1 / v2 / v3)
+- `sunpump red-packet` (`get` / `remain` / `by-user` / `summary`)
+- `sunpump campaign` (`list` / `banners`)
+- `sunpump referral` (`rewards` / `invites`)
+- `sunpump admin-summary`
+- `sunpump quota`
+
+The remaining surface is: `token`, `tx token`, `tx user`, `portfolio`, `state`,
+`quote-buy`, `quote-sell`, `buy`, `sell`.
+
 ## [1.1.1] - 2026-05-21
 
 ### Docs

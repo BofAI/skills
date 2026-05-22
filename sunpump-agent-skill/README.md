@@ -62,14 +62,11 @@ ls -l ~/.claude/skills/sunpump-agent-skill   # directory or symlink present
 sun sunpump --help                            # runtime CLI exposes buy/sell/state
 ```
 
-## Networks
+## Network
 
-| Network | API Host |
-|---------|----------|
-| **mainnet** (default) | `https://api-v2.sunpump.meme/pump-api` |
-| **nile** (testnet) | `https://tn-api.sunpump.meme/pump-api` |
-
-> Shasta is **not** supported by the SunPump API.
+SunPump is **mainnet only**: `https://api-v2.sunpump.meme/pump-api`. The CLI rejects
+any non-mainnet `--network` value (the testnet host is internal-only and not publicly
+reachable). Drop `--network` or pass `--network mainnet`.
 
 ## Feature Summary
 
@@ -134,6 +131,8 @@ sun --json sunpump tx user T... --size 20
 - `@bankofai/sun-cli` (installed globally)
 
 ## Version
+
+1.2.0 (2026-05-22) — breaking: drops nile testnet (internal-only host); upstream `sun sunpump` API surface also trimmed (no more `home/kline/red-packet/campaign/referral/admin-summary/quota/tx ticker`)
 
 1.1.1 (2026-05-21) — docs: install via `npx skills add`, pin sun-cli ≥ 1.2.0
 
