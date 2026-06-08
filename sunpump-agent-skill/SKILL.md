@@ -1,7 +1,7 @@
 ---
 name: SunPump Meme Token Toolkit
 description: Create meme tokens on SunPump (`sun sunpump launch`), trade them — both pre-launch (bonding curve via `sun sunpump buy/sell`) and post-launch (SunSwap via `sun swap`) — and query token info, rankings, holders, portfolios, and trade history.
-version: 1.3.0
+version: 1.3.1
 dependencies:
   - "@bankofai/sun-cli"
 tags:
@@ -437,13 +437,15 @@ Returns the full token object including `contractAddress`, `createTxHash`, and `
 
 > **NOTE: timestamp quirk in `--json` mode.** Unlike the GET endpoints (epoch seconds), the launch endpoint serializes `tokenCreatedInstant` / `tokenLaunchedInstant` / `firstReachHillInstant` as epoch-millis ÷ 1e6 (e.g. `1780476.327`). The CLI normalizes these only for the human-readable view — in `--json` mode you get the raw values. Multiply by 1000 to get epoch seconds.
 
+> **WARNING: mainnet only.** Like every `sunpump` subcommand, `launch` is mainnet-only. The `sunpump` command group runs a `preAction` guard that throws `SunPump is only available on mainnet (got "...")` for any non-mainnet `--network` — **before** the action runs, so it fires even on `--dry-run`. Drop `--network` or pass `--network mainnet`.
+
 #### Dry-run first
 
 ```bash
 sun --json --yes --dry-run sunpump launch --name "My Meme" --symbol MEME --description "..." --image ./logo.png
 ```
 
-Prints the resolved parameters (including the image size) without calling the API — use this to show the user exactly what will be created.
+Prints the resolved parameters (including the image size) without calling the API — use this to show the user exactly what will be created. The mainnet guard still applies (`--dry-run --network nile` errors out before previewing).
 
 #### Verify after creation
 
@@ -527,7 +529,9 @@ sun --json sunpump state <memeTokenAddress>
    sun --json --yes --dry-run sunpump launch --name "..." --symbol ... --description "..." --image ./logo.png
    ```
 
-5. **Get explicit user confirmation, then launch once.** Token creation is irreversible — never retry a launch that may have succeeded; verify with `sun sunpump token search <symbol>` first.
+5. **`--network` must be `mainnet`.** SunPump launch is mainnet-only; the `sunpump` group's `preAction` guard throws on any other value, including under `--dry-run`. Drop `--network` or pass `--network mainnet`.
+
+6. **Get explicit user confirmation, then launch once.** Token creation is irreversible — never retry a launch that may have succeeded; verify with `sun sunpump token search <symbol>` first.
 
 ### Before Read-Only Calls
 
@@ -852,6 +856,6 @@ Set one of `TRON_PRIVATE_KEY`, `TRON_MNEMONIC`, or `AGENT_WALLET_PASSWORD`. Read
 
 ---
 
-**Version**: 1.3.0 (adds token creation — `sun sunpump launch`)
-**Last Updated**: 2026-06-04
+**Version**: 1.3.1 (docs: `sun sunpump launch` is mainnet-only)
+**Last Updated**: 2026-06-08
 **Maintainer**: Bank of AI Team

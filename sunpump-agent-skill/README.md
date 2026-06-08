@@ -123,6 +123,8 @@ sun --json sunpump tx user T... --size 20
 
 ## Version
 
+1.3.1 (2026-06-08) — docs: clarify `sun sunpump launch` is mainnet-only (sun-cli dropped SunPump nile support again); document that `--dry-run` skips the mainnet check
+
 1.3.0 (2026-06-04) — adds token creation via `sun sunpump launch` (server-side `POST /ai/agentTokenLaunch`, no wallet needed); requires sun-cli ≥ 1.2.1
 
 1.2.0 (2026-05-22) — breaking: drops nile testnet (internal-only host); upstream `sun sunpump` API surface also trimmed (no more `home/kline/red-packet/campaign/referral/admin-summary/quota/tx ticker`)

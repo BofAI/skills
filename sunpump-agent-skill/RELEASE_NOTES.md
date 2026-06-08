@@ -1,5 +1,30 @@
 # Release Notes — SunPump Meme Token Toolkit
 
+## v1.3.1 — 2026-06-08 _(docs only)_
+
+> **TL;DR** — Sync with `@bankofai/sun-cli` dropping SunPump nile support
+> again: **`sun sunpump launch` is mainnet-only**, like every other
+> `sunpump` subcommand. No skill behaviour changes — just makes the
+> launch section's network requirement explicit.
+
+### Changes
+
+- **Section 8 (Token Creation)** gains a mainnet-only warning. The
+  `sunpump` command group runs a `preAction` guard that throws
+  `SunPump is only available on mainnet (got "...")` for any non-mainnet
+  `--network`, on every subcommand including `launch`.
+- **Clarified the guard fires before the action** — so it applies even
+  under `--dry-run` (`--dry-run --network nile` errors out before
+  previewing). Drop `--network` or pass `--network mainnet`.
+- **Launch pre-validation checklist** adds a `--network` must-be-mainnet
+  step.
+
+> The rest of the skill already documented SunPump as mainnet-only (since
+> v1.2.0); this release only closes the gap in the launch-specific
+> sections.
+
+---
+
 ## v1.3.0 — 2026-06-04
 
 > **TL;DR** — Adds **token creation**: `sun sunpump launch` creates a new
