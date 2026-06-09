@@ -1,7 +1,7 @@
 ---
 name: SunPump Meme Token Toolkit
-description: Trade meme tokens on SunPump — both pre-launch (bonding curve via `sun sunpump buy/sell`) and post-launch (SunSwap via `sun swap`) — and query token info, rankings, holders, portfolios, and trade history.
-version: 1.2.0
+description: Create meme tokens on SunPump (`sun sunpump launch`), trade them — both pre-launch (bonding curve via `sun sunpump buy/sell`) and post-launch (SunSwap via `sun swap`) — and query token info, rankings, holders, portfolios, and trade history.
+version: 1.3.1
 dependencies:
   - "@bankofai/sun-cli"
 tags:
@@ -16,15 +16,16 @@ tags:
 
 ## Quick Start
 
-This skill enables AI agents to interact with **SunPump** — the meme-token launchpad on the TRON blockchain — through `sun-cli`. It covers the seven core flows an end user needs:
+This skill enables AI agents to interact with **SunPump** — the meme-token launchpad on the TRON blockchain — through `sun-cli`. It covers the eight core flows an end user needs:
 
-1. **Trade post-launch tokens** through SunSwap (`sun swap`)
-2. **Trade pre-launch tokens** on the SunPump bonding curve (`sun sunpump buy` / `sun sunpump sell`)
-3. **Check a wallet's positions** (`sun sunpump portfolio`)
-4. **View a wallet's trade history** (`sun sunpump tx user`)
-5. **Look up token info** (`sun sunpump token get`)
-6. **See token rankings** (`sun sunpump token ranking`)
-7. **List a token's top holders** (`sun sunpump token holders`)
+1. **Create (launch) a new meme token** (`sun sunpump launch`) — server-side creation, no wallet needed
+2. **Trade post-launch tokens** through SunSwap (`sun swap`)
+3. **Trade pre-launch tokens** on the SunPump bonding curve (`sun sunpump buy` / `sun sunpump sell`)
+4. **Check a wallet's positions** (`sun sunpump portfolio`)
+5. **View a wallet's trade history** (`sun sunpump tx user`)
+6. **Look up token info** (`sun sunpump token get`)
+7. **See token rankings** (`sun sunpump token ranking`)
+8. **List a token's top holders** (`sun sunpump token holders`)
 
 **Pre-launch vs post-launch decision** — choose the right trade command:
 
@@ -40,6 +41,7 @@ Always call `sun sunpump state <addr>` or `sun sunpump token get <addr>` first t
 > **Wallet required for trading only:** Run `agent-wallet list` first.
 > If no wallets exist, invoke `bankofai-guide` (Section C — Wallet Guard) before proceeding.
 > All read-only SunPump queries (portfolio, tx history, token info, ranking, holders) work without a wallet.
+> Token creation (`sun sunpump launch`) is server-side and also needs **no wallet**.
 
 1. **Install this skill** (once, picked up by Claude Code / Cursor / Codex):
    ```bash
@@ -47,9 +49,9 @@ Always call `sun sunpump state <addr>` or `sun sunpump token get <addr>` first t
    ```
 
 
-2. **Install sun-cli** (≥ 1.2.0 required — earlier versions lack `sunpump buy/sell/state`):
+2. **Install sun-cli** (≥ 1.2.1 required — earlier versions lack `sunpump launch`; ≥ 1.2.0 lacks only that but has `sunpump buy/sell/state`):
    ```bash
-   npm install -g @bankofai/sun-cli@^1.2.0
+   npm install -g @bankofai/sun-cli@^1.2.1
    ```
 
 3. **Configure wallet** (required for write commands — `sun swap`, `sun sunpump buy`, `sun sunpump sell`):
@@ -402,9 +404,61 @@ If `holders` results look thin, also call `sunpump token get <address>` and read
 
 ---
 
+### 8. Token Creation — `sun sunpump launch`
+
+Create a new meme token on SunPump through the agent endpoint (`POST /ai/agentTokenLaunch`). Creation is **server-side**: the platform signs and broadcasts the creation transaction, so **no wallet is required**. The new token starts on the bonding curve (state `1 TRADING`) and is immediately buyable via `sun sunpump buy`.
+
+```bash
+sun --json --yes sunpump launch \
+  --name "My Meme" \
+  --symbol MEME \
+  --description "The dankest meme on TRON" \
+  --image ./logo.png \
+  --twitter-url https://x.com/mymeme \
+  --telegram-url https://t.me/mymeme \
+  --website-url https://mymeme.example
+```
+
+| Flag | Required | Description |
+|------|----------|-------------|
+| `--name <name>` | ✓ | Token name |
+| `--symbol <symbol>` | ✓ | Token symbol (ticker) |
+| `--description <text>` | ✓ | Token description |
+| `--image <path>` | strongly recommended | Logo image file — read locally and sent as base64 |
+| `--image-base64 <data>` | | Logo as a raw base64 string (no data-URI prefix; overrides `--image`) |
+| `--twitter-url <url>` | | Twitter/X URL |
+| `--telegram-url <url>` | | Telegram URL |
+| `--website-url <url>` | | Website URL |
+| `--tweet-username <name>` | | Tweet username to associate with the launch |
+
+Returns the full token object including `contractAddress`, `createTxHash`, and `logoUrl`.
+
+> **WARNING: Provide a logo.** Launching without `--image` / `--image-base64` has been seen to fail with the opaque server error `Invoke third part error`. Always attach a logo image; if you hit that error, retry with `--image <path>`.
+
+> **NOTE: timestamp quirk in `--json` mode.** Unlike the GET endpoints (epoch seconds), the launch endpoint serializes `tokenCreatedInstant` / `tokenLaunchedInstant` / `firstReachHillInstant` as epoch-millis ÷ 1e6 (e.g. `1780476.327`). The CLI normalizes these only for the human-readable view — in `--json` mode you get the raw values. Multiply by 1000 to get epoch seconds.
+
+> **WARNING: mainnet only.** Like every `sunpump` subcommand, `launch` is mainnet-only. The `sunpump` command group runs a `preAction` guard that throws `SunPump is only available on mainnet (got "...")` for any non-mainnet `--network` — **before** the action runs, so it fires even on `--dry-run`. Drop `--network` or pass `--network mainnet`.
+
+#### Dry-run first
+
+```bash
+sun --json --yes --dry-run sunpump launch --name "My Meme" --symbol MEME --description "..." --image ./logo.png
+```
+
+Prints the resolved parameters (including the image size) without calling the API — use this to show the user exactly what will be created. The mainnet guard still applies (`--dry-run --network nile` errors out before previewing).
+
+#### Verify after creation
+
+```bash
+sun --json sunpump token get <contractAddress>     # metadata is live
+sun --json sunpump state <contractAddress>         # expect state 1 (TRADING)
+```
+
+---
+
 ## Agent Pre-Validation Checklist
 
-Before executing any **write** operation (`sun swap`, `sun sunpump buy`, `sun sunpump sell`), the AI agent **must** perform these checks:
+Before executing any **write** operation (`sun swap`, `sun sunpump buy`, `sun sunpump sell`, `sun sunpump launch`), the AI agent **must** perform these checks:
 
 ### Step 0 — Decide which trade path to use
 
@@ -457,6 +511,27 @@ sun --json sunpump state <memeTokenAddress>
 4. **Validate slippage is reasonable.** Meme tokens often need 1–5% slippage; flag anything outside 0.001 (0.1%) – 0.10 (10%) for review.
 
 5. **Validate `--network`**. `sun swap` accepts `mainnet` / `nile` / `shasta` for general TRC20 pairs, but SunPump-migrated tokens are still mainnet-only — check the migration target before quoting on a non-mainnet network.
+
+### Before `sun sunpump launch` (token creation)
+
+1. **Confirm all three required fields with the user**: `--name`, `--symbol`, `--description`. Never invent or autofill these — they are permanent on-chain metadata.
+
+2. **Require a logo image.** Launching without one often fails with `Invoke third part error`. Ask the user for an image file path (or base64 data) before proceeding; verify the file exists and is a reasonable image (PNG/JPG, < 1 MB recommended).
+
+3. **Check for an existing token with the same symbol** to avoid confusing duplicates:
+   ```bash
+   sun --json sunpump token search <symbol>
+   ```
+   If close matches exist, surface them to the user and confirm intent.
+
+4. **Dry-run and show the user the exact payload** before the real call:
+   ```bash
+   sun --json --yes --dry-run sunpump launch --name "..." --symbol ... --description "..." --image ./logo.png
+   ```
+
+5. **`--network` must be `mainnet`.** SunPump launch is mainnet-only; the `sunpump` group's `preAction` guard throws on any other value, including under `--dry-run`. Drop `--network` or pass `--network mainnet`.
+
+6. **Get explicit user confirmation, then launch once.** Token creation is irreversible — never retry a launch that may have succeeded; verify with `sun sunpump token search <symbol>` first.
 
 ### Before Read-Only Calls
 
@@ -587,6 +662,40 @@ sun --json sunpump tx user T... --swap-type BUY --size 20
 
 ---
 
+### Pattern 5 — Launch a New Token
+
+**Step 1 — Collect and confirm metadata with the user:** name, symbol, description, logo image, optional social links.
+
+**Step 2 — Check for symbol collisions:**
+
+```bash
+sun --json sunpump token search MEME
+```
+
+**Step 3 — Dry-run and show the user the payload:**
+
+```bash
+sun --json --yes --dry-run sunpump launch --name "My Meme" --symbol MEME --description "..." --image ./logo.png
+```
+
+**Step 4 — User confirms → launch (once):**
+
+```bash
+sun --json --yes sunpump launch --name "My Meme" --symbol MEME --description "..." --image ./logo.png \
+  --twitter-url https://x.com/mymeme --telegram-url https://t.me/mymeme --website-url https://mymeme.example
+```
+
+**Step 5 — Verify and hand back:**
+
+```bash
+sun --json sunpump token get <contractAddress>
+sun --json sunpump state <contractAddress>      # expect 1 (TRADING)
+```
+
+Show the user: contract address, creation tx hash (`createTxHash`), logo URL, and a Tronscan link (`https://tronscan.org/#/transaction/<createTxHash>`). The token is now live on the bonding curve and buyable via [Pattern 1b](#pattern-1b--pre-launch-buy-via-sun-sunpump-buy).
+
+---
+
 ## Security Rules
 
 ### CRITICAL: Never Display Private Keys
@@ -608,11 +717,22 @@ The AI agent **must never** execute `sun swap` or `sun sunpump buy/sell` without
 
 > **WARNING:** Do not pass `--yes` on the first call. Use `--yes` only after the user has reviewed the preview and confirmed.
 
+### CRITICAL: Always Preview Before Launching a Token
+
+`sun sunpump launch` creates a **permanent on-chain token**. Correct sequence:
+
+1. Collect `--name` / `--symbol` / `--description` / logo from the user — never invent them
+2. `sun --json sunpump token search <symbol>` — surface symbol collisions
+3. `sun --json --yes --dry-run sunpump launch ...` — show the user the exact payload
+4. **Ask the user to confirm**
+5. Execute once with `--yes`
+
 ### CRITICAL: Prevent Duplicate Transactions
 
 - One user command = one transaction
-- After a successful swap, mark it as done
+- After a successful swap or launch, mark it as done
 - Never silently retry a successful transaction
+- For `launch`: if the call errors ambiguously (timeout, opaque server error), check `sun sunpump token search <symbol>` before retrying — the token may already exist
 
 ### CRITICAL: Highlight Holder Concentration
 
@@ -646,6 +766,32 @@ Swap completed.
   Bought:      100 TRX → 812,344 PEPE
 ```
 
+**Before a token launch:**
+
+```
+About to create a new SunPump token (irreversible):
+  Name:        My Meme
+  Symbol:      MEME
+  Description: The dankest meme on TRON
+  Logo:        ./logo.png (24,310 bytes)
+  Socials:     x.com/mymeme • t.me/mymeme • mymeme.example
+
+No similarly-named token found on SunPump.
+
+Proceed with launch?
+```
+
+**After a successful launch:**
+
+```
+Token created.
+  Contract:  TXYZ...
+  Create Tx: abc123...
+  Explorer:  https://tronscan.org/#/transaction/abc123...
+  Logo:      https://.../logo.png
+  State:     TRADING (bonding curve) — buyable via `sun sunpump buy`
+```
+
 ---
 
 ## Known Limitations
@@ -662,6 +808,8 @@ Swap completed.
 | Invalid `--type` for ranking | `token ranking` | API rejects with non-obvious error | Only pass `MARKET_CAP`, `VOLUME_24H`, or `PRICE_CHANGE_24H` |
 | `--start-time` / `--end-time` are seconds, not ms | `tx user`, `tx token` | Ms values produce empty results | Use epoch seconds |
 | `percent` field magnitude differs by endpoint | `token holders` vs `token list` | Holders endpoint returns 38.51, list endpoint returns 0.3851 | The CLI normalizes, but check magnitude when consuming raw JSON |
+| Launch without a logo fails opaquely | `sunpump launch` | Server returns `Invoke third part error` when no image accompanies the launch | Always pass `--image <path>` (or `--image-base64`) |
+| Launch `*Instant` fields use a non-standard unit | `sunpump launch` (`--json` mode) | `tokenCreatedInstant` etc. come back as epoch-millis ÷ 1e6 (e.g. `1780476.327`), not epoch seconds | Multiply by 1000 for epoch seconds; the CLI only normalizes in human-readable mode |
 
 ---
 
@@ -688,8 +836,18 @@ The token has already migrated to SunSwap. Switch to `sun swap`.
 ### `sun sunpump sell` quote-sell reverts
 The token is in state 3 (LAUNCHED). The bonding-curve contract refuses sells once a token has migrated. Use `sun swap` instead.
 
+### `sun sunpump launch` fails with `Invoke third part error`
+The launch most likely lacked a logo image. Retry with `--image <path>` (or `--image-base64 <data>`). If it still fails, check the image is a valid PNG/JPG and try a smaller file.
+
+### `sun sunpump launch` timed out or returned an ambiguous error
+The token may still have been created server-side. Before retrying, check:
+```bash
+sun --json sunpump token search <symbol>
+```
+If the token exists, treat the launch as successful — do **not** launch again.
+
 ### "Wallet not configured" (write commands only)
-Set one of `TRON_PRIVATE_KEY`, `TRON_MNEMONIC`, or `AGENT_WALLET_PASSWORD`. Read-only sunpump commands do **not** need a wallet.
+Set one of `TRON_PRIVATE_KEY`, `TRON_MNEMONIC`, or `AGENT_WALLET_PASSWORD`. Read-only sunpump commands and `sunpump launch` do **not** need a wallet.
 
 ### Network error / timeout
 - Check internet
@@ -698,6 +856,6 @@ Set one of `TRON_PRIVATE_KEY`, `TRON_MNEMONIC`, or `AGENT_WALLET_PASSWORD`. Read
 
 ---
 
-**Version**: 1.2.0 (drops nile testnet — SunPump is now mainnet-only)
-**Last Updated**: 2026-05-22
+**Version**: 1.3.1 (docs: `sun sunpump launch` is mainnet-only)
+**Last Updated**: 2026-06-08
 **Maintainer**: Bank of AI Team

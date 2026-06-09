@@ -1,6 +1,6 @@
 # SunPump Skill
 
-Trade meme tokens on **SunPump** and query token info, rankings, holders, portfolios, and trade history via `sun-cli`.
+Create and trade meme tokens on **SunPump** and query token info, rankings, holders, portfolios, and trade history via `sun-cli`.
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](../LICENSE)
 [![TRON](https://img.shields.io/badge/Blockchain-TRON-red)](https://tron.network/)
@@ -11,7 +11,7 @@ Trade meme tokens on **SunPump** and query token info, rankings, holders, portfo
 
 ## Approach
 
-This skill uses **sun-cli** (`@bankofai/sun-cli`) — a unified CLI for SUN.IO / SunSwap / SunPump on TRON. Trading auto-routes by token state: pre-launch (bonding curve) tokens go through `sun sunpump buy/sell`, post-launch (migrated to DEX) tokens go through `sun swap`. All SunPump data is read through the `sun sunpump *` subcommands with `--json` output for AI agent consumption.
+This skill uses **sun-cli** (`@bankofai/sun-cli`) — a unified CLI for SUN.IO / SunSwap / SunPump on TRON. Token creation goes through the SunPump agent endpoint (`sun sunpump launch` — server-side, no wallet). Trading auto-routes by token state: pre-launch (bonding curve) tokens go through `sun sunpump buy/sell`, post-launch (migrated to DEX) tokens go through `sun swap`. All SunPump data is read through the `sun sunpump *` subcommands with `--json` output for AI agent consumption.
 
 ## Files
 
@@ -31,14 +31,14 @@ npx skills add BofAI/skills
 ### 2. Install the runtime CLI
 
 ```bash
-npm install -g @bankofai/sun-cli@^1.2.0
+npm install -g @bankofai/sun-cli@^1.2.1
 ```
 
-`@bankofai/sun-cli >= 1.2.0` is required (earlier versions lack `sun sunpump buy/sell/state`). The skills CLI does **not** auto-install npm dependencies.
+`@bankofai/sun-cli >= 1.2.1` is required (earlier versions lack `sun sunpump launch`; < 1.2.0 also lack `sun sunpump buy/sell/state`). The skills CLI does **not** auto-install npm dependencies.
 
-### 3. Configure a wallet (only for write commands)
+### 3. Configure a wallet (only for trading commands)
 
-A wallet (`TRON_PRIVATE_KEY`, `TRON_MNEMONIC`, or `AGENT_WALLET_PASSWORD`) is required only for `sun swap` / `sun sunpump buy` / `sun sunpump sell`. All read endpoints work without one.
+A wallet (`TRON_PRIVATE_KEY`, `TRON_MNEMONIC`, or `AGENT_WALLET_PASSWORD`) is required only for `sun swap` / `sun sunpump buy` / `sun sunpump sell`. All read endpoints work without one, and so does token creation (`sun sunpump launch` — the platform signs server-side).
 
 
 ## Network
@@ -51,20 +51,32 @@ reachable). Drop `--network` or pass `--network mainnet`.
 
 | # | Feature | Command |
 |---|---------|---------|
-| 1 | Post-launch buy / sell | `sun --json --yes swap <tokenIn> <tokenOut> <amount>` |
-| 2 | Pre-launch buy / sell | `sun --json --yes sunpump buy <addr> --trx <n>` · `sun --json --yes sunpump sell <addr> --amount <n>` |
-| 3 | Token state (route picker) | `sun --json sunpump state <contractAddress>` |
-| 4 | User position check | `sun --json sunpump portfolio <walletAddress>` |
-| 5 | Trade history | `sun --json sunpump tx user <walletAddress> --size 20` |
-| 6 | Token info | `sun --json sunpump token get <contractAddress>` |
-| 7 | Ranking | `sun --json sunpump token ranking --type MARKET_CAP --size 10` |
-| 8 | Top holders | `sun --json sunpump token holders <contractAddress> --size 20` |
+| 1 | Create (launch) a token | `sun --json --yes sunpump launch --name <n> --symbol <s> --description <d> --image <path>` |
+| 2 | Post-launch buy / sell | `sun --json --yes swap <tokenIn> <tokenOut> <amount>` |
+| 3 | Pre-launch buy / sell | `sun --json --yes sunpump buy <addr> --trx <n>` · `sun --json --yes sunpump sell <addr> --amount <n>` |
+| 4 | Token state (route picker) | `sun --json sunpump state <contractAddress>` |
+| 5 | User position check | `sun --json sunpump portfolio <walletAddress>` |
+| 6 | Trade history | `sun --json sunpump tx user <walletAddress> --size 20` |
+| 7 | Token info | `sun --json sunpump token get <contractAddress>` |
+| 8 | Ranking | `sun --json sunpump token ranking --type MARKET_CAP --size 10` |
+| 9 | Top holders | `sun --json sunpump token holders <contractAddress> --size 20` |
 
 Ranking types: `MARKET_CAP`, `VOLUME_24H`, `PRICE_CHANGE_24H`.
 
 State values: `0 NOT_EXIST`, `1 TRADING`, `2 READY_TO_LAUNCH`, `3 LAUNCHED`.
 
 ## Usage Examples
+
+### Create a new meme token (no wallet needed — server-side creation)
+```bash
+sun --json sunpump token search MEME                       # check for symbol collisions
+sun --json --yes --dry-run sunpump launch --name "My Meme" --symbol MEME \
+  --description "The dankest meme on TRON" --image ./logo.png   # preview payload
+sun --json --yes sunpump launch --name "My Meme" --symbol MEME \
+  --description "The dankest meme on TRON" --image ./logo.png   # create (irreversible)
+sun --json sunpump state <contractAddress>                 # expect 1 (TRADING)
+```
+Always pass `--image` — launches without a logo often fail with `Invoke third part error`.
 
 ### Buy a meme token (auto-routes pre/post-launch)
 ```bash
@@ -110,6 +122,10 @@ sun --json sunpump tx user T... --size 20
 - `@bankofai/sun-cli` (installed globally)
 
 ## Version
+
+1.3.1 (2026-06-08) — docs: clarify `sun sunpump launch` is mainnet-only (sun-cli dropped SunPump nile support again); document that `--dry-run` skips the mainnet check
+
+1.3.0 (2026-06-04) — adds token creation via `sun sunpump launch` (server-side `POST /ai/agentTokenLaunch`, no wallet needed); requires sun-cli ≥ 1.2.1
 
 1.2.0 (2026-05-22) — breaking: drops nile testnet (internal-only host); upstream `sun sunpump` API surface also trimmed (no more `home/kline/red-packet/campaign/referral/admin-summary/quota/tx ticker`)
 
