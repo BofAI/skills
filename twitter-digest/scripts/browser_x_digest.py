@@ -925,6 +925,7 @@ def main() -> None:
                     result["dm_note"] = "X Chat passcode is required. Non-interactive mode skipped DM recovery for this run."
                     data["pages"].append(result)
                     continue
+                resume_headless_after_passcode = bool(headless)
                 if headless:
                     print("DM passcode screen detected in headless mode. Reopening X Messages in a visible browser window...")
                     stop_browser(proc)
@@ -932,6 +933,12 @@ def main() -> None:
                     headless = False
                     wait_for_login(port, args.login_timeout_sec, interactive=True)
                 if wait_for_dm_passcode_resolution(port, args.login_timeout_sec):
+                    if resume_headless_after_passcode:
+                        print("X Chat passcode was completed. Returning to headless collection...")
+                        stop_browser(proc)
+                        proc, port = launch_browser(profile_dir, "https://x.com/messages", headless=True)
+                        headless = True
+                        wait_for_login(port, args.login_timeout_sec, interactive=False)
                     result = collect_page(port, page, args.scrolls, args.dm_threads)
                 else:
                     result["dm_note"] = (
