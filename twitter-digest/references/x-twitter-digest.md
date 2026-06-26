@@ -142,6 +142,10 @@ Count fields:
 - `dm_visible_thread_count`: all visible conversation targets found in the DM list.
 - `dm_unread_thread_count`: visible conversations that looked unread or newly changed.
 - `dm_read_thread_count`: visible conversations treated as read/history.
+- `dm_captured_message_count`: captured message bubbles from opened unread/new conversations only.
+- Per-thread `message_count`: captured message bubbles in that opened conversation.
+
+Do not compare conversation counts and message counts as if they were the same unit. A user can have 5 visible conversations, 1 unread conversation, and 4 captured message bubbles in that one opened conversation.
 
 Status rules:
 

@@ -250,6 +250,8 @@ def collect_dm_threads(ws_url: str, max_threads: int) -> dict[str, Any]:
         for _ in range(2):
             cdp_eval(ws_url, "window.scrollBy(0, -Math.max(700, window.innerHeight * 0.8));")
             time.sleep(1)
+        thread_text = extract_main_text(ws_url)
+        message_count = count_dm_messages(ws_url)
         threads.append(
             {
                 "url": str(target.get("url") or ""),
@@ -258,7 +260,8 @@ def collect_dm_threads(ws_url: str, max_threads: int) -> dict[str, Any]:
                 "target_type": str(target.get("target_type") or ""),
                 "unread": bool(target.get("unread")),
                 "unread_reason": str(target.get("unread_reason") or ""),
-                "text": extract_main_text(ws_url),
+                "message_count": message_count,
+                "text": thread_text,
             }
         )
         cdp_call(ws_url, "Page.navigate", {"url": "https://x.com/messages"})
@@ -268,9 +271,11 @@ def collect_dm_threads(ws_url: str, max_threads: int) -> dict[str, Any]:
         "dm_status": "captured_unread_threads" if threads else "no_unread_threads",
         "dm_note": (
             f"Visible DM threads: {counts['dm_visible_thread_count']}; unread/new: {counts['dm_unread_thread_count']}; "
-            f"read/history: {counts['dm_read_thread_count']}. Opened up to {max_threads} unread or newly changed thread(s)."
+            f"read/history: {counts['dm_read_thread_count']}. Opened up to {max_threads} unread or newly changed thread(s); "
+            f"captured message bubbles: {sum(int(thread.get('message_count') or 0) for thread in threads)}."
         ),
         "dm_threads": threads,
+        "dm_captured_message_count": sum(int(thread.get("message_count") or 0) for thread in threads),
         **counts,
     }
 
@@ -305,6 +310,37 @@ def dm_counts(targets: list[dict[str, Any]]) -> dict[str, int]:
         "dm_unread_thread_count": unread_count,
         "dm_read_thread_count": max(visible_count - unread_count, 0),
     }
+
+
+def count_dm_messages(ws_url: str) -> int:
+    script = r"""
+(() => {
+  const main = document.querySelector('main') || document.body;
+  const nodes = Array.from(main.querySelectorAll('[data-testid="messageEntry"], [data-testid*="message" i], [role="group"]'));
+  const seen = new Set();
+  let count = 0;
+  for (const node of nodes) {
+    const text = (node.innerText || '').replace(/\s+/g, ' ').trim();
+    if (!text || text.length < 1) continue;
+    if (/^(chat|search|message|messages|today|this conversation is now end-to-end encrypted)$/i.test(text)) continue;
+    const rect = node.getBoundingClientRect();
+    if (rect.width < 20 || rect.height < 12) continue;
+    const key = `${Math.round(rect.left)}:${Math.round(rect.top)}:${text.slice(0, 80)}`;
+    if (seen.has(key)) continue;
+    seen.add(key);
+    count += 1;
+  }
+  if (count > 0) return count;
+  return Array.from(main.querySelectorAll('div[dir="auto"]')).filter((node) => {
+    const text = (node.innerText || '').replace(/\s+/g, ' ').trim();
+    const rect = node.getBoundingClientRect();
+    if (!text || rect.width < 20 || rect.height < 12) return false;
+    return !/^(chat|search|message|messages|today|this conversation is now end-to-end encrypted)$/i.test(text);
+  }).length;
+})()
+"""
+    value = cdp_eval(ws_url, script)
+    return int(value) if isinstance(value, (int, float)) else 0
 
 
 def wait_for_dm_ready(ws_url: str, timeout_sec: int = 20) -> str:
@@ -465,7 +501,29 @@ def extract_dm_thread_targets(ws_url: str) -> list[dict[str, Any]]:
                     "y": float(item.get("y") or 0),
                 }
             )
-    return out
+    return dedupe_dm_targets(out)
+
+
+def dedupe_dm_targets(targets: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    deduped: dict[str, dict[str, Any]] = {}
+    for target in targets:
+        key = str(target.get("url") or dm_participant(target) or target.get("label") or "").lower()
+        if not key:
+            key = f"{round(float(target.get('x') or 0))}:{round(float(target.get('y') or 0))}"
+        existing = deduped.get(key)
+        if existing is None:
+            deduped[key] = target
+            continue
+        existing["unread"] = bool(existing.get("unread")) or bool(target.get("unread"))
+        reasons = {part for part in str(existing.get("unread_reason") or "").split(",") if part}
+        reasons.update(part for part in str(target.get("unread_reason") or "").split(",") if part)
+        existing["unread_reason"] = ",".join(sorted(reasons))
+        if not existing.get("url") and target.get("url"):
+            existing["url"] = target["url"]
+            existing["target_type"] = target.get("target_type") or existing.get("target_type")
+        if len(str(target.get("label") or "")) > len(str(existing.get("label") or "")):
+            existing["label"] = target["label"]
+    return list(deduped.values())
 
 
 def click_point(ws_url: str, x: float, y: float) -> None:
@@ -583,11 +641,12 @@ def render_markdown(data: dict[str, Any]) -> str:
         if page.get("dm_status"):
             lines.extend(["", f"DM 状态: `{page['dm_status']}`"])
             lines.append(
-                "DM 统计: "
+                "DM 会话统计: "
                 f"可见 `{int(page.get('dm_visible_thread_count') or 0)}` / "
                 f"未读或新增 `{int(page.get('dm_unread_thread_count') or 0)}` / "
                 f"已读历史 `{int(page.get('dm_read_thread_count') or 0)}`"
             )
+            lines.append(f"DM 消息统计: 已打开会话中捕获消息气泡 `{int(page.get('dm_captured_message_count') or 0)}`")
             if page.get("dm_note"):
                 lines.append(str(page["dm_note"]))
         if page.get("collection_error"):
@@ -597,6 +656,7 @@ def render_markdown(data: dict[str, Any]) -> str:
             lines.extend(["", f"### DM thread: {participant}", ""])
             if participant:
                 lines.append(f"会话对象: `{participant}`")
+                lines.append(f"消息数量: `{int(thread.get('message_count') or 0)}`")
                 lines.append("发信人判断: 使用会话对象/消息气泡判断；引用帖、转发卡片或链接预览里的作者不是 DM 发信人。")
                 lines.append("")
             lines.append(str(thread.get("text") or "")[:3000])

@@ -137,7 +137,7 @@ Classify DMs as:
 - `routine`: informational, friendly, low-risk, or easy acknowledgement.
 - `ignore`: spam, phishing, harassment, or irrelevant bulk outreach.
 
-Always report DM counts when available: visible conversations, unread/new conversations, and read/history conversations. Only summarize DM bodies from `dm_status: captured_unread_threads` or from threads marked `memory_status: new_or_changed`. If the messages page shows only already-read/history threads, report `no_unread_threads` as “没有未读或新增私信需要处理”, not “没有私信”. If `visible_threads_unopened` appears, say the conversation list was visible but unread message bodies were not opened.
+Always report DM conversation counts and message counts separately when available. Conversation counts come from the X Chat list: visible conversations, unread/new conversations, and read/history conversations. Message counts come only from opened unread/new conversations and represent captured message bubbles. Only summarize DM bodies from `dm_status: captured_unread_threads` or from threads marked `memory_status: new_or_changed`. If the messages page shows only already-read/history threads, report `no_unread_threads` as “没有未读或新增私信需要处理”, not “没有私信”. If `visible_threads_unopened` appears, say the conversation list was visible but unread message bodies were not opened.
 
 For DM sender attribution, use the thread `participant` / `会话对象` and message bubble direction. Do not treat authors inside quoted posts, repost cards, link previews, or embedded tweet text as the DM sender. If a DM contains a shared post by `Marco` inside a conversation with `@jerry`, the DM is from the conversation participant, not from `Marco`.
 
@@ -163,7 +163,8 @@ For private messages, summarize minimally. Quote only the short phrase needed to
 - ⚪ 噪音折叠统计
 
 **◆ 私信（DM）**
-- 统计：可见会话 N 个，未读/新增 N 个，已读历史 N 个
+- 会话统计：可见会话 N 个，未读/新增 N 个，已读历史 N 个
+- 消息统计：已打开未读/新增会话中捕获消息 N 条
 - 仅总结未读或新增/变更的可见私信
 - 🔴 重要 / 🟡 一般 / ⚪ 忽略
 

@@ -157,7 +157,7 @@ def update_memory(
     new_posts: list[dict[str, Any]] = []
     repeated_posts: list[dict[str, Any]] = []
     dm_status = "not_requested"
-    dm_counts = {"visible": 0, "unread": 0, "read": 0}
+    dm_counts = {"visible": 0, "unread": 0, "read": 0, "captured_messages": 0}
     dm_thread_updates: list[dict[str, str]] = []
 
     for page in data.get("pages", []):
@@ -172,6 +172,7 @@ def update_memory(
                 "visible": int(page.get("dm_visible_thread_count") or 0),
                 "unread": int(page.get("dm_unread_thread_count") or 0),
                 "read": int(page.get("dm_read_thread_count") or 0),
+                "captured_messages": int(page.get("dm_captured_message_count") or 0),
             }
             for thread in page.get("dm_threads") or []:
                 if not isinstance(thread, dict):
@@ -359,11 +360,12 @@ def render_digest_input(data: dict[str, Any]) -> str:
         if page.get("dm_status"):
             lines.extend(["", f"DM 状态: `{page['dm_status']}`"])
             lines.append(
-                "DM 统计: "
+                "DM 会话统计: "
                 f"可见 `{int(page.get('dm_visible_thread_count') or 0)}` / "
                 f"未读或新增 `{int(page.get('dm_unread_thread_count') or 0)}` / "
                 f"已读历史 `{int(page.get('dm_read_thread_count') or 0)}`"
             )
+            lines.append(f"DM 消息统计: 已打开会话中捕获消息气泡 `{int(page.get('dm_captured_message_count') or 0)}`")
             if page.get("dm_note"):
                 lines.append(str(page["dm_note"]))
         if page.get("collection_error"):
@@ -375,6 +377,7 @@ def render_digest_input(data: dict[str, Any]) -> str:
             lines.extend(["", f"### DM thread [{thread.get('memory_status') or 'unknown'}]: {participant}", ""])
             if participant:
                 lines.append(f"会话对象: `{participant}`")
+                lines.append(f"消息数量: `{int(thread.get('message_count') or 0)}`")
                 lines.append("发信人判断: 使用会话对象/消息气泡判断；引用帖、转发卡片或链接预览里的作者不是 DM 发信人。")
                 lines.append("")
             lines.append(str(thread.get("text") or "")[:3000])
@@ -403,7 +406,8 @@ def render_memory_context(summary: dict[str, Any]) -> str:
             "- DM counts: "
             f"visible `{(summary.get('dm_counts') or {}).get('visible', 0)}`, "
             f"unread/new `{(summary.get('dm_counts') or {}).get('unread', 0)}`, "
-            f"read/history `{(summary.get('dm_counts') or {}).get('read', 0)}`"
+            f"read/history `{(summary.get('dm_counts') or {}).get('read', 0)}`, "
+            f"captured messages `{(summary.get('dm_counts') or {}).get('captured_messages', 0)}`"
         ),
         "",
         "## Page Counts",
