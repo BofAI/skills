@@ -416,13 +416,30 @@ def wait_for_dm_passcode_resolution(port: int, timeout_sec: int) -> bool:
     while time.time() < deadline:
         time.sleep(3)
         main_text = extract_main_text(ws_url)
-        if not is_dm_passcode_screen(main_text):
-            print("X Chat passcode screen cleared. Resuming DM collection...")
+        if is_dm_passcode_screen(main_text):
+            if time.time() - last_notice > 15:
+                print("Still waiting for X Chat passcode to be completed in the opened browser window.")
+                last_notice = time.time()
+            continue
+        if dm_messages_page_is_readable(ws_url, main_text):
+            print("X Chat messages are readable. Resuming DM collection...")
             return True
         if time.time() - last_notice > 15:
-            print("Still waiting for X Chat passcode to be completed in the opened browser window.")
+            print("Passcode screen is not readable yet or messages are still loading. Keep the visible browser open until X Messages shows the inbox.")
             last_notice = time.time()
     return False
+
+
+def dm_messages_page_is_readable(ws_url: str, text: str) -> bool:
+    if is_dm_passcode_screen(text):
+        return False
+    if extract_dm_thread_targets(ws_url):
+        return True
+    normalized = " ".join(text.lower().split())
+    empty_markers = ["no messages", "welcome to your inbox", "send a message to start a conversation"]
+    if any(marker in normalized for marker in empty_markers):
+        return True
+    return looks_like_dm_list_text(text)
 
 
 def extract_dm_thread_targets(ws_url: str) -> list[dict[str, Any]]:
@@ -942,8 +959,8 @@ def main() -> None:
                     result = collect_page(port, page, args.scrolls, args.dm_threads)
                 else:
                     result["dm_note"] = (
-                        "Timed out waiting for the X Chat passcode screen to clear. "
-                        "Open the visible browser window, complete passcode setup or entry, then rerun the digest."
+                        "Timed out waiting for X Messages to become readable after passcode handling. "
+                        "Keep the visible browser window open, complete passcode setup or entry until the inbox is visible, then rerun the digest."
                     )
             data["pages"].append(result)
         write_digest_output(out_dir, data)
