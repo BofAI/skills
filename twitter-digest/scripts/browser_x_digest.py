@@ -196,7 +196,7 @@ def collect_page(port: int, page: dict[str, str], scrolls: int, dm_threads: int 
 
 
 def collect_dm_threads(ws_url: str, max_threads: int) -> dict[str, Any]:
-    main_text = extract_main_text(ws_url)
+    main_text = wait_for_dm_ready(ws_url)
     if is_dm_passcode_screen(main_text):
         return {
             "dm_status": "blocked_by_x_chat_passcode",
@@ -204,34 +204,85 @@ def collect_dm_threads(ws_url: str, max_threads: int) -> dict[str, Any]:
             "dm_threads": [],
         }
 
-    thread_links = extract_dm_thread_links(ws_url)
-    if not thread_links:
+    thread_targets = extract_dm_thread_targets(ws_url)
+    if not thread_targets:
+        if looks_like_dm_list_text(main_text):
+            return {
+                "dm_status": "visible_threads_unopened",
+                "dm_note": "DM conversation list text was visible, but no openable conversation link or row target could be detected.",
+                "dm_threads": [],
+            }
         return {
             "dm_status": "no_visible_threads",
-            "dm_note": "No DM conversation links were visible on the messages page.",
+            "dm_note": "No DM conversation links or clickable conversation rows were visible after waiting for the messages page.",
             "dm_threads": [],
         }
 
     threads: list[dict[str, Any]] = []
-    for link in thread_links[: max(max_threads, 0)]:
-        cdp_call(ws_url, "Page.navigate", {"url": link["url"]})
+    seen_targets: set[str] = set()
+    for _ in range(max(max_threads, 0)):
+        thread_targets = [target for target in extract_dm_thread_targets(ws_url) if dm_target_key(target) not in seen_targets]
+        if not thread_targets:
+            break
+        target = thread_targets[0]
+        seen_targets.add(dm_target_key(target))
+        if target.get("url"):
+            cdp_call(ws_url, "Page.navigate", {"url": str(target["url"])})
+        else:
+            click_point(ws_url, float(target.get("x") or 0), float(target.get("y") or 0))
         time.sleep(4)
         for _ in range(2):
             cdp_eval(ws_url, "window.scrollBy(0, -Math.max(700, window.innerHeight * 0.8));")
             time.sleep(1)
         threads.append(
             {
-                "url": link["url"],
-                "label": link.get("label") or "",
+                "url": str(target.get("url") or ""),
+                "label": str(target.get("label") or ""),
+                "target_type": str(target.get("target_type") or ""),
                 "text": extract_main_text(ws_url),
             }
         )
+        cdp_call(ws_url, "Page.navigate", {"url": "https://x.com/messages"})
+        wait_for_dm_ready(ws_url, timeout_sec=8)
 
     return {
         "dm_status": "captured_threads" if threads else "no_visible_threads",
-        "dm_note": f"Opened up to {max_threads} visible DM thread(s) and captured on-screen text only.",
+        "dm_note": f"Opened up to {max_threads} visible DM thread(s) using links or clickable conversation rows and captured on-screen text only.",
         "dm_threads": threads,
     }
+
+
+def dm_target_key(target: dict[str, Any]) -> str:
+    return str(target.get("url") or target.get("label") or f"{target.get('x')}:{target.get('y')}")
+
+
+def wait_for_dm_ready(ws_url: str, timeout_sec: int = 20) -> str:
+    deadline = time.time() + timeout_sec
+    last_text = ""
+    while time.time() < deadline:
+        text = extract_main_text(ws_url)
+        last_text = text or last_text
+        if is_dm_passcode_screen(text):
+            return text
+        if extract_dm_thread_targets(ws_url):
+            return text
+        normalized = " ".join(text.lower().split())
+        empty_markers = ["no messages", "welcome to your inbox", "send a message to start a conversation"]
+        if any(marker in normalized for marker in empty_markers):
+            return text
+        time.sleep(1)
+    return last_text
+
+
+def looks_like_dm_list_text(text: str) -> bool:
+    lines = [line.strip() for line in text.splitlines() if line.strip()]
+    if len(lines) < 4:
+        return False
+    joined = " ".join(lines).lower()
+    if not any(marker in joined for marker in ("chat", "messages", "search", "inbox")):
+        return False
+    conversation_markers = ("@", "you sent", "you:", "sent you", "min", "m", "h", "d")
+    return any(marker in joined for marker in conversation_markers)
 
 
 def is_dm_passcode_screen(text: str) -> bool:
@@ -269,31 +320,88 @@ def wait_for_dm_passcode_resolution(port: int, timeout_sec: int) -> bool:
     return False
 
 
-def extract_dm_thread_links(ws_url: str) -> list[dict[str, str]]:
+def extract_dm_thread_targets(ws_url: str) -> list[dict[str, Any]]:
     script = r"""
 (() => {
   const seen = new Set();
-  return Array.from(document.querySelectorAll('a[href^="/messages/"], a[href*="x.com/messages/"]')).map((a) => {
+  const ignoredText = /^(messages|new message|message requests|search direct messages|search|settings|home|profile|notifications)$/i;
+  const ignoredShortText = /^(all|chat)$/i;
+  const visible = (el) => {
+    const rect = el.getBoundingClientRect();
+    const style = getComputedStyle(el);
+    return rect.width > 40 && rect.height > 24 && style.visibility !== 'hidden' && style.display !== 'none';
+  };
+  const clean = (text) => (text || '').replace(/\s+/g, ' ').trim();
+  const out = [];
+
+  for (const a of document.querySelectorAll('a[href^="/messages/"], a[href*="x.com/messages/"]')) {
+    if (!visible(a)) continue;
     const url = new URL(a.getAttribute('href'), location.href);
     url.search = '';
     url.hash = '';
-    return { url: url.href, label: (a.innerText || a.getAttribute('aria-label') || '').trim() };
-  }).filter((item) => {
-    if (!/^https:\/\/(x|twitter)\.com\/messages\/[^/]+/.test(item.url)) return false;
-    if (seen.has(item.url)) return false;
-    seen.add(item.url);
-    return true;
-  });
+    const label = clean(a.innerText || a.getAttribute('aria-label') || '');
+    if (!/^https:\/\/(x|twitter)\.com\/messages\/[^/]+/.test(url.href)) continue;
+    if (/\/messages\/compose$/.test(url.pathname)) continue;
+    if (!label || ignoredText.test(label) || ignoredShortText.test(label)) continue;
+    const key = url.href;
+    if (seen.has(key)) continue;
+    seen.add(key);
+    out.push({ target_type: 'link', url: url.href, label });
+  }
+
+  const candidates = Array.from(document.querySelectorAll('[role="button"], [data-testid*="conversation" i], [data-testid*="cell" i]'));
+  for (const node of candidates) {
+    if (!visible(node)) continue;
+    const label = clean(node.innerText || node.getAttribute('aria-label') || '');
+    if (!label || label.length < 2 || ignoredText.test(label) || ignoredShortText.test(label)) continue;
+    if (!/[A-Za-z0-9_\u4e00-\u9fff]/.test(label)) continue;
+    const link = node.querySelector && node.querySelector('a[href*="/messages/"]');
+    let url = '';
+    if (link) {
+      const parsed = new URL(link.getAttribute('href'), location.href);
+      parsed.search = '';
+      parsed.hash = '';
+      url = parsed.href;
+    }
+    const rect = node.getBoundingClientRect();
+    const key = url || `${Math.round(rect.left)}:${Math.round(rect.top)}:${label.slice(0, 80)}`;
+    if (seen.has(key)) continue;
+    seen.add(key);
+    out.push({
+      target_type: url ? 'row_link' : 'row_click',
+      url,
+      label,
+      x: rect.left + Math.min(rect.width / 2, 280),
+      y: rect.top + rect.height / 2
+    });
+  }
+  return out.slice(0, 20);
 })()
 """
     value = cdp_eval(ws_url, script)
     if not isinstance(value, list):
         return []
-    out: list[dict[str, str]] = []
+    out: list[dict[str, Any]] = []
     for item in value:
-        if isinstance(item, dict) and isinstance(item.get("url"), str):
-            out.append({"url": str(item["url"]), "label": str(item.get("label") or "")})
+        if isinstance(item, dict):
+            out.append(
+                {
+                    "target_type": str(item.get("target_type") or ""),
+                    "url": str(item.get("url") or ""),
+                    "label": str(item.get("label") or ""),
+                    "x": float(item.get("x") or 0),
+                    "y": float(item.get("y") or 0),
+                }
+            )
     return out
+
+
+def click_point(ws_url: str, x: float, y: float) -> None:
+    for event_type in ("mouseMoved", "mousePressed", "mouseReleased"):
+        params: dict[str, Any] = {"type": event_type, "x": x, "y": y, "button": "left", "clickCount": 1}
+        if event_type == "mousePressed":
+            params["buttons"] = 1
+        cdp_call(ws_url, "Input.dispatchMouseEvent", params)
 
 
 def extract_articles(ws_url: str) -> list[dict[str, Any]]:
