@@ -40,7 +40,7 @@ Default scope:
 - Mentions of the authenticated handle.
 - Home timeline hotspots.
 - Own profile activity.
-- Today's visible DM conversations, with only unreplied conversations opened for content.
+- Today's visible DM conversations, with only conversations whose latest preview is not from the user opened for content.
 - Optional keyword searches only when the user explicitly passes `--keywords`.
 
 Read only `twitter-digest/.state/run/digest-context.md` when writing the Chinese digest. Its `Final Summary Facts` section is the content source for the final summary. Use `digest-input.md` only when debugging collection issues, not during normal summarization. Do not add content from older runs.
@@ -130,9 +130,9 @@ Classify DMs as:
 - `routine`: informational, friendly, low-risk, or easy acknowledgement.
 - `ignore`: spam, phishing, harassment, or irrelevant bulk outreach.
 
-Always report DM conversation counts and message counts separately when available. Conversation counts come from today's X Chat list items only: today visible conversations, conversations the user appears to have replied to, and conversations not yet replied to. Older conversations visible in the list are ignored for the daily count. Message counts come only from opened unreplied conversations and represent captured message bubbles. Only summarize DM bodies from `dm_status: captured_unreplied_threads`. If today's visible conversations all appear replied, report `no_unreplied_threads` as “今天可见私信会话都已回复，无需处理”, not “没有私信”. If `no_today_threads` appears, say there were visible older conversations but no today conversations. If `visible_threads_unopened` appears, say the conversation list was visible but unreplied message bodies were not opened.
+Always report DM conversation counts and message counts separately when available. Conversation counts come from today's X Chat list items only: today visible conversations, conversations whose latest preview is from the user (`You:` / `You sent` / `你:`), and conversations waiting for the user's reply. Older conversations visible in the list are ignored for the daily count. Message counts come only from opened waiting-reply conversations and represent captured message bubbles. Only summarize DM bodies from `dm_status: captured_unreplied_threads`. If today's visible conversations all have latest previews from the user, report `no_unreplied_threads` as “今天可见私信会话最后一条都是我发出的，无需处理”, not “没有私信”. If `no_today_threads` appears, say there were visible older conversations but no today conversations. If `visible_threads_unopened` appears, say the conversation list was visible but waiting-reply message bodies were not opened.
 
-For unreplied DMs, still summarize selectively. Count all unreplied conversations, but only include DMs with action value, relationship value, risk, money/security implications, or clear user relevance in the digest. Obvious spam, phishing, generic promotion, low-context links, or repeated junk should be counted and classified as ignore/noise without copying the content into the main summary.
+For waiting-reply DMs, still summarize selectively. Count all waiting-reply conversations, but only include DMs with action value, relationship value, risk, money/security implications, or clear user relevance in the digest. Obvious spam, phishing, generic promotion, low-context links, or repeated junk should be counted and classified as ignore/noise without copying the content into the main summary.
 
 For DM sender attribution, use the thread `participant` / `会话对象` and message bubble direction. Do not treat authors inside quoted posts, repost cards, link previews, or embedded tweet text as the DM sender. If a DM contains a shared post by `Marco` inside a conversation with `@jerry`, the DM is from the conversation participant, not from `Marco`.
 
@@ -158,9 +158,9 @@ For private messages, summarize minimally. Quote only the short phrase needed to
 - ⚪ 噪音折叠统计
 
 **◆ 私信（DM）**
-- 会话统计：今日可见会话 N 个，已回复 N 个，未回复 N 个
-- 消息统计：已打开未回复会话中捕获消息 N 条
-- 仅挑重点总结未回复私信；垃圾、钓鱼、低质营销只计数并归为忽略
+- 会话统计：今日可见会话 N 个，最后我发出 N 个，等我回复 N 个
+- 消息统计：已打开等我回复会话中捕获消息 N 条
+- 仅挑重点总结等我回复的私信；垃圾、钓鱼、低质营销只计数并归为忽略
 - 🔴 重要 / 🟡 一般 / ⚪ 忽略
 
 **◆ 时间线热点**

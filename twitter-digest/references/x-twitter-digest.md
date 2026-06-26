@@ -132,26 +132,26 @@ Classification bands:
 
 ## DM Handling
 
-DMs are private. Count today's visible conversations, but summarize only unreplied conversations with real action value. Conversations that already show a self reply should not be presented as action items.
+DMs are private. Count today's visible conversations, but summarize only conversations whose latest preview is not from the user and has real action value. Conversations whose latest preview is `You:` / `You sent` / `你:` should not be presented as action items.
 
 Count fields:
 
 - `dm_visible_thread_count`: today's visible conversation targets found in the DM list.
-- `dm_replied_thread_count`: today's visible conversations that appear to contain the user's reply, based on list labels such as `You:` / `You sent` / `你:`.
-- `dm_unreplied_thread_count`: today's visible conversations without a detected self reply.
-- `dm_captured_message_count`: captured message bubbles from opened unreplied conversations only.
+- `dm_replied_thread_count`: today's visible conversations whose latest list preview appears to be from the user, based on labels such as `You:` / `You sent` / `你:`.
+- `dm_unreplied_thread_count`: today's visible conversations waiting for the user's reply, meaning the latest list preview is not from the user.
+- `dm_captured_message_count`: captured message bubbles from opened waiting-reply conversations only.
 - Per-thread `message_count`: captured message bubbles in that opened conversation.
 
-Do not compare conversation counts and message counts as if they were the same unit. A user can have 5 today visible conversations, 2 unreplied conversations, and 4 captured message bubbles across those opened conversations.
+Do not compare conversation counts and message counts as if they were the same unit. A user can have 5 today visible conversations, 2 waiting-reply conversations, and 4 captured message bubbles across those opened conversations.
 
-Unreplied does not automatically mean important. Count every unreplied conversation, but summarize only messages that are actionable, relationship-relevant, risky, money/security-sensitive, or clearly useful. Spam, phishing, generic promotion, low-context links, and repeated junk should be classified as ignore/noise and not copied into the main narrative.
+Waiting-reply does not automatically mean important. Count every waiting-reply conversation, but summarize only messages that are actionable, relationship-relevant, risky, money/security-sensitive, or clearly useful. Spam, phishing, generic promotion, low-context links, and repeated junk should be classified as ignore/noise and not copied into the main narrative.
 
 Status rules:
 
-- `captured_unreplied_threads`: summarize the captured unreplied DM bodies selectively and classify importance.
-- `no_unreplied_threads`: report the counts and say today's visible DM conversations all appear replied; do not say there are no DMs.
+- `captured_unreplied_threads`: summarize the captured waiting-reply DM bodies selectively and classify importance.
+- `no_unreplied_threads`: report the counts and say today's visible DM conversations all have latest previews from the user; do not say there are no DMs.
 - `no_today_threads`: say older conversations were visible, but no today conversations were found.
-- `visible_threads_unopened`: say the conversation list was visible but unreplied message bodies could not be opened; do not infer content.
+- `visible_threads_unopened`: say the conversation list was visible but waiting-reply message bodies could not be opened; do not infer content.
 - `blocked_by_x_chat_passcode`: say DM content is unavailable until the user completes X Chat passcode recovery.
 
 Sender attribution:

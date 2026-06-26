@@ -183,17 +183,38 @@ def collect_page(port: int, page: dict[str, str], scrolls: int, dm_threads: int 
             "collection_error": navigate_result["_cdp_error"],
         }
     time.sleep(5)
+    if page["kind"] == "messages":
+        extra = collect_messages_page(ws_url, dm_threads)
+        if dm_collection_looks_premature(extra):
+            cdp_call(ws_url, "Page.navigate", {"url": page["url"]})
+            time.sleep(8)
+            extra = collect_messages_page(ws_url, dm_threads)
+        return {"kind": page["kind"], "url": page["url"], "items": [], **extra}
     posts: list[dict[str, Any]] = []
     for _ in range(max(scrolls, 1)):
         posts.extend(extract_articles(ws_url))
         cdp_eval(ws_url, "window.scrollBy(0, Math.max(900, window.innerHeight * 0.9));")
         time.sleep(2)
     posts.extend(extract_articles(ws_url))
+    return {"kind": page["kind"], "url": page["url"], "items": dedupe_items(posts)}
+
+
+def collect_messages_page(ws_url: str, dm_threads: int) -> dict[str, Any]:
     extra: dict[str, Any] = {}
-    if page["kind"] == "messages":
-        extra["visible_text"] = extract_main_text(ws_url)
-        extra.update(collect_dm_threads(ws_url, max_threads=dm_threads))
-    return {"kind": page["kind"], "url": page["url"], "items": dedupe_items(posts), **extra}
+    extra["visible_text"] = extract_main_text(ws_url)
+    extra.update(collect_dm_threads(ws_url, max_threads=dm_threads))
+    return extra
+
+
+def dm_collection_looks_premature(extra: dict[str, Any]) -> bool:
+    status = str(extra.get("dm_status") or "")
+    text = " ".join(str(extra.get("visible_text") or "").lower().split())
+    if status not in {"no_today_threads", "no_visible_threads", "visible_threads_unopened"}:
+        return False
+    if "start conversation" not in text:
+        return False
+    conversation_markers = ("you:", "you sent", "now", " min", "m ", "h ", "today", "今天")
+    return not any(marker in text for marker in conversation_markers)
 
 
 def collect_dm_threads(ws_url: str, max_threads: int) -> dict[str, Any]:
@@ -216,7 +237,7 @@ def collect_dm_threads(ws_url: str, max_threads: int) -> dict[str, Any]:
                 "dm_status": "no_unreplied_threads",
                 "dm_note": (
                     f"DM conversation list was visible with {counts['dm_visible_thread_count']} today thread target(s), "
-                    "but all appeared to have a self reply."
+                    "but every latest preview appears to be from you."
                 ),
                 "dm_threads": [],
                 **counts,
@@ -250,16 +271,17 @@ def collect_dm_threads(ws_url: str, max_threads: int) -> dict[str, Any]:
             break
         target = thread_targets[0]
         seen_targets.add(dm_target_key(target))
-        if target.get("url"):
-            cdp_call(ws_url, "Page.navigate", {"url": str(target["url"])})
-        else:
+        if float(target.get("x") or 0) > 0 and float(target.get("y") or 0) > 0:
             click_point(ws_url, float(target.get("x") or 0), float(target.get("y") or 0))
+        elif target.get("url"):
+            cdp_call(ws_url, "Page.navigate", {"url": str(target["url"])})
         time.sleep(4)
         for _ in range(2):
             cdp_eval(ws_url, "window.scrollBy(0, -Math.max(700, window.innerHeight * 0.8));")
             time.sleep(1)
-        thread_text = extract_main_text(ws_url)
-        message_count = count_dm_messages(ws_url)
+        messages = extract_dm_messages(ws_url)
+        thread_text = render_dm_messages(messages) or extract_dm_conversation_text(ws_url)
+        message_count = len(messages) if messages else count_dm_messages(ws_url)
         threads.append(
             {
                 "url": str(target.get("url") or ""),
@@ -270,6 +292,7 @@ def collect_dm_threads(ws_url: str, max_threads: int) -> dict[str, Any]:
                 "reply_reason": str(target.get("reply_reason") or ""),
                 "today": bool(target.get("today")),
                 "message_count": message_count,
+                "messages": messages,
                 "text": thread_text,
             }
         )
@@ -279,8 +302,8 @@ def collect_dm_threads(ws_url: str, max_threads: int) -> dict[str, Any]:
     return {
         "dm_status": "captured_unreplied_threads" if threads else "no_unreplied_threads",
         "dm_note": (
-            f"Today visible DM threads: {counts['dm_visible_thread_count']}; replied: {counts['dm_replied_thread_count']}; "
-            f"unreplied: {counts['dm_unreplied_thread_count']}. Opened up to {max_threads} unreplied thread(s); "
+            f"Today visible DM threads: {counts['dm_visible_thread_count']}; latest from you: {counts['dm_replied_thread_count']}; "
+            f"waiting for your reply: {counts['dm_unreplied_thread_count']}. Opened up to {max_threads} waiting-reply thread(s); "
             f"captured message bubbles: {sum(int(thread.get('message_count') or 0) for thread in threads)}."
         ),
         "dm_threads": threads,
@@ -333,32 +356,141 @@ def dm_target_has_self_reply(label: str) -> bool:
 def count_dm_messages(ws_url: str) -> int:
     script = r"""
 (() => {
-  const main = document.querySelector('main') || document.body;
-  const nodes = Array.from(main.querySelectorAll('[data-testid="messageEntry"], [data-testid*="message" i], [role="group"]'));
-  const seen = new Set();
-  let count = 0;
-  for (const node of nodes) {
-    const text = (node.innerText || '').replace(/\s+/g, ' ').trim();
-    if (!text || text.length < 1) continue;
-    if (/^(chat|search|message|messages|today|this conversation is now end-to-end encrypted)$/i.test(text)) continue;
+  const panel = document.querySelector('[data-testid="dm-conversation-panel"]')
+    || document.querySelector('[data-testid="dm-conversation-content"]')
+    || document.querySelector('main')
+    || document.body;
+  const roots = Array.from(panel.querySelectorAll('div[data-testid^="message-"]'))
+    .filter((node) => !String(node.getAttribute('data-testid') || '').startsWith('message-text-'));
+  return roots.filter((node) => {
+    const bubble = node.querySelector('[data-testid^="message-text-"]');
+    const text = bubbleText(bubble || node);
     const rect = node.getBoundingClientRect();
-    if (rect.width < 20 || rect.height < 12) continue;
-    const key = `${Math.round(rect.left)}:${Math.round(rect.top)}:${text.slice(0, 80)}`;
-    if (seen.has(key)) continue;
-    seen.add(key);
-    count += 1;
-  }
-  if (count > 0) return count;
-  return Array.from(main.querySelectorAll('div[dir="auto"]')).filter((node) => {
-    const text = (node.innerText || '').replace(/\s+/g, ' ').trim();
-    const rect = node.getBoundingClientRect();
-    if (!text || rect.width < 20 || rect.height < 12) return false;
-    return !/^(chat|search|message|messages|today|this conversation is now end-to-end encrypted)$/i.test(text);
+    return Boolean(text) && rect.width > 20 && rect.height > 12;
   }).length;
+
+  function bubbleText(node) {
+    if (!node) return '';
+    const parts = [];
+    for (const child of Array.from(node.querySelectorAll('span, div[dir="auto"]'))) {
+      const text = clean(child.innerText || '');
+      if (!text || isTimeText(text)) continue;
+      const style = getComputedStyle(child);
+      if (style.opacity === '0' || style.visibility === 'hidden' || style.display === 'none') continue;
+      parts.push(text);
+    }
+    return Array.from(new Set(parts)).join(' ').trim();
+  }
+  function clean(text) { return (text || '').replace(/\s+/g, ' ').trim(); }
+  function isTimeText(text) { return /^(\d{1,2}:\d{2}\s?(AM|PM)?|\d{1,2}:\d{2}|上午\s*\d{1,2}:\d{2}|下午\s*\d{1,2}:\d{2})$/i.test(text); }
 })()
 """
     value = cdp_eval(ws_url, script)
     return int(value) if isinstance(value, (int, float)) else 0
+
+
+def extract_dm_messages(ws_url: str) -> list[dict[str, str]]:
+    script = r"""
+(() => {
+  const panel = document.querySelector('[data-testid="dm-conversation-panel"]')
+    || document.querySelector('[data-testid="dm-conversation-content"]')
+    || document.querySelector('main')
+    || document.body;
+  const roots = Array.from(panel.querySelectorAll('div[data-testid^="message-"]'))
+    .filter((node) => !String(node.getAttribute('data-testid') || '').startsWith('message-text-'));
+  const out = [];
+  const seen = new Set();
+  for (const node of roots) {
+    const bubble = node.querySelector('[data-testid^="message-text-"]');
+    const text = bubbleText(bubble || node);
+    if (!text) continue;
+    const rect = node.getBoundingClientRect();
+    if (rect.width < 20 || rect.height < 12) continue;
+    const key = `${Math.round(rect.top)}:${text.slice(0, 120)}`;
+    if (seen.has(key)) continue;
+    seen.add(key);
+    const time = firstTimeText(bubble || node);
+    const classText = String(node.className || '');
+    out.push({
+      sender: classText.includes('justify-end') ? 'me' : 'other',
+      time,
+      text,
+    });
+  }
+  return out;
+
+  function bubbleText(node) {
+    if (!node) return '';
+    const leafParts = [];
+    for (const child of Array.from(node.querySelectorAll('span'))) {
+      const text = clean(child.innerText || '');
+      if (!text || isTimeText(text)) continue;
+      const style = getComputedStyle(child);
+      if (style.opacity === '0' || style.visibility === 'hidden' || style.display === 'none') continue;
+      leafParts.push(text);
+    }
+    if (leafParts.length) return Array.from(new Set(leafParts)).join(' ').trim();
+    const text = clean(node.innerText || '');
+    return stripTrailingTimes(text);
+  }
+  function firstTimeText(node) {
+    if (!node) return '';
+    for (const child of Array.from(node.querySelectorAll('span, div'))) {
+      const text = clean(child.innerText || '');
+      if (isTimeText(text)) return text;
+    }
+    const match = clean(node.innerText || '').match(/(\d{1,2}:\d{2}\s?(?:AM|PM)?|上午\s*\d{1,2}:\d{2}|下午\s*\d{1,2}:\d{2})/i);
+    return match ? match[1] : '';
+  }
+  function stripTrailingTimes(text) {
+    let value = clean(text);
+    for (let i = 0; i < 3; i += 1) {
+      value = value.replace(/\s+(\d{1,2}:\d{2}\s?(?:AM|PM)?|上午\s*\d{1,2}:\d{2}|下午\s*\d{1,2}:\d{2})$/i, '').trim();
+    }
+    return value;
+  }
+  function clean(text) { return (text || '').replace(/\s+/g, ' ').trim(); }
+  function isTimeText(text) { return /^(\d{1,2}:\d{2}\s?(AM|PM)?|\d{1,2}:\d{2}|上午\s*\d{1,2}:\d{2}|下午\s*\d{1,2}:\d{2})$/i.test(text); }
+})()
+"""
+    value = cdp_eval(ws_url, script)
+    if not isinstance(value, list):
+        return []
+    messages: list[dict[str, str]] = []
+    for item in value:
+        if not isinstance(item, dict):
+            continue
+        text = str(item.get("text") or "").strip()
+        if not text:
+            continue
+        messages.append(
+            {
+                "sender": "me" if str(item.get("sender") or "") == "me" else "other",
+                "time": str(item.get("time") or ""),
+                "text": text[:1000],
+            }
+        )
+    return messages
+
+
+def render_dm_messages(messages: list[dict[str, str]]) -> str:
+    lines = []
+    for message in messages:
+        sender = "me" if message.get("sender") == "me" else "other"
+        timestamp = f" {message.get('time')}" if message.get("time") else ""
+        lines.append(f"{sender}{timestamp}: {message.get('text') or ''}")
+    return "\n".join(lines)
+
+
+def extract_dm_conversation_text(ws_url: str) -> str:
+    script = r"""
+(() => {
+  const panel = document.querySelector('[data-testid="dm-conversation-panel"]') || document.querySelector('[data-testid="conversationPanel"]') || document.querySelector('main') || document.body;
+  return (panel.innerText || '').trim().slice(0, 12000);
+})()
+"""
+    value = cdp_eval(ws_url, script)
+    return str(value or "")
 
 
 def wait_for_dm_ready(ws_url: str, timeout_sec: int = 20) -> str:
@@ -372,7 +504,7 @@ def wait_for_dm_ready(ws_url: str, timeout_sec: int = 20) -> str:
         if extract_dm_thread_targets(ws_url):
             return text
         normalized = " ".join(text.lower().split())
-        empty_markers = ["no messages", "welcome to your inbox", "send a message to start a conversation"]
+        empty_markers = ["no messages", "welcome to your inbox"]
         if any(marker in normalized for marker in empty_markers):
             return text
         time.sleep(1)
@@ -436,7 +568,7 @@ def dm_messages_page_is_readable(ws_url: str, text: str) -> bool:
     if extract_dm_thread_targets(ws_url):
         return True
     normalized = " ".join(text.lower().split())
-    empty_markers = ["no messages", "welcome to your inbox", "send a message to start a conversation"]
+    empty_markers = ["no messages", "welcome to your inbox"]
     if any(marker in normalized for marker in empty_markers):
         return True
     return False
@@ -466,30 +598,82 @@ def extract_dm_thread_targets(ws_url: str) -> list[dict[str, Any]]:
     }
     return { replied: reasons.length > 0, reply_reason: reasons.join(',') };
   };
+  const timeMeta = (el) => {
+    const parts = [];
+    for (const node of Array.from(el.querySelectorAll('time'))) {
+      parts.push(clean(node.getAttribute('datetime') || ''));
+      parts.push(clean(node.getAttribute('title') || ''));
+      parts.push(clean(node.getAttribute('aria-label') || ''));
+      parts.push(clean(node.innerText || ''));
+    }
+    parts.push(clean(el.getAttribute('title') || ''));
+    parts.push(clean(el.getAttribute('aria-label') || ''));
+    return parts.filter(Boolean).join(' ');
+  };
 
-  for (const a of document.querySelectorAll('a[href^="/messages/"], a[href*="x.com/messages/"]')) {
+  for (const a of document.querySelectorAll('a[href^="/messages/"], a[href^="/i/chat/"], a[href*="x.com/messages/"], a[href*="x.com/i/chat/"]')) {
     if (!visible(a)) continue;
     const url = new URL(a.getAttribute('href'), location.href);
     url.search = '';
     url.hash = '';
     const label = clean(a.innerText || a.getAttribute('aria-label') || '');
-    if (!/^https:\/\/(x|twitter)\.com\/messages\/[^/]+/.test(url.href)) continue;
+    if (!/^https:\/\/(x|twitter)\.com\/(messages\/[^/]+|i\/chat\/[^/]+)/.test(url.href)) continue;
     if (/\/messages\/compose$/.test(url.pathname)) continue;
     if (!label || ignoredText.test(label) || ignoredShortText.test(label)) continue;
     const key = url.href;
     if (seen.has(key)) continue;
     seen.add(key);
     const meta = replyMeta(a, label);
-    out.push({ target_type: 'link', url: url.href, label, ...meta });
+    const rect = a.getBoundingClientRect();
+    out.push({
+      target_type: 'link',
+      url: url.href,
+      label,
+      time_hint: timeMeta(a),
+      x: rect.left + Math.min(rect.width / 2, 280),
+      y: rect.top + rect.height / 2,
+      ...meta
+    });
   }
 
-  const candidates = Array.from(document.querySelectorAll('[role="button"], [data-testid*="conversation" i], [data-testid*="cell" i]'));
+  const hasThreadMarker = (label) => (
+    /\byou\s*[:：]|\byou sent\b|\byou replied\b|\byou responded\b|你\s*[:：]|你已发送|你发送|您\s*[:：]/i.test(label)
+    || /\b(now|just now|\d+\s*(m|min|mins|minute|minutes|h|hr|hrs|hour|hours))\b/i.test(label)
+    || /(刚刚|\d+\s*(秒|分钟|小时)|今天|今日|上午|下午|晚上|中午)/.test(label)
+  );
+
+  const candidates = Array.from(document.querySelectorAll([
+    '[role="button"]',
+    '[role="link"]',
+    '[data-testid*="conversation" i]',
+    '[data-testid*="cell" i]',
+    '[data-testid="cellInnerDiv"]',
+    'a[href*="/messages/"]',
+    'div[aria-label]',
+    'section div',
+    'aside div'
+  ].join(',')));
   for (const node of candidates) {
     if (!visible(node)) continue;
-    const label = clean(node.innerText || node.getAttribute('aria-label') || '');
+    let label = clean(node.innerText || node.getAttribute('aria-label') || '');
     if (!label || label.length < 2 || ignoredText.test(label) || ignoredShortText.test(label)) continue;
+    if (label.length > 600) continue;
     if (!/[A-Za-z0-9_\u4e00-\u9fff]/.test(label)) continue;
-    const link = node.querySelector && node.querySelector('a[href*="/messages/"]');
+    let rect = node.getBoundingClientRect();
+    const link = node.querySelector && node.querySelector('a[href*="/messages/"], a[href*="/i/chat/"]');
+    if (link) {
+      const linkLabel = clean(link.innerText || link.getAttribute('aria-label') || '');
+      const linkRect = link.getBoundingClientRect();
+      if (linkLabel && hasThreadMarker(linkLabel) && linkRect.width > 40 && linkRect.height > 24) {
+        label = linkLabel;
+        rect = linkRect;
+      }
+    }
+    if (!link && rect.left < 150) continue;
+    if (!link && rect.height > 220) continue;
+    const isLikelyListRow = rect.left < Math.min(760, window.innerWidth * 0.45) && rect.width > 160 && rect.height >= 36 && rect.height < 180;
+    if (!link && !hasThreadMarker(label)) continue;
+    if (!node.matches('[role="button"], [role="link"], [data-testid*="conversation" i], [data-testid*="cell" i], [data-testid="cellInnerDiv"], a[href*="/messages/"], div[aria-label]') && (!isLikelyListRow || !hasThreadMarker(label))) continue;
     let url = '';
     if (link) {
       const parsed = new URL(link.getAttribute('href'), location.href);
@@ -497,7 +681,6 @@ def extract_dm_thread_targets(ws_url: str) -> list[dict[str, Any]]:
       parsed.hash = '';
       url = parsed.href;
     }
-    const rect = node.getBoundingClientRect();
     const key = url || `${Math.round(rect.left)}:${Math.round(rect.top)}:${label.slice(0, 80)}`;
     if (seen.has(key)) continue;
     seen.add(key);
@@ -506,6 +689,7 @@ def extract_dm_thread_targets(ws_url: str) -> list[dict[str, Any]]:
       target_type: url ? 'row_link' : 'row_click',
       url,
       label,
+      time_hint: timeMeta(node),
       x: rect.left + Math.min(rect.width / 2, 280),
       y: rect.top + rect.height / 2,
       ...meta
@@ -525,9 +709,10 @@ def extract_dm_thread_targets(ws_url: str) -> list[dict[str, Any]]:
                     "target_type": str(item.get("target_type") or ""),
                     "url": str(item.get("url") or ""),
                     "label": str(item.get("label") or ""),
+                    "time_hint": str(item.get("time_hint") or ""),
                     "replied": bool(item.get("replied")) or dm_target_has_self_reply(str(item.get("label") or "")),
                     "reply_reason": str(item.get("reply_reason") or ""),
-                    "today": dm_target_is_today(str(item.get("label") or "")),
+                    "today": dm_target_is_today(str(item.get("label") or ""), str(item.get("time_hint") or "")),
                     "x": float(item.get("x") or 0),
                     "y": float(item.get("y") or 0),
                 }
@@ -535,8 +720,11 @@ def extract_dm_thread_targets(ws_url: str) -> list[dict[str, Any]]:
     return dedupe_dm_targets(out)
 
 
-def dm_target_is_today(label: str) -> bool:
-    normalized = " ".join(label.lower().split())
+def dm_target_is_today(label: str, time_hint: str = "") -> bool:
+    combined = " ".join(part for part in (time_hint, label) if part)
+    if dm_time_hint_is_today(time_hint):
+        return True
+    normalized = " ".join(combined.lower().split())
     if not normalized:
         return False
     if re.search(r"\b(now|just now|sec|secs|second|seconds|min|mins|minute|minutes|h|hr|hrs|hour|hours)\b", normalized):
@@ -547,6 +735,22 @@ def dm_target_is_today(label: str) -> bool:
         return True
     if re.search(r"\b(yesterday|d|day|days|w|week|weeks|mo|month|months|y|year|years)\b|昨天|周|週|月|年", normalized):
         return False
+    return False
+
+
+def dm_time_hint_is_today(value: str) -> bool:
+    if not value:
+        return False
+    today = dt.datetime.now().astimezone().date()
+    for match in re.findall(r"\d{4}-\d{2}-\d{2}(?:[T ][0-9:.+-Z]*)?", value):
+        try:
+            parsed = dt.datetime.fromisoformat(match.replace("Z", "+00:00"))
+        except ValueError:
+            continue
+        if parsed.tzinfo is None:
+            parsed = parsed.replace(tzinfo=dt.datetime.now().astimezone().tzinfo)
+        if parsed.astimezone().date() == today:
+            return True
     return False
 
 
@@ -565,6 +769,8 @@ def dedupe_dm_targets(targets: list[dict[str, Any]]) -> list[dict[str, Any]]:
         reasons = {part for part in str(existing.get("reply_reason") or "").split(",") if part}
         reasons.update(part for part in str(target.get("reply_reason") or "").split(",") if part)
         existing["reply_reason"] = ",".join(sorted(reasons))
+        if not existing.get("time_hint") and target.get("time_hint"):
+            existing["time_hint"] = target["time_hint"]
         if not existing.get("url") and target.get("url"):
             existing["url"] = target["url"]
             existing["target_type"] = target.get("target_type") or existing.get("target_type")
@@ -690,10 +896,10 @@ def render_markdown(data: dict[str, Any]) -> str:
             lines.append(
                 "DM 会话统计: "
                 f"今日可见 `{int(page.get('dm_visible_thread_count') or 0)}` / "
-                f"已回复 `{int(page.get('dm_replied_thread_count') or 0)}` / "
-                f"未回复 `{int(page.get('dm_unreplied_thread_count') or 0)}`"
+                f"最后我发出 `{int(page.get('dm_replied_thread_count') or 0)}` / "
+                f"等我回复 `{int(page.get('dm_unreplied_thread_count') or 0)}`"
             )
-            lines.append(f"DM 消息统计: 已打开未回复会话中捕获消息气泡 `{int(page.get('dm_captured_message_count') or 0)}`")
+            lines.append(f"DM 消息统计: 已打开等我回复会话中捕获消息气泡 `{int(page.get('dm_captured_message_count') or 0)}`")
             if page.get("dm_note"):
                 lines.append(str(page["dm_note"]))
         if page.get("collection_error"):
@@ -703,7 +909,7 @@ def render_markdown(data: dict[str, Any]) -> str:
             lines.extend(["", f"### DM thread: {participant}", ""])
             if participant:
                 lines.append(f"会话对象: `{participant}`")
-                lines.append(f"回复状态: `{'已回复' if thread.get('replied') else '未回复'}`")
+                lines.append(f"会话状态: `{'最后我发出' if thread.get('replied') else '等我回复'}`")
                 lines.append(f"消息数量: `{int(thread.get('message_count') or 0)}`")
                 lines.append("发信人判断: 使用会话对象/消息气泡判断；引用帖、转发卡片或链接预览里的作者不是 DM 发信人。")
                 lines.append("")
@@ -936,6 +1142,10 @@ def main() -> None:
         }
         for page in pages:
             print(f"Collecting {page['kind']}: {page['url']}")
+            if page["kind"] == "messages" and headless:
+                stop_browser(proc)
+                proc, port = launch_browser(profile_dir, "https://x.com/messages", headless=True)
+                wait_for_login(port, args.login_timeout_sec, interactive=False)
             result = collect_page(port, page, args.scrolls, args.dm_threads)
             if page["kind"] == "messages" and result.get("dm_status") == "blocked_by_x_chat_passcode":
                 if args.non_interactive:

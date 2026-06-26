@@ -43,7 +43,7 @@ def summarize_current_run(data: dict[str, Any]) -> dict[str, Any]:
     generated_at = str(data.get("generated_at") or now_iso())
     post_counts: dict[str, dict[str, int]] = {}
     dm_status = "not_requested"
-    dm_counts = {"visible": 0, "replied": 0, "unreplied": 0, "captured_messages": 0}
+    dm_counts = {"visible": 0, "last_from_me": 0, "waiting_reply": 0, "captured_messages": 0}
 
     for page in data.get("pages", []):
         if not isinstance(page, dict):
@@ -55,8 +55,8 @@ def summarize_current_run(data: dict[str, Any]) -> dict[str, Any]:
             dm_status = str(page.get("dm_status") or "unknown")
             dm_counts = {
                 "visible": int(page.get("dm_visible_thread_count") or 0),
-                "replied": int(page.get("dm_replied_thread_count") or 0),
-                "unreplied": int(page.get("dm_unreplied_thread_count") or 0),
+                "last_from_me": int(page.get("dm_replied_thread_count") or 0),
+                "waiting_reply": int(page.get("dm_unreplied_thread_count") or 0),
                 "captured_messages": int(page.get("dm_captured_message_count") or 0),
             }
 
@@ -90,9 +90,9 @@ def build_digest_facts(data: dict[str, Any], summary: dict[str, Any]) -> dict[st
                 "Use only this run's digest context as content.",
                 "Do not use historical memory or older runs.",
                 "Use DM conversation counts and message counts as separate units.",
-                "Only unreplied DM threads are opened for content.",
+                "Only threads whose latest preview is not from the user are opened for content.",
                 "Do not treat embedded post authors as DM senders.",
-                "Count low-value unreplied DMs but do not expand spam, phishing, generic promotions, or repeated junk.",
+                "Count low-value waiting-reply DMs but do not expand spam, phishing, generic promotions, or repeated junk.",
             ],
         },
         "public": {"counts": summary.get("post_counts") or {}, "items": []},
@@ -128,7 +128,7 @@ def build_digest_facts(data: dict[str, Any], summary: dict[str, Any]) -> dict[st
                         "participant": thread.get("participant") or thread.get("label") or thread.get("url") or "",
                         "url": thread.get("url") or "",
                         "label": thread.get("label") or "",
-                        "reply_state": "replied" if thread.get("replied") else "unreplied",
+                        "reply_state": "last_from_me" if thread.get("replied") else "waiting_reply",
                         "message_count": int(thread.get("message_count") or 0),
                         "should_summarize": assessment["should_summarize"],
                         "noise_reason": assessment["noise_reason"],
@@ -164,7 +164,7 @@ def assess_dm_thread(thread: dict[str, Any]) -> dict[str, Any]:
     if not text:
         return {"should_summarize": False, "noise_reason": "empty_thread_text"}
     if bool(thread.get("replied")):
-        return {"should_summarize": False, "noise_reason": "already_replied"}
+        return {"should_summarize": False, "noise_reason": "last_message_from_me"}
     spam_patterns = [
         r"airdrop",
         r"giveaway",
@@ -210,10 +210,10 @@ def render_digest_input(data: dict[str, Any]) -> str:
             lines.append(
                 "DM 会话统计: "
                 f"今日可见 `{int(page.get('dm_visible_thread_count') or 0)}` / "
-                f"已回复 `{int(page.get('dm_replied_thread_count') or 0)}` / "
-                f"未回复 `{int(page.get('dm_unreplied_thread_count') or 0)}`"
+                f"最后我发出 `{int(page.get('dm_replied_thread_count') or 0)}` / "
+                f"等我回复 `{int(page.get('dm_unreplied_thread_count') or 0)}`"
             )
-            lines.append(f"DM 消息统计: 已打开未回复会话中捕获消息气泡 `{int(page.get('dm_captured_message_count') or 0)}`")
+            lines.append(f"DM 消息统计: 已打开等我回复会话中捕获消息气泡 `{int(page.get('dm_captured_message_count') or 0)}`")
             if page.get("dm_note"):
                 lines.append(str(page["dm_note"]))
         if page.get("collection_error"):
@@ -224,7 +224,7 @@ def render_digest_input(data: dict[str, Any]) -> str:
             participant = thread.get("participant") or thread.get("label") or thread.get("url")
             lines.extend(["", f"### DM thread [current]: {participant}", ""])
             lines.append(f"会话对象: `{participant}`")
-            lines.append(f"回复状态: `{'已回复' if thread.get('replied') else '未回复'}`")
+            lines.append(f"会话状态: `{'最后我发出' if thread.get('replied') else '等我回复'}`")
             lines.append(f"消息数量: `{int(thread.get('message_count') or 0)}`")
             lines.append("发信人判断: 使用会话对象/消息气泡判断；引用帖、转发卡片或链接预览里的作者不是 DM 发信人。")
             lines.extend(["", str(thread.get("text") or "")[:3000]])
@@ -258,8 +258,8 @@ def render_digest_context(summary: dict[str, Any], facts: dict[str, Any]) -> str
             (
                 "- DM counts: "
                 f"today visible `{(summary.get('dm_counts') or {}).get('visible', 0)}`, "
-                f"replied `{(summary.get('dm_counts') or {}).get('replied', 0)}`, "
-                f"unreplied `{(summary.get('dm_counts') or {}).get('unreplied', 0)}`, "
+                f"last_from_me `{(summary.get('dm_counts') or {}).get('last_from_me', 0)}`, "
+                f"waiting_reply `{(summary.get('dm_counts') or {}).get('waiting_reply', 0)}`, "
                 f"captured messages `{(summary.get('dm_counts') or {}).get('captured_messages', 0)}`"
             ),
             "",
@@ -295,11 +295,11 @@ def render_digest_facts(facts: dict[str, Any]) -> str:
         (
             "- counts: "
             f"today visible `{dm_counts.get('visible', 0)}`, "
-            f"replied `{dm_counts.get('replied', 0)}`, "
-            f"unreplied `{dm_counts.get('unreplied', 0)}`, "
+            f"last_from_me `{dm_counts.get('last_from_me', 0)}`, "
+            f"waiting_reply `{dm_counts.get('waiting_reply', 0)}`, "
             f"captured messages `{dm_counts.get('captured_messages', 0)}`"
         ),
-        "- rule: summarize only unreplied threads with `should_summarize: true`; count noise but do not expand it.",
+        "- rule: summarize only `waiting_reply` threads with `should_summarize: true`; count noise but do not expand it.",
     ]
     if dms.get("note"):
         lines.append(f"- note: {dms.get('note')}")
