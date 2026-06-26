@@ -9,7 +9,7 @@ import subprocess
 import sys
 from pathlib import Path
 
-from memory import DEFAULT_MEMORY_DIR, update_from_file
+from digest_context import build_current_context_from_file
 
 
 STATE_DIR = Path(__file__).resolve().parents[1] / ".state"
@@ -32,10 +32,6 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--headless", action="store_true", help="Run browser collection headlessly. This is the default when login is already saved.")
     parser.add_argument("--headed", action="store_true", help="Force a visible browser window for debugging or manual login.")
     parser.add_argument("--non-interactive", action="store_true", help="Do not open a visible browser for DM passcode recovery; record a data gap instead.")
-    parser.add_argument("--memory-dir", default=str(DEFAULT_MEMORY_DIR))
-    parser.add_argument("--no-memory", action="store_true", help="Do not update local digest memory after collection.")
-    parser.add_argument("--seen-retention-days", type=int, default=60)
-    parser.add_argument("--daily-retention-days", type=int, default=90)
     return parser.parse_args()
 
 
@@ -97,26 +93,17 @@ def main() -> None:
         cmd.append("--non-interactive")
     subprocess.run(cmd, check=True)
     out_dir = Path(args.out)
-    memory_result = None
-    if not args.no_memory:
-        memory_result = update_from_file(
-            input_path=out_dir / "digest-input.json",
-            markdown_path=out_dir / "digest-input.md",
-            out_dir=out_dir,
-            memory_dir=Path(args.memory_dir).expanduser().resolve(),
-            include_dms=include_dms,
-            dm_threads=args.dm_threads,
-            seen_retention_days=args.seen_retention_days,
-            daily_retention_days=args.daily_retention_days,
-        )
+    build_current_context_from_file(
+        input_path=out_dir / "digest-input.json",
+        markdown_path=out_dir / "digest-input.md",
+        out_dir=out_dir,
+    )
     result = {
-        "summary_primary_markdown": str(out_dir / "digest-context.md"),
-        "digest_markdown": str(out_dir / "digest-input.md"),
-        "digest_json": str(out_dir / "digest-input.json"),
-        "digest_context_markdown": str(out_dir / "digest-context.md"),
-        "digest_context_json": str(out_dir / "digest-context.json"),
-        "memory_file": None if memory_result is None else memory_result.get("memory_file"),
-        "daily_archive_dir": None if memory_result is None else memory_result.get("daily_dir"),
+        "ai_input_markdown": str(out_dir / "digest-context.md"),
+        "ai_input_json": str(out_dir / "digest-context.json"),
+        "debug_raw_markdown": str(out_dir / "digest-input.md"),
+        "debug_raw_json": str(out_dir / "digest-input.json"),
+        "memory": "disabled",
     }
     print(json.dumps(result, ensure_ascii=False, indent=2))
 

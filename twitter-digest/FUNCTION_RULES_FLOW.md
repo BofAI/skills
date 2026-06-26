@@ -43,18 +43,10 @@ twitter-digest/.state/run/digest-context.md
 
 用途：
 
-- `digest-context.md/json`：最终总结主输入，包含 memory context 和归一化后的 `Final Summary Facts`。
+- `digest-context.md/json`：最终总结主输入，包含本次采集归一化后的 `Final Summary Facts`。
 - `digest-input.md/json`：原始浏览器采集结果，只在需要核对细节或排查抓取问题时使用。
 
-长期 memory 保存在：
-
-```text
-twitter-digest/.state/config.json
-twitter-digest/.state/memory.json
-twitter-digest/.state/daily/
-```
-
-长期 memory 不保存 DM 原文。
+不生成长期 `memory.json`，不生成 `daily/` 历史归档。
 `twitter-digest/.state/run/` 会尽量设置为 700 权限，避免把当次 DM 原文放到全局可读的 `/tmp`。
 
 ## 3. 运行规则
@@ -69,7 +61,7 @@ twitter-digest/.state/daily/
 - 支持 `--non-interactive`，定时任务遇到 passcode 时跳过 DM 恢复并记录数据缺口，不阻塞等待。
 - 不自动发送消息、回复、点赞、关注、拉黑、打开可疑链接或接受 DM 请求。
 - 只生成摘要和建议回复草稿。
-- DM 原文只用于当次总结，不写入长期 memory。
+- DM 原文只用于当次总结，不写入长期状态文件。
 
 ## 4. 首次运行流程
 
@@ -91,11 +83,11 @@ twitter-digest/.state/daily/
 
 7. 脚本采集 timeline、mentions、own profile、DM。
 
-8. 脚本生成 `twitter-digest/.state/run/*` 当次采集文件，并在 memory 更新后给公开条目标记 `[new]` / `[repeat]`。
+8. 脚本生成 `twitter-digest/.state/run/*` 当次采集文件。
 
-9. 脚本更新 `twitter-digest/.state/memory.json`。
+9. Agent 只读取 `twitter-digest/.state/run/digest-context.md` 生成中文日报。
 
-10. Agent 读取采集文件，生成中文日报。
+10. `digest-input.*` 只在排查抓取问题时使用。
 
 ## 5. 后续运行流程
 
@@ -151,28 +143,9 @@ DM 默认读取。
 隐私规则：
 
 - 不长期保存 DM 原文。
-- 不把 DM 原文写入 `memory.json`。
-- 不把 DM 原文写入 `daily/` 归档。
-- 只保存 DM thread 状态签名和处理状态。
-
-## 8. Memory 规则
-
-memory 用来识别新增、重复和延续内容。
-
-长期保存：
-
-- 当前账号 handle
-- 用户偏好
-- 已见公开帖子 URL
-- DM thread 状态签名
-- 每日运行记录
-- 脱敏后的每日归档
-
-保留策略：
-
-- 已见公开帖子和 DM thread 状态默认保留 60 天。
-- 脱敏 daily 归档默认保留 90 天。
-- 归档日期使用本地时区日期，不使用 UTC 日期。
+- 不写 `memory.json`。
+- 不写 `daily/` 历史归档。
+- 不保存 DM thread 状态签名。
 
 不保存：
 
@@ -182,7 +155,7 @@ memory 用来识别新增、重复和延续内容。
 - passcode
 - 浏览器截图
 
-## 9. 常用命令
+## 8. 常用命令
 
 生成今日 X 日报：
 
@@ -274,9 +247,8 @@ rm -rf twitter-digest/.state/chrome-profile
 
    ```text
    twitter-digest/.state/run/digest-context.md
-   twitter-digest/.state/run/digest-input.md
    ```
 
-   生成日报时优先读 `digest-context.md`，只在事实不清楚时再查 `digest-input.md`。
+   生成日报只读 `digest-context.md`。`digest-input.*` 只给开发排查抓取问题。
 
 6. 再运行一次同样命令，确认后续默认 headless，不再弹浏览器窗口。

@@ -47,7 +47,7 @@ Outputs:
 
 - `twitter-digest/.state/run/digest-input.json`: raw browser capture.
 - `twitter-digest/.state/run/digest-input.md`: readable raw browser capture.
-- `twitter-digest/.state/run/digest-context.json`: memory context plus normalized facts.
+- `twitter-digest/.state/run/digest-context.json`: normalized current-run facts.
 - `twitter-digest/.state/run/digest-context.md`: primary final summary input. Read this first.
 
 ## Browser Collection Rules
@@ -75,24 +75,20 @@ Optional pages:
 
 - `keyword_N`: explicit search queries, only when `--keywords` is provided.
 
-## Memory
+## Run Outputs
 
-Memory files:
+Current-run files:
 
 - `twitter-digest/.state/config.json`: account defaults and preferences.
-- `twitter-digest/.state/memory.json`: seen public post URLs, DM thread status signatures, account metadata, and run history.
-- `twitter-digest/.state/daily/YYYY-MM-DD.json`: sanitized daily archive.
-- `twitter-digest/.state/daily/YYYY-MM-DD.md`: sanitized markdown archive.
-- `twitter-digest/.state/run/digest-input.*`: current run raw capture, including raw DM text only for immediate verification.
-- `twitter-digest/.state/run/digest-context.*`: current run final summary input, including memory context and normalized facts.
+- `twitter-digest/.state/run/digest-context.md`: the only normal input for AI daily-summary writing.
+- `twitter-digest/.state/run/digest-context.json`: machine-readable current-run facts.
+- `twitter-digest/.state/run/digest-input.*`: raw browser capture for debugging only.
 
-Privacy rule: do not persist raw DM text in memory or daily archives. Raw DM text may exist only in the current run's private `twitter-digest/.state/run/digest-input.*` and `digest-context.*` files for immediate summarization. Use `digest-context.md` as the primary final input; use `digest-input.md` only as raw backup.
+Privacy rule: do not write long-term memory or daily archives. Raw DM text may exist only in the current run's private `twitter-digest/.state/run/digest-input.*` and `digest-context.*` files for immediate summarization/debugging. Use only `digest-context.md` for normal final summaries.
 
-Retention and date rules:
+Date rule:
 
-- Seen public posts and DM thread signatures are pruned after 60 days by default.
-- Sanitized daily archives are pruned after 90 days by default.
-- Run dates and archive names use the user's local timezone, not UTC.
+- Run dates use the user's local timezone, not UTC.
 
 ## Hotspot Detection
 

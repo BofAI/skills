@@ -9,7 +9,7 @@ description: Use when the user wants Claude Code or another agent to analyze the
 
 Use this skill to produce a concise Chinese daily digest from the user's own X/Twitter account. The only supported access path is local browser collection with a persistent dedicated Chromium profile.
 
-Load `references/x-twitter-digest.md` when you need implementation details, browser workflow rules, memory behavior, or the scoring rubric.
+Load `references/x-twitter-digest.md` when you need implementation details, browser workflow rules, current-run context behavior, or the scoring rubric.
 
 ## Browser-Only Access
 
@@ -43,7 +43,7 @@ Default scope:
 - Today's visible DM conversations, with only unreplied conversations opened for content.
 - Optional keyword searches only when the user explicitly passes `--keywords`.
 
-Read `twitter-digest/.state/run/digest-context.md` first before writing the Chinese digest. Its `Final Summary Facts` section is the primary normalized input. Use `digest-input.md` only as raw capture for detail verification when the facts are ambiguous.
+Read only `twitter-digest/.state/run/digest-context.md` when writing the Chinese digest. Its `Final Summary Facts` section is the content source for the final summary. Use `digest-input.md` only when debugging collection issues, not during normal summarization. Do not add content from older runs.
 
 ## Install
 
@@ -59,24 +59,17 @@ The installer moves old `twitter-briefing`, `twitter-briefing.bak`, or existing 
 
 Claude Code or other agents can use the installed skill by running the same browser scripts.
 
-## Memory
+## Run Outputs
 
-`scripts/run_daily_digest.py` updates local memory by default:
+`scripts/run_daily_digest.py` does not write long-term memory. Each run writes only current-run files:
 
 - `twitter-digest/.state/config.json`: account defaults and preferences.
-- `twitter-digest/.state/memory.json`: account metadata, seen public post URLs, DM thread status signatures, and run history.
-- `twitter-digest/.state/daily/YYYY-MM-DD.json`: sanitized daily archive.
-- `twitter-digest/.state/daily/YYYY-MM-DD.md`: sanitized daily archive.
-- `twitter-digest/.state/run/digest-input.md`: current run raw browser capture, annotated with `[new]` / `[repeat]` for public posts.
-- `twitter-digest/.state/run/digest-context.md`: primary final summary input. It includes memory context plus normalized `Final Summary Facts`.
+- `twitter-digest/.state/run/digest-context.md`: the only normal input for AI daily-summary writing.
+- `twitter-digest/.state/run/digest-context.json`: machine-readable version of the same normalized facts.
+- `twitter-digest/.state/run/digest-input.md`: raw browser capture for debugging only.
+- `twitter-digest/.state/run/digest-input.json`: raw machine-readable browser capture for debugging only.
 
-Long-term memory must not store raw DM text. Raw DM text or DM excerpts may exist only in the current run's private `twitter-digest/.state/run/digest-input.*` and `digest-context.*` files for immediate summarization. The run directory is created with owner-only permissions where supported.
-
-Memory retention defaults:
-
-- Seen public posts and DM thread signatures: 60 days.
-- Sanitized daily archives: 90 days.
-- Run dates use the user's local timezone, not UTC.
+No `memory.json` or `daily/` archive is produced. Raw DM text or DM excerpts may exist only in the current run's private `twitter-digest/.state/run/digest-input.*` and `digest-context.*` files for immediate summarization/debugging. The run directory is created with owner-only permissions where supported. Run dates use the user's local timezone.
 
 ## Workflow
 
