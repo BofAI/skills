@@ -26,7 +26,9 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--keywords", default="", help="Comma-separated keywords or queries for hotspot search.")
     parser.add_argument("--out", default=str(default_state_dir / "run"), help="Output directory.")
     parser.add_argument("--profile-dir", default=str(default_state_dir / "chrome-profile"))
-    parser.add_argument("--scrolls", type=int, default=4, help="Scroll rounds per page.")
+    parser.add_argument("--scrolls", type=int, default=40, help="Maximum scroll rounds per public page.")
+    parser.add_argument("--max-public-items", type=int, default=300, help="Maximum public post items kept per run.")
+    parser.add_argument("--public-window-hours", type=int, default=24, help="Stop loading older public timeline items once posts beyond this window are detected.")
     parser.add_argument("--login-timeout-sec", type=int, default=300)
     parser.add_argument("--include-dms", action="store_true", help="Also visit X messages and capture visible conversation text.")
     parser.add_argument("--dm-threads", type=int, default=5, help="Maximum recent DM threads to open when --include-dms is set.")
@@ -180,6 +182,8 @@ def collect_page(
     dm_scrolls: int = 40,
     dm_max_messages: int = 300,
     dm_window_hours: int = 24,
+    max_public_items: int = 300,
+    public_window_hours: int = 24,
 ) -> dict[str, Any]:
     ws_url = wait_for_cdp_page_ws(port)
     cdp_call(ws_url, "Page.enable")
@@ -201,13 +205,64 @@ def collect_page(
             time.sleep(8)
             extra = collect_messages_page(ws_url, dm_threads, dm_scrolls, dm_max_messages, dm_window_hours)
         return {"kind": page["kind"], "url": page["url"], "items": [], **extra}
+    extra = collect_public_items(ws_url, max_scrolls=scrolls, max_items=max_public_items, window_hours=public_window_hours)
+    return {"kind": page["kind"], "url": page["url"], **extra}
+
+
+def collect_public_items(ws_url: str, max_scrolls: int, max_items: int, window_hours: int) -> dict[str, Any]:
     posts: list[dict[str, Any]] = []
-    for _ in range(max(scrolls, 1)):
-        posts.extend(extract_articles(ws_url))
+    scroll_limit = max(1, int(max_scrolls))
+    item_limit = max(1, int(max_items))
+    window = max(1, int(window_hours))
+    stagnant_rounds = 0
+    previous_count = 0
+    window_exceeded = False
+
+    for scroll_index in range(scroll_limit):
+        posts = dedupe_items([*posts, *extract_articles(ws_url)])
+        if len(posts) >= item_limit:
+            break
+        window_exceeded = public_posts_beyond_window(posts, window)
+        if window_exceeded:
+            break
+        if len(posts) <= previous_count:
+            stagnant_rounds += 1
+        else:
+            stagnant_rounds = 0
+        if stagnant_rounds >= 4:
+            break
+        previous_count = len(posts)
         cdp_eval(ws_url, "window.scrollBy(0, Math.max(900, window.innerHeight * 0.9));")
-        time.sleep(2)
-    posts.extend(extract_articles(ws_url))
-    return {"kind": page["kind"], "url": page["url"], "items": dedupe_items(posts)}
+        time.sleep(2 if scroll_index < 3 else 1)
+
+    posts = dedupe_items([*posts, *extract_articles(ws_url)])
+    if len(posts) > item_limit:
+        posts = posts[:item_limit]
+    return {
+        "items": posts,
+        "public_scrolls_used": min(scroll_limit, max(0, scroll_index + 1 if "scroll_index" in locals() else 0)),
+        "public_window_exceeded": window_exceeded,
+        "public_max_items": item_limit,
+        "public_window_hours": window,
+    }
+
+
+def public_posts_beyond_window(posts: list[dict[str, Any]], window_hours: int) -> bool:
+    now = dt.datetime.now(dt.timezone.utc)
+    oldest_age = 0.0
+    for post in posts:
+        timestamp = str(post.get("time") or "")
+        if not timestamp:
+            continue
+        try:
+            parsed = dt.datetime.fromisoformat(timestamp.replace("Z", "+00:00"))
+        except ValueError:
+            continue
+        if parsed.tzinfo is None:
+            parsed = parsed.replace(tzinfo=dt.timezone.utc)
+        age = (now - parsed.astimezone(dt.timezone.utc)).total_seconds() / 3600
+        oldest_age = max(oldest_age, age)
+    return oldest_age > max(1, int(window_hours))
 
 
 def collect_messages_page(ws_url: str, dm_threads: int, dm_scrolls: int, dm_max_messages: int, dm_window_hours: int) -> dict[str, Any]:
@@ -1460,7 +1515,17 @@ def main() -> None:
                 stop_browser(proc)
                 proc, port = launch_browser(profile_dir, "https://x.com/messages", headless=True)
                 wait_for_login(port, args.login_timeout_sec, interactive=False)
-            result = collect_page(port, page, args.scrolls, args.dm_threads, args.dm_scrolls, args.dm_max_messages, args.dm_window_hours)
+            result = collect_page(
+                port,
+                page,
+                args.scrolls,
+                args.dm_threads,
+                args.dm_scrolls,
+                args.dm_max_messages,
+                args.dm_window_hours,
+                args.max_public_items,
+                args.public_window_hours,
+            )
             if page["kind"] == "messages" and result.get("dm_status") == "blocked_by_x_chat_passcode":
                 if args.non_interactive:
                     result["dm_note"] = "X Chat passcode is required. Non-interactive mode skipped DM recovery for this run."
@@ -1474,7 +1539,17 @@ def main() -> None:
                     headless = False
                     wait_for_login(port, args.login_timeout_sec, interactive=True)
                 if wait_for_dm_passcode_resolution(port, args.login_timeout_sec):
-                    result = collect_page(port, page, args.scrolls, args.dm_threads, args.dm_scrolls, args.dm_max_messages, args.dm_window_hours)
+                    result = collect_page(
+                        port,
+                        page,
+                        args.scrolls,
+                        args.dm_threads,
+                        args.dm_scrolls,
+                        args.dm_max_messages,
+                        args.dm_window_hours,
+                        args.max_public_items,
+                        args.public_window_hours,
+                    )
                     if resume_headless_after_passcode:
                         print("X Chat passcode was completed. DM collection finished in the visible browser; returning to headless mode...")
                         stop_browser(proc)

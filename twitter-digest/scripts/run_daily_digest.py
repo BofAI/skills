@@ -31,7 +31,9 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--dm-scrolls", type=int, default=40, help="Maximum upward scroll rounds per opened DM thread.")
     parser.add_argument("--dm-max-messages", type=int, default=300, help="Maximum message bubbles kept per opened DM thread.")
     parser.add_argument("--dm-window-hours", type=int, default=24, help="Stop loading older DM history once messages beyond this window are detected.")
-    parser.add_argument("--scrolls", type=int, default=4)
+    parser.add_argument("--scrolls", type=int, default=40, help="Maximum scroll rounds per public page.")
+    parser.add_argument("--max-public-items", type=int, default=300, help="Maximum public post items kept per run.")
+    parser.add_argument("--public-window-hours", type=int, default=24, help="Stop loading older public timeline items once posts beyond this window are detected.")
     parser.add_argument("--headless", action="store_true", help="Run browser collection headlessly. This is the default when login is already saved.")
     parser.add_argument("--headed", action="store_true", help="Force a visible browser window for debugging or manual login.")
     parser.add_argument("--non-interactive", action="store_true", help="Do not open a visible browser for DM passcode recovery; record a data gap instead.")
@@ -76,6 +78,10 @@ def main() -> None:
         args.out,
         "--scrolls",
         str(args.scrolls),
+        "--max-public-items",
+        str(args.max_public_items),
+        "--public-window-hours",
+        str(args.public_window_hours),
         "--dm-threads",
         str(args.dm_threads),
         "--dm-scrolls",

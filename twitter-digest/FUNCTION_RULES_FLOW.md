@@ -14,6 +14,13 @@
 
 默认不采集关键词。只有显式传 `--keywords` 时才做关键词搜索。
 
+公开页采集范围：
+
+- timeline、profile、mentions 默认按日报目标加载近 24 小时内容。
+- 每个公开页默认最多滚动 40 次，并最多保留 300 条公开帖子进入 `digest-context`。
+- 如果已加载帖子的时间戳显示已经超过 24 小时窗口，会提前停止滚动。
+- 公开帖子数量表示“本次浏览器加载到的帖子”，不是完整 X 历史。
+
 ## 2. 数据保存位置
 
 安装脚本会把旧的 `twitter-briefing`、`twitter-briefing.bak` 或已有 `twitter-digest` 安装迁移到 `~/.claude/skills/.backups/`，并把备份里的 `SKILL.md` 改成 `SKILL.md.disabled`，避免 Claude Code 加载重复旧 skill。

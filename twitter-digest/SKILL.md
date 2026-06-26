@@ -43,6 +43,8 @@ Default scope:
 - Today's visible DM conversations, with only conversations whose latest preview is not from the user opened for content.
 - Optional keyword searches only when the user explicitly passes `--keywords`.
 
+Public timeline/profile/mentions pages use the same daily-window loading model as DMs: by default the collector scrolls each public page up to 40 rounds, keeps up to 300 public items, and stops early when loaded post timestamps show content beyond the 24-hour digest window (`--scrolls 40`, `--max-public-items 300`, `--public-window-hours 24`).
+
 Read only `twitter-digest/.state/run/digest-context.md` when writing the Chinese digest. Its `Final Summary Facts` section is the content source for the final summary. Use `digest-input.md` only when debugging collection issues, not during normal summarization. Do not add content from older runs.
 
 ## Install

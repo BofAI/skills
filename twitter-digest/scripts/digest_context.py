@@ -430,7 +430,7 @@ def render_digest_facts(facts: dict[str, Any]) -> str:
         lines.append(f"| {md_cell(kind)} | {counts.get('total', 0)} |")
 
     lines.extend(["", "## Public Items", ""])
-    for item in ((facts.get("public") or {}).get("items") or [])[:80]:
+    for item in ((facts.get("public") or {}).get("items") or [])[:300]:
         lines.append(f"- `{item.get('kind')}` `{item.get('time')}` {item.get('url') or '[no url]'} - {item.get('text_excerpt')}")
         for asset in item.get("media") or []:
             alt = f" alt={asset.get('alt')}" if asset.get("alt") else ""

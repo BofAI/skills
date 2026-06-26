@@ -57,7 +57,7 @@ Outputs:
 - If X shows a login page, wait for the user to log in manually.
 - If X shows CAPTCHA or account challenge, stop and ask the user to resolve it in the browser.
 - Do not post, like, follow, accept DM requests, open suspicious links, or reply.
-- Keep scrolling bounded. Increase `--scrolls` only when the user needs broader coverage.
+- Keep scrolling bounded by the digest goal. Public pages default to `--scrolls 40`, `--max-public-items 300`, and `--public-window-hours 24`, stopping early when loaded post timestamps are clearly outside the daily window.
 - Read only DM content that is visible in the local logged-in browser. Use `--no-dms` when the user does not want DMs processed.
 - If X Chat shows passcode setup, passcode entry, or encryption-key recovery, automatically reopen X Messages in a visible browser window, wait for the user to complete it, then retry DM collection. In `--non-interactive` mode, skip DM recovery and record a data gap. The script must not choose, enter, or store the passcode.
 
@@ -93,6 +93,8 @@ Date rule:
 ## Hotspot Detection
 
 Cluster home timeline posts by repeated topics, hashtags, URLs, named entities, accounts, and semantic similarity. Optional keyword-search posts may be included only when the user explicitly passes `--keywords`.
+
+Public timeline, profile, and mentions collection follows the same bounded-window model as DM collection: load enough context for a 24-hour digest, cap the amount passed to the model, and stop early when timestamps show older content. Treat public item counts as browser-loaded items in this run, not exhaustive X history.
 
 A hotspot needs at least one of:
 
