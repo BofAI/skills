@@ -53,7 +53,7 @@ Outputs:
 - Do not post, like, follow, accept DM requests, open suspicious links, or reply.
 - Keep scrolling bounded. Increase `--scrolls` only when the user needs broader coverage.
 - Read only DM content that is visible in the local logged-in browser. Use `--no-dms` when the user does not want DMs processed.
-- If X Chat shows passcode setup, report `blocked_by_x_chat_passcode`; the user must complete that setup in the browser once.
+- If X Chat shows passcode setup, passcode entry, or encryption-key recovery, automatically reopen X Messages in a visible browser window, wait for the user to complete it, then retry DM collection. The script must not choose, enter, or store the passcode.
 
 ## Pages Collected
 

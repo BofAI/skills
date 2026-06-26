@@ -103,7 +103,7 @@ Do not ask the user to copy cookies or configure another service. If the script 
 
 Treat browser sessions, cookies observed internally by the script, DMs, phone numbers, emails, private handles, and screenshots as sensitive. Do not post, reply, like, follow, block, open suspicious links, accept DM requests, or send DMs unless the user explicitly asks after reviewing a draft.
 
-Browser DM collection only reads message content visible in the logged-in local browser. If X Chat shows a passcode setup or end-to-end-encryption onboarding screen, report `blocked_by_x_chat_passcode` and ask the user to complete that setup in the opened browser once; do not choose or store a passcode for the user.
+Browser DM collection only reads message content visible in the logged-in local browser. If X Chat shows a passcode setup, passcode entry, or end-to-end-encryption recovery screen during headless collection, the script should automatically reopen X Messages in a visible browser window, wait for the user to complete it, then retry DM collection. Do not choose, enter, or store a passcode for the user.
 
 ### 3. Analyze
 

@@ -118,7 +118,7 @@ twitter-digest/.state/daily/
 - X session 过期。
 - 用户退出了 X。
 - X 要求 CAPTCHA 或风控验证。
-- X Chat 要求设置或输入 passcode。
+- X Chat 要求设置或输入 passcode，此时会自动打开可见浏览器窗口，等待用户处理后继续。
 - `twitter-digest/.state/chrome-profile` 被删除。
 
 ## 7. DM 规则
@@ -130,7 +130,7 @@ DM 默认读取。
 - 只读 X Messages 页面可见内容。
 - 如果能看到会话列表，会尝试打开最近几个会话。
 - 如果 inbox 为空，会记录 `no_visible_threads`。
-- 如果 X Chat 要求 passcode，会记录 `blocked_by_x_chat_passcode`。
+- 如果 X Chat 要求 passcode，headless 会自动切到可见浏览器窗口，等待用户输入或完成设置后重试 DM 采集。
 
 隐私规则：
 

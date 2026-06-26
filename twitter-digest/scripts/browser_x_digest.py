@@ -184,10 +184,10 @@ def collect_page(port: int, page: dict[str, str], scrolls: int, dm_threads: int 
 
 def collect_dm_threads(ws_url: str, max_threads: int) -> dict[str, Any]:
     main_text = extract_main_text(ws_url)
-    if "Create Passcode" in main_text or "Set Passcode" in main_text:
+    if is_dm_passcode_screen(main_text):
         return {
             "dm_status": "blocked_by_x_chat_passcode",
-            "dm_note": "X Chat is showing an end-to-end encryption passcode setup screen before message content is visible.",
+            "dm_note": "X Chat is asking for an encryption passcode before message content is visible.",
             "dm_threads": [],
         }
 
@@ -219,6 +219,41 @@ def collect_dm_threads(ws_url: str, max_threads: int) -> dict[str, Any]:
         "dm_note": f"Opened up to {max_threads} visible DM thread(s) and captured on-screen text only.",
         "dm_threads": threads,
     }
+
+
+def is_dm_passcode_screen(text: str) -> bool:
+    normalized = " ".join(text.lower().split())
+    if "passcode" not in normalized:
+        return False
+    passcode_phrases = [
+        "create passcode",
+        "set passcode",
+        "enter passcode",
+        "your passcode is required",
+        "recover your encryption keys",
+        "encryption keys",
+    ]
+    return any(phrase in normalized for phrase in passcode_phrases)
+
+
+def wait_for_dm_passcode_resolution(port: int, timeout_sec: int) -> bool:
+    ws_url = wait_for_cdp_page_ws(port)
+    cdp_call(ws_url, "Page.enable")
+    cdp_call(ws_url, "Runtime.enable")
+    cdp_call(ws_url, "Page.navigate", {"url": "https://x.com/messages"})
+    print("X Chat passcode is required. Complete it in the opened browser window; collection will resume automatically.")
+    deadline = time.time() + timeout_sec
+    last_notice = 0.0
+    while time.time() < deadline:
+        time.sleep(3)
+        main_text = extract_main_text(ws_url)
+        if not is_dm_passcode_screen(main_text):
+            print("X Chat passcode screen cleared. Resuming DM collection...")
+            return True
+        if time.time() - last_notice > 15:
+            print("Still waiting for X Chat passcode to be completed in the opened browser window.")
+            last_notice = time.time()
+    return False
 
 
 def extract_dm_thread_links(ws_url: str) -> list[dict[str, str]]:
@@ -533,7 +568,22 @@ def main() -> None:
         }
         for page in pages:
             print(f"Collecting {page['kind']}: {page['url']}")
-            data["pages"].append(collect_page(port, page, args.scrolls, args.dm_threads))
+            result = collect_page(port, page, args.scrolls, args.dm_threads)
+            if page["kind"] == "messages" and result.get("dm_status") == "blocked_by_x_chat_passcode":
+                if headless:
+                    print("DM passcode screen detected in headless mode. Reopening X Messages in a visible browser window...")
+                    stop_browser(proc)
+                    proc, port = launch_browser(profile_dir, "https://x.com/messages", headless=False)
+                    headless = False
+                    wait_for_login(port, args.login_timeout_sec, interactive=True)
+                if wait_for_dm_passcode_resolution(port, args.login_timeout_sec):
+                    result = collect_page(port, page, args.scrolls, args.dm_threads)
+                else:
+                    result["dm_note"] = (
+                        "Timed out waiting for the X Chat passcode screen to clear. "
+                        "Open the visible browser window, complete passcode setup or entry, then rerun the digest."
+                    )
+            data["pages"].append(result)
         out_dir = Path(args.out).expanduser().resolve()
         out_dir.mkdir(parents=True, exist_ok=True)
         (out_dir / "digest-input.json").write_text(json.dumps(data, ensure_ascii=False, indent=2), encoding="utf-8")
