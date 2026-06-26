@@ -135,7 +135,14 @@ Classification bands:
 
 ## DM Handling
 
-DMs are private. Summarize only what the user needs to decide the next action.
+DMs are private. By default, summarize only unread or newly changed visible conversations. Historical read-only conversations should not be presented as action items.
+
+Status rules:
+
+- `captured_unread_threads`: summarize the captured unread/new DM bodies and classify importance.
+- `no_unread_threads`: say there are no unread or newly changed DMs to process; do not say there are no DMs.
+- `visible_threads_unopened`: say the conversation list was visible but unread message bodies could not be opened; do not infer content.
+- `blocked_by_x_chat_passcode`: say DM content is unavailable until the user completes X Chat passcode recovery.
 
 Red flags:
 

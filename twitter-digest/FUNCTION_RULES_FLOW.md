@@ -132,7 +132,10 @@ DM 默认读取。
 读取范围：
 
 - 只读 X Messages 页面可见内容。
-- 如果能看到会话列表，会尝试打开最近几个会话。
+- 默认只打开未读或看起来有新活动的会话。
+- 如果只有历史已读会话，会记录 `no_unread_threads`，日报应写“没有未读或新增私信需要处理”，不能写“没有私信”。
+- 如果能看到会话列表但打不开未读正文，会记录 `visible_threads_unopened`。
+- 只有 `captured_unread_threads` 或 memory 标记为 `new_or_changed` 的私信，才进入 DM 摘要。
 - 如果 inbox 为空，会记录 `no_visible_threads`。
 - 如果 X Chat 要求 passcode，headless 会自动切到可见浏览器窗口，等待用户输入或完成设置后重试 DM 采集。
 

@@ -204,12 +204,20 @@ def collect_dm_threads(ws_url: str, max_threads: int) -> dict[str, Any]:
             "dm_threads": [],
         }
 
-    thread_targets = extract_dm_thread_targets(ws_url)
+    thread_targets = unread_dm_targets(extract_dm_thread_targets(ws_url))
     if not thread_targets:
+        all_targets = extract_dm_thread_targets(ws_url)
+        if all_targets:
+            return {
+                "dm_status": "no_unread_threads",
+                "dm_note": f"DM conversation list was visible with {len(all_targets)} thread target(s), but none looked unread or newly changed.",
+                "dm_threads": [],
+                "dm_visible_thread_count": len(all_targets),
+            }
         if looks_like_dm_list_text(main_text):
             return {
                 "dm_status": "visible_threads_unopened",
-                "dm_note": "DM conversation list text was visible, but no openable conversation link or row target could be detected.",
+                "dm_note": "DM conversation list text was visible, but no unread openable conversation link or row target could be detected.",
                 "dm_threads": [],
             }
         return {
@@ -221,7 +229,7 @@ def collect_dm_threads(ws_url: str, max_threads: int) -> dict[str, Any]:
     threads: list[dict[str, Any]] = []
     seen_targets: set[str] = set()
     for _ in range(max(max_threads, 0)):
-        thread_targets = [target for target in extract_dm_thread_targets(ws_url) if dm_target_key(target) not in seen_targets]
+        thread_targets = [target for target in unread_dm_targets(extract_dm_thread_targets(ws_url)) if dm_target_key(target) not in seen_targets]
         if not thread_targets:
             break
         target = thread_targets[0]
@@ -239,6 +247,8 @@ def collect_dm_threads(ws_url: str, max_threads: int) -> dict[str, Any]:
                 "url": str(target.get("url") or ""),
                 "label": str(target.get("label") or ""),
                 "target_type": str(target.get("target_type") or ""),
+                "unread": bool(target.get("unread")),
+                "unread_reason": str(target.get("unread_reason") or ""),
                 "text": extract_main_text(ws_url),
             }
         )
@@ -246,14 +256,18 @@ def collect_dm_threads(ws_url: str, max_threads: int) -> dict[str, Any]:
         wait_for_dm_ready(ws_url, timeout_sec=8)
 
     return {
-        "dm_status": "captured_threads" if threads else "no_visible_threads",
-        "dm_note": f"Opened up to {max_threads} visible DM thread(s) using links or clickable conversation rows and captured on-screen text only.",
+        "dm_status": "captured_unread_threads" if threads else "no_unread_threads",
+        "dm_note": f"Opened up to {max_threads} unread or newly changed visible DM thread(s) and captured on-screen text only.",
         "dm_threads": threads,
     }
 
 
 def dm_target_key(target: dict[str, Any]) -> str:
     return str(target.get("url") or target.get("label") or f"{target.get('x')}:{target.get('y')}")
+
+
+def unread_dm_targets(targets: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    return [target for target in targets if bool(target.get("unread"))]
 
 
 def wait_for_dm_ready(ws_url: str, timeout_sec: int = 20) -> str:
@@ -334,6 +348,22 @@ def extract_dm_thread_targets(ws_url: str) -> list[dict[str, Any]]:
   const clean = (text) => (text || '').replace(/\s+/g, ' ').trim();
   const out = [];
 
+  const unreadMeta = (el, label) => {
+    const text = clean(label).toLowerCase();
+    const aria = clean(el.getAttribute('aria-label') || '').toLowerCase();
+    const combined = `${text} ${aria}`;
+    const reasons = [];
+    if (/\bunread\b|未读|未讀/.test(combined)) reasons.push('unread_label');
+    if (/\b(new|sent you|replied|mentioned)\b|发来|傳送|回复|回覆/.test(combined)) reasons.push('new_activity_label');
+    if (el.querySelector('[aria-label*="Unread" i], [aria-label*="unread" i], [data-testid*="unread" i]')) reasons.push('unread_badge');
+    const fontWeighted = Array.from(el.querySelectorAll('span, div')).some((child) => {
+      const style = getComputedStyle(child);
+      return Number.parseInt(style.fontWeight || '0', 10) >= 600 && clean(child.innerText || '').length > 0;
+    });
+    if (fontWeighted) reasons.push('bold_text');
+    return { unread: reasons.length > 0, unread_reason: reasons.join(',') };
+  };
+
   for (const a of document.querySelectorAll('a[href^="/messages/"], a[href*="x.com/messages/"]')) {
     if (!visible(a)) continue;
     const url = new URL(a.getAttribute('href'), location.href);
@@ -346,7 +376,8 @@ def extract_dm_thread_targets(ws_url: str) -> list[dict[str, Any]]:
     const key = url.href;
     if (seen.has(key)) continue;
     seen.add(key);
-    out.push({ target_type: 'link', url: url.href, label });
+    const meta = unreadMeta(a, label);
+    out.push({ target_type: 'link', url: url.href, label, ...meta });
   }
 
   const candidates = Array.from(document.querySelectorAll('[role="button"], [data-testid*="conversation" i], [data-testid*="cell" i]'));
@@ -367,12 +398,14 @@ def extract_dm_thread_targets(ws_url: str) -> list[dict[str, Any]]:
     const key = url || `${Math.round(rect.left)}:${Math.round(rect.top)}:${label.slice(0, 80)}`;
     if (seen.has(key)) continue;
     seen.add(key);
+    const meta = unreadMeta(node, label);
     out.push({
       target_type: url ? 'row_link' : 'row_click',
       url,
       label,
       x: rect.left + Math.min(rect.width / 2, 280),
-      y: rect.top + rect.height / 2
+      y: rect.top + rect.height / 2,
+      ...meta
     });
   }
   return out.slice(0, 20);
@@ -389,6 +422,8 @@ def extract_dm_thread_targets(ws_url: str) -> list[dict[str, Any]]:
                     "target_type": str(item.get("target_type") or ""),
                     "url": str(item.get("url") or ""),
                     "label": str(item.get("label") or ""),
+                    "unread": bool(item.get("unread")),
+                    "unread_reason": str(item.get("unread_reason") or ""),
                     "x": float(item.get("x") or 0),
                     "y": float(item.get("y") or 0),
                 }

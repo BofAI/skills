@@ -40,7 +40,7 @@ Default scope:
 - Mentions of the authenticated handle.
 - Home timeline hotspots.
 - Own profile activity.
-- Visible DM conversations.
+- Unread or newly changed visible DM conversations.
 - Optional keyword searches only when the user explicitly passes `--keywords`.
 
 Read `twitter-digest/.state/run/digest-input.md`, `twitter-digest/.state/run/digest-context.md`, and JSON if needed before writing the Chinese digest.
@@ -137,6 +137,8 @@ Classify DMs as:
 - `routine`: informational, friendly, low-risk, or easy acknowledgement.
 - `ignore`: spam, phishing, harassment, or irrelevant bulk outreach.
 
+Only summarize DMs from `dm_status: captured_unread_threads` or from threads marked `memory_status: new_or_changed`. If the messages page shows only already-read/history threads, report `no_unread_threads` as “没有未读或新增私信需要处理”, not “没有私信”. If `visible_threads_unopened` appears, say the conversation list was visible but unread message bodies were not opened.
+
 For private messages, summarize minimally. Quote only the short phrase needed to justify classification, and omit sensitive personal data unless the user specifically needs it.
 
 ### 4. Produce The Daily Summary
@@ -159,7 +161,7 @@ For private messages, summarize minimally. Quote only the short phrase needed to
 - ⚪ 噪音折叠统计
 
 **◆ 私信（DM）**
-- 仅在用户允许并且数据可见时总结
+- 仅总结未读或新增/变更的可见私信
 - 🔴 重要 / 🟡 一般 / ⚪ 忽略
 
 **◆ 时间线热点**
