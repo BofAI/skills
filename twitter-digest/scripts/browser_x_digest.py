@@ -32,9 +32,9 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--login-timeout-sec", type=int, default=300)
     parser.add_argument("--include-dms", action="store_true", help="Also visit X messages and capture visible conversation text.")
     parser.add_argument("--dm-threads", type=int, default=5, help="Maximum recent DM threads to open when --include-dms is set.")
-    parser.add_argument("--dm-scrolls", type=int, default=40, help="Maximum upward scroll rounds per opened DM thread.")
-    parser.add_argument("--dm-max-messages", type=int, default=300, help="Maximum message bubbles kept per opened DM thread.")
-    parser.add_argument("--dm-window-hours", type=int, default=24, help="Stop loading older DM history once messages beyond this window are detected.")
+    parser.add_argument("--dm-scrolls", type=int, default=200, help="Maximum upward scroll rounds per opened DM thread.")
+    parser.add_argument("--dm-max-messages", type=int, default=2000, help="Maximum message bubbles kept per opened DM thread.")
+    parser.add_argument("--dm-window-hours", type=int, default=0, help="Stop loading older DM history once messages beyond this window are detected. 0 means load the full thread available in the browser.")
     parser.add_argument("--headless", action="store_true", help="Run without a visible browser window. This is the default after first login.")
     parser.add_argument("--headed", action="store_true", help="Force a visible browser window for debugging or manual login.")
     parser.add_argument("--non-interactive", action="store_true", help="Do not open a visible browser for DM passcode recovery; record a data gap instead.")
@@ -367,6 +367,7 @@ def collect_dm_threads(ws_url: str, max_threads: int, dm_scrolls: int, dm_max_me
                 "dm_scrolls_used": load_info.get("scrolls_used", 0),
                 "dm_load_complete": load_info.get("load_complete", False),
                 "dm_window_exceeded": load_info.get("window_exceeded", False),
+                "dm_hit_message_cap": load_info.get("hit_message_cap", False),
                 "messages": messages,
                 "text": thread_text,
             }
@@ -379,7 +380,7 @@ def collect_dm_threads(ws_url: str, max_threads: int, dm_scrolls: int, dm_max_me
         "dm_note": (
             f"Today visible DM threads: {counts['dm_visible_thread_count']}; latest from you: {counts['dm_replied_thread_count']}; "
             f"waiting for your reply: {counts['dm_unreplied_thread_count']}. Opened up to {max_threads} waiting-reply thread(s); "
-            f"loaded up to {dm_max_messages} message bubbles per thread with {dm_scrolls} upward scroll round(s) within about {dm_window_hours}h when timestamps are available; "
+            f"loaded up to {dm_max_messages} message bubbles per thread with {dm_scrolls} upward scroll round(s); "
             f"captured message bubbles: {sum(int(thread.get('message_count') or 0) for thread in threads)}."
         ),
         "dm_threads": threads,
@@ -432,35 +433,84 @@ def dm_target_has_self_reply(label: str) -> bool:
 def load_dm_thread_history(ws_url: str, max_scrolls: int, target_messages: int, window_hours: int) -> dict[str, Any]:
     scroll_limit = max(0, int(max_scrolls))
     target = max(1, int(target_messages))
-    last_count = count_dm_messages(ws_url)
-    stagnant_rounds = 0
+    state = get_dm_history_state(ws_url)
+    last_count = int(state.get("count") or 0)
+    last_top_signature = str(state.get("top_signature") or "")
+    stable_top_rounds = 0
     scrolls_used = 0
-    reached_top = False
-    window_exceeded = dm_loaded_beyond_window(ws_url, window_hours)
+    reached_top = bool(state.get("at_top"))
+    hit_message_cap = last_count >= target
+    window_exceeded = dm_loaded_beyond_window(ws_url, window_hours) if int(window_hours) > 0 else False
 
-    while scrolls_used < scroll_limit and last_count < target and stagnant_rounds < 4 and not window_exceeded:
+    while scrolls_used < scroll_limit and not reached_top and not window_exceeded and not hit_message_cap:
         info = scroll_dm_messages_up(ws_url)
         scrolls_used += 1
         time.sleep(0.8)
-        current_count = count_dm_messages(ws_url)
-        window_exceeded = dm_loaded_beyond_window(ws_url, window_hours)
-        reached_top = bool(info.get("at_top"))
+        state = get_dm_history_state(ws_url)
+        current_count = int(state.get("count") or 0)
+        current_top_signature = str(state.get("top_signature") or "")
+        window_exceeded = dm_loaded_beyond_window(ws_url, window_hours) if int(window_hours) > 0 else False
+        reached_top = bool(info.get("at_top")) or bool(state.get("at_top"))
+        hit_message_cap = current_count >= target
         if current_count <= last_count:
-            stagnant_rounds += 1
+            if current_top_signature and current_top_signature == last_top_signature:
+                stable_top_rounds += 1
+            else:
+                stable_top_rounds = 0
         else:
-            stagnant_rounds = 0
+            stable_top_rounds = 0
         last_count = max(last_count, current_count)
-        if reached_top and stagnant_rounds >= 1:
+        last_top_signature = current_top_signature or last_top_signature
+        if reached_top and stable_top_rounds >= 1:
             break
 
     return {
         "scrolls_used": scrolls_used,
         "loaded_messages": last_count,
-        "load_complete": reached_top,
+        "load_complete": reached_top and not hit_message_cap,
         "window_exceeded": window_exceeded,
+        "hit_message_cap": hit_message_cap,
+        "top_signature": last_top_signature,
         "target_messages": target,
-        "window_hours": max(1, int(window_hours)),
+        "window_hours": max(0, int(window_hours)),
     }
+
+
+def get_dm_history_state(ws_url: str) -> dict[str, Any]:
+    script = r"""
+(() => {
+  const panel = document.querySelector('[data-testid="dm-conversation-panel"]')
+    || document.querySelector('[data-testid="dm-conversation-content"]')
+    || document.querySelector('main')
+    || document.body;
+  const scroller = findScroller(panel);
+  const roots = Array.from(panel.querySelectorAll('div[data-testid^="message-"]'))
+    .filter((node) => !String(node.getAttribute('data-testid') || '').startsWith('message-text-'));
+  const first = roots[0];
+  return {
+    count: roots.length,
+    at_top: scroller ? scroller.scrollTop <= 2 : window.scrollY <= 0,
+    scroll_top: scroller ? scroller.scrollTop : window.scrollY,
+    top_signature: first ? signature(first) : '',
+  };
+
+  function findScroller(root) {
+    const candidates = [root, ...Array.from(root.querySelectorAll('*'))].filter((el) => {
+      const rect = el.getBoundingClientRect();
+      return rect.width > 200 && rect.height > 200 && el.scrollHeight > el.clientHeight + 40;
+    });
+    return candidates.sort((a, b) => (b.scrollHeight - b.clientHeight) - (a.scrollHeight - a.clientHeight))[0] || null;
+  }
+  function signature(node) {
+    const text = (node.innerText || '').replace(/\s+/g, ' ').trim();
+    const testid = node.getAttribute('data-testid') || '';
+    const rect = node.getBoundingClientRect();
+    return `${testid}:${Math.round(rect.top)}:${text.slice(0, 160)}`;
+  }
+})()
+"""
+    value = cdp_eval(ws_url, script)
+    return value if isinstance(value, dict) else {}
 
 
 def scroll_dm_messages_up(ws_url: str) -> dict[str, Any]:

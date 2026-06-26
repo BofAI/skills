@@ -18,9 +18,9 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--profile-dir", default=str(DEFAULT_PROFILE_DIR))
     parser.add_argument("--login-timeout-sec", type=int, default=300)
     parser.add_argument("--dm-threads", type=int, default=5)
-    parser.add_argument("--dm-scrolls", type=int, default=40)
-    parser.add_argument("--dm-max-messages", type=int, default=300)
-    parser.add_argument("--dm-window-hours", type=int, default=24)
+    parser.add_argument("--dm-scrolls", type=int, default=200)
+    parser.add_argument("--dm-max-messages", type=int, default=2000)
+    parser.add_argument("--dm-window-hours", type=int, default=0)
     parser.add_argument("--headed", action="store_true", help="Open a visible browser window.")
     parser.add_argument("--non-interactive", action="store_true", help="Do not open a visible login window if the saved session is unavailable.")
     return parser.parse_args()
@@ -76,6 +76,7 @@ def main() -> None:
                 "message_count": thread.get("message_count", 0),
                 "scrolls_used": thread.get("dm_scrolls_used", 0),
                 "window_exceeded": thread.get("dm_window_exceeded", False),
+                "hit_message_cap": thread.get("dm_hit_message_cap", False),
                 "load_complete": thread.get("dm_load_complete", False),
                 "first_message": messages[0] if messages else None,
                 "last_message": messages[-1] if messages else None,

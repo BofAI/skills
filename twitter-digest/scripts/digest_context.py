@@ -133,15 +133,30 @@ def build_digest_facts(data: dict[str, Any], summary: dict[str, Any]) -> dict[st
                         "should_summarize": assessment["should_summarize"],
                         "noise_reason": assessment["noise_reason"],
                         "text_excerpt": compact_text(thread.get("text"))[:1200],
-                        "messages": normalize_dm_messages(thread.get("messages"))[-300:],
+                        "messages": normalize_dm_messages(thread.get("messages"))[-2000:],
                         "conversation_context": dm_conversation_context(thread),
                         "load": {
                             "scrolls_used": int(thread.get("dm_scrolls_used") or 0),
                             "load_complete": bool(thread.get("dm_load_complete")),
                             "window_exceeded": bool(thread.get("dm_window_exceeded")),
+                            "hit_message_cap": bool(thread.get("dm_hit_message_cap")),
                         },
                     }
                 )
+                if not bool(thread.get("dm_load_complete")):
+                    facts["data_gaps"].append(
+                        {
+                            "source": "messages",
+                            "status": "dm_thread_incomplete",
+                            "detail": (
+                                f"DM thread {thread.get('participant') or thread.get('label') or thread.get('url') or '[unknown]'} "
+                                "may not be fully loaded. "
+                                f"scrolls_used={int(thread.get('dm_scrolls_used') or 0)}, "
+                                f"hit_message_cap={bool(thread.get('dm_hit_message_cap'))}, "
+                                f"window_exceeded={bool(thread.get('dm_window_exceeded'))}."
+                            ),
+                        }
+                    )
             continue
         for item in page.get("items") or []:
             if not isinstance(item, dict):
@@ -215,7 +230,7 @@ def normalize_dm_messages(value: Any) -> list[dict[str, Any]]:
     return messages
 
 
-def dm_conversation_context(thread: dict[str, Any], max_messages: int = 300, max_chars: int = 30000) -> str:
+def dm_conversation_context(thread: dict[str, Any], max_messages: int = 2000, max_chars: int = 120000) -> str:
     messages = normalize_dm_messages(thread.get("messages"))[-max_messages:]
     if messages:
         lines = []
@@ -406,7 +421,7 @@ def render_digest_facts(facts: dict[str, Any]) -> str:
         )
         for index, thread in enumerate(context_threads, start=1):
             messages = thread.get("messages") if isinstance(thread.get("messages"), list) else []
-            shown_messages = len(messages[-300:]) if messages else int(thread.get("message_count") or 0)
+            shown_messages = len(messages[-2000:]) if messages else int(thread.get("message_count") or 0)
             load = thread.get("load") if isinstance(thread.get("load"), dict) else {}
             lines.extend(
                 [
@@ -417,10 +432,10 @@ def render_digest_facts(facts: dict[str, Any]) -> str:
                     f"- raw_label: `{md_inline(thread.get('label') or '')}`",
                     f"- url: `{md_inline(thread.get('url') or '')}`",
                     f"- loaded message bubbles in context: `{shown_messages}` of `{int(thread.get('message_count') or 0)}`",
-                    f"- load: scrolls_used `{int(load.get('scrolls_used') or 0)}`, load_complete `{bool(load.get('load_complete'))}`, window_exceeded `{bool(load.get('window_exceeded'))}`",
+                    f"- load: scrolls_used `{int(load.get('scrolls_used') or 0)}`, load_complete `{bool(load.get('load_complete'))}`, window_exceeded `{bool(load.get('window_exceeded'))}`, hit_message_cap `{bool(load.get('hit_message_cap'))}`",
                     "",
                     "```text",
-                    str(thread.get("conversation_context") or "")[:30000],
+                    str(thread.get("conversation_context") or "")[:120000],
                     "```",
                 ]
             )

@@ -146,11 +146,11 @@ Count fields:
 
 Do not compare conversation counts and message counts as if they were the same unit. A user can have 5 today visible conversations, 2 waiting-reply conversations, and 4 captured message bubbles across those opened conversations.
 
-The collector opens waiting-reply conversations and scrolls upward before extracting message bubbles. Defaults are `--dm-scrolls 40`, `--dm-max-messages 300`, and `--dm-window-hours 24`, so long conversations should load hundreds of recent bubbles when X exposes them while stopping once the loaded timestamps are clearly outside the daily window. These counts still mean “browser-loaded bubbles in this run”, not “all historical messages in the thread”.
+The collector opens waiting-reply conversations and scrolls upward before extracting message bubbles. Defaults are `--dm-scrolls 200`, `--dm-max-messages 2000`, and `--dm-window-hours 0`, so it tries to load the full browser-available thread instead of stopping at the 24-hour digest window. If X does not reach the thread top or the message cap is hit, the context records `dm_thread_incomplete`.
 
 Waiting-reply does not automatically mean important. Count every waiting-reply conversation, but summarize only messages that are actionable, relationship-relevant, risky, money/security-sensitive, or clearly useful. Spam, phishing, generic promotion, low-context links, and repeated junk should be classified as ignore/noise and not copied into the main narrative.
 
-For waiting-reply DMs that should be summarized, `digest-context.md` includes a `### DM Thread Context` section with recent loaded message history, raw thread label, URL, and load metadata. It can include up to 300 loaded message bubbles per thread. Use it to understand the conversation, but do not copy full private history into the final digest. Keep final DM summaries short and action-oriented.
+For waiting-reply DMs that should be summarized, `digest-context.md` includes a `### DM Thread Context` section with loaded message history, raw thread label, URL, and load metadata. It can include up to 2000 loaded message bubbles per thread. Use it to understand the conversation, but do not copy full private history into the final digest. Keep final DM summaries short and action-oriented.
 
 Media/link context:
 
