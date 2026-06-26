@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Install twitter-briefing into Codex skills."""
+"""Install twitter-briefing into a local Claude Code skills directory."""
 
 from __future__ import annotations
 
@@ -10,7 +10,7 @@ from pathlib import Path
 
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--skills-dir", default=str(Path.home() / ".codex" / "skills"))
+    parser.add_argument("--skills-dir", default=str(Path.home() / ".claude" / "skills"))
     parser.add_argument("--copy", action="store_true", help="Copy files instead of creating a symlink. This is the default.")
     parser.add_argument("--symlink", action="store_true", help="Install as a symlink for local skill development.")
     parser.add_argument("--dry-run", action="store_true")

@@ -1,6 +1,6 @@
 ---
 name: twitter-briefing
-description: Use when the user wants Codex, Claude, or another agent to analyze their own X/Twitter mentions, home timeline, visible direct messages, reply opportunities, and daily social-media summaries through a local logged-in browser session.
+description: Use when the user wants Claude Code or another agent to analyze their own X/Twitter mentions, home timeline, visible direct messages, reply opportunities, and daily social-media summaries through a local logged-in browser session.
 ---
 
 # X/Twitter 每日简报
@@ -24,7 +24,7 @@ python3 twitter-briefing/scripts/browser_x_briefing.py --out /tmp/x-briefing
 For chat usage, run the wrapper:
 
 ```bash
-python3 ~/.codex/skills/twitter-briefing/scripts/run_daily_brief.py
+python3 twitter-briefing/scripts/run_daily_brief.py
 ```
 
 The first run opens a dedicated browser profile at `~/.twitter-briefing/chrome-profile`. The user logs in to X once in that browser. Later runs reuse the saved local browser session.
@@ -32,7 +32,7 @@ The first run opens a dedicated browser profile at `~/.twitter-briefing/chrome-p
 DM reading is enabled by default and only reads visible local browser content. To skip DMs for a run:
 
 ```bash
-python3 ~/.codex/skills/twitter-briefing/scripts/run_daily_brief.py --no-dms
+python3 twitter-briefing/scripts/run_daily_brief.py --no-dms
 ```
 
 Default scope:
@@ -53,9 +53,9 @@ From the repository `skills/` directory:
 python3 twitter-briefing/scripts/install.py
 ```
 
-Default install copies the skill to `~/.codex/skills/twitter-briefing`. Local development can use `--symlink`.
+Default install copies the skill to `~/.claude/skills/twitter-briefing`. Local development can use `--symlink`.
 
-Claude Code or other agents can use the same installed skill by running the same browser scripts.
+Claude Code or other agents can use the installed skill by running the same browser scripts.
 
 ## Memory
 
@@ -76,19 +76,19 @@ Long-term memory must not store raw DM text. Raw DM text may exist only in the c
 When the user asks for an X daily brief, run:
 
 ```bash
-python3 ~/.codex/skills/twitter-briefing/scripts/run_daily_brief.py
+python3 twitter-briefing/scripts/run_daily_brief.py
 ```
 
 If they ask to skip DMs:
 
 ```bash
-python3 ~/.codex/skills/twitter-briefing/scripts/run_daily_brief.py --no-dms
+python3 twitter-briefing/scripts/run_daily_brief.py --no-dms
 ```
 
 If the authenticated handle is not detected or the user corrects it:
 
 ```bash
-python3 ~/.codex/skills/twitter-briefing/scripts/run_daily_brief.py --handle <handle> --account-name "<显示名>" --save-default
+python3 twitter-briefing/scripts/run_daily_brief.py --handle <handle> --account-name "<显示名>" --save-default
 ```
 
 Do not ask the user to copy cookies or configure another service. If the script waits for login, tell the user to log in inside the opened dedicated browser window.
