@@ -439,7 +439,7 @@ def dm_messages_page_is_readable(ws_url: str, text: str) -> bool:
     empty_markers = ["no messages", "welcome to your inbox", "send a message to start a conversation"]
     if any(marker in normalized for marker in empty_markers):
         return True
-    return looks_like_dm_list_text(text)
+    return False
 
 
 def extract_dm_thread_targets(ws_url: str) -> list[dict[str, Any]]:
@@ -950,13 +950,13 @@ def main() -> None:
                     headless = False
                     wait_for_login(port, args.login_timeout_sec, interactive=True)
                 if wait_for_dm_passcode_resolution(port, args.login_timeout_sec):
+                    result = collect_page(port, page, args.scrolls, args.dm_threads)
                     if resume_headless_after_passcode:
-                        print("X Chat passcode was completed. Returning to headless collection...")
+                        print("X Chat passcode was completed. DM collection finished in the visible browser; returning to headless mode...")
                         stop_browser(proc)
                         proc, port = launch_browser(profile_dir, "https://x.com/messages", headless=True)
                         headless = True
                         wait_for_login(port, args.login_timeout_sec, interactive=False)
-                    result = collect_page(port, page, args.scrolls, args.dm_threads)
                 else:
                     result["dm_note"] = (
                         "Timed out waiting for X Messages to become readable after passcode handling. "
