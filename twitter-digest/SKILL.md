@@ -57,6 +57,8 @@ python3 twitter-digest/scripts/install.py
 
 Default install copies the skill to `~/.claude/skills/twitter-digest`. Local development can use `--symlink`.
 
+The installer checks for Python 3.10+ and a supported Chromium browser before installing. Supported browsers are Google Chrome, Chromium, Microsoft Edge, and Brave. If the browser will be installed later, use `--skip-browser-check`.
+
 The installer moves old `twitter-briefing`, `twitter-briefing.bak`, or existing `twitter-digest` installs into `~/.claude/skills/.backups/` and disables their `SKILL.md` files so Claude Code does not load duplicate old skills. It does not copy `.state` from the development checkout.
 
 Claude Code or other agents can use the installed skill by running the same browser scripts.

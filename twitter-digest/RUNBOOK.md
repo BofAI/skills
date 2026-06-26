@@ -16,6 +16,29 @@
 -> Agent 只基于 digest-context.md 写中文日报
 ```
 
+## 安装与依赖检查
+
+安装命令：
+
+```bash
+python3 twitter-digest/scripts/install.py
+```
+
+安装脚本会检查：
+
+- Python 3.10+
+- Google Chrome、Chromium、Microsoft Edge 或 Brave
+
+如果缺少支持的 Chromium 浏览器，安装脚本会停止并提示先安装浏览器。浏览器必须存在，因为后续采集完全依赖本地浏览器打开 `x.com`。
+
+如果浏览器会稍后安装，可以显式跳过检查：
+
+```bash
+python3 twitter-digest/scripts/install.py --skip-browser-check
+```
+
+安装脚本不会复制 `.state/`，因此不会把开发机器上的 X 登录态、运行结果或 DM 原文复制到用户的 skill 安装目录。
+
 ## 登录与浏览器状态
 
 首次运行：

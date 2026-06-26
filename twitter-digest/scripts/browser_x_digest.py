@@ -9,6 +9,7 @@ import datetime as dt
 import json
 import os
 import re
+import shutil
 import socket
 import struct
 import subprocess
@@ -48,10 +49,20 @@ def find_chrome() -> str:
         "/Applications/Chromium.app/Contents/MacOS/Chromium",
         "/Applications/Microsoft Edge.app/Contents/MacOS/Microsoft Edge",
         "/Applications/Brave Browser.app/Contents/MacOS/Brave Browser",
+        "google-chrome",
+        "google-chrome-stable",
+        "chromium",
+        "chromium-browser",
+        "microsoft-edge",
+        "brave-browser",
     ]
     for candidate in candidates:
-        if Path(candidate).exists():
+        path = Path(candidate)
+        if path.is_absolute() and path.exists():
             return candidate
+        resolved = shutil.which(candidate)
+        if resolved:
+            return resolved
     raise SystemExit("No supported Chromium browser found. Install Chrome, Chromium, Edge, or Brave.")
 
 
