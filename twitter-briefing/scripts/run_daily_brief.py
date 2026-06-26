@@ -23,7 +23,8 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--configure-only", action="store_true", help="Only save default account config; do not collect data.")
     parser.add_argument("--keywords", default="", help="Optional comma-separated search queries. Default is empty; the daily brief focuses on timeline, mentions, and DMs.")
     parser.add_argument("--out", default="/tmp/x-briefing")
-    parser.add_argument("--include-dms", action="store_true")
+    parser.add_argument("--include-dms", action="store_true", help="Include visible DMs. This is already the default; kept for compatibility.")
+    parser.add_argument("--no-dms", action="store_true", help="Skip X Messages collection for this run.")
     parser.add_argument("--dm-threads", type=int, default=5)
     parser.add_argument("--scrolls", type=int, default=4)
     parser.add_argument("--memory-dir", default=str(DEFAULT_MEMORY_DIR))
@@ -76,7 +77,10 @@ def main() -> None:
         cmd.extend(["--handle", handle])
     elif handle:
         cmd.extend(["--handle", handle])
+    include_dms = not args.no_dms
     if args.include_dms:
+        include_dms = True
+    if include_dms:
         cmd.append("--include-dms")
     subprocess.run(cmd, check=True)
     out_dir = Path(args.out)
@@ -87,7 +91,7 @@ def main() -> None:
             markdown_path=out_dir / "briefing-input.md",
             out_dir=out_dir,
             memory_dir=Path(args.memory_dir).expanduser().resolve(),
-            include_dms=args.include_dms,
+            include_dms=include_dms,
             dm_threads=args.dm_threads,
         )
     result = {

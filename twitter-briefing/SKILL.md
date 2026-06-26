@@ -29,10 +29,10 @@ python3 ~/.codex/skills/twitter-briefing/scripts/run_daily_brief.py
 
 The first run opens a dedicated browser profile at `~/.twitter-briefing/chrome-profile`. The user logs in to X once in that browser. Later runs reuse the saved local browser session.
 
-When the user explicitly approves local DM reading, include:
+DM reading is enabled by default and only reads visible local browser content. To skip DMs for a run:
 
 ```bash
-python3 ~/.codex/skills/twitter-briefing/scripts/run_daily_brief.py --include-dms
+python3 ~/.codex/skills/twitter-briefing/scripts/run_daily_brief.py --no-dms
 ```
 
 Default scope:
@@ -40,7 +40,7 @@ Default scope:
 - Mentions of the authenticated handle.
 - Home timeline hotspots.
 - Own profile activity.
-- Visible DM conversations only when `--include-dms` is used.
+- Visible DM conversations.
 - Optional keyword searches only when the user explicitly passes `--keywords`.
 
 Read `/tmp/x-briefing/briefing-input.md`, `/tmp/x-briefing/memory-context.md`, and JSON if needed before writing the Chinese brief.
@@ -79,10 +79,10 @@ When the user asks for an X daily brief, run:
 python3 ~/.codex/skills/twitter-briefing/scripts/run_daily_brief.py
 ```
 
-If they ask to include DMs:
+If they ask to skip DMs:
 
 ```bash
-python3 ~/.codex/skills/twitter-briefing/scripts/run_daily_brief.py --include-dms
+python3 ~/.codex/skills/twitter-briefing/scripts/run_daily_brief.py --no-dms
 ```
 
 If the authenticated handle is not detected or the user corrects it:

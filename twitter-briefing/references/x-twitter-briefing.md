@@ -18,10 +18,10 @@ Typical chat run:
 python3 twitter-briefing/scripts/run_daily_brief.py
 ```
 
-Include visible DMs only when the user requests it:
+Visible DM collection is enabled by default. To skip DMs:
 
 ```bash
-python3 twitter-briefing/scripts/run_daily_brief.py --include-dms
+python3 twitter-briefing/scripts/run_daily_brief.py --no-dms
 ```
 
 Optional keyword search is off by default. Use it only when the user explicitly asks:
@@ -45,7 +45,7 @@ Outputs:
 - If X shows CAPTCHA or account challenge, stop and ask the user to resolve it in the browser.
 - Do not post, like, follow, accept DM requests, open suspicious links, or reply.
 - Keep scrolling bounded. Increase `--scrolls` only when the user needs broader coverage.
-- Read DMs only when `--include-dms` is used and the user has approved local private-message processing.
+- Read only DM content that is visible in the local logged-in browser. Use `--no-dms` when the user does not want DMs processed.
 - If X Chat shows passcode setup, report `blocked_by_x_chat_passcode`; the user must complete that setup in the browser once.
 
 ## Pages Collected
@@ -56,10 +56,10 @@ Default browser pages:
 - `own_profile`: the authenticated account profile.
 - `mentions_search`: live search for `@handle`.
 - `mentions_notifications`: notifications mentions page.
+- `messages`: X Messages.
 
 Optional pages:
 
-- `messages`: X Messages, only with `--include-dms`.
 - `keyword_N`: explicit search queries, only when `--keywords` is provided.
 
 ## Memory
