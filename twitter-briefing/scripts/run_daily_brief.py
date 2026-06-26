@@ -27,6 +27,8 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--no-dms", action="store_true", help="Skip X Messages collection for this run.")
     parser.add_argument("--dm-threads", type=int, default=5)
     parser.add_argument("--scrolls", type=int, default=4)
+    parser.add_argument("--headless", action="store_true", help="Run browser collection headlessly. This is the default when login is already saved.")
+    parser.add_argument("--headed", action="store_true", help="Force a visible browser window for debugging or manual login.")
     parser.add_argument("--memory-dir", default=str(DEFAULT_MEMORY_DIR))
     parser.add_argument("--no-memory", action="store_true", help="Do not update local briefing memory after collection.")
     return parser.parse_args()
@@ -82,6 +84,10 @@ def main() -> None:
         include_dms = True
     if include_dms:
         cmd.append("--include-dms")
+    if args.headed:
+        cmd.append("--headed")
+    if args.headless:
+        cmd.append("--headless")
     subprocess.run(cmd, check=True)
     out_dir = Path(args.out)
     memory_result = None

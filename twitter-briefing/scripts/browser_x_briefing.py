@@ -28,6 +28,8 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--login-timeout-sec", type=int, default=300)
     parser.add_argument("--include-dms", action="store_true", help="Also visit X messages and capture visible conversation text.")
     parser.add_argument("--dm-threads", type=int, default=5, help="Maximum recent DM threads to open when --include-dms is set.")
+    parser.add_argument("--headless", action="store_true", help="Run without a visible browser window. This is the default after first login.")
+    parser.add_argument("--headed", action="store_true", help="Force a visible browser window for debugging or manual login.")
     parser.add_argument("--keep-browser-open", action="store_true")
     return parser.parse_args()
 
@@ -51,7 +53,7 @@ def get_free_port() -> int:
         return int(sock.getsockname()[1])
 
 
-def launch_browser(profile_dir: Path, start_url: str) -> tuple[subprocess.Popen[bytes], int]:
+def launch_browser(profile_dir: Path, start_url: str, headless: bool) -> tuple[subprocess.Popen[bytes], int]:
     profile_dir.mkdir(parents=True, exist_ok=True)
     port = get_free_port()
     command = [
@@ -62,13 +64,44 @@ def launch_browser(profile_dir: Path, start_url: str) -> tuple[subprocess.Popen[
         "--no-default-browser-check",
         start_url,
     ]
+    if headless:
+        command.extend(["--headless=new", "--disable-gpu", "--window-size=1440,1200"])
     proc = subprocess.Popen(command, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
     wait_for_cdp(port)
     return proc, port
 
 
-def wait_for_login(port: int, timeout_sec: int) -> None:
-    print("Waiting for X login in the opened browser window...")
+def ensure_logged_in(profile_dir: Path, timeout_sec: int, force_headed: bool) -> tuple[subprocess.Popen[bytes], int, bool]:
+    if force_headed:
+        proc, port = launch_browser(profile_dir, "https://x.com/home", headless=False)
+        wait_for_login(port, timeout_sec, interactive=True)
+        return proc, port, False
+
+    proc, port = launch_browser(profile_dir, "https://x.com/home", headless=True)
+    if is_logged_in(port):
+        print("X login detected in saved browser session. Continuing headless collection...")
+        return proc, port, True
+
+    print("Saved X login was not available. Opening a visible browser window for one-time login...")
+    stop_browser(proc)
+    proc, port = launch_browser(profile_dir, "https://x.com/home", headless=False)
+    wait_for_login(port, timeout_sec, interactive=True)
+    return proc, port, False
+
+
+def is_logged_in(port: int) -> bool:
+    try:
+        ws_url = wait_for_cdp_page_ws(port)
+        return has_x_login_cookie(ws_url)
+    except Exception:
+        return False
+
+
+def wait_for_login(port: int, timeout_sec: int, interactive: bool) -> None:
+    if interactive:
+        print("Waiting for X login in the opened browser window...")
+    else:
+        print("Waiting for X login...")
     deadline = time.time() + timeout_sec
     last_notice = 0.0
     while time.time() < deadline:
@@ -80,10 +113,21 @@ def wait_for_login(port: int, timeout_sec: int) -> None:
         except Exception:
             pass
         if time.time() - last_notice > 15:
-            print("Still waiting for X login. Log in once in the opened browser window.")
+            if interactive:
+                print("Still waiting for X login. Log in once in the opened browser window.")
+            else:
+                print("Still waiting for X login.")
             last_notice = time.time()
         time.sleep(2)
     raise SystemExit("Timed out waiting for X login.")
+
+
+def stop_browser(proc: subprocess.Popen[bytes]) -> None:
+    proc.terminate()
+    try:
+        proc.wait(timeout=5)
+    except subprocess.TimeoutExpired:
+        proc.kill()
 
 
 def has_x_login_cookie(ws_url: str) -> bool:
@@ -470,9 +514,9 @@ def recv_exact(sock: socket.socket, size: int) -> bytes:
 def main() -> None:
     args = parse_args()
     profile_dir = Path(args.profile_dir).expanduser().resolve()
-    proc, port = launch_browser(profile_dir, "https://x.com/home")
+    force_headed = bool(args.headed and not args.headless)
+    proc, port, headless = ensure_logged_in(profile_dir, args.login_timeout_sec, force_headed)
     try:
-        wait_for_login(port, args.login_timeout_sec)
         handle = args.handle.lstrip("@") if args.handle else detect_handle(port)
         if handle:
             print(f"Using X handle: @{handle}")
@@ -493,14 +537,10 @@ def main() -> None:
         out_dir.mkdir(parents=True, exist_ok=True)
         (out_dir / "briefing-input.json").write_text(json.dumps(data, ensure_ascii=False, indent=2), encoding="utf-8")
         (out_dir / "briefing-input.md").write_text(render_markdown(data), encoding="utf-8")
-        print(json.dumps({"out_dir": str(out_dir), "pages": len(data["pages"])}, indent=2))
+        print(json.dumps({"out_dir": str(out_dir), "pages": len(data["pages"]), "headless": headless}, indent=2))
     finally:
         if not args.keep_browser_open:
-            proc.terminate()
-            try:
-                proc.wait(timeout=5)
-            except subprocess.TimeoutExpired:
-                proc.kill()
+            stop_browser(proc)
 
 
 if __name__ == "__main__":

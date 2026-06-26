@@ -27,7 +27,7 @@ For chat usage, run the wrapper:
 python3 twitter-briefing/scripts/run_daily_brief.py
 ```
 
-The first run opens a dedicated browser profile at `~/.twitter-briefing/chrome-profile`. The user logs in to X once in that browser. Later runs reuse the saved local browser session.
+The first run opens a dedicated browser profile at `~/.twitter-briefing/chrome-profile`. The user logs in to X once in that browser. Later runs default to headless collection and reuse the saved local browser session. If the saved login is unavailable, the script automatically opens a visible browser window for manual login.
 
 DM reading is enabled by default and only reads visible local browser content. To skip DMs for a run:
 
@@ -91,7 +91,13 @@ If the authenticated handle is not detected or the user corrects it:
 python3 twitter-briefing/scripts/run_daily_brief.py --handle <handle> --account-name "<显示名>" --save-default
 ```
 
-Do not ask the user to copy cookies or configure another service. If the script waits for login, tell the user to log in inside the opened dedicated browser window.
+For debugging or manual inspection:
+
+```bash
+python3 twitter-briefing/scripts/run_daily_brief.py --headed
+```
+
+Do not ask the user to copy cookies or configure another service. If the script opens a visible browser window, tell the user to log in or resolve the visible X challenge there.
 
 ### 2. Protect Privacy
 

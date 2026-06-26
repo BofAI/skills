@@ -8,7 +8,8 @@ The only supported data access path is direct local browser automation:
 
 - `scripts/browser_x_briefing.py` launches a dedicated Chromium profile at `~/.twitter-briefing/chrome-profile`.
 - The user logs in to X once in that browser.
-- Later runs reuse the saved browser session.
+- Later runs default to headless collection and reuse the saved browser session.
+- If the saved login is unavailable, the script automatically opens a visible browser window for manual login.
 - The script reads only visible content from X pages.
 - No other data access path is part of this skill.
 
@@ -28,6 +29,12 @@ Optional keyword search is off by default. Use it only when the user explicitly 
 
 ```bash
 python3 twitter-briefing/scripts/run_daily_brief.py --keywords "query one,query two"
+```
+
+Force a visible browser window for debugging:
+
+```bash
+python3 twitter-briefing/scripts/run_daily_brief.py --headed
 ```
 
 Outputs:
