@@ -8,6 +8,7 @@ import base64
 import datetime as dt
 import json
 import os
+import re
 import socket
 import struct
 import subprocess
@@ -253,6 +254,7 @@ def collect_dm_threads(ws_url: str, max_threads: int) -> dict[str, Any]:
             {
                 "url": str(target.get("url") or ""),
                 "label": str(target.get("label") or ""),
+                "participant": dm_participant(target),
                 "target_type": str(target.get("target_type") or ""),
                 "unread": bool(target.get("unread")),
                 "unread_reason": str(target.get("unread_reason") or ""),
@@ -275,6 +277,20 @@ def collect_dm_threads(ws_url: str, max_threads: int) -> dict[str, Any]:
 
 def dm_target_key(target: dict[str, Any]) -> str:
     return str(target.get("url") or target.get("label") or f"{target.get('x')}:{target.get('y')}")
+
+
+def dm_participant(target: dict[str, Any]) -> str:
+    label = " ".join(str(target.get("label") or "").split())
+    handle = re.search(r"@([A-Za-z0-9_]{1,15})", label)
+    if handle:
+        return "@" + handle.group(1)
+    first_chunk = re.split(
+        r"(?:\s+You:|\s+You sent|\s+sent you|\s+unread|\s+new|\s+\d+\s*(?:m|h|d|min|hour|day)\b)",
+        label,
+        maxsplit=1,
+        flags=re.IGNORECASE,
+    )[0]
+    return first_chunk.strip(" -·•|")[:80] or label[:80]
 
 
 def unread_dm_targets(targets: list[dict[str, Any]]) -> list[dict[str, Any]]:
@@ -577,7 +593,12 @@ def render_markdown(data: dict[str, Any]) -> str:
         if page.get("collection_error"):
             lines.extend(["", f"采集错误: `{page['collection_error']}`"])
         for thread in page.get("dm_threads", [])[:20]:
-            lines.extend(["", f"### DM thread: {thread.get('label') or thread.get('url')}", ""])
+            participant = thread.get("participant") or thread.get("label") or thread.get("url")
+            lines.extend(["", f"### DM thread: {participant}", ""])
+            if participant:
+                lines.append(f"会话对象: `{participant}`")
+                lines.append("发信人判断: 使用会话对象/消息气泡判断；引用帖、转发卡片或链接预览里的作者不是 DM 发信人。")
+                lines.append("")
             lines.append(str(thread.get("text") or "")[:3000])
         lines.append("")
     lines.extend(

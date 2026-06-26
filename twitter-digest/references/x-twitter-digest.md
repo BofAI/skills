@@ -150,6 +150,12 @@ Status rules:
 - `visible_threads_unopened`: say the conversation list was visible but unread message bodies could not be opened; do not infer content.
 - `blocked_by_x_chat_passcode`: say DM content is unavailable until the user completes X Chat passcode recovery.
 
+Sender attribution:
+
+- Use the thread `participant` / `会话对象` field and message bubble direction as the DM sender signal.
+- Do not treat authors inside quoted posts, repost cards, link previews, or embedded tweet text as DM senders.
+- If a conversation with `@jerry` contains a shared post authored by `Marco`, attribute the DM conversation to `@jerry`; mention `Marco` only as the quoted/shared post author if relevant.
+
 Red flags:
 
 - Credential requests, wallet/private-key requests, suspicious links, payment pressure, impersonation.

@@ -134,6 +134,7 @@ DM 默认读取。
 - 只读 X Messages 页面可见内容。
 - 统计所有可见会话数量、未读/新增数量、已读历史数量。
 - 默认只打开未读或看起来有新活动的会话。
+- 发信人以 `participant` / `会话对象` 和消息气泡方向为准，不能把引用帖、转发卡片、链接预览里的作者当作 DM 发信人。
 - 如果只有历史已读会话，会记录 `no_unread_threads`，日报应写“没有未读或新增私信需要处理”，不能写“没有私信”。
 - 如果能看到会话列表但打不开未读正文，会记录 `visible_threads_unopened`。
 - 只有 `captured_unread_threads` 或 memory 标记为 `new_or_changed` 的私信，才进入 DM 摘要。

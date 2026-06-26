@@ -139,6 +139,8 @@ Classify DMs as:
 
 Always report DM counts when available: visible conversations, unread/new conversations, and read/history conversations. Only summarize DM bodies from `dm_status: captured_unread_threads` or from threads marked `memory_status: new_or_changed`. If the messages page shows only already-read/history threads, report `no_unread_threads` as “没有未读或新增私信需要处理”, not “没有私信”. If `visible_threads_unopened` appears, say the conversation list was visible but unread message bodies were not opened.
 
+For DM sender attribution, use the thread `participant` / `会话对象` and message bubble direction. Do not treat authors inside quoted posts, repost cards, link previews, or embedded tweet text as the DM sender. If a DM contains a shared post by `Marco` inside a conversation with `@jerry`, the DM is from the conversation participant, not from `Marco`.
+
 For private messages, summarize minimally. Quote only the short phrase needed to justify classification, and omit sensitive personal data unless the user specifically needs it.
 
 ### 4. Produce The Daily Summary

@@ -183,6 +183,7 @@ def update_memory(
                 thread_status = "new_or_changed" if changed else "unchanged"
                 thread["memory_status"] = thread_status
                 dm_memory[thread_key] = {
+                    "participant": str(thread.get("participant") or "")[:120],
                     "label": str(thread.get("label") or "")[:120],
                     "url": str(thread.get("url") or ""),
                     "first_seen_at": previous.get("first_seen_at") or generated_at,
@@ -193,6 +194,7 @@ def update_memory(
                 dm_thread_updates.append(
                     {
                         "label": dm_memory[thread_key]["label"],
+                        "participant": dm_memory[thread_key]["participant"],
                         "url": dm_memory[thread_key]["url"],
                         "status": dm_memory[thread_key]["status"],
                     }
@@ -369,7 +371,12 @@ def render_digest_input(data: dict[str, Any]) -> str:
         for thread in page.get("dm_threads", [])[:20]:
             if not isinstance(thread, dict):
                 continue
-            lines.extend(["", f"### DM thread [{thread.get('memory_status') or 'unknown'}]: {thread.get('label') or thread.get('url')}", ""])
+            participant = thread.get("participant") or thread.get("label") or thread.get("url")
+            lines.extend(["", f"### DM thread [{thread.get('memory_status') or 'unknown'}]: {participant}", ""])
+            if participant:
+                lines.append(f"会话对象: `{participant}`")
+                lines.append("发信人判断: 使用会话对象/消息气泡判断；引用帖、转发卡片或链接预览里的作者不是 DM 发信人。")
+                lines.append("")
             lines.append(str(thread.get("text") or "")[:3000])
         lines.append("")
     lines.extend(
@@ -415,7 +422,7 @@ def render_memory_context(summary: dict[str, Any]) -> str:
 
     lines.extend(["", "## DM Thread Memory", ""])
     for thread in summary.get("dm_threads", [])[:20]:
-        label = thread.get("label") or thread.get("url") or "[unknown]"
+        label = thread.get("participant") or thread.get("label") or thread.get("url") or "[unknown]"
         lines.append(f"- `{thread.get('status')}` {label}")
     if not summary.get("dm_threads"):
         lines.append("- No visible DM threads captured in this run.")
