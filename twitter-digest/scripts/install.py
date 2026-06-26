@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Install twitter-briefing into a local Claude Code skills directory."""
+"""Install twitter-digest into a local Claude Code skills directory."""
 
 from __future__ import annotations
 

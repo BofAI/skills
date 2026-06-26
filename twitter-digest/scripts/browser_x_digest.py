@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Collect X/Twitter briefing input through a persistent local browser session."""
+"""Collect X/Twitter digest input through a persistent local browser session."""
 
 from __future__ import annotations
 
@@ -20,10 +20,11 @@ from typing import Any
 
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description=__doc__)
+    default_state_dir = Path(__file__).resolve().parents[1] / ".state"
     parser.add_argument("--handle", help="Your X handle, with or without @. If omitted, the script tries to detect it from the logged-in page.")
     parser.add_argument("--keywords", default="", help="Comma-separated keywords or queries for hotspot search.")
-    parser.add_argument("--out", default="x-browser-briefing-output", help="Output directory.")
-    parser.add_argument("--profile-dir", default=str(Path.home() / ".twitter-briefing" / "chrome-profile"))
+    parser.add_argument("--out", default="/tmp/x-digest", help="Output directory.")
+    parser.add_argument("--profile-dir", default=str(default_state_dir / "chrome-profile"))
     parser.add_argument("--scrolls", type=int, default=4, help="Scroll rounds per page.")
     parser.add_argument("--login-timeout-sec", type=int, default=300)
     parser.add_argument("--include-dms", action="store_true", help="Also visit X messages and capture visible conversation text.")
@@ -535,8 +536,8 @@ def main() -> None:
             data["pages"].append(collect_page(port, page, args.scrolls, args.dm_threads))
         out_dir = Path(args.out).expanduser().resolve()
         out_dir.mkdir(parents=True, exist_ok=True)
-        (out_dir / "briefing-input.json").write_text(json.dumps(data, ensure_ascii=False, indent=2), encoding="utf-8")
-        (out_dir / "briefing-input.md").write_text(render_markdown(data), encoding="utf-8")
+        (out_dir / "digest-input.json").write_text(json.dumps(data, ensure_ascii=False, indent=2), encoding="utf-8")
+        (out_dir / "digest-input.md").write_text(render_markdown(data), encoding="utf-8")
         print(json.dumps({"out_dir": str(out_dir), "pages": len(data["pages"]), "headless": headless}, indent=2))
     finally:
         if not args.keep_browser_open:

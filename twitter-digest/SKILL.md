@@ -1,15 +1,15 @@
 ---
-name: twitter-briefing
+name: twitter-digest
 description: Use when the user wants Claude Code or another agent to analyze their own X/Twitter mentions, home timeline, visible direct messages, reply opportunities, and daily social-media summaries through a local logged-in browser session.
 ---
 
-# X/Twitter 每日简报
+# X/Twitter Digest
 
 ## Overview
 
-Use this skill to produce a concise Chinese daily brief from the user's own X/Twitter account. The only supported access path is local browser collection with a persistent dedicated Chromium profile.
+Use this skill to produce a concise Chinese daily digest from the user's own X/Twitter account. The only supported access path is local browser collection with a persistent dedicated Chromium profile.
 
-Load `references/x-twitter-briefing.md` when you need implementation details, browser workflow rules, memory behavior, or the scoring rubric.
+Load `references/x-twitter-digest.md` when you need implementation details, browser workflow rules, memory behavior, or the scoring rubric.
 
 ## Browser-Only Access
 
@@ -18,21 +18,21 @@ This skill intentionally uses only local browser automation.
 Default collection uses:
 
 ```bash
-python3 twitter-briefing/scripts/browser_x_briefing.py --out /tmp/x-briefing
+python3 twitter-digest/scripts/browser_x_digest.py --out /tmp/x-digest
 ```
 
 For chat usage, run the wrapper:
 
 ```bash
-python3 twitter-briefing/scripts/run_daily_brief.py
+python3 twitter-digest/scripts/run_daily_digest.py
 ```
 
-The first run opens a dedicated browser profile at `~/.twitter-briefing/chrome-profile`. The user logs in to X once in that browser. Later runs default to headless collection and reuse the saved local browser session. If the saved login is unavailable, the script automatically opens a visible browser window for manual login.
+The first run opens a dedicated browser profile at `twitter-digest/.state/chrome-profile`. The user logs in to X once in that browser. Later runs default to headless collection and reuse the saved local browser session. If the saved login is unavailable, the script automatically opens a visible browser window for manual login.
 
 DM reading is enabled by default and only reads visible local browser content. To skip DMs for a run:
 
 ```bash
-python3 twitter-briefing/scripts/run_daily_brief.py --no-dms
+python3 twitter-digest/scripts/run_daily_digest.py --no-dms
 ```
 
 Default scope:
@@ -43,58 +43,58 @@ Default scope:
 - Visible DM conversations.
 - Optional keyword searches only when the user explicitly passes `--keywords`.
 
-Read `/tmp/x-briefing/briefing-input.md`, `/tmp/x-briefing/memory-context.md`, and JSON if needed before writing the Chinese brief.
+Read `/tmp/x-digest/digest-input.md`, `/tmp/x-digest/digest-context.md`, and JSON if needed before writing the Chinese digest.
 
 ## Install
 
 From the repository `skills/` directory:
 
 ```bash
-python3 twitter-briefing/scripts/install.py
+python3 twitter-digest/scripts/install.py
 ```
 
-Default install copies the skill to `~/.claude/skills/twitter-briefing`. Local development can use `--symlink`.
+Default install copies the skill to `~/.claude/skills/twitter-digest`. Local development can use `--symlink`.
 
 Claude Code or other agents can use the installed skill by running the same browser scripts.
 
 ## Memory
 
-`scripts/run_daily_brief.py` updates local memory by default:
+`scripts/run_daily_digest.py` updates local memory by default:
 
-- `~/.twitter-briefing/config.json`: account defaults and preferences.
-- `~/.twitter-briefing/memory.json`: account metadata, seen public post URLs, DM thread status signatures, and run history.
-- `~/.twitter-briefing/daily/YYYY-MM-DD.json`: sanitized daily archive.
-- `~/.twitter-briefing/daily/YYYY-MM-DD.md`: sanitized daily archive.
-- `/tmp/x-briefing/memory-context.md`: current run memory context for the final brief.
+- `twitter-digest/.state/config.json`: account defaults and preferences.
+- `twitter-digest/.state/memory.json`: account metadata, seen public post URLs, DM thread status signatures, and run history.
+- `twitter-digest/.state/daily/YYYY-MM-DD.json`: sanitized daily archive.
+- `twitter-digest/.state/daily/YYYY-MM-DD.md`: sanitized daily archive.
+- `/tmp/x-digest/digest-context.md`: current run memory context for the final digest.
 
-Long-term memory must not store raw DM text. Raw DM text may exist only in the current run's `/tmp/x-briefing/briefing-input.*` files for immediate summarization.
+Long-term memory must not store raw DM text. Raw DM text may exist only in the current run's `/tmp/x-digest/digest-input.*` files for immediate summarization.
 
 ## Workflow
 
 ### 1. Collect
 
-When the user asks for an X daily brief, run:
+When the user asks for an X daily digest or X 日报, run:
 
 ```bash
-python3 twitter-briefing/scripts/run_daily_brief.py
+python3 twitter-digest/scripts/run_daily_digest.py
 ```
 
 If they ask to skip DMs:
 
 ```bash
-python3 twitter-briefing/scripts/run_daily_brief.py --no-dms
+python3 twitter-digest/scripts/run_daily_digest.py --no-dms
 ```
 
 If the authenticated handle is not detected or the user corrects it:
 
 ```bash
-python3 twitter-briefing/scripts/run_daily_brief.py --handle <handle> --account-name "<显示名>" --save-default
+python3 twitter-digest/scripts/run_daily_digest.py --handle <handle> --account-name "<显示名>" --save-default
 ```
 
 For debugging or manual inspection:
 
 ```bash
-python3 twitter-briefing/scripts/run_daily_brief.py --headed
+python3 twitter-digest/scripts/run_daily_digest.py --headed
 ```
 
 Do not ask the user to copy cookies or configure another service. If the script opens a visible browser window, tell the user to log in or resolve the visible X challenge there.

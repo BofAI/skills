@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Local memory for X/Twitter briefing runs.
+"""Local memory for X/Twitter digest runs.
 
 Long-term memory intentionally avoids storing raw DM text. The current run's
 raw browser capture can stay in /tmp for summarization, while this module keeps
@@ -17,7 +17,7 @@ from pathlib import Path
 from typing import Any
 
 
-DEFAULT_MEMORY_DIR = Path.home() / ".twitter-briefing"
+DEFAULT_MEMORY_DIR = Path(__file__).resolve().parents[1] / ".state"
 MEMORY_FILE = "memory.json"
 
 
@@ -25,10 +25,10 @@ def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description=__doc__)
     subparsers = parser.add_subparsers(dest="command", required=True)
 
-    update = subparsers.add_parser("update", help="Update memory from a briefing-input.json file.")
-    update.add_argument("--input", required=True, help="Path to briefing-input.json.")
-    update.add_argument("--markdown", help="Path to briefing-input.md for daily sanitized archive context.")
-    update.add_argument("--out-dir", required=True, help="Directory for memory-context output files.")
+    update = subparsers.add_parser("update", help="Update memory from a digest-input.json file.")
+    update.add_argument("--input", required=True, help="Path to digest-input.json.")
+    update.add_argument("--markdown", help="Path to digest-input.md for daily sanitized archive context.")
+    update.add_argument("--out-dir", required=True, help="Directory for digest-context output files.")
     update.add_argument("--memory-dir", default=str(DEFAULT_MEMORY_DIR))
     update.add_argument("--include-dms", action="store_true")
     update.add_argument("--dm-threads", type=int, default=5)
@@ -51,7 +51,7 @@ def update_from_file(
     summary = update_memory(memory, data, include_dms=include_dms, dm_threads=dm_threads)
     save_memory(memory_dir, memory)
 
-    sanitized = sanitize_briefing(data)
+    sanitized = sanitize_digest(data)
     archive_daily(memory_dir, sanitized, markdown_path, summary)
 
     context_md = render_memory_context(summary)
@@ -60,8 +60,8 @@ def update_from_file(
         "daily_dir": str(memory_dir / "daily"),
         "summary": summary,
     }
-    (out_dir / "memory-context.md").write_text(context_md, encoding="utf-8")
-    (out_dir / "memory-context.json").write_text(json.dumps(context_json, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
+    (out_dir / "digest-context.md").write_text(context_md, encoding="utf-8")
+    (out_dir / "digest-context.json").write_text(json.dumps(context_json, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
     return context_json
 
 
@@ -206,7 +206,7 @@ def update_memory(memory: dict[str, Any], data: dict[str, Any], include_dms: boo
     }
 
 
-def sanitize_briefing(data: dict[str, Any]) -> dict[str, Any]:
+def sanitize_digest(data: dict[str, Any]) -> dict[str, Any]:
     sanitized = copy.deepcopy(data)
     for page in sanitized.get("pages", []):
         if not isinstance(page, dict) or page.get("kind") != "messages":
@@ -223,7 +223,7 @@ def archive_daily(memory_dir: Path, sanitized: dict[str, Any], markdown_path: Pa
     daily_dir = memory_dir / "daily"
     daily_dir.mkdir(parents=True, exist_ok=True)
     date = str(summary.get("date") or now_iso()[:10])
-    payload = {"summary": summary, "briefing": sanitized}
+    payload = {"summary": summary, "digest": sanitized}
     (daily_dir / f"{date}.json").write_text(json.dumps(payload, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
     if markdown_path and markdown_path.exists():
         md = markdown_path.read_text(encoding="utf-8")
@@ -233,7 +233,7 @@ def archive_daily(memory_dir: Path, sanitized: dict[str, Any], markdown_path: Pa
 
 def render_memory_context(summary: dict[str, Any]) -> str:
     lines = [
-        "# X Briefing Memory Context",
+        "# X Digest Memory Context",
         "",
         f"- date: `{summary.get('date')}`",
         f"- handle: `@{summary.get('handle') or ''}`",

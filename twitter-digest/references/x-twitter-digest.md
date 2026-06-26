@@ -1,12 +1,12 @@
-# X/Twitter Browser Briefing Reference
+# X/Twitter Browser Digest Reference
 
-Use this reference when implementing, auditing, or troubleshooting the browser-only X/Twitter briefing workflow.
+Use this reference when implementing, auditing, or troubleshooting the browser-only X/Twitter digest workflow.
 
 ## Access Model
 
 The only supported data access path is direct local browser automation:
 
-- `scripts/browser_x_briefing.py` launches a dedicated Chromium profile at `~/.twitter-briefing/chrome-profile`.
+- `scripts/browser_x_digest.py` launches a dedicated Chromium profile at `twitter-digest/.state/chrome-profile`.
 - The user logs in to X once in that browser.
 - Later runs default to headless collection and reuse the saved browser session.
 - If the saved login is unavailable, the script automatically opens a visible browser window for manual login.
@@ -16,33 +16,33 @@ The only supported data access path is direct local browser automation:
 Typical chat run:
 
 ```bash
-python3 twitter-briefing/scripts/run_daily_brief.py
+python3 twitter-digest/scripts/run_daily_digest.py
 ```
 
 Visible DM collection is enabled by default. To skip DMs:
 
 ```bash
-python3 twitter-briefing/scripts/run_daily_brief.py --no-dms
+python3 twitter-digest/scripts/run_daily_digest.py --no-dms
 ```
 
 Optional keyword search is off by default. Use it only when the user explicitly asks:
 
 ```bash
-python3 twitter-briefing/scripts/run_daily_brief.py --keywords "query one,query two"
+python3 twitter-digest/scripts/run_daily_digest.py --keywords "query one,query two"
 ```
 
 Force a visible browser window for debugging:
 
 ```bash
-python3 twitter-briefing/scripts/run_daily_brief.py --headed
+python3 twitter-digest/scripts/run_daily_digest.py --headed
 ```
 
 Outputs:
 
-- `/tmp/x-briefing/briefing-input.json`
-- `/tmp/x-briefing/briefing-input.md`
-- `/tmp/x-briefing/memory-context.json`
-- `/tmp/x-briefing/memory-context.md`
+- `/tmp/x-digest/digest-input.json`
+- `/tmp/x-digest/digest-input.md`
+- `/tmp/x-digest/digest-context.json`
+- `/tmp/x-digest/digest-context.md`
 
 ## Browser Collection Rules
 
@@ -73,12 +73,12 @@ Optional pages:
 
 Memory files:
 
-- `~/.twitter-briefing/config.json`: account defaults and preferences.
-- `~/.twitter-briefing/memory.json`: seen public post URLs, DM thread status signatures, account metadata, and run history.
-- `~/.twitter-briefing/daily/YYYY-MM-DD.json`: sanitized daily archive.
-- `~/.twitter-briefing/daily/YYYY-MM-DD.md`: sanitized markdown archive.
+- `twitter-digest/.state/config.json`: account defaults and preferences.
+- `twitter-digest/.state/memory.json`: seen public post URLs, DM thread status signatures, account metadata, and run history.
+- `twitter-digest/.state/daily/YYYY-MM-DD.json`: sanitized daily archive.
+- `twitter-digest/.state/daily/YYYY-MM-DD.md`: sanitized markdown archive.
 
-Privacy rule: do not persist raw DM text in memory or daily archives. Raw DM text may exist only in the current run's `/tmp/x-briefing/briefing-input.*` files for immediate summarization. Use `memory-context.md` to distinguish new, repeated, and unchanged items in the final Chinese brief.
+Privacy rule: do not persist raw DM text in memory or daily archives. Raw DM text may exist only in the current run's `/tmp/x-digest/digest-input.*` files for immediate summarization. Use `digest-context.md` to distinguish new, repeated, and unchanged items in the final Chinese digest.
 
 ## Hotspot Detection
 
@@ -86,7 +86,7 @@ Cluster home timeline posts by repeated topics, hashtags, URLs, named entities, 
 
 A hotspot needs at least one of:
 
-- Multiple independent posts in the briefing window.
+- Multiple independent posts in the digest window.
 - One high-signal post with unusually strong engagement.
 - A topic that directly affects the user's projects, brand, customers, portfolio, or community.
 
@@ -140,5 +140,5 @@ Reply drafting rules:
 ## 中文每日 Prompt
 
 ```text
-使用 $twitter-briefing 通过本地浏览器读取我最近 24 小时的 X/Twitter 动态，生成中文日报。重点总结谁 @ 了我、时间线热点、需要处理的私信或互动、我的账号动态。先给今日总结和行动建议，再给明细。回复只生成草稿，不要自动发送。读不到的数据要明确标注。
+使用 $twitter-digest 通过本地浏览器读取我最近 24 小时的 X/Twitter 动态，生成中文日报。重点总结谁 @ 了我、时间线热点、需要处理的私信或互动、我的账号动态。先给今日总结和行动建议，再给明细。回复只生成草稿，不要自动发送。读不到的数据要明确标注。
 ```
