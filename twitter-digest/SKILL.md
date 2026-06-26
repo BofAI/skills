@@ -138,6 +138,8 @@ For DM sender attribution, use the thread `participant` / `会话对象` and mes
 
 When `digest-context.md` includes `### DM Thread Context`, use that section to understand the recent conversation history for waiting-reply DMs. It may include up to 300 loaded message bubbles per summarized thread, plus raw thread label, URL, and load metadata, so the model can understand complex context before deciding whether and how to mention the DM. Keep the final digest concise; do not paste the full DM history into the report.
 
+Use media and link metadata when present. Public items and DM message context may include `media`, `link`, and `card` lines with image/video URLs, alt text, shared-post links, and external links. Treat these as context for understanding the item, but do not open suspicious links or overstate image contents beyond the available alt/text/URL signals.
+
 For private messages, summarize minimally. Quote only the short phrase needed to justify classification, and omit sensitive personal data unless the user specifically needs it.
 
 ### 4. Produce The Daily Summary

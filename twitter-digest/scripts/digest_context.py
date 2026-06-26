@@ -147,14 +147,17 @@ def build_digest_facts(data: dict[str, Any], summary: dict[str, Any]) -> dict[st
             if not isinstance(item, dict):
                 continue
             facts["public"]["items"].append(
-                {
-                    "kind": kind,
-                    "time": item.get("time") or "",
-                    "url": item.get("url") or "",
-                    "author_url": item.get("authorUrl") or "",
-                    "text_excerpt": compact_text(item.get("text"))[:700],
-                }
-            )
+                    {
+                        "kind": kind,
+                        "time": item.get("time") or "",
+                        "url": item.get("url") or "",
+                        "author_url": item.get("authorUrl") or "",
+                        "text_excerpt": compact_text(item.get("text"))[:700],
+                        "external_links": normalize_context_assets(item.get("externalLinks")),
+                        "media": normalize_context_assets(item.get("media")),
+                        "cards": normalize_context_assets(item.get("cards")),
+                    }
+                )
     if (summary.get("dm_status") or "") in {"blocked_by_x_chat_passcode", "visible_threads_unopened", "no_visible_threads"}:
         facts["data_gaps"].append(
             {
@@ -190,10 +193,10 @@ def assess_dm_thread(thread: dict[str, Any]) -> dict[str, Any]:
     return {"should_summarize": True, "noise_reason": ""}
 
 
-def normalize_dm_messages(value: Any) -> list[dict[str, str]]:
+def normalize_dm_messages(value: Any) -> list[dict[str, Any]]:
     if not isinstance(value, list):
         return []
-    messages: list[dict[str, str]] = []
+    messages: list[dict[str, Any]] = []
     for item in value:
         if not isinstance(item, dict):
             continue
@@ -205,6 +208,8 @@ def normalize_dm_messages(value: Any) -> list[dict[str, str]]:
                 "sender": "me" if item.get("sender") == "me" else "other",
                 "time": compact_text(item.get("time")),
                 "text": text[:1000],
+                "links": normalize_context_assets(item.get("links")),
+                "media": normalize_context_assets(item.get("media")),
             }
         )
     return messages
@@ -217,8 +222,33 @@ def dm_conversation_context(thread: dict[str, Any], max_messages: int = 300, max
         for message in messages:
             timestamp = f" {message['time']}" if message.get("time") else ""
             lines.append(f"{message['sender']}{timestamp}: {message['text']}")
+            for link in message.get("links") or []:
+                label = f" {link.get('label')}" if link.get("label") else ""
+                lines.append(f"  link: {link.get('url')}{label}")
+            for media in message.get("media") or []:
+                alt = f" alt={media.get('alt')}" if media.get("alt") else ""
+                poster = f" poster={media.get('poster')}" if media.get("poster") else ""
+                lines.append(f"  media: {media.get('type') or 'media'} {media.get('url')}{poster}{alt}".rstrip())
         return "\n".join(lines)[-max_chars:]
     return str(thread.get("text") or "")[-max_chars:]
+
+
+def normalize_context_assets(value: Any) -> list[dict[str, str]]:
+    if not isinstance(value, list):
+        return []
+    out: list[dict[str, str]] = []
+    for item in value:
+        if not isinstance(item, dict):
+            continue
+        url = compact_text(item.get("url"))
+        if not url:
+            continue
+        asset = {"url": url[:1200]}
+        for key in ("label", "type", "alt", "poster", "text"):
+            if item.get(key):
+                asset[key] = compact_text(item.get(key))[:700]
+        out.append(asset)
+    return out[:12]
 
 
 def render_digest_input(data: dict[str, Any]) -> str:
@@ -402,6 +432,16 @@ def render_digest_facts(facts: dict[str, Any]) -> str:
     lines.extend(["", "## Public Items", ""])
     for item in ((facts.get("public") or {}).get("items") or [])[:80]:
         lines.append(f"- `{item.get('kind')}` `{item.get('time')}` {item.get('url') or '[no url]'} - {item.get('text_excerpt')}")
+        for asset in item.get("media") or []:
+            alt = f" alt={asset.get('alt')}" if asset.get("alt") else ""
+            poster = f" poster={asset.get('poster')}" if asset.get("poster") else ""
+            lines.append(f"  - media: {asset.get('type') or 'media'} {asset.get('url')}{poster}{alt}".rstrip())
+        for link in item.get("external_links") or []:
+            label = f" {link.get('label')}" if link.get("label") else ""
+            lines.append(f"  - link: {link.get('url')}{label}")
+        for card in item.get("cards") or []:
+            text = f" {card.get('text')}" if card.get("text") else ""
+            lines.append(f"  - card: {card.get('url')}{text}")
     if not ((facts.get("public") or {}).get("items") or []):
         lines.append("- None")
 

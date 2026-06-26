@@ -568,7 +568,7 @@ def count_dm_messages(ws_url: str) -> int:
     return int(value) if isinstance(value, (int, float)) else 0
 
 
-def extract_dm_messages(ws_url: str, max_messages: int = 300) -> list[dict[str, str]]:
+def extract_dm_messages(ws_url: str, max_messages: int = 300) -> list[dict[str, Any]]:
     script = r"""
 (() => {
   const panel = document.querySelector('[data-testid="dm-conversation-panel"]')
@@ -590,10 +590,13 @@ def extract_dm_messages(ws_url: str, max_messages: int = 300) -> list[dict[str, 
     seen.add(key);
     const time = firstTimeText(bubble || node);
     const classText = String(node.className || '');
+    const assets = messageAssets(node);
     out.push({
       sender: classText.includes('justify-end') ? 'me' : 'other',
       time,
       text,
+      links: assets.links,
+      media: assets.media,
     });
   }
   return out.slice(-Math.max(1, %d));
@@ -630,12 +633,44 @@ def extract_dm_messages(ws_url: str, max_messages: int = 300) -> list[dict[str, 
   }
   function clean(text) { return (text || '').replace(/\s+/g, ' ').trim(); }
   function isTimeText(text) { return /^(\d{1,2}:\d{2}\s?(AM|PM)?|\d{1,2}:\d{2}|上午\s*\d{1,2}:\d{2}|下午\s*\d{1,2}:\d{2})$/i.test(text); }
+  function messageAssets(node) {
+    const links = [];
+    for (const a of Array.from(node.querySelectorAll('a[href]'))) {
+      const href = normalizeUrl(a.getAttribute('href'));
+      if (!href) continue;
+      const label = clean(a.innerText || a.getAttribute('aria-label') || '');
+      if (!links.some((item) => item.url === href)) links.push({url: href, label});
+    }
+    const media = [];
+    for (const img of Array.from(node.querySelectorAll('img[src]'))) {
+      const src = normalizeUrl(img.getAttribute('src'));
+      if (!src) continue;
+      const alt = clean(img.getAttribute('alt') || img.getAttribute('aria-label') || '');
+      if (!media.some((item) => item.url === src)) media.push({type: 'image', url: src, alt});
+    }
+    for (const video of Array.from(node.querySelectorAll('video'))) {
+      const src = normalizeUrl(video.currentSrc || video.getAttribute('src'));
+      const poster = normalizeUrl(video.getAttribute('poster'));
+      if (src || poster) media.push({type: 'video', url: src || '', poster: poster || '', alt: clean(video.getAttribute('aria-label') || '')});
+    }
+    return {links: links.slice(0, 10), media: media.slice(0, 8)};
+  }
+  function normalizeUrl(value) {
+    if (!value || value.startsWith('data:') || value.startsWith('blob:')) return '';
+    try {
+      const url = new URL(value, location.href);
+      url.hash = '';
+      return url.href;
+    } catch {
+      return '';
+    }
+  }
 })()
 """ % max(1, int(max_messages))
     value = cdp_eval(ws_url, script)
     if not isinstance(value, list):
         return []
-    messages: list[dict[str, str]] = []
+    messages: list[dict[str, Any]] = []
     for item in value:
         if not isinstance(item, dict):
             continue
@@ -647,17 +682,49 @@ def extract_dm_messages(ws_url: str, max_messages: int = 300) -> list[dict[str, 
                 "sender": "me" if str(item.get("sender") or "") == "me" else "other",
                 "time": str(item.get("time") or ""),
                 "text": text[:1000],
+                "links": normalize_assets(item.get("links"), kind="links"),
+                "media": normalize_assets(item.get("media"), kind="media"),
             }
         )
     return messages
 
 
-def render_dm_messages(messages: list[dict[str, str]]) -> str:
+def normalize_assets(value: Any, kind: str) -> list[dict[str, str]]:
+    if not isinstance(value, list):
+        return []
+    out: list[dict[str, str]] = []
+    for item in value:
+        if not isinstance(item, dict):
+            continue
+        url = str(item.get("url") or "").strip()
+        if not url:
+            continue
+        normalized: dict[str, str] = {"url": url[:1200]}
+        if kind == "media":
+            normalized["type"] = str(item.get("type") or "media")[:40]
+            if item.get("poster"):
+                normalized["poster"] = str(item.get("poster") or "")[:1200]
+            if item.get("alt"):
+                normalized["alt"] = str(item.get("alt") or "")[:500]
+        else:
+            if item.get("label"):
+                normalized["label"] = str(item.get("label") or "")[:500]
+        out.append(normalized)
+    return out[:10]
+
+
+def render_dm_messages(messages: list[dict[str, Any]]) -> str:
     lines = []
     for message in messages:
         sender = "me" if message.get("sender") == "me" else "other"
         timestamp = f" {message.get('time')}" if message.get("time") else ""
-        lines.append(f"{sender}{timestamp}: {message.get('text') or ''}")
+        suffixes = []
+        if message.get("links"):
+            suffixes.append("links=" + ", ".join(asset.get("url", "") for asset in message.get("links", [])[:3]))
+        if message.get("media"):
+            suffixes.append("media=" + ", ".join(asset.get("url", "") for asset in message.get("media", [])[:3]))
+        suffix = f" [{' ; '.join(suffixes)}]" if suffixes else ""
+        lines.append(f"{sender}{timestamp}: {message.get('text') or ''}{suffix}")
     return "\n".join(lines)
 
 
@@ -975,6 +1042,65 @@ def extract_articles(ws_url: str) -> list[dict[str, Any]]:
       return /\/status\/\d+/.test(url.pathname) ? url.href : null;
     } catch { return null; }
   };
+  const clean = (text) => (text || '').replace(/\s+/g, ' ').trim();
+  const normalizeUrl = (value) => {
+    if (!value || value.startsWith('data:') || value.startsWith('blob:')) return '';
+    try {
+      const url = new URL(value, location.href);
+      url.hash = '';
+      return url.href;
+    } catch { return ''; }
+  };
+  const linkInfo = (article, links) => {
+    const out = [];
+    for (const a of Array.from(article.querySelectorAll('a[href]'))) {
+      const url = normalizeUrl(a.getAttribute('href'));
+      if (!url) continue;
+      let parsed;
+      try { parsed = new URL(url); } catch { continue; }
+      if (/\/photo\/\d+/.test(parsed.pathname)) continue;
+      if (/\/analytics$|\/retweets$|\/likes$/.test(parsed.pathname)) continue;
+      const label = clean(a.innerText || a.getAttribute('aria-label') || '');
+      const isStatus = /\/status\/\d+/.test(parsed.pathname);
+      const sameStatus = isStatus && links.map(statusUrl).includes(url);
+      const isProfile = /^\/[^/]+$/.test(parsed.pathname) && (parsed.hostname.endsWith('x.com') || parsed.hostname.endsWith('twitter.com'));
+      if (sameStatus || isProfile) continue;
+      if (!out.some((item) => item.url === url)) out.push({url, label});
+    }
+    return out.slice(0, 12);
+  };
+  const mediaInfo = (article) => {
+    const out = [];
+    for (const img of Array.from(article.querySelectorAll('img[src]'))) {
+      const url = normalizeUrl(img.getAttribute('src'));
+      if (!url) continue;
+      if (/profile_images|emoji|hashflags|abs\.twimg\.com\/responsive-web/i.test(url)) continue;
+      const alt = clean(img.getAttribute('alt') || img.getAttribute('aria-label') || '');
+      if (!out.some((item) => item.url === url)) out.push({type: 'image', url, alt});
+    }
+    for (const video of Array.from(article.querySelectorAll('video'))) {
+      const url = normalizeUrl(video.currentSrc || video.getAttribute('src'));
+      const poster = normalizeUrl(video.getAttribute('poster'));
+      if (url || poster) out.push({type: 'video', url, poster, alt: clean(video.getAttribute('aria-label') || '')});
+    }
+    return out.slice(0, 8);
+  };
+  const cardInfo = (article) => {
+    const cards = [];
+    for (const link of Array.from(article.querySelectorAll('a[href]'))) {
+      const text = clean(link.innerText || link.getAttribute('aria-label') || '');
+      const href = normalizeUrl(link.getAttribute('href'));
+      if (!href || text.length < 8) continue;
+      try {
+        const parsed = new URL(href);
+        const isProfile = /^\/[^/]+$/.test(parsed.pathname) && (parsed.hostname.endsWith('x.com') || parsed.hostname.endsWith('twitter.com'));
+        if (isProfile) continue;
+        if (/\/status\/\d+/.test(parsed.pathname) && text.length < 80) continue;
+      } catch { continue; }
+      if (!cards.some((item) => item.url === href && item.text === text)) cards.push({url: href, text: text.slice(0, 500)});
+    }
+    return cards.slice(0, 5);
+  };
   return Array.from(document.querySelectorAll('article')).map((article) => {
     const text = (article.innerText || '').trim();
     const links = Array.from(article.querySelectorAll('a[href]')).map(a => a.href).filter(Boolean);
@@ -986,7 +1112,16 @@ def extract_articles(ws_url: str) -> list[dict[str, Any]]:
         return /^\/[^/]+$/.test(p) && !p.includes('/i/');
       } catch { return false; }
     });
-    return { text, url: status, links, time: times[0] || null, authorUrl: authorLinks[0] || null };
+    return {
+      text,
+      url: status,
+      links,
+      externalLinks: linkInfo(article, links),
+      media: mediaInfo(article),
+      cards: cardInfo(article),
+      time: times[0] || null,
+      authorUrl: authorLinks[0] || null
+    };
   }).filter(item => item.text);
 })()
 """

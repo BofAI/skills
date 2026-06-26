@@ -150,6 +150,13 @@ Waiting-reply does not automatically mean important. Count every waiting-reply c
 
 For waiting-reply DMs that should be summarized, `digest-context.md` includes a `### DM Thread Context` section with recent loaded message history, raw thread label, URL, and load metadata. It can include up to 300 loaded message bubbles per thread. Use it to understand the conversation, but do not copy full private history into the final digest. Keep final DM summaries short and action-oriented.
 
+Media/link context:
+
+- Public items may include `media`, `link`, and `card` lines with image/video URLs, thumbnail URLs, alt text, shared-post links, or external links.
+- DM message context may include per-message `link:` and `media:` lines.
+- Use these fields to understand whether a post or DM includes a shared post, image, video, or external reference.
+- Do not open suspicious links. Do not claim visual details that are not present in the text, alt text, thumbnail URL, or surrounding context.
+
 Status rules:
 
 - `captured_unreplied_threads`: summarize the captured waiting-reply DM bodies selectively and classify importance.
