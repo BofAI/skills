@@ -4,6 +4,7 @@
 from __future__ import annotations
 
 import argparse
+import datetime as dt
 import shutil
 from pathlib import Path
 
@@ -31,27 +32,61 @@ def display_path(path: Path) -> str:
         return str(expanded)
 
 
+def backup_path(skills_dir: Path, name: str) -> Path:
+    stamp = dt.datetime.now().strftime("%Y%m%d-%H%M%S")
+    backups_dir = skills_dir / ".backups"
+    candidate = backups_dir / f"{name}-{stamp}"
+    suffix = 1
+    while candidate.exists() or candidate.is_symlink():
+        suffix += 1
+        candidate = backups_dir / f"{name}-{stamp}-{suffix}"
+    return candidate
+
+
+def disable_backup_skill_marker(path: Path) -> None:
+    if path.is_symlink() or not path.is_dir():
+        return
+    marker = path / "SKILL.md"
+    if marker.exists():
+        marker.rename(path / "SKILL.md.disabled")
+
+
+def move_to_hidden_backup(path: Path, skills_dir: Path, dry_run: bool) -> None:
+    backup = backup_path(skills_dir, path.name)
+    if dry_run:
+        print(f"Would move existing install to hidden backup: {display_path(path)} -> {display_path(backup)}", flush=True)
+        return
+    backup.parent.mkdir(parents=True, exist_ok=True)
+    path.rename(backup)
+    disable_backup_skill_marker(backup)
+    print(f"Existing install moved to hidden backup: {display_path(backup)}", flush=True)
+
+
+def cleanup_legacy_installs(skills_dir: Path, dry_run: bool) -> None:
+    for legacy_name in ("twitter-briefing", "twitter-briefing.bak"):
+        legacy = skills_dir / legacy_name
+        if legacy.exists() or legacy.is_symlink():
+            move_to_hidden_backup(legacy, skills_dir, dry_run)
+
+
 def install_skill(root: Path, skills_dir: Path, copy: bool, dry_run: bool) -> Path:
     target = skills_dir / root.name
     if dry_run:
         action = "copy" if copy else "symlink"
+        cleanup_legacy_installs(skills_dir, dry_run=True)
+        if target.exists() or target.is_symlink():
+            move_to_hidden_backup(target, skills_dir, dry_run=True)
         print(f"Would {action} skill to: {display_path(target)}", flush=True)
         return target
     skills_dir.mkdir(parents=True, exist_ok=True)
+    cleanup_legacy_installs(skills_dir, dry_run=False)
     if target.is_symlink() or target.exists():
         if target.is_symlink() and target.resolve() == root and not copy:
             print(f"Skill already installed: {display_path(target)}", flush=True)
             return target
-        backup = target.with_name(target.name + ".bak")
-        if backup.exists() or backup.is_symlink():
-            if backup.is_dir() and not backup.is_symlink():
-                shutil.rmtree(backup)
-            else:
-                backup.unlink()
-        target.rename(backup)
-        print(f"Existing install moved to: {display_path(backup)}", flush=True)
+        move_to_hidden_backup(target, skills_dir, dry_run=False)
     if copy:
-        shutil.copytree(root, target, ignore=shutil.ignore_patterns("__pycache__", "*.pyc"))
+        shutil.copytree(root, target, ignore=shutil.ignore_patterns(".state", "__pycache__", "*.pyc"))
         print(f"Copied skill to: {display_path(target)}", flush=True)
     else:
         target.symlink_to(root, target_is_directory=True)

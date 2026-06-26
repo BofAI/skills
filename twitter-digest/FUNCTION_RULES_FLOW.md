@@ -16,6 +16,8 @@
 
 ## 2. 数据保存位置
 
+安装脚本会把旧的 `twitter-briefing`、`twitter-briefing.bak` 或已有 `twitter-digest` 安装迁移到 `~/.claude/skills/.backups/`，并把备份里的 `SKILL.md` 改成 `SKILL.md.disabled`，避免 Claude Code 加载重复旧 skill。
+
 登录状态保存在：
 
 ```text
