@@ -1,0 +1,4 @@
+interface:
+  display_name: "Twitter Briefing"
+  short_description: "Analyze X mentions, trends, DMs, daily summaries, and local memory"
+  default_prompt: "Use $twitter-briefing to summarize my X mentions, timeline hotspots, important DMs, and what changed since prior runs."
