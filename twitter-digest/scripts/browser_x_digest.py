@@ -23,7 +23,7 @@ def parse_args() -> argparse.Namespace:
     default_state_dir = Path(__file__).resolve().parents[1] / ".state"
     parser.add_argument("--handle", help="Your X handle, with or without @. If omitted, the script tries to detect it from the logged-in page.")
     parser.add_argument("--keywords", default="", help="Comma-separated keywords or queries for hotspot search.")
-    parser.add_argument("--out", default="/tmp/x-digest", help="Output directory.")
+    parser.add_argument("--out", default=str(default_state_dir / "run"), help="Output directory.")
     parser.add_argument("--profile-dir", default=str(default_state_dir / "chrome-profile"))
     parser.add_argument("--scrolls", type=int, default=4, help="Scroll rounds per page.")
     parser.add_argument("--login-timeout-sec", type=int, default=300)
@@ -31,6 +31,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--dm-threads", type=int, default=5, help="Maximum recent DM threads to open when --include-dms is set.")
     parser.add_argument("--headless", action="store_true", help="Run without a visible browser window. This is the default after first login.")
     parser.add_argument("--headed", action="store_true", help="Force a visible browser window for debugging or manual login.")
+    parser.add_argument("--non-interactive", action="store_true", help="Do not open a visible browser for DM passcode recovery; record a data gap instead.")
     parser.add_argument("--keep-browser-open", action="store_true")
     return parser.parse_args()
 
@@ -72,22 +73,26 @@ def launch_browser(profile_dir: Path, start_url: str, headless: bool) -> tuple[s
     return proc, port
 
 
-def ensure_logged_in(profile_dir: Path, timeout_sec: int, force_headed: bool) -> tuple[subprocess.Popen[bytes], int, bool]:
+def ensure_logged_in(profile_dir: Path, timeout_sec: int, force_headed: bool, non_interactive: bool) -> tuple[subprocess.Popen[bytes], int, bool, bool]:
     if force_headed:
         proc, port = launch_browser(profile_dir, "https://x.com/home", headless=False)
         wait_for_login(port, timeout_sec, interactive=True)
-        return proc, port, False
+        return proc, port, False, True
 
     proc, port = launch_browser(profile_dir, "https://x.com/home", headless=True)
     if is_logged_in(port):
         print("X login detected in saved browser session. Continuing headless collection...")
-        return proc, port, True
+        return proc, port, True, True
+
+    if non_interactive:
+        print("Saved X login was not available. Non-interactive mode will record a login data gap without opening a browser.")
+        return proc, port, True, False
 
     print("Saved X login was not available. Opening a visible browser window for one-time login...")
     stop_browser(proc)
     proc, port = launch_browser(profile_dir, "https://x.com/home", headless=False)
     wait_for_login(port, timeout_sec, interactive=True)
-    return proc, port, False
+    return proc, port, False, True
 
 
 def is_logged_in(port: int) -> bool:
@@ -167,7 +172,15 @@ def collect_page(port: int, page: dict[str, str], scrolls: int, dm_threads: int 
     ws_url = wait_for_cdp_page_ws(port)
     cdp_call(ws_url, "Page.enable")
     cdp_call(ws_url, "Runtime.enable")
-    cdp_call(ws_url, "Page.navigate", {"url": page["url"]})
+    navigate_result = cdp_call(ws_url, "Page.navigate", {"url": page["url"]})
+    if cdp_error(navigate_result):
+        return {
+            "kind": page["kind"],
+            "url": page["url"],
+            "items": [],
+            "collection_status": "error",
+            "collection_error": navigate_result["_cdp_error"],
+        }
     time.sleep(5)
     posts: list[dict[str, Any]] = []
     for _ in range(max(scrolls, 1)):
@@ -323,12 +336,13 @@ def extract_main_text(ws_url: str) -> str:
 
 
 def detect_handle(port: int) -> str | None:
-    ws_url = wait_for_cdp_page_ws(port)
-    cdp_call(ws_url, "Page.enable")
-    cdp_call(ws_url, "Runtime.enable")
-    cdp_call(ws_url, "Page.navigate", {"url": "https://x.com/home"})
-    time.sleep(5)
-    script = r"""
+    try:
+        ws_url = wait_for_cdp_page_ws(port)
+        cdp_call(ws_url, "Page.enable")
+        cdp_call(ws_url, "Runtime.enable")
+        cdp_call(ws_url, "Page.navigate", {"url": "https://x.com/home"})
+        time.sleep(5)
+        script = r"""
 (() => {
   const account = document.querySelector('[data-testid="SideNav_AccountSwitcher_Button"]');
   const accountText = account ? account.innerText : '';
@@ -346,8 +360,11 @@ def detect_handle(port: int) -> str | None:
   return null;
 })()
 """
-    value = cdp_eval(ws_url, script)
-    return str(value).lstrip("@") if value else None
+        value = cdp_eval(ws_url, script)
+        return str(value).lstrip("@") if value else None
+    except Exception as exc:
+        print(f"Could not auto-detect X handle: {exc}")
+        return None
 
 
 def dedupe_items(items: list[dict[str, Any]]) -> list[dict[str, Any]]:
@@ -387,6 +404,8 @@ def render_markdown(data: dict[str, Any]) -> str:
             lines.extend(["", f"DM 状态: `{page['dm_status']}`"])
             if page.get("dm_note"):
                 lines.append(str(page["dm_note"]))
+        if page.get("collection_error"):
+            lines.extend(["", f"采集错误: `{page['collection_error']}`"])
         for thread in page.get("dm_threads", [])[:20]:
             lines.extend(["", f"### DM thread: {thread.get('label') or thread.get('url')}", ""])
             lines.append(str(thread.get("text") or "")[:3000])
@@ -421,8 +440,12 @@ def wait_for_cdp_page_ws(port: int) -> str:
     deadline = time.time() + 30
     fallback: str | None = None
     while time.time() < deadline:
-        with urllib.request.urlopen(url, timeout=1) as response:
-            targets = json.loads(response.read().decode("utf-8"))
+        try:
+            with urllib.request.urlopen(url, timeout=1) as response:
+                targets = json.loads(response.read().decode("utf-8"))
+        except Exception:
+            time.sleep(0.2)
+            continue
         if isinstance(targets, list):
             for target in targets:
                 if not isinstance(target, dict):
@@ -452,7 +475,7 @@ def cdp_get_all_cookies(ws_url: str) -> list[dict[str, object]]:
 
 def cdp_eval(ws_url: str, expression: str) -> Any:
     result = cdp_call(ws_url, "Runtime.evaluate", {"expression": expression, "returnByValue": True, "awaitPromise": True})
-    if not isinstance(result, dict):
+    if not isinstance(result, dict) or cdp_error(result):
         return None
     remote = result.get("result", {})
     if isinstance(remote, dict):
@@ -460,25 +483,37 @@ def cdp_eval(ws_url: str, expression: str) -> Any:
     return None
 
 
-def cdp_call(ws_url: str, method: str, params: dict[str, Any] | None = None) -> Any:
-    sock = websocket_connect(ws_url)
-    try:
-        websocket_send_json(sock, {"id": 1, "method": method, "params": params or {}})
-        deadline = time.time() + 20
-        while time.time() < deadline:
-            message = websocket_recv_json(sock)
-            if message.get("id") == 1:
-                if "error" in message:
-                    return {}
-                return message.get("result", {})
-    finally:
-        sock.close()
-    return {}
+def cdp_error(result: Any) -> bool:
+    return isinstance(result, dict) and isinstance(result.get("_cdp_error"), str)
+
+
+def cdp_call(ws_url: str, method: str, params: dict[str, Any] | None = None, retries: int = 2) -> Any:
+    last_error = ""
+    for _ in range(max(retries, 1)):
+        sock: socket.socket | None = None
+        try:
+            sock = websocket_connect(ws_url)
+            websocket_send_json(sock, {"id": 1, "method": method, "params": params or {}})
+            deadline = time.time() + 20
+            while time.time() < deadline:
+                message = websocket_recv_json(sock)
+                if message.get("id") == 1:
+                    if "error" in message:
+                        return {"_cdp_error": json.dumps(message.get("error"), ensure_ascii=False)}
+                    return message.get("result", {})
+            last_error = f"Timed out waiting for CDP response to {method}"
+        except Exception as exc:
+            last_error = str(exc)
+            time.sleep(0.4)
+        finally:
+            if sock is not None:
+                sock.close()
+    return {"_cdp_error": last_error or f"CDP call failed: {method}"}
 
 
 def websocket_connect(ws_url: str) -> socket.socket:
     if not ws_url.startswith("ws://"):
-        raise SystemExit("Only local ws:// DevTools endpoints are supported.")
+        raise RuntimeError("Only local ws:// DevTools endpoints are supported.")
     without_scheme = ws_url[len("ws://") :]
     host_port, path = without_scheme.split("/", 1)
     path = "/" + path
@@ -497,7 +532,7 @@ def websocket_connect(ws_url: str) -> socket.socket:
     response = raw_sock.recv(4096)
     if b" 101 " not in response.split(b"\r\n", 1)[0]:
         raw_sock.close()
-        raise SystemExit("Could not open DevTools WebSocket.")
+        raise RuntimeError("Could not open DevTools WebSocket.")
     return raw_sock
 
 
@@ -521,7 +556,7 @@ def websocket_recv_json(sock: socket.socket) -> dict[str, object]:
     first_two = recv_exact(sock, 2)
     opcode = first_two[0] & 0x0F
     if opcode == 0x8:
-        raise SystemExit("DevTools WebSocket closed.")
+        raise ConnectionError("DevTools WebSocket closed.")
     length = first_two[1] & 0x7F
     if length == 126:
         length = struct.unpack("!H", recv_exact(sock, 2))[0]
@@ -542,17 +577,51 @@ def recv_exact(sock: socket.socket, size: int) -> bytes:
     while len(chunks) < size:
         chunk = sock.recv(size - len(chunks))
         if not chunk:
-            raise SystemExit("Unexpected end of DevTools WebSocket stream.")
+            raise ConnectionError("Unexpected end of DevTools WebSocket stream.")
         chunks.extend(chunk)
     return bytes(chunks)
+
+
+def ensure_private_dir(path: Path) -> None:
+    path.mkdir(parents=True, exist_ok=True)
+    try:
+        path.chmod(0o700)
+    except PermissionError:
+        pass
+
+
+def write_digest_output(out_dir: Path, data: dict[str, Any]) -> None:
+    ensure_private_dir(out_dir)
+    (out_dir / "digest-input.json").write_text(json.dumps(data, ensure_ascii=False, indent=2), encoding="utf-8")
+    (out_dir / "digest-input.md").write_text(render_markdown(data), encoding="utf-8")
 
 
 def main() -> None:
     args = parse_args()
     profile_dir = Path(args.profile_dir).expanduser().resolve()
     force_headed = bool(args.headed and not args.headless)
-    proc, port, headless = ensure_logged_in(profile_dir, args.login_timeout_sec, force_headed)
+    proc, port, headless, logged_in = ensure_logged_in(profile_dir, args.login_timeout_sec, force_headed, args.non_interactive)
     try:
+        out_dir = Path(args.out).expanduser().resolve()
+        if not logged_in:
+            data = {
+                "generated_at": dt.datetime.now().astimezone().isoformat(),
+                "profile_dir": str(profile_dir),
+                "handle": args.handle.lstrip("@") if args.handle else None,
+                "keywords": [k.strip() for k in args.keywords.split(",") if k.strip()],
+                "pages": [
+                    {
+                        "kind": "login",
+                        "url": "https://x.com/home",
+                        "items": [],
+                        "collection_status": "skipped",
+                        "collection_error": "Saved X login unavailable in non-interactive mode.",
+                    }
+                ],
+            }
+            write_digest_output(out_dir, data)
+            print(json.dumps({"out_dir": str(out_dir), "pages": len(data["pages"]), "headless": headless, "login": "unavailable"}, indent=2))
+            return
         handle = args.handle.lstrip("@") if args.handle else detect_handle(port)
         if handle:
             print(f"Using X handle: @{handle}")
@@ -560,7 +629,7 @@ def main() -> None:
             print("Could not auto-detect X handle. Mention search will be skipped unless --handle is provided.")
         pages = build_pages(handle, args.keywords, args.include_dms)
         data = {
-            "generated_at": dt.datetime.now(dt.timezone.utc).isoformat(),
+            "generated_at": dt.datetime.now().astimezone().isoformat(),
             "profile_dir": str(profile_dir),
             "handle": handle,
             "keywords": [k.strip() for k in args.keywords.split(",") if k.strip()],
@@ -570,6 +639,10 @@ def main() -> None:
             print(f"Collecting {page['kind']}: {page['url']}")
             result = collect_page(port, page, args.scrolls, args.dm_threads)
             if page["kind"] == "messages" and result.get("dm_status") == "blocked_by_x_chat_passcode":
+                if args.non_interactive:
+                    result["dm_note"] = "X Chat passcode is required. Non-interactive mode skipped DM recovery for this run."
+                    data["pages"].append(result)
+                    continue
                 if headless:
                     print("DM passcode screen detected in headless mode. Reopening X Messages in a visible browser window...")
                     stop_browser(proc)
@@ -584,10 +657,7 @@ def main() -> None:
                         "Open the visible browser window, complete passcode setup or entry, then rerun the digest."
                     )
             data["pages"].append(result)
-        out_dir = Path(args.out).expanduser().resolve()
-        out_dir.mkdir(parents=True, exist_ok=True)
-        (out_dir / "digest-input.json").write_text(json.dumps(data, ensure_ascii=False, indent=2), encoding="utf-8")
-        (out_dir / "digest-input.md").write_text(render_markdown(data), encoding="utf-8")
+        write_digest_output(out_dir, data)
         print(json.dumps({"out_dir": str(out_dir), "pages": len(data["pages"]), "headless": headless}, indent=2))
     finally:
         if not args.keep_browser_open:

@@ -37,12 +37,18 @@ Force a visible browser window for debugging:
 python3 twitter-digest/scripts/run_daily_digest.py --headed
 ```
 
+For unattended scheduled runs that should not open a visible browser or wait on passcode recovery:
+
+```bash
+python3 twitter-digest/scripts/run_daily_digest.py --non-interactive
+```
+
 Outputs:
 
-- `/tmp/x-digest/digest-input.json`
-- `/tmp/x-digest/digest-input.md`
-- `/tmp/x-digest/digest-context.json`
-- `/tmp/x-digest/digest-context.md`
+- `twitter-digest/.state/run/digest-input.json`
+- `twitter-digest/.state/run/digest-input.md`
+- `twitter-digest/.state/run/digest-context.json`
+- `twitter-digest/.state/run/digest-context.md`
 
 ## Browser Collection Rules
 
@@ -53,7 +59,7 @@ Outputs:
 - Do not post, like, follow, accept DM requests, open suspicious links, or reply.
 - Keep scrolling bounded. Increase `--scrolls` only when the user needs broader coverage.
 - Read only DM content that is visible in the local logged-in browser. Use `--no-dms` when the user does not want DMs processed.
-- If X Chat shows passcode setup, passcode entry, or encryption-key recovery, automatically reopen X Messages in a visible browser window, wait for the user to complete it, then retry DM collection. The script must not choose, enter, or store the passcode.
+- If X Chat shows passcode setup, passcode entry, or encryption-key recovery, automatically reopen X Messages in a visible browser window, wait for the user to complete it, then retry DM collection. In `--non-interactive` mode, skip DM recovery and record a data gap. The script must not choose, enter, or store the passcode.
 
 ## Pages Collected
 
@@ -77,8 +83,15 @@ Memory files:
 - `twitter-digest/.state/memory.json`: seen public post URLs, DM thread status signatures, account metadata, and run history.
 - `twitter-digest/.state/daily/YYYY-MM-DD.json`: sanitized daily archive.
 - `twitter-digest/.state/daily/YYYY-MM-DD.md`: sanitized markdown archive.
+- `twitter-digest/.state/run/digest-input.*`: current run capture, including raw DM text only for immediate summarization.
 
-Privacy rule: do not persist raw DM text in memory or daily archives. Raw DM text may exist only in the current run's `/tmp/x-digest/digest-input.*` files for immediate summarization. Use `digest-context.md` to distinguish new, repeated, and unchanged items in the final Chinese digest.
+Privacy rule: do not persist raw DM text in memory or daily archives. Raw DM text may exist only in the current run's private `twitter-digest/.state/run/digest-input.*` files for immediate summarization. Use `digest-context.md` and the `[new]` / `[repeat]` markers in `digest-input.md` to distinguish new, repeated, and unchanged items in the final Chinese digest.
+
+Retention and date rules:
+
+- Seen public posts and DM thread signatures are pruned after 60 days by default.
+- Sanitized daily archives are pruned after 90 days by default.
+- Run dates and archive names use the user's local timezone, not UTC.
 
 ## Hotspot Detection
 

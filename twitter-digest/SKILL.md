@@ -18,7 +18,7 @@ This skill intentionally uses only local browser automation.
 Default collection uses:
 
 ```bash
-python3 twitter-digest/scripts/browser_x_digest.py --out /tmp/x-digest
+python3 twitter-digest/scripts/browser_x_digest.py
 ```
 
 For chat usage, run the wrapper:
@@ -43,7 +43,7 @@ Default scope:
 - Visible DM conversations.
 - Optional keyword searches only when the user explicitly passes `--keywords`.
 
-Read `/tmp/x-digest/digest-input.md`, `/tmp/x-digest/digest-context.md`, and JSON if needed before writing the Chinese digest.
+Read `twitter-digest/.state/run/digest-input.md`, `twitter-digest/.state/run/digest-context.md`, and JSON if needed before writing the Chinese digest.
 
 ## Install
 
@@ -67,9 +67,16 @@ Claude Code or other agents can use the installed skill by running the same brow
 - `twitter-digest/.state/memory.json`: account metadata, seen public post URLs, DM thread status signatures, and run history.
 - `twitter-digest/.state/daily/YYYY-MM-DD.json`: sanitized daily archive.
 - `twitter-digest/.state/daily/YYYY-MM-DD.md`: sanitized daily archive.
-- `/tmp/x-digest/digest-context.md`: current run memory context for the final digest.
+- `twitter-digest/.state/run/digest-input.md`: current run browser capture, annotated with `[new]` / `[repeat]` for public posts.
+- `twitter-digest/.state/run/digest-context.md`: current run memory context for the final digest.
 
-Long-term memory must not store raw DM text. Raw DM text may exist only in the current run's `/tmp/x-digest/digest-input.*` files for immediate summarization.
+Long-term memory must not store raw DM text. Raw DM text may exist only in the current run's private `twitter-digest/.state/run/digest-input.*` files for immediate summarization. The run directory is created with owner-only permissions where supported.
+
+Memory retention defaults:
+
+- Seen public posts and DM thread signatures: 60 days.
+- Sanitized daily archives: 90 days.
+- Run dates use the user's local timezone, not UTC.
 
 ## Workflow
 
@@ -99,13 +106,19 @@ For debugging or manual inspection:
 python3 twitter-digest/scripts/run_daily_digest.py --headed
 ```
 
+For unattended scheduled runs that should not block on passcode recovery:
+
+```bash
+python3 twitter-digest/scripts/run_daily_digest.py --non-interactive
+```
+
 Do not ask the user to copy cookies or configure another service. If the script opens a visible browser window, tell the user to log in or resolve the visible X challenge there.
 
 ### 2. Protect Privacy
 
 Treat browser sessions, cookies observed internally by the script, DMs, phone numbers, emails, private handles, and screenshots as sensitive. Do not post, reply, like, follow, block, open suspicious links, accept DM requests, or send DMs unless the user explicitly asks after reviewing a draft.
 
-Browser DM collection only reads message content visible in the logged-in local browser. If X Chat shows a passcode setup, passcode entry, or end-to-end-encryption recovery screen during headless collection, the script should automatically reopen X Messages in a visible browser window, wait for the user to complete it, then retry DM collection. Do not choose, enter, or store a passcode for the user.
+Browser DM collection only reads message content visible in the logged-in local browser. If X Chat shows a passcode setup, passcode entry, or end-to-end-encryption recovery screen during headless collection, the script should automatically reopen X Messages in a visible browser window, wait for the user to complete it, then retry DM collection. In `--non-interactive` mode, record the DM data gap and continue without blocking. Do not choose, enter, or store a passcode for the user.
 
 ### 3. Analyze
 

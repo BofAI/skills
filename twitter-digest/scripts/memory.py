@@ -2,8 +2,9 @@
 """Local memory for X/Twitter digest runs.
 
 Long-term memory intentionally avoids storing raw DM text. The current run's
-raw browser capture can stay in /tmp for summarization, while this module keeps
-only identifiers, statuses, counts, and short public-post previews.
+raw browser capture stays in the skill's private .state/run directory for
+summarization, while this module keeps only identifiers, statuses, counts, and
+short public-post previews.
 """
 
 from __future__ import annotations
@@ -19,6 +20,8 @@ from typing import Any
 
 DEFAULT_MEMORY_DIR = Path(__file__).resolve().parents[1] / ".state"
 MEMORY_FILE = "memory.json"
+DEFAULT_SEEN_RETENTION_DAYS = 60
+DEFAULT_DAILY_RETENTION_DAYS = 90
 
 
 def parse_args() -> argparse.Namespace:
@@ -32,6 +35,8 @@ def parse_args() -> argparse.Namespace:
     update.add_argument("--memory-dir", default=str(DEFAULT_MEMORY_DIR))
     update.add_argument("--include-dms", action="store_true")
     update.add_argument("--dm-threads", type=int, default=5)
+    update.add_argument("--seen-retention-days", type=int, default=DEFAULT_SEEN_RETENTION_DAYS)
+    update.add_argument("--daily-retention-days", type=int, default=DEFAULT_DAILY_RETENTION_DAYS)
     return parser.parse_args()
 
 
@@ -42,17 +47,40 @@ def update_from_file(
     markdown_path: Path | None = None,
     include_dms: bool = False,
     dm_threads: int = 5,
+    seen_retention_days: int = DEFAULT_SEEN_RETENTION_DAYS,
+    daily_retention_days: int = DEFAULT_DAILY_RETENTION_DAYS,
 ) -> dict[str, Any]:
     data = json.loads(input_path.read_text(encoding="utf-8"))
     memory_dir.mkdir(parents=True, exist_ok=True)
+    try:
+        memory_dir.chmod(0o700)
+    except PermissionError:
+        pass
     out_dir.mkdir(parents=True, exist_ok=True)
+    try:
+        out_dir.chmod(0o700)
+    except PermissionError:
+        pass
 
     memory = load_memory(memory_dir)
-    summary = update_memory(memory, data, include_dms=include_dms, dm_threads=dm_threads)
+    summary = update_memory(
+        memory,
+        data,
+        include_dms=include_dms,
+        dm_threads=dm_threads,
+        seen_retention_days=seen_retention_days,
+        daily_retention_days=daily_retention_days,
+    )
+    prune_memory(memory, retention_days=seen_retention_days)
     save_memory(memory_dir, memory)
+
+    input_path.write_text(json.dumps(data, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
+    if markdown_path:
+        markdown_path.write_text(render_digest_input(data), encoding="utf-8")
 
     sanitized = sanitize_digest(data)
     archive_daily(memory_dir, sanitized, markdown_path, summary)
+    prune_daily_archives(memory_dir, retention_days=daily_retention_days)
 
     context_md = render_memory_context(summary)
     context_json = {
@@ -94,7 +122,14 @@ def save_memory(memory_dir: Path, memory: dict[str, Any]) -> None:
     tmp.replace(path)
 
 
-def update_memory(memory: dict[str, Any], data: dict[str, Any], include_dms: bool, dm_threads: int) -> dict[str, Any]:
+def update_memory(
+    memory: dict[str, Any],
+    data: dict[str, Any],
+    include_dms: bool,
+    dm_threads: int,
+    seen_retention_days: int,
+    daily_retention_days: int,
+) -> dict[str, Any]:
     generated_at = str(data.get("generated_at") or now_iso())
     run_date = generated_at[:10]
     handle = clean_handle(data.get("handle"))
@@ -112,6 +147,8 @@ def update_memory(memory: dict[str, Any], data: dict[str, Any], include_dms: boo
         "dm_threads": int(dm_threads),
         "language": "zh-CN",
         "raw_dm_persisted": False,
+        "seen_retention_days": int(seen_retention_days),
+        "daily_retention_days": int(daily_retention_days),
     }
 
     seen_posts = memory.setdefault("seen_posts", {})
@@ -137,13 +174,15 @@ def update_memory(memory: dict[str, Any], data: dict[str, Any], include_dms: boo
                 text_signature = stable_hash(str(thread.get("text") or ""))
                 previous = dm_memory.get(thread_key, {})
                 changed = previous.get("last_text_signature") != text_signature
+                thread_status = "new_or_changed" if changed else "unchanged"
+                thread["memory_status"] = thread_status
                 dm_memory[thread_key] = {
                     "label": str(thread.get("label") or "")[:120],
                     "url": str(thread.get("url") or ""),
                     "first_seen_at": previous.get("first_seen_at") or generated_at,
                     "last_seen_at": generated_at,
                     "last_text_signature": text_signature,
-                    "status": "new_or_changed" if changed else "unchanged",
+                    "status": thread_status,
                 }
                 dm_thread_updates.append(
                     {
@@ -172,9 +211,11 @@ def update_memory(memory: dict[str, Any], data: dict[str, Any], include_dms: boo
                 "text_preview": text_preview,
             }
             if previous:
+                item["memory_status"] = "repeat"
                 post_counts[kind]["repeat"] += 1
                 repeated_posts.append({"kind": kind, "url": entry["url"], "text_preview": text_preview})
             else:
+                item["memory_status"] = "new"
                 post_counts[kind]["new"] += 1
                 new_posts.append({"kind": kind, "url": entry["url"], "text_preview": text_preview})
             seen_posts[key] = entry
@@ -202,8 +243,37 @@ def update_memory(memory: dict[str, Any], data: dict[str, Any], include_dms: boo
         "repeated_posts": repeated_posts[:30],
         "dm_status": dm_status,
         "dm_threads": dm_thread_updates,
-        "memory_policy": "Long-term memory stores no raw DM text.",
+        "memory_policy": "Long-term memory stores no raw DM text and prunes old seen items.",
     }
+
+
+def prune_memory(memory: dict[str, Any], retention_days: int) -> None:
+    if retention_days <= 0:
+        return
+    cutoff = dt.datetime.now().astimezone() - dt.timedelta(days=retention_days)
+    for key in ("seen_posts", "dm_threads"):
+        bucket = memory.get(key)
+        if not isinstance(bucket, dict):
+            continue
+        for item_key, item in list(bucket.items()):
+            if not isinstance(item, dict):
+                bucket.pop(item_key, None)
+                continue
+            timestamp = parse_iso(str(item.get("last_seen_at") or item.get("first_seen_at") or ""))
+            if timestamp and timestamp < cutoff:
+                bucket.pop(item_key, None)
+
+
+def parse_iso(value: str) -> dt.datetime | None:
+    if not value:
+        return None
+    try:
+        parsed = dt.datetime.fromisoformat(value.replace("Z", "+00:00"))
+    except ValueError:
+        return None
+    if parsed.tzinfo is None:
+        return parsed.replace(tzinfo=dt.datetime.now().astimezone().tzinfo)
+    return parsed.astimezone()
 
 
 def sanitize_digest(data: dict[str, Any]) -> dict[str, Any]:
@@ -229,6 +299,75 @@ def archive_daily(memory_dir: Path, sanitized: dict[str, Any], markdown_path: Pa
         md = markdown_path.read_text(encoding="utf-8")
         redacted_md = redact_messages_section(md)
         (daily_dir / f"{date}.md").write_text(redacted_md, encoding="utf-8")
+
+
+def prune_daily_archives(memory_dir: Path, retention_days: int) -> None:
+    if retention_days <= 0:
+        return
+    daily_dir = memory_dir / "daily"
+    if not daily_dir.exists():
+        return
+    cutoff_date = (dt.datetime.now().astimezone() - dt.timedelta(days=retention_days)).date()
+    for path in daily_dir.iterdir():
+        if path.suffix not in {".json", ".md"}:
+            continue
+        try:
+            archive_date = dt.date.fromisoformat(path.stem)
+        except ValueError:
+            continue
+        if archive_date < cutoff_date:
+            path.unlink()
+
+
+def render_digest_input(data: dict[str, Any]) -> str:
+    lines = [
+        "# X 浏览器采集输入",
+        "",
+        f"- 生成时间: `{data.get('generated_at')}`",
+        f"- 浏览器 profile: `{data.get('profile_dir')}`",
+        f"- 当前账号: `{data.get('handle') or ''}`",
+        "",
+    ]
+    for page in data.get("pages", []):
+        if not isinstance(page, dict):
+            continue
+        lines.extend([f"## {page.get('kind')}", "", f"Source: {page.get('url')}", ""])
+        items = page.get("items") if isinstance(page.get("items"), list) else []
+        lines.append(f"采集条数: `{len(items)}`")
+        lines.append("")
+        for item in items[:80]:
+            if not isinstance(item, dict):
+                continue
+            status = item.get("memory_status") or "unknown"
+            text = " ".join(str(item.get("text") or "").split())
+            url = item.get("url") or ""
+            timestamp = item.get("time") or ""
+            lines.append(f"- [{status}] `{timestamp}` {url}")
+            lines.append(f"  {text[:1000]}")
+        if page.get("visible_text"):
+            lines.extend(["", "页面可见文本摘录:", "", str(page["visible_text"])[:3000]])
+        if page.get("dm_status"):
+            lines.extend(["", f"DM 状态: `{page['dm_status']}`"])
+            if page.get("dm_note"):
+                lines.append(str(page["dm_note"]))
+        if page.get("collection_error"):
+            lines.extend(["", f"采集错误: `{page['collection_error']}`"])
+        for thread in page.get("dm_threads", [])[:20]:
+            if not isinstance(thread, dict):
+                continue
+            lines.extend(["", f"### DM thread [{thread.get('memory_status') or 'unknown'}]: {thread.get('label') or thread.get('url')}", ""])
+            lines.append(str(thread.get("text") or "")[:3000])
+        lines.append("")
+    lines.extend(
+        [
+            "## 数据缺口",
+            "",
+            "- 浏览器采集依赖 X 页面结构和已加载的可见内容。",
+            "- 每条公开内容前的 `[new]` / `[repeat]` 标记来自本地 memory。",
+            "- DM 属于私密内容，长期 memory 和 daily archive 不保存 DM 原文。",
+        ]
+    )
+    return "\n".join(lines) + "\n"
 
 
 def render_memory_context(summary: dict[str, Any]) -> str:
@@ -273,7 +412,7 @@ def redact_messages_section(markdown: str) -> str:
         next_index = len(markdown)
     replacement = (
         "\n## messages\n\n"
-        "Long-term archive redacts raw DM text. Use the current run's /tmp output for one-time summarization.\n\n"
+        "Long-term archive redacts raw DM text. Use the current run's private .state/run output for one-time summarization.\n\n"
     )
     return markdown[:index] + replacement + markdown[next_index:]
 
@@ -308,6 +447,8 @@ def main() -> None:
             memory_dir=Path(args.memory_dir).expanduser().resolve(),
             include_dms=args.include_dms,
             dm_threads=args.dm_threads,
+            seen_retention_days=args.seen_retention_days,
+            daily_retention_days=args.daily_retention_days,
         )
         print(json.dumps(result, ensure_ascii=False, indent=2))
 

@@ -29,16 +29,16 @@ twitter-digest/.state/chrome-profile
 每次运行的临时采集结果保存在：
 
 ```text
-/tmp/x-digest/
+twitter-digest/.state/run/
 ```
 
 主要文件：
 
 ```text
-/tmp/x-digest/digest-input.json
-/tmp/x-digest/digest-input.md
-/tmp/x-digest/digest-context.json
-/tmp/x-digest/digest-context.md
+twitter-digest/.state/run/digest-input.json
+twitter-digest/.state/run/digest-input.md
+twitter-digest/.state/run/digest-context.json
+twitter-digest/.state/run/digest-context.md
 ```
 
 长期 memory 保存在：
@@ -50,6 +50,7 @@ twitter-digest/.state/daily/
 ```
 
 长期 memory 不保存 DM 原文。
+`twitter-digest/.state/run/` 会尽量设置为 700 权限，避免把当次 DM 原文放到全局可读的 `/tmp`。
 
 ## 3. 运行规则
 
@@ -60,6 +61,7 @@ twitter-digest/.state/daily/
 - 默认 headless 运行。
 - 第一次没有登录态时，会自动打开可见浏览器让用户登录。
 - 默认读取 DM，但只读取浏览器页面上可见的内容。
+- 支持 `--non-interactive`，定时任务遇到 passcode 时跳过 DM 恢复并记录数据缺口，不阻塞等待。
 - 不自动发送消息、回复、点赞、关注、拉黑、打开可疑链接或接受 DM 请求。
 - 只生成摘要和建议回复草稿。
 - DM 原文只用于当次总结，不写入长期 memory。
@@ -84,7 +86,7 @@ twitter-digest/.state/daily/
 
 7. 脚本采集 timeline、mentions、own profile、DM。
 
-8. 脚本生成 `/tmp/x-digest/*` 临时采集文件。
+8. 脚本生成 `twitter-digest/.state/run/*` 当次采集文件，并在 memory 更新后给公开条目标记 `[new]` / `[repeat]`。
 
 9. 脚本更新 `twitter-digest/.state/memory.json`。
 
@@ -154,6 +156,12 @@ memory 用来识别新增、重复和延续内容。
 - 每日运行记录
 - 脱敏后的每日归档
 
+保留策略：
+
+- 已见公开帖子和 DM thread 状态默认保留 60 天。
+- 脱敏 daily 归档默认保留 90 天。
+- 归档日期使用本地时区日期，不使用 UTC 日期。
+
 不保存：
 
 - DM 原文
@@ -180,6 +188,12 @@ python3 twitter-digest/scripts/run_daily_digest.py --no-dms
 
 ```bash
 python3 twitter-digest/scripts/run_daily_digest.py --headed
+```
+
+无人值守定时运行：
+
+```bash
+python3 twitter-digest/scripts/run_daily_digest.py --non-interactive
 ```
 
 增加滚动覆盖：
@@ -247,8 +261,8 @@ rm -rf twitter-digest/.state/chrome-profile
 5. 检查输出：
 
    ```text
-   /tmp/x-digest/digest-input.md
-   /tmp/x-digest/digest-context.md
+   twitter-digest/.state/run/digest-input.md
+   twitter-digest/.state/run/digest-context.md
    ```
 
 6. 再运行一次同样命令，确认后续默认 headless，不再弹浏览器窗口。
