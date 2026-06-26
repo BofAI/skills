@@ -25,7 +25,7 @@ Load `references/x-twitter-briefing.md` when you need implementation details, X 
 默认采集命令：
 
 ```bash
-python3 twitter-briefing/scripts/browser_x_briefing.py --keywords "crypto,TRON,x402,AI,BTC" --out /tmp/x-briefing
+python3 twitter-briefing/scripts/browser_x_briefing.py --out /tmp/x-briefing
 ```
 
 第一次运行会打开专用浏览器，用户登录 X。后续运行会复用登录态。
@@ -51,6 +51,14 @@ python3 twitter-briefing/scripts/install.py
 ```
 
 默认会 copy 到 `~/.codex/skills/twitter-briefing`。本地开发需要实时联动源码时再使用 `--symlink`。
+
+Claude Desktop 的 MCP 备用配置可运行：
+
+```bash
+python3 twitter-briefing/scripts/install.py --setup-mcp --client claude-desktop --browser-login
+```
+
+这只配置本地 MCP fallback。默认日报仍优先使用浏览器采集，不依赖开发者 API。
 
 ## Workflow
 
@@ -102,14 +110,14 @@ Collect these data groups when available:
 
 - Account identity: authenticated user id, username, display name.
 - Mentions: posts that mention the user, quote posts, replies, reposts of the user's posts.
-- Timeline hotspots: high-engagement posts from followed accounts, repeated topics, keywords, hashtags, URLs, and accounts appearing across the window.
+- Timeline hotspots: high-engagement posts from the home timeline, repeated topics, hashtags, URLs, and accounts appearing across the window. Optional keyword searches are only used when the user explicitly provides `--keywords`.
 - Direct messages: recent conversations, unread messages, sender identity, message text, timestamps, and links only when permission allows.
 - User's own posts: recent posts and replies for context.
 
 For browser collection, run:
 
 ```bash
-python3 twitter-briefing/scripts/browser_x_briefing.py --keywords "crypto,TRON,x402,AI,BTC" --out /tmp/x-briefing
+python3 twitter-briefing/scripts/browser_x_briefing.py --out /tmp/x-briefing
 ```
 
 If the user's X handle is not auto-detected, rerun with `--handle <handle>`.

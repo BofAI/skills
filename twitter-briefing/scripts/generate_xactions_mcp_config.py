@@ -34,7 +34,7 @@ def main() -> None:
         }
     }
     if args.client == "claude-desktop":
-        print("Add this server to claude_desktop_config.json:")
+        print("Add this server to Claude Desktop's claude_desktop_config.json:")
     else:
         print("Add an equivalent stdio MCP server to your agent/MCP client:")
     print(json.dumps(config, indent=2))

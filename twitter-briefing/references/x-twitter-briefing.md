@@ -43,7 +43,6 @@ If handle auto-detection fails:
 ```bash
 python3 twitter-briefing/scripts/browser_x_briefing.py \
   --handle your_handle \
-  --keywords "crypto,TRON,x402,AI,BTC" \
   --out /tmp/x-briefing
 ```
 
@@ -106,10 +105,22 @@ Generate this template from the skill with:
 python3 twitter-briefing/scripts/generate_xactions_mcp_config.py --client generic
 ```
 
+For Claude Desktop config JSON:
+
+```bash
+python3 twitter-briefing/scripts/generate_xactions_mcp_config.py --client claude-desktop
+```
+
 For guided setup on this machine:
 
 ```bash
 python3 twitter-briefing/scripts/setup_xactions_mcp.py --client codex --browser-login
+```
+
+For guided Claude Desktop setup:
+
+```bash
+python3 twitter-briefing/scripts/setup_xactions_mcp.py --client claude-desktop --browser-login
 ```
 
 The guided setup opens a dedicated browser window, waits for the user to log in to X, reads the local `x.com` `auth_token` through the browser DevTools endpoint, then writes `~/.codex/config.toml` after creating a timestamped backup. The token is not printed in terminal output or conversation logs.
@@ -261,7 +272,7 @@ Classification bands:
 
 ## Hotspot Detection
 
-Cluster posts by topic using repeated keywords, hashtags, URLs, named entities, accounts, and semantic similarity. A hotspot needs at least one of:
+Cluster home timeline posts by repeated topics, hashtags, URLs, named entities, accounts, and semantic similarity. Optional keyword-search posts may be included only when the user explicitly passes `--keywords`. A hotspot needs at least one of:
 
 - Multiple independent posts in the briefing window.
 - One high-signal post with unusually strong engagement.

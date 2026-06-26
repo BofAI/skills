@@ -21,7 +21,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--account-name")
     parser.add_argument("--save-default", action="store_true", help="Save --handle/--account-name as the default account for future chat runs.")
     parser.add_argument("--configure-only", action="store_true", help="Only save default account config; do not collect data.")
-    parser.add_argument("--keywords", default="crypto,TRON,x402,AI,BTC")
+    parser.add_argument("--keywords", default="", help="Optional comma-separated search queries. Default is empty; the daily brief focuses on timeline, mentions, and DMs.")
     parser.add_argument("--out", default="/tmp/x-briefing")
     parser.add_argument("--include-dms", action="store_true")
     parser.add_argument("--dm-threads", type=int, default=5)

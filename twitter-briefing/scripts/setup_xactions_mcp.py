@@ -311,7 +311,7 @@ AUTH_METHOD = "cookies"
 TWITTER_COOKIES = {toml_escape(token)}
 """.strip()
     if dry_run:
-        print(f"Would update: {path}")
+        print(f"Would update: {display_path(path)}")
         print(block.replace(token, "REDACTED"))
         return
     path.parent.mkdir(parents=True, exist_ok=True)
@@ -320,9 +320,9 @@ TWITTER_COOKIES = {toml_escape(token)}
     updated = remove_toml_section(updated, "mcp_servers.twitter").rstrip() + "\n\n" + block + "\n"
     backup_path = backup(path)
     path.write_text(updated, encoding="utf-8")
-    print(f"Updated Codex MCP config: {path}")
+    print(f"Updated Codex MCP config: {display_path(path)}")
     if backup_path:
-        print(f"Backup written: {backup_path}")
+        print(f"Backup written: {display_path(backup_path)}")
     print("Restart Codex so it reloads MCP servers, then verify the `twitter` tools are available.")
 
 
@@ -334,8 +334,8 @@ def setup_claude_desktop(token: str, dry_run: bool) -> None:
         "env": {"AUTH_METHOD": "cookies", "TWITTER_COOKIES": token},
     }
     if dry_run:
-        print(f"Would update: {path}")
-        print(json.dumps({"mcpServers": {"xactions": server}}, indent=2).replace(token, "REDACTED"))
+        print(f"Would update: {display_path(path)}")
+        print(json.dumps({"mcpServers": {"twitter": server}}, indent=2).replace(token, "REDACTED"))
         return
     path.parent.mkdir(parents=True, exist_ok=True)
     if path.exists():
@@ -347,9 +347,9 @@ def setup_claude_desktop(token: str, dry_run: bool) -> None:
     servers["twitter"] = server
     backup_path = backup(path)
     path.write_text(json.dumps(config, indent=2) + "\n", encoding="utf-8")
-    print(f"Updated Claude Desktop MCP config: {path}")
+    print(f"Updated Claude Desktop MCP config: {display_path(path)}")
     if backup_path:
-        print(f"Backup written: {backup_path}")
+        print(f"Backup written: {display_path(backup_path)}")
     print("Restart Claude Desktop so it reloads MCP servers, then verify the `twitter` tools are available.")
 
 
@@ -366,6 +366,16 @@ def setup_generic(token: str, dry_run: bool) -> None:
     rendered = json.dumps(config, indent=2)
     print(rendered.replace(token, "REDACTED" if dry_run else "PASTE_AUTH_TOKEN_IN_LOCAL_CONFIG_ONLY"))
     print("Use this shape in your MCP client. Store the real token locally, not in chat or git.")
+
+
+def display_path(path: Path) -> str:
+    expanded = path.expanduser()
+    if not expanded.is_absolute():
+        expanded = Path.cwd() / expanded
+    try:
+        return "~/" + str(expanded.relative_to(Path.home()))
+    except ValueError:
+        return str(expanded)
 
 
 def main() -> None:
