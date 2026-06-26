@@ -135,24 +135,26 @@ Classification bands:
 
 ## DM Handling
 
-DMs are private. Count today's visible conversations, but summarize only unread or newly changed visible conversations. Historical read-only conversations should not be presented as action items.
+DMs are private. Count today's visible conversations, but summarize only unreplied conversations with real action value. Conversations that already show a self reply should not be presented as action items.
 
 Count fields:
 
 - `dm_visible_thread_count`: today's visible conversation targets found in the DM list.
-- `dm_unread_thread_count`: visible conversations that looked unread or newly changed.
-- `dm_read_thread_count`: visible conversations treated as read/history.
-- `dm_captured_message_count`: captured message bubbles from opened unread/new conversations only.
+- `dm_replied_thread_count`: today's visible conversations that appear to contain the user's reply, based on list labels such as `You:` / `You sent` / `你:`.
+- `dm_unreplied_thread_count`: today's visible conversations without a detected self reply.
+- `dm_captured_message_count`: captured message bubbles from opened unreplied conversations only.
 - Per-thread `message_count`: captured message bubbles in that opened conversation.
 
-Do not compare conversation counts and message counts as if they were the same unit. A user can have 5 today visible conversations, 1 unread conversation, and 4 captured message bubbles in that one opened conversation.
+Do not compare conversation counts and message counts as if they were the same unit. A user can have 5 today visible conversations, 2 unreplied conversations, and 4 captured message bubbles across those opened conversations.
+
+Unreplied does not automatically mean important. Count every unreplied conversation, but summarize only messages that are actionable, relationship-relevant, risky, money/security-sensitive, or clearly useful. Spam, phishing, generic promotion, low-context links, and repeated junk should be classified as ignore/noise and not copied into the main narrative.
 
 Status rules:
 
-- `captured_unread_threads`: summarize the captured unread/new DM bodies and classify importance.
-- `no_unread_threads`: report the counts and say there are no unread or newly changed DMs to process; do not say there are no DMs.
+- `captured_unreplied_threads`: summarize the captured unreplied DM bodies selectively and classify importance.
+- `no_unreplied_threads`: report the counts and say today's visible DM conversations all appear replied; do not say there are no DMs.
 - `no_today_threads`: say older conversations were visible, but no today conversations were found.
-- `visible_threads_unopened`: say the conversation list was visible but unread message bodies could not be opened; do not infer content.
+- `visible_threads_unopened`: say the conversation list was visible but unreplied message bodies could not be opened; do not infer content.
 - `blocked_by_x_chat_passcode`: say DM content is unavailable until the user completes X Chat passcode recovery.
 
 Sender attribution:
