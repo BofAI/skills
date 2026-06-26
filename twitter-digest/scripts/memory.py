@@ -14,6 +14,7 @@ import copy
 import datetime as dt
 import hashlib
 import json
+import re
 from pathlib import Path
 from typing import Any
 
@@ -82,11 +83,13 @@ def update_from_file(
     archive_daily(memory_dir, sanitized, markdown_path, summary)
     prune_daily_archives(memory_dir, retention_days=daily_retention_days)
 
-    context_md = render_memory_context(summary)
+    facts = build_digest_facts(data, summary)
+    context_md = render_memory_context(summary, facts)
     context_json = {
         "memory_file": str(memory_dir / MEMORY_FILE),
         "daily_dir": str(memory_dir / "daily"),
         "summary": summary,
+        "facts": facts,
     }
     (out_dir / "digest-context.md").write_text(context_md, encoding="utf-8")
     (out_dir / "digest-context.json").write_text(json.dumps(context_json, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
@@ -395,7 +398,7 @@ def render_digest_input(data: dict[str, Any]) -> str:
     return "\n".join(lines) + "\n"
 
 
-def render_memory_context(summary: dict[str, Any]) -> str:
+def render_memory_context(summary: dict[str, Any], facts: dict[str, Any] | None = None) -> str:
     lines = [
         "# X Digest Memory Context",
         "",
@@ -431,7 +434,201 @@ def render_memory_context(summary: dict[str, Any]) -> str:
         lines.append(f"- `{thread.get('status')}` {label}")
     if not summary.get("dm_threads"):
         lines.append("- No visible DM threads captured in this run.")
+    if facts:
+        lines.extend(["", "## Final Summary Facts", ""])
+        lines.extend(render_digest_facts(facts).splitlines()[2:])
     return "\n".join(lines) + "\n"
+
+
+def build_digest_facts(data: dict[str, Any], summary: dict[str, Any]) -> dict[str, Any]:
+    facts: dict[str, Any] = {
+        "schema_version": 1,
+        "run": {
+            "generated_at": data.get("generated_at"),
+            "date": summary.get("date"),
+            "timezone": local_timezone_name(),
+        },
+        "account": {
+            "handle": summary.get("handle") or clean_handle(data.get("handle")),
+            "profile_dir": data.get("profile_dir"),
+        },
+        "summary_inputs": {
+            "primary": "digest-context.md#Final Summary Facts",
+            "fallback_raw_capture": "digest-input.md",
+            "memory_context": "digest-context.md",
+            "rules": [
+                "Use DM conversation counts and message counts as separate units.",
+                "Only unreplied DM threads are opened for content.",
+                "Do not treat embedded post authors as DM senders.",
+                "Count low-value unreplied DMs but do not expand spam, phishing, generic promotions, or repeated junk.",
+            ],
+        },
+        "public": {"counts": summary.get("post_counts") or {}, "items": []},
+        "dms": {
+            "status": summary.get("dm_status"),
+            "counts": summary.get("dm_counts") or {},
+            "threads": [],
+        },
+        "data_gaps": [],
+    }
+
+    for page in data.get("pages", []):
+        if not isinstance(page, dict):
+            continue
+        kind = str(page.get("kind") or "unknown")
+        if page.get("collection_error"):
+            facts["data_gaps"].append(
+                {
+                    "source": kind,
+                    "status": page.get("collection_status") or "error",
+                    "detail": str(page.get("collection_error") or ""),
+                }
+            )
+        if kind == "messages":
+            if page.get("dm_note"):
+                facts["dms"]["note"] = str(page.get("dm_note") or "")
+            for thread in page.get("dm_threads") or []:
+                if not isinstance(thread, dict):
+                    continue
+                assessment = assess_dm_thread(thread)
+                facts["dms"]["threads"].append(
+                    {
+                        "participant": thread.get("participant") or thread.get("label") or thread.get("url") or "",
+                        "url": thread.get("url") or "",
+                        "label": thread.get("label") or "",
+                        "reply_state": "replied" if thread.get("replied") else "unreplied",
+                        "memory_status": thread.get("memory_status") or "unknown",
+                        "message_count": int(thread.get("message_count") or 0),
+                        "should_summarize": assessment["should_summarize"],
+                        "noise_reason": assessment["noise_reason"],
+                        "text_excerpt": " ".join(str(thread.get("text") or "").split())[:1200],
+                    }
+                )
+            continue
+        for item in page.get("items") or []:
+            if not isinstance(item, dict):
+                continue
+            facts["public"]["items"].append(
+                {
+                    "kind": kind,
+                    "memory_status": item.get("memory_status") or "unknown",
+                    "time": item.get("time") or "",
+                    "url": item.get("url") or "",
+                    "author_url": item.get("authorUrl") or "",
+                    "text_excerpt": " ".join(str(item.get("text") or "").split())[:700],
+                }
+            )
+    if (summary.get("dm_status") or "") in {"blocked_by_x_chat_passcode", "visible_threads_unopened", "no_visible_threads"}:
+        facts["data_gaps"].append(
+            {
+                "source": "messages",
+                "status": summary.get("dm_status"),
+                "detail": facts["dms"].get("note") or "DM content was incomplete or unavailable.",
+            }
+        )
+    return facts
+
+
+def assess_dm_thread(thread: dict[str, Any]) -> dict[str, Any]:
+    text = " ".join(str(thread.get("text") or thread.get("label") or "").split()).lower()
+    if not text:
+        return {"should_summarize": False, "noise_reason": "empty_thread_text"}
+    if bool(thread.get("replied")):
+        return {"should_summarize": False, "noise_reason": "already_replied"}
+    spam_patterns = [
+        r"airdrop",
+        r"giveaway",
+        r"claim",
+        r"free\s+(token|mint|nft|crypto)",
+        r"private key",
+        r"seed phrase",
+        r"wallet",
+        r"telegram|whatsapp",
+        r"follow-up visit",
+    ]
+    if any(re.search(pattern, text, re.IGNORECASE) for pattern in spam_patterns):
+        return {"should_summarize": False, "noise_reason": "spam_or_suspicious_link"}
+    if re.search(r"(t\.co|bit\.ly)/\S+", text, re.IGNORECASE) and len(text) < 180:
+        return {"should_summarize": False, "noise_reason": "low_context_link"}
+    return {"should_summarize": True, "noise_reason": ""}
+
+
+def render_digest_facts(facts: dict[str, Any]) -> str:
+    dms = facts.get("dms") or {}
+    dm_counts = dms.get("counts") or {}
+    lines = [
+        "# X Digest Facts",
+        "",
+        "Use this section as the primary input for the final Chinese X daily digest. Use raw capture only to verify details.",
+        "",
+        "## Run",
+        "",
+        f"- date: `{(facts.get('run') or {}).get('date')}`",
+        f"- generated_at: `{(facts.get('run') or {}).get('generated_at')}`",
+        f"- timezone: `{(facts.get('run') or {}).get('timezone')}`",
+        f"- account: `@{(facts.get('account') or {}).get('handle') or ''}`",
+        "",
+        "## DM Facts",
+        "",
+        f"- status: `{dms.get('status')}`",
+        (
+            "- counts: "
+            f"today visible `{dm_counts.get('visible', 0)}`, "
+            f"replied `{dm_counts.get('replied', 0)}`, "
+            f"unreplied `{dm_counts.get('unreplied', 0)}`, "
+            f"captured messages `{dm_counts.get('captured_messages', 0)}`"
+        ),
+        "- rule: summarize only unreplied threads with `should_summarize: true`; count noise but do not expand it.",
+    ]
+    if dms.get("note"):
+        lines.append(f"- note: {dms.get('note')}")
+    lines.extend(["", "| participant | reply_state | messages | summarize | noise_reason | excerpt |", "|---|---|---:|---|---|---|"])
+    for thread in dms.get("threads") or []:
+        lines.append(
+            "| "
+            + " | ".join(
+                [
+                    md_cell(thread.get("participant") or ""),
+                    md_cell(thread.get("reply_state") or ""),
+                    str(int(thread.get("message_count") or 0)),
+                    "yes" if thread.get("should_summarize") else "no",
+                    md_cell(thread.get("noise_reason") or ""),
+                    md_cell(thread.get("text_excerpt") or ""),
+                ]
+            )
+            + " |"
+        )
+    if not dms.get("threads"):
+        lines.append("| none | - | 0 | no | no_opened_unreplied_threads | |")
+
+    lines.extend(["", "## Public Counts", "", "| page | total | new | repeat |", "|---|---:|---:|---:|"])
+    for kind, counts in ((facts.get("public") or {}).get("counts") or {}).items():
+        lines.append(f"| {md_cell(kind)} | {counts.get('total', 0)} | {counts.get('new', 0)} | {counts.get('repeat', 0)} |")
+
+    lines.extend(["", "## Public Items", ""])
+    for item in ((facts.get("public") or {}).get("items") or [])[:80]:
+        lines.append(
+            f"- `{item.get('kind')}` [{item.get('memory_status')}] `{item.get('time')}` "
+            f"{item.get('url') or '[no url]'} — {item.get('text_excerpt')}"
+        )
+    if not ((facts.get("public") or {}).get("items") or []):
+        lines.append("- None")
+
+    lines.extend(["", "## Data Gaps", ""])
+    for gap in facts.get("data_gaps") or []:
+        lines.append(f"- `{gap.get('source')}` `{gap.get('status')}`: {gap.get('detail')}")
+    if not facts.get("data_gaps"):
+        lines.append("- None")
+    return "\n".join(lines) + "\n"
+
+
+def md_cell(value: Any) -> str:
+    return " ".join(str(value or "").replace("|", "\\|").split())[:500]
+
+
+def local_timezone_name() -> str:
+    tz = dt.datetime.now().astimezone().tzinfo
+    return str(tz) if tz else "local"
 
 
 def redact_messages_section(markdown: str) -> str:

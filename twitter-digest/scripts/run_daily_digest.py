@@ -110,6 +110,7 @@ def main() -> None:
             daily_retention_days=args.daily_retention_days,
         )
     result = {
+        "summary_primary_markdown": str(out_dir / "digest-context.md"),
         "digest_markdown": str(out_dir / "digest-input.md"),
         "digest_json": str(out_dir / "digest-input.json"),
         "digest_context_markdown": str(out_dir / "digest-context.md"),

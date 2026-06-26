@@ -43,7 +43,7 @@ Default scope:
 - Today's visible DM conversations, with only unreplied conversations opened for content.
 - Optional keyword searches only when the user explicitly passes `--keywords`.
 
-Read `twitter-digest/.state/run/digest-input.md`, `twitter-digest/.state/run/digest-context.md`, and JSON if needed before writing the Chinese digest.
+Read `twitter-digest/.state/run/digest-context.md` first before writing the Chinese digest. Its `Final Summary Facts` section is the primary normalized input. Use `digest-input.md` only as raw capture for detail verification when the facts are ambiguous.
 
 ## Install
 
@@ -67,10 +67,10 @@ Claude Code or other agents can use the installed skill by running the same brow
 - `twitter-digest/.state/memory.json`: account metadata, seen public post URLs, DM thread status signatures, and run history.
 - `twitter-digest/.state/daily/YYYY-MM-DD.json`: sanitized daily archive.
 - `twitter-digest/.state/daily/YYYY-MM-DD.md`: sanitized daily archive.
-- `twitter-digest/.state/run/digest-input.md`: current run browser capture, annotated with `[new]` / `[repeat]` for public posts.
-- `twitter-digest/.state/run/digest-context.md`: current run memory context for the final digest.
+- `twitter-digest/.state/run/digest-input.md`: current run raw browser capture, annotated with `[new]` / `[repeat]` for public posts.
+- `twitter-digest/.state/run/digest-context.md`: primary final summary input. It includes memory context plus normalized `Final Summary Facts`.
 
-Long-term memory must not store raw DM text. Raw DM text may exist only in the current run's private `twitter-digest/.state/run/digest-input.*` files for immediate summarization. The run directory is created with owner-only permissions where supported.
+Long-term memory must not store raw DM text. Raw DM text or DM excerpts may exist only in the current run's private `twitter-digest/.state/run/digest-input.*` and `digest-context.*` files for immediate summarization. The run directory is created with owner-only permissions where supported.
 
 Memory retention defaults:
 

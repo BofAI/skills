@@ -41,6 +41,11 @@ twitter-digest/.state/run/digest-context.json
 twitter-digest/.state/run/digest-context.md
 ```
 
+用途：
+
+- `digest-context.md/json`：最终总结主输入，包含 memory context 和归一化后的 `Final Summary Facts`。
+- `digest-input.md/json`：原始浏览器采集结果，只在需要核对细节或排查抓取问题时使用。
+
 长期 memory 保存在：
 
 ```text
@@ -268,8 +273,10 @@ rm -rf twitter-digest/.state/chrome-profile
 5. 检查输出：
 
    ```text
-   twitter-digest/.state/run/digest-input.md
    twitter-digest/.state/run/digest-context.md
+   twitter-digest/.state/run/digest-input.md
    ```
+
+   生成日报时优先读 `digest-context.md`，只在事实不清楚时再查 `digest-input.md`。
 
 6. 再运行一次同样命令，确认后续默认 headless，不再弹浏览器窗口。

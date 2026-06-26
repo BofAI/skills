@@ -45,10 +45,10 @@ python3 twitter-digest/scripts/run_daily_digest.py --non-interactive
 
 Outputs:
 
-- `twitter-digest/.state/run/digest-input.json`
-- `twitter-digest/.state/run/digest-input.md`
-- `twitter-digest/.state/run/digest-context.json`
-- `twitter-digest/.state/run/digest-context.md`
+- `twitter-digest/.state/run/digest-input.json`: raw browser capture.
+- `twitter-digest/.state/run/digest-input.md`: readable raw browser capture.
+- `twitter-digest/.state/run/digest-context.json`: memory context plus normalized facts.
+- `twitter-digest/.state/run/digest-context.md`: primary final summary input. Read this first.
 
 ## Browser Collection Rules
 
@@ -83,9 +83,10 @@ Memory files:
 - `twitter-digest/.state/memory.json`: seen public post URLs, DM thread status signatures, account metadata, and run history.
 - `twitter-digest/.state/daily/YYYY-MM-DD.json`: sanitized daily archive.
 - `twitter-digest/.state/daily/YYYY-MM-DD.md`: sanitized markdown archive.
-- `twitter-digest/.state/run/digest-input.*`: current run capture, including raw DM text only for immediate summarization.
+- `twitter-digest/.state/run/digest-input.*`: current run raw capture, including raw DM text only for immediate verification.
+- `twitter-digest/.state/run/digest-context.*`: current run final summary input, including memory context and normalized facts.
 
-Privacy rule: do not persist raw DM text in memory or daily archives. Raw DM text may exist only in the current run's private `twitter-digest/.state/run/digest-input.*` files for immediate summarization. Use `digest-context.md` and the `[new]` / `[repeat]` markers in `digest-input.md` to distinguish new, repeated, and unchanged items in the final Chinese digest.
+Privacy rule: do not persist raw DM text in memory or daily archives. Raw DM text may exist only in the current run's private `twitter-digest/.state/run/digest-input.*` and `digest-context.*` files for immediate summarization. Use `digest-context.md` as the primary final input; use `digest-input.md` only as raw backup.
 
 Retention and date rules:
 
