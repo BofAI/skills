@@ -361,7 +361,7 @@ def render_digest_input(data: dict[str, Any]) -> str:
             lines.extend(["", f"DM 状态: `{page['dm_status']}`"])
             lines.append(
                 "DM 会话统计: "
-                f"可见 `{int(page.get('dm_visible_thread_count') or 0)}` / "
+                f"今日可见 `{int(page.get('dm_visible_thread_count') or 0)}` / "
                 f"未读或新增 `{int(page.get('dm_unread_thread_count') or 0)}` / "
                 f"已读历史 `{int(page.get('dm_read_thread_count') or 0)}`"
             )
@@ -404,7 +404,7 @@ def render_memory_context(summary: dict[str, Any]) -> str:
         f"- DM status: `{summary.get('dm_status')}`",
         (
             "- DM counts: "
-            f"visible `{(summary.get('dm_counts') or {}).get('visible', 0)}`, "
+            f"today visible `{(summary.get('dm_counts') or {}).get('visible', 0)}`, "
             f"unread/new `{(summary.get('dm_counts') or {}).get('unread', 0)}`, "
             f"read/history `{(summary.get('dm_counts') or {}).get('read', 0)}`, "
             f"captured messages `{(summary.get('dm_counts') or {}).get('captured_messages', 0)}`"

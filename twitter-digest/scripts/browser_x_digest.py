@@ -207,16 +207,24 @@ def collect_dm_threads(ws_url: str, max_threads: int) -> dict[str, Any]:
         }
 
     all_targets = extract_dm_thread_targets(ws_url)
-    thread_targets = unread_dm_targets(all_targets)
-    counts = dm_counts(all_targets)
+    today_targets = today_dm_targets(all_targets)
+    thread_targets = unread_dm_targets(today_targets)
+    counts = dm_counts(today_targets)
     if not thread_targets:
-        if all_targets:
+        if today_targets:
             return {
                 "dm_status": "no_unread_threads",
                 "dm_note": (
-                    f"DM conversation list was visible with {counts['dm_visible_thread_count']} thread target(s), "
+                    f"DM conversation list was visible with {counts['dm_visible_thread_count']} today thread target(s), "
                     "but none looked unread or newly changed."
                 ),
+                "dm_threads": [],
+                **counts,
+            }
+        if all_targets:
+            return {
+                "dm_status": "no_today_threads",
+                "dm_note": f"DM conversation list was visible with {len(all_targets)} older thread target(s), but no today conversation targets were found.",
                 "dm_threads": [],
                 **counts,
             }
@@ -237,7 +245,7 @@ def collect_dm_threads(ws_url: str, max_threads: int) -> dict[str, Any]:
     threads: list[dict[str, Any]] = []
     seen_targets: set[str] = set()
     for _ in range(max(max_threads, 0)):
-        thread_targets = [target for target in unread_dm_targets(extract_dm_thread_targets(ws_url)) if dm_target_key(target) not in seen_targets]
+        thread_targets = [target for target in unread_dm_targets(today_dm_targets(extract_dm_thread_targets(ws_url))) if dm_target_key(target) not in seen_targets]
         if not thread_targets:
             break
         target = thread_targets[0]
@@ -260,6 +268,7 @@ def collect_dm_threads(ws_url: str, max_threads: int) -> dict[str, Any]:
                 "target_type": str(target.get("target_type") or ""),
                 "unread": bool(target.get("unread")),
                 "unread_reason": str(target.get("unread_reason") or ""),
+                "today": bool(target.get("today")),
                 "message_count": message_count,
                 "text": thread_text,
             }
@@ -270,7 +279,7 @@ def collect_dm_threads(ws_url: str, max_threads: int) -> dict[str, Any]:
     return {
         "dm_status": "captured_unread_threads" if threads else "no_unread_threads",
         "dm_note": (
-            f"Visible DM threads: {counts['dm_visible_thread_count']}; unread/new: {counts['dm_unread_thread_count']}; "
+            f"Today visible DM threads: {counts['dm_visible_thread_count']}; unread/new: {counts['dm_unread_thread_count']}; "
             f"read/history: {counts['dm_read_thread_count']}. Opened up to {max_threads} unread or newly changed thread(s); "
             f"captured message bubbles: {sum(int(thread.get('message_count') or 0) for thread in threads)}."
         ),
@@ -300,6 +309,10 @@ def dm_participant(target: dict[str, Any]) -> str:
 
 def unread_dm_targets(targets: list[dict[str, Any]]) -> list[dict[str, Any]]:
     return [target for target in targets if bool(target.get("unread"))]
+
+
+def today_dm_targets(targets: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    return [target for target in targets if bool(target.get("today"))]
 
 
 def dm_counts(targets: list[dict[str, Any]]) -> dict[str, int]:
@@ -497,11 +510,27 @@ def extract_dm_thread_targets(ws_url: str) -> list[dict[str, Any]]:
                     "label": str(item.get("label") or ""),
                     "unread": bool(item.get("unread")),
                     "unread_reason": str(item.get("unread_reason") or ""),
+                    "today": dm_target_is_today(str(item.get("label") or "")),
                     "x": float(item.get("x") or 0),
                     "y": float(item.get("y") or 0),
                 }
             )
     return dedupe_dm_targets(out)
+
+
+def dm_target_is_today(label: str) -> bool:
+    normalized = " ".join(label.lower().split())
+    if not normalized:
+        return False
+    if re.search(r"\b(now|just now|sec|secs|second|seconds|min|mins|minute|minutes|h|hr|hrs|hour|hours)\b", normalized):
+        return True
+    if re.search(r"\b\d+\s*(m|min|mins|minute|minutes|h|hr|hrs|hour|hours)\b", normalized):
+        return True
+    if re.search(r"(刚刚|秒|分钟|小时|今天|今日|上午|下午|晚上|中午)", normalized):
+        return True
+    if re.search(r"\b(yesterday|d|day|days|w|week|weeks|mo|month|months|y|year|years)\b|昨天|周|週|月|年", normalized):
+        return False
+    return False
 
 
 def dedupe_dm_targets(targets: list[dict[str, Any]]) -> list[dict[str, Any]]:
@@ -515,6 +544,7 @@ def dedupe_dm_targets(targets: list[dict[str, Any]]) -> list[dict[str, Any]]:
             deduped[key] = target
             continue
         existing["unread"] = bool(existing.get("unread")) or bool(target.get("unread"))
+        existing["today"] = bool(existing.get("today")) or bool(target.get("today"))
         reasons = {part for part in str(existing.get("unread_reason") or "").split(",") if part}
         reasons.update(part for part in str(target.get("unread_reason") or "").split(",") if part)
         existing["unread_reason"] = ",".join(sorted(reasons))
@@ -642,7 +672,7 @@ def render_markdown(data: dict[str, Any]) -> str:
             lines.extend(["", f"DM 状态: `{page['dm_status']}`"])
             lines.append(
                 "DM 会话统计: "
-                f"可见 `{int(page.get('dm_visible_thread_count') or 0)}` / "
+                f"今日可见 `{int(page.get('dm_visible_thread_count') or 0)}` / "
                 f"未读或新增 `{int(page.get('dm_unread_thread_count') or 0)}` / "
                 f"已读历史 `{int(page.get('dm_read_thread_count') or 0)}`"
             )
