@@ -136,6 +136,8 @@ For waiting-reply DMs, still summarize selectively. Count all waiting-reply conv
 
 For DM sender attribution, use the thread `participant` / `会话对象` and message bubble direction. Do not treat authors inside quoted posts, repost cards, link previews, or embedded tweet text as the DM sender. If a DM contains a shared post by `Marco` inside a conversation with `@jerry`, the DM is from the conversation participant, not from `Marco`.
 
+When `digest-context.md` includes `### DM Thread Context`, use that section to understand the recent conversation history for waiting-reply DMs. It may include up to 300 loaded message bubbles per summarized thread, plus raw thread label, URL, and load metadata, so the model can understand complex context before deciding whether and how to mention the DM. Keep the final digest concise; do not paste the full DM history into the report.
+
 For private messages, summarize minimally. Quote only the short phrase needed to justify classification, and omit sensitive personal data unless the user specifically needs it.
 
 ### 4. Produce The Daily Summary

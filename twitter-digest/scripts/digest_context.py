@@ -133,6 +133,13 @@ def build_digest_facts(data: dict[str, Any], summary: dict[str, Any]) -> dict[st
                         "should_summarize": assessment["should_summarize"],
                         "noise_reason": assessment["noise_reason"],
                         "text_excerpt": compact_text(thread.get("text"))[:1200],
+                        "messages": normalize_dm_messages(thread.get("messages"))[-300:],
+                        "conversation_context": dm_conversation_context(thread),
+                        "load": {
+                            "scrolls_used": int(thread.get("dm_scrolls_used") or 0),
+                            "load_complete": bool(thread.get("dm_load_complete")),
+                            "window_exceeded": bool(thread.get("dm_window_exceeded")),
+                        },
                     }
                 )
             continue
@@ -181,6 +188,37 @@ def assess_dm_thread(thread: dict[str, Any]) -> dict[str, Any]:
     if re.search(r"(t\.co|bit\.ly)/\S+", text, re.IGNORECASE) and len(text) < 180:
         return {"should_summarize": False, "noise_reason": "low_context_link"}
     return {"should_summarize": True, "noise_reason": ""}
+
+
+def normalize_dm_messages(value: Any) -> list[dict[str, str]]:
+    if not isinstance(value, list):
+        return []
+    messages: list[dict[str, str]] = []
+    for item in value:
+        if not isinstance(item, dict):
+            continue
+        text = compact_text(item.get("text"))
+        if not text:
+            continue
+        messages.append(
+            {
+                "sender": "me" if item.get("sender") == "me" else "other",
+                "time": compact_text(item.get("time")),
+                "text": text[:1000],
+            }
+        )
+    return messages
+
+
+def dm_conversation_context(thread: dict[str, Any], max_messages: int = 300, max_chars: int = 30000) -> str:
+    messages = normalize_dm_messages(thread.get("messages"))[-max_messages:]
+    if messages:
+        lines = []
+        for message in messages:
+            timestamp = f" {message['time']}" if message.get("time") else ""
+            lines.append(f"{message['sender']}{timestamp}: {message['text']}")
+        return "\n".join(lines)[-max_chars:]
+    return str(thread.get("text") or "")[-max_chars:]
 
 
 def render_digest_input(data: dict[str, Any]) -> str:
@@ -322,6 +360,41 @@ def render_digest_facts(facts: dict[str, Any]) -> str:
     if not dms.get("threads"):
         lines.append("| none | - | 0 | no | no_opened_unreplied_threads | |")
 
+    context_threads = [
+        thread
+        for thread in dms.get("threads") or []
+        if thread.get("reply_state") == "waiting_reply" and thread.get("should_summarize") and thread.get("conversation_context")
+    ]
+    if context_threads:
+        lines.extend(
+            [
+                "",
+                "### DM Thread Context",
+                "",
+                "Use this recent loaded history to understand what the waiting-reply DM is about before drafting the daily digest. Sender is based on message bubble direction; quoted-post authors are not DM senders.",
+            ]
+        )
+        for index, thread in enumerate(context_threads, start=1):
+            messages = thread.get("messages") if isinstance(thread.get("messages"), list) else []
+            shown_messages = len(messages[-300:]) if messages else int(thread.get("message_count") or 0)
+            load = thread.get("load") if isinstance(thread.get("load"), dict) else {}
+            lines.extend(
+                [
+                    "",
+                    f"#### DM {index}: {thread.get('participant') or '[unknown]'}",
+                    "",
+                    f"- reply_state: `{thread.get('reply_state')}`",
+                    f"- raw_label: `{md_inline(thread.get('label') or '')}`",
+                    f"- url: `{md_inline(thread.get('url') or '')}`",
+                    f"- loaded message bubbles in context: `{shown_messages}` of `{int(thread.get('message_count') or 0)}`",
+                    f"- load: scrolls_used `{int(load.get('scrolls_used') or 0)}`, load_complete `{bool(load.get('load_complete'))}`, window_exceeded `{bool(load.get('window_exceeded'))}`",
+                    "",
+                    "```text",
+                    str(thread.get("conversation_context") or "")[:30000],
+                    "```",
+                ]
+            )
+
     lines.extend(["", "## Public Counts", "", "| page | total |", "|---|---:|"])
     for kind, counts in ((facts.get("public") or {}).get("counts") or {}).items():
         lines.append(f"| {md_cell(kind)} | {counts.get('total', 0)} |")
@@ -346,6 +419,10 @@ def compact_text(value: Any) -> str:
 
 def md_cell(value: Any) -> str:
     return compact_text(str(value or "").replace("|", "\\|"))[:500]
+
+
+def md_inline(value: Any) -> str:
+    return compact_text(str(value or "").replace("`", "'"))[:1000]
 
 
 def clean_handle(value: Any) -> str:

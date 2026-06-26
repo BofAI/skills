@@ -148,6 +148,8 @@ The collector opens waiting-reply conversations and scrolls upward before extrac
 
 Waiting-reply does not automatically mean important. Count every waiting-reply conversation, but summarize only messages that are actionable, relationship-relevant, risky, money/security-sensitive, or clearly useful. Spam, phishing, generic promotion, low-context links, and repeated junk should be classified as ignore/noise and not copied into the main narrative.
 
+For waiting-reply DMs that should be summarized, `digest-context.md` includes a `### DM Thread Context` section with recent loaded message history, raw thread label, URL, and load metadata. It can include up to 300 loaded message bubbles per thread. Use it to understand the conversation, but do not copy full private history into the final digest. Keep final DM summaries short and action-oriented.
+
 Status rules:
 
 - `captured_unreplied_threads`: summarize the captured waiting-reply DM bodies selectively and classify importance.
