@@ -202,28 +202,35 @@ def collect_dm_threads(ws_url: str, max_threads: int) -> dict[str, Any]:
             "dm_status": "blocked_by_x_chat_passcode",
             "dm_note": "X Chat is asking for an encryption passcode before message content is visible.",
             "dm_threads": [],
+            **dm_counts([]),
         }
 
-    thread_targets = unread_dm_targets(extract_dm_thread_targets(ws_url))
+    all_targets = extract_dm_thread_targets(ws_url)
+    thread_targets = unread_dm_targets(all_targets)
+    counts = dm_counts(all_targets)
     if not thread_targets:
-        all_targets = extract_dm_thread_targets(ws_url)
         if all_targets:
             return {
                 "dm_status": "no_unread_threads",
-                "dm_note": f"DM conversation list was visible with {len(all_targets)} thread target(s), but none looked unread or newly changed.",
+                "dm_note": (
+                    f"DM conversation list was visible with {counts['dm_visible_thread_count']} thread target(s), "
+                    "but none looked unread or newly changed."
+                ),
                 "dm_threads": [],
-                "dm_visible_thread_count": len(all_targets),
+                **counts,
             }
         if looks_like_dm_list_text(main_text):
             return {
                 "dm_status": "visible_threads_unopened",
                 "dm_note": "DM conversation list text was visible, but no unread openable conversation link or row target could be detected.",
                 "dm_threads": [],
+                **counts,
             }
         return {
             "dm_status": "no_visible_threads",
             "dm_note": "No DM conversation links or clickable conversation rows were visible after waiting for the messages page.",
             "dm_threads": [],
+            **counts,
         }
 
     threads: list[dict[str, Any]] = []
@@ -257,8 +264,12 @@ def collect_dm_threads(ws_url: str, max_threads: int) -> dict[str, Any]:
 
     return {
         "dm_status": "captured_unread_threads" if threads else "no_unread_threads",
-        "dm_note": f"Opened up to {max_threads} unread or newly changed visible DM thread(s) and captured on-screen text only.",
+        "dm_note": (
+            f"Visible DM threads: {counts['dm_visible_thread_count']}; unread/new: {counts['dm_unread_thread_count']}; "
+            f"read/history: {counts['dm_read_thread_count']}. Opened up to {max_threads} unread or newly changed thread(s)."
+        ),
         "dm_threads": threads,
+        **counts,
     }
 
 
@@ -268,6 +279,16 @@ def dm_target_key(target: dict[str, Any]) -> str:
 
 def unread_dm_targets(targets: list[dict[str, Any]]) -> list[dict[str, Any]]:
     return [target for target in targets if bool(target.get("unread"))]
+
+
+def dm_counts(targets: list[dict[str, Any]]) -> dict[str, int]:
+    unread_count = len(unread_dm_targets(targets))
+    visible_count = len(targets)
+    return {
+        "dm_visible_thread_count": visible_count,
+        "dm_unread_thread_count": unread_count,
+        "dm_read_thread_count": max(visible_count - unread_count, 0),
+    }
 
 
 def wait_for_dm_ready(ws_url: str, timeout_sec: int = 20) -> str:
@@ -545,6 +566,12 @@ def render_markdown(data: dict[str, Any]) -> str:
             lines.extend(["", "页面可见文本摘录:", "", str(page["visible_text"])[:3000]])
         if page.get("dm_status"):
             lines.extend(["", f"DM 状态: `{page['dm_status']}`"])
+            lines.append(
+                "DM 统计: "
+                f"可见 `{int(page.get('dm_visible_thread_count') or 0)}` / "
+                f"未读或新增 `{int(page.get('dm_unread_thread_count') or 0)}` / "
+                f"已读历史 `{int(page.get('dm_read_thread_count') or 0)}`"
+            )
             if page.get("dm_note"):
                 lines.append(str(page["dm_note"]))
         if page.get("collection_error"):

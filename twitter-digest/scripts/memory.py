@@ -157,6 +157,7 @@ def update_memory(
     new_posts: list[dict[str, Any]] = []
     repeated_posts: list[dict[str, Any]] = []
     dm_status = "not_requested"
+    dm_counts = {"visible": 0, "unread": 0, "read": 0}
     dm_thread_updates: list[dict[str, str]] = []
 
     for page in data.get("pages", []):
@@ -167,6 +168,11 @@ def update_memory(
 
         if kind == "messages":
             dm_status = str(page.get("dm_status") or "unknown")
+            dm_counts = {
+                "visible": int(page.get("dm_visible_thread_count") or 0),
+                "unread": int(page.get("dm_unread_thread_count") or 0),
+                "read": int(page.get("dm_read_thread_count") or 0),
+            }
             for thread in page.get("dm_threads") or []:
                 if not isinstance(thread, dict):
                     continue
@@ -226,6 +232,7 @@ def update_memory(
         "handle": handle,
         "post_counts": post_counts,
         "dm_status": dm_status,
+        "dm_counts": dm_counts,
         "new_posts": len(new_posts),
         "repeated_posts": len(repeated_posts),
         "dm_thread_updates": len(dm_thread_updates),
@@ -242,6 +249,7 @@ def update_memory(
         "new_posts": new_posts[:30],
         "repeated_posts": repeated_posts[:30],
         "dm_status": dm_status,
+        "dm_counts": dm_counts,
         "dm_threads": dm_thread_updates,
         "memory_policy": "Long-term memory stores no raw DM text and prunes old seen items.",
     }
@@ -348,6 +356,12 @@ def render_digest_input(data: dict[str, Any]) -> str:
             lines.extend(["", "页面可见文本摘录:", "", str(page["visible_text"])[:3000]])
         if page.get("dm_status"):
             lines.extend(["", f"DM 状态: `{page['dm_status']}`"])
+            lines.append(
+                "DM 统计: "
+                f"可见 `{int(page.get('dm_visible_thread_count') or 0)}` / "
+                f"未读或新增 `{int(page.get('dm_unread_thread_count') or 0)}` / "
+                f"已读历史 `{int(page.get('dm_read_thread_count') or 0)}`"
+            )
             if page.get("dm_note"):
                 lines.append(str(page["dm_note"]))
         if page.get("collection_error"):
@@ -378,6 +392,12 @@ def render_memory_context(summary: dict[str, Any]) -> str:
         f"- handle: `@{summary.get('handle') or ''}`",
         f"- memory policy: {summary.get('memory_policy')}",
         f"- DM status: `{summary.get('dm_status')}`",
+        (
+            "- DM counts: "
+            f"visible `{(summary.get('dm_counts') or {}).get('visible', 0)}`, "
+            f"unread/new `{(summary.get('dm_counts') or {}).get('unread', 0)}`, "
+            f"read/history `{(summary.get('dm_counts') or {}).get('read', 0)}`"
+        ),
         "",
         "## Page Counts",
         "",
