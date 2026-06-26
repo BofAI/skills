@@ -20,6 +20,30 @@ cd skills/skills
 python3 twitter-digest/scripts/install.py
 ```
 
+To ask Claude Code to install this skill for itself, paste this into Claude Code:
+
+```text
+请帮我安装这个 Claude Code skill：
+
+git clone -b twitter-digest-skill git@github.com:BofAI/skills.git /tmp/bofai-skills \
+  && cd /tmp/bofai-skills/skills \
+  && python3 twitter-digest/scripts/install.py
+
+安装后请确认 ~/.claude/skills/twitter-digest 存在。首次运行日报时，如果弹出浏览器，请让我登录 X。
+```
+
+After the PR is merged, use the main branch version:
+
+```text
+请帮我安装这个 Claude Code skill：
+
+git clone git@github.com:BofAI/skills.git /tmp/bofai-skills \
+  && cd /tmp/bofai-skills/skills \
+  && python3 twitter-digest/scripts/install.py
+
+安装后请确认 ~/.claude/skills/twitter-digest 存在。首次运行日报时，如果弹出浏览器，请让我登录 X。
+```
+
 The installer copies the skill to:
 
 ```text
