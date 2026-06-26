@@ -30,6 +30,9 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--login-timeout-sec", type=int, default=300)
     parser.add_argument("--include-dms", action="store_true", help="Also visit X messages and capture visible conversation text.")
     parser.add_argument("--dm-threads", type=int, default=5, help="Maximum recent DM threads to open when --include-dms is set.")
+    parser.add_argument("--dm-scrolls", type=int, default=40, help="Maximum upward scroll rounds per opened DM thread.")
+    parser.add_argument("--dm-max-messages", type=int, default=300, help="Maximum message bubbles kept per opened DM thread.")
+    parser.add_argument("--dm-window-hours", type=int, default=24, help="Stop loading older DM history once messages beyond this window are detected.")
     parser.add_argument("--headless", action="store_true", help="Run without a visible browser window. This is the default after first login.")
     parser.add_argument("--headed", action="store_true", help="Force a visible browser window for debugging or manual login.")
     parser.add_argument("--non-interactive", action="store_true", help="Do not open a visible browser for DM passcode recovery; record a data gap instead.")
@@ -169,7 +172,15 @@ def build_pages(handle: str | None, keywords: str, include_dms: bool) -> list[di
     return pages
 
 
-def collect_page(port: int, page: dict[str, str], scrolls: int, dm_threads: int = 5) -> dict[str, Any]:
+def collect_page(
+    port: int,
+    page: dict[str, str],
+    scrolls: int,
+    dm_threads: int = 5,
+    dm_scrolls: int = 40,
+    dm_max_messages: int = 300,
+    dm_window_hours: int = 24,
+) -> dict[str, Any]:
     ws_url = wait_for_cdp_page_ws(port)
     cdp_call(ws_url, "Page.enable")
     cdp_call(ws_url, "Runtime.enable")
@@ -184,11 +195,11 @@ def collect_page(port: int, page: dict[str, str], scrolls: int, dm_threads: int 
         }
     time.sleep(5)
     if page["kind"] == "messages":
-        extra = collect_messages_page(ws_url, dm_threads)
+        extra = collect_messages_page(ws_url, dm_threads, dm_scrolls, dm_max_messages, dm_window_hours)
         if dm_collection_looks_premature(extra):
             cdp_call(ws_url, "Page.navigate", {"url": page["url"]})
             time.sleep(8)
-            extra = collect_messages_page(ws_url, dm_threads)
+            extra = collect_messages_page(ws_url, dm_threads, dm_scrolls, dm_max_messages, dm_window_hours)
         return {"kind": page["kind"], "url": page["url"], "items": [], **extra}
     posts: list[dict[str, Any]] = []
     for _ in range(max(scrolls, 1)):
@@ -199,10 +210,18 @@ def collect_page(port: int, page: dict[str, str], scrolls: int, dm_threads: int 
     return {"kind": page["kind"], "url": page["url"], "items": dedupe_items(posts)}
 
 
-def collect_messages_page(ws_url: str, dm_threads: int) -> dict[str, Any]:
+def collect_messages_page(ws_url: str, dm_threads: int, dm_scrolls: int, dm_max_messages: int, dm_window_hours: int) -> dict[str, Any]:
     extra: dict[str, Any] = {}
     extra["visible_text"] = extract_main_text(ws_url)
-    extra.update(collect_dm_threads(ws_url, max_threads=dm_threads))
+    extra.update(
+        collect_dm_threads(
+            ws_url,
+            max_threads=dm_threads,
+            dm_scrolls=dm_scrolls,
+            dm_max_messages=dm_max_messages,
+            dm_window_hours=dm_window_hours,
+        )
+    )
     return extra
 
 
@@ -217,7 +236,7 @@ def dm_collection_looks_premature(extra: dict[str, Any]) -> bool:
     return not any(marker in text for marker in conversation_markers)
 
 
-def collect_dm_threads(ws_url: str, max_threads: int) -> dict[str, Any]:
+def collect_dm_threads(ws_url: str, max_threads: int, dm_scrolls: int, dm_max_messages: int, dm_window_hours: int) -> dict[str, Any]:
     main_text = wait_for_dm_ready(ws_url)
     if is_dm_passcode_screen(main_text):
         return {
@@ -276,10 +295,8 @@ def collect_dm_threads(ws_url: str, max_threads: int) -> dict[str, Any]:
         elif target.get("url"):
             cdp_call(ws_url, "Page.navigate", {"url": str(target["url"])})
         time.sleep(4)
-        for _ in range(2):
-            cdp_eval(ws_url, "window.scrollBy(0, -Math.max(700, window.innerHeight * 0.8));")
-            time.sleep(1)
-        messages = extract_dm_messages(ws_url)
+        load_info = load_dm_thread_history(ws_url, max_scrolls=dm_scrolls, target_messages=dm_max_messages, window_hours=dm_window_hours)
+        messages = extract_dm_messages(ws_url, max_messages=dm_max_messages)
         thread_text = render_dm_messages(messages) or extract_dm_conversation_text(ws_url)
         message_count = len(messages) if messages else count_dm_messages(ws_url)
         threads.append(
@@ -292,6 +309,9 @@ def collect_dm_threads(ws_url: str, max_threads: int) -> dict[str, Any]:
                 "reply_reason": str(target.get("reply_reason") or ""),
                 "today": bool(target.get("today")),
                 "message_count": message_count,
+                "dm_scrolls_used": load_info.get("scrolls_used", 0),
+                "dm_load_complete": load_info.get("load_complete", False),
+                "dm_window_exceeded": load_info.get("window_exceeded", False),
                 "messages": messages,
                 "text": thread_text,
             }
@@ -304,6 +324,7 @@ def collect_dm_threads(ws_url: str, max_threads: int) -> dict[str, Any]:
         "dm_note": (
             f"Today visible DM threads: {counts['dm_visible_thread_count']}; latest from you: {counts['dm_replied_thread_count']}; "
             f"waiting for your reply: {counts['dm_unreplied_thread_count']}. Opened up to {max_threads} waiting-reply thread(s); "
+            f"loaded up to {dm_max_messages} message bubbles per thread with {dm_scrolls} upward scroll round(s) within about {dm_window_hours}h when timestamps are available; "
             f"captured message bubbles: {sum(int(thread.get('message_count') or 0) for thread in threads)}."
         ),
         "dm_threads": threads,
@@ -353,6 +374,164 @@ def dm_target_has_self_reply(label: str) -> bool:
     return bool(re.search(r"\byou\s*[:：]|\byou sent\b|\byou replied\b|\byou responded\b|你\s*[:：]|你已发送|你发送|您\s*[:：]", normalized, re.IGNORECASE))
 
 
+def load_dm_thread_history(ws_url: str, max_scrolls: int, target_messages: int, window_hours: int) -> dict[str, Any]:
+    scroll_limit = max(0, int(max_scrolls))
+    target = max(1, int(target_messages))
+    last_count = count_dm_messages(ws_url)
+    stagnant_rounds = 0
+    scrolls_used = 0
+    reached_top = False
+    window_exceeded = dm_loaded_beyond_window(ws_url, window_hours)
+
+    while scrolls_used < scroll_limit and last_count < target and stagnant_rounds < 4 and not window_exceeded:
+        info = scroll_dm_messages_up(ws_url)
+        scrolls_used += 1
+        time.sleep(0.8)
+        current_count = count_dm_messages(ws_url)
+        window_exceeded = dm_loaded_beyond_window(ws_url, window_hours)
+        reached_top = bool(info.get("at_top"))
+        if current_count <= last_count:
+            stagnant_rounds += 1
+        else:
+            stagnant_rounds = 0
+        last_count = max(last_count, current_count)
+        if reached_top and stagnant_rounds >= 1:
+            break
+
+    return {
+        "scrolls_used": scrolls_used,
+        "loaded_messages": last_count,
+        "load_complete": reached_top,
+        "window_exceeded": window_exceeded,
+        "target_messages": target,
+        "window_hours": max(1, int(window_hours)),
+    }
+
+
+def scroll_dm_messages_up(ws_url: str) -> dict[str, Any]:
+    script = r"""
+(() => {
+  const panel = document.querySelector('[data-testid="dm-conversation-panel"]')
+    || document.querySelector('[data-testid="dm-conversation-content"]')
+    || document.querySelector('main')
+    || document.body;
+  const candidates = [panel, ...Array.from(panel.querySelectorAll('*'))].filter((el) => {
+    const rect = el.getBoundingClientRect();
+    return rect.width > 200 && rect.height > 200 && el.scrollHeight > el.clientHeight + 40;
+  });
+  const scroller = candidates.sort((a, b) => (b.scrollHeight - b.clientHeight) - (a.scrollHeight - a.clientHeight))[0];
+  if (!scroller) {
+    window.scrollBy(0, -Math.max(900, window.innerHeight * 0.9));
+    return {found: false, at_top: window.scrollY <= 0, scroll_top: window.scrollY};
+  }
+  const before = scroller.scrollTop;
+  scroller.scrollTop = Math.max(0, before - Math.max(900, scroller.clientHeight * 0.9));
+  scroller.dispatchEvent(new Event('scroll', {bubbles: true}));
+  return {found: true, at_top: scroller.scrollTop <= 0, scroll_top: scroller.scrollTop, before};
+})()
+"""
+    value = cdp_eval(ws_url, script)
+    return value if isinstance(value, dict) else {}
+
+
+def dm_loaded_beyond_window(ws_url: str, window_hours: int) -> bool:
+    script = r"""
+(() => {
+  const windowHours = Math.max(1, %d);
+  const oldest = oldestLoadedMessageAgeHours();
+  return Number.isFinite(oldest) && oldest > windowHours;
+
+  function oldestLoadedMessageAgeHours() {
+    const panel = document.querySelector('[data-testid="dm-conversation-panel"]')
+      || document.querySelector('[data-testid="dm-conversation-content"]')
+      || document.querySelector('main')
+      || document.body;
+    const list = panel.querySelector('[data-testid="dm-message-list"]') || panel;
+    const items = Array.from(list.querySelectorAll('li'));
+    let currentDay = '';
+    let oldest = -Infinity;
+    for (const item of items) {
+      const text = clean(item.innerText || '');
+      if (!text) continue;
+      if (!item.querySelector('div[data-testid^="message-"]')) {
+        const day = dayLabel(text);
+        if (day) currentDay = day;
+        continue;
+      }
+      for (const root of Array.from(item.querySelectorAll('div[data-testid^="message-"]'))) {
+        if (String(root.getAttribute('data-testid') || '').startsWith('message-text-')) continue;
+        const timeText = firstTimeText(root);
+        const when = parseMessageDate(currentDay, timeText);
+        if (!when) continue;
+        const age = (Date.now() - when.getTime()) / 36e5;
+        if (age > oldest) oldest = age;
+      }
+    }
+    return oldest;
+  }
+  function dayLabel(text) {
+    const value = clean(text);
+    if (/^(today|yesterday|今天|昨天)$/i.test(value)) return value;
+    if (/^(jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec)[a-z]*\.?\s+\d{1,2}/i.test(value)) return value;
+    if (/^\d{4}[\/-]\d{1,2}[\/-]\d{1,2}$/.test(value)) return value;
+    if (/^\d{1,2}[\/-]\d{1,2}(?:[\/-]\d{2,4})?$/.test(value)) return value;
+    return '';
+  }
+  function parseMessageDate(day, timeText) {
+    const time = parseTime(timeText);
+    if (!time) return null;
+    const base = parseDay(day);
+    if (!base) return null;
+    base.setHours(time.hours, time.minutes, 0, 0);
+    return base;
+  }
+  function parseDay(day) {
+    const now = new Date();
+    const value = clean(day).toLowerCase();
+    if (!value || value === 'today' || value === '今天') return new Date(now.getFullYear(), now.getMonth(), now.getDate());
+    if (value === 'yesterday' || value === '昨天') return new Date(now.getFullYear(), now.getMonth(), now.getDate() - 1);
+    const parsed = new Date(day);
+    if (!Number.isNaN(parsed.getTime())) return new Date(parsed.getFullYear(), parsed.getMonth(), parsed.getDate());
+    return null;
+  }
+  function firstTimeText(node) {
+    for (const child of Array.from(node.querySelectorAll('span, div'))) {
+      const text = clean(child.innerText || '');
+      if (isTimeText(text)) return text;
+    }
+    const match = clean(node.innerText || '').match(/(\d{1,2}:\d{2}\s?(?:AM|PM)?|上午\s*\d{1,2}:\d{2}|下午\s*\d{1,2}:\d{2})/i);
+    return match ? match[1] : '';
+  }
+  function parseTime(text) {
+    const value = clean(text);
+    let match = value.match(/^(\d{1,2}):(\d{2})\s?(AM|PM)$/i);
+    if (match) {
+      let hours = Number(match[1]);
+      const minutes = Number(match[2]);
+      const suffix = match[3].toUpperCase();
+      if (suffix === 'PM' && hours < 12) hours += 12;
+      if (suffix === 'AM' && hours === 12) hours = 0;
+      return {hours, minutes};
+    }
+    match = value.match(/^(上午|下午)\s*(\d{1,2}):(\d{2})$/);
+    if (match) {
+      let hours = Number(match[2]);
+      const minutes = Number(match[3]);
+      if (match[1] === '下午' && hours < 12) hours += 12;
+      if (match[1] === '上午' && hours === 12) hours = 0;
+      return {hours, minutes};
+    }
+    match = value.match(/^(\d{1,2}):(\d{2})$/);
+    if (match) return {hours: Number(match[1]), minutes: Number(match[2])};
+    return null;
+  }
+  function clean(text) { return (text || '').replace(/\s+/g, ' ').trim(); }
+  function isTimeText(text) { return /^(\d{1,2}:\d{2}\s?(AM|PM)?|\d{1,2}:\d{2}|上午\s*\d{1,2}:\d{2}|下午\s*\d{1,2}:\d{2})$/i.test(text); }
+})()
+""" % max(1, int(window_hours))
+    return bool(cdp_eval(ws_url, script))
+
+
 def count_dm_messages(ws_url: str) -> int:
     script = r"""
 (() => {
@@ -389,7 +568,7 @@ def count_dm_messages(ws_url: str) -> int:
     return int(value) if isinstance(value, (int, float)) else 0
 
 
-def extract_dm_messages(ws_url: str) -> list[dict[str, str]]:
+def extract_dm_messages(ws_url: str, max_messages: int = 300) -> list[dict[str, str]]:
     script = r"""
 (() => {
   const panel = document.querySelector('[data-testid="dm-conversation-panel"]')
@@ -417,7 +596,7 @@ def extract_dm_messages(ws_url: str) -> list[dict[str, str]]:
       text,
     });
   }
-  return out;
+  return out.slice(-Math.max(1, %d));
 
   function bubbleText(node) {
     if (!node) return '';
@@ -452,7 +631,7 @@ def extract_dm_messages(ws_url: str) -> list[dict[str, str]]:
   function clean(text) { return (text || '').replace(/\s+/g, ' ').trim(); }
   function isTimeText(text) { return /^(\d{1,2}:\d{2}\s?(AM|PM)?|\d{1,2}:\d{2}|上午\s*\d{1,2}:\d{2}|下午\s*\d{1,2}:\d{2})$/i.test(text); }
 })()
-"""
+""" % max(1, int(max_messages))
     value = cdp_eval(ws_url, script)
     if not isinstance(value, list):
         return []
@@ -1146,7 +1325,7 @@ def main() -> None:
                 stop_browser(proc)
                 proc, port = launch_browser(profile_dir, "https://x.com/messages", headless=True)
                 wait_for_login(port, args.login_timeout_sec, interactive=False)
-            result = collect_page(port, page, args.scrolls, args.dm_threads)
+            result = collect_page(port, page, args.scrolls, args.dm_threads, args.dm_scrolls, args.dm_max_messages, args.dm_window_hours)
             if page["kind"] == "messages" and result.get("dm_status") == "blocked_by_x_chat_passcode":
                 if args.non_interactive:
                     result["dm_note"] = "X Chat passcode is required. Non-interactive mode skipped DM recovery for this run."
@@ -1160,7 +1339,7 @@ def main() -> None:
                     headless = False
                     wait_for_login(port, args.login_timeout_sec, interactive=True)
                 if wait_for_dm_passcode_resolution(port, args.login_timeout_sec):
-                    result = collect_page(port, page, args.scrolls, args.dm_threads)
+                    result = collect_page(port, page, args.scrolls, args.dm_threads, args.dm_scrolls, args.dm_max_messages, args.dm_window_hours)
                     if resume_headless_after_passcode:
                         print("X Chat passcode was completed. DM collection finished in the visible browser; returning to headless mode...")
                         stop_browser(proc)

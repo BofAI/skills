@@ -28,6 +28,9 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--include-dms", action="store_true", help="Include visible DMs. This is already the default; kept for compatibility.")
     parser.add_argument("--no-dms", action="store_true", help="Skip X Messages collection for this run.")
     parser.add_argument("--dm-threads", type=int, default=5)
+    parser.add_argument("--dm-scrolls", type=int, default=40, help="Maximum upward scroll rounds per opened DM thread.")
+    parser.add_argument("--dm-max-messages", type=int, default=300, help="Maximum message bubbles kept per opened DM thread.")
+    parser.add_argument("--dm-window-hours", type=int, default=24, help="Stop loading older DM history once messages beyond this window are detected.")
     parser.add_argument("--scrolls", type=int, default=4)
     parser.add_argument("--headless", action="store_true", help="Run browser collection headlessly. This is the default when login is already saved.")
     parser.add_argument("--headed", action="store_true", help="Force a visible browser window for debugging or manual login.")
@@ -75,6 +78,12 @@ def main() -> None:
         str(args.scrolls),
         "--dm-threads",
         str(args.dm_threads),
+        "--dm-scrolls",
+        str(args.dm_scrolls),
+        "--dm-max-messages",
+        str(args.dm_max_messages),
+        "--dm-window-hours",
+        str(args.dm_window_hours),
     ]
     if args.handle:
         cmd.extend(["--handle", handle])

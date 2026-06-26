@@ -144,6 +144,8 @@ Count fields:
 
 Do not compare conversation counts and message counts as if they were the same unit. A user can have 5 today visible conversations, 2 waiting-reply conversations, and 4 captured message bubbles across those opened conversations.
 
+The collector opens waiting-reply conversations and scrolls upward before extracting message bubbles. Defaults are `--dm-scrolls 40`, `--dm-max-messages 300`, and `--dm-window-hours 24`, so long conversations should load hundreds of recent bubbles when X exposes them while stopping once the loaded timestamps are clearly outside the daily window. These counts still mean “browser-loaded bubbles in this run”, not “all historical messages in the thread”.
+
 Waiting-reply does not automatically mean important. Count every waiting-reply conversation, but summarize only messages that are actionable, relationship-relevant, risky, money/security-sensitive, or clearly useful. Spam, phishing, generic promotion, low-context links, and repeated junk should be classified as ignore/noise and not copied into the main narrative.
 
 Status rules:
