@@ -1,5 +1,11 @@
 # X/Twitter Digest 功能 / 规则 / 流程说明
 
+面向 PM/用户的完整运行流程说明见：
+
+```text
+twitter-digest/RUNBOOK.md
+```
+
 ## 1. 功能
 
 `twitter-digest` 用本地浏览器读取用户自己的 X/Twitter 页面，并生成中文日报。
