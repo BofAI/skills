@@ -46,6 +46,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--dm-threads", type=int, default=5)
     parser.add_argument("--dm-scrolls", type=int, default=200, help="Maximum upward scroll rounds per opened DM thread.")
     parser.add_argument("--dm-max-messages", type=int, default=2000, help="Maximum message bubbles kept per opened DM thread.")
+    parser.add_argument("--dm-max-events", type=int, default=300, help="Maximum Direct Message API events kept per run.")
     parser.add_argument("--dm-window-hours", type=int, default=0, help="Stop loading older DM history once messages beyond this window are detected. 0 means load full available thread history.")
     parser.add_argument("--scrolls", type=int, default=40, help="Maximum scroll rounds per public page.")
     parser.add_argument("--max-public-items", type=int, default=300, help="Maximum public post items kept per run.")
@@ -72,7 +73,13 @@ def load_api_config() -> dict:
         data = json.loads(API_CONFIG_PATH.read_text(encoding="utf-8"))
     except Exception:
         return {}
-    return data if isinstance(data, dict) else {}
+    if not isinstance(data, dict):
+        return {}
+    user_id = str(data.get("user_id") or "")
+    if user_id and not user_id.isdigit() and not data.get("handle"):
+        data["handle"] = user_id.lstrip("@")
+        data["user_id"] = ""
+    return data
 
 
 def save_api_config(config: dict) -> None:
@@ -237,6 +244,7 @@ def main() -> None:
     ]
     if source == "api":
         cmd.extend(["--api-base", api_base])
+        cmd.extend(["--dm-max-events", str(args.dm_max_events)])
         child_env = os.environ.copy()
         if bearer_token:
             child_env["X_BEARER_TOKEN"] = bearer_token
