@@ -11,6 +11,7 @@ import hmac
 import json
 import os
 import secrets
+import sys
 import time
 import urllib.error
 import urllib.parse
@@ -512,7 +513,11 @@ def collect_api(args: argparse.Namespace) -> dict[str, Any]:
 def main() -> None:
     args = parse_args()
     out_dir = Path(args.out).expanduser().resolve()
-    data = collect_api(args)
+    try:
+        data = collect_api(args)
+    except Exception as exc:
+        print(json.dumps({"source": "api", "collection_status": "error", "error": str(exc)[:1200]}, ensure_ascii=False, indent=2), file=sys.stderr)
+        raise SystemExit(1) from exc
     write_digest_output(out_dir, data)
     print(json.dumps({"out_dir": str(out_dir), "source": "api", "pages": len(data["pages"])}, indent=2))
 

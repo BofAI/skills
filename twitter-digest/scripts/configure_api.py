@@ -31,7 +31,7 @@ OAUTH1_REQUEST_TOKEN_URL = "https://api.twitter.com/oauth/request_token"
 OAUTH1_AUTHORIZE_URL = "https://api.twitter.com/oauth/authorize"
 OAUTH1_ACCESS_TOKEN_URL = "https://api.twitter.com/oauth/access_token"
 DEFAULT_REDIRECT_URI = "http://127.0.0.1:8765/callback"
-DEFAULT_SCOPES = "tweet.read users.read follows.read offline.access"
+DEFAULT_SCOPES = "dm.read tweet.read users.read offline.access"
 
 
 def parse_args() -> argparse.Namespace:

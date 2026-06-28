@@ -205,6 +205,25 @@ def api_configured(config: dict, bearer_token: str) -> bool:
     )
 
 
+def summarize_child_error(error: subprocess.CalledProcessError) -> str:
+    text = "\n".join(part for part in [error.stdout or "", error.stderr or ""] if part)
+    if not text:
+        return f"collector exited with code {error.returncode}"
+    markers = [
+        "client-not-enrolled",
+        "Appropriate Level of API Access",
+        "Forbidden",
+        "Unauthorized",
+        "HTTP 403",
+        "HTTP 401",
+    ]
+    matched = [marker for marker in markers if marker in text]
+    if matched:
+        return "; ".join(dict.fromkeys(matched))
+    compact = " ".join(text.split())
+    return compact[:500]
+
+
 def main() -> None:
     args = parse_args()
     if args.configure_api:
@@ -292,7 +311,55 @@ def main() -> None:
     if args.non_interactive and source == "browser":
         cmd.append("--non-interactive")
     print(f"Collecting X digest data via {source} source.", flush=True)
-    subprocess.run(cmd, check=True, env=child_env)
+    try:
+        if source == "api":
+            completed = subprocess.run(cmd, check=True, env=child_env, capture_output=True, text=True)
+            if completed.stdout:
+                print(completed.stdout.strip(), flush=True)
+        else:
+            subprocess.run(cmd, check=True, env=child_env)
+    except subprocess.CalledProcessError as exc:
+        summary = summarize_child_error(exc)
+        if args.source == "auto" and source == "api":
+            print(f"API collection unavailable ({summary}). Falling back to browser collection.", flush=True)
+            source = "browser"
+            script = Path(__file__).with_name("browser_x_digest.py")
+            cmd = [
+                sys.executable,
+                str(script),
+                "--keywords",
+                args.keywords,
+                "--out",
+                args.out,
+                "--max-public-items",
+                str(args.max_public_items),
+                "--public-window-hours",
+                str(args.public_window_hours),
+                "--scrolls",
+                str(args.scrolls),
+                "--dm-threads",
+                str(args.dm_threads),
+                "--dm-scrolls",
+                str(args.dm_scrolls),
+                "--dm-max-messages",
+                str(args.dm_max_messages),
+                "--dm-window-hours",
+                str(args.dm_window_hours),
+            ]
+            if handle:
+                cmd.extend(["--handle", handle])
+            if include_dms:
+                cmd.append("--include-dms")
+            if args.headed:
+                cmd.append("--headed")
+            if args.headless:
+                cmd.append("--headless")
+            if args.non_interactive:
+                cmd.append("--non-interactive")
+            subprocess.run(cmd, check=True)
+        else:
+            print(f"API collection failed: {summary}", file=sys.stderr, flush=True)
+            raise SystemExit(exc.returncode) from exc
     out_dir = Path(args.out)
     build_current_context_from_file(
         input_path=out_dir / "digest-input.json",
