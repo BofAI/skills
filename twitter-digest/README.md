@@ -1,6 +1,6 @@
 # X/Twitter Digest
 
-Browser-only skill for generating a Chinese daily digest from a user's own X/Twitter account.
+Skill for generating a Chinese daily digest from a user's own X/Twitter account through API collection when configured, otherwise through a saved local browser session.
 
 ## Quick Install
 
@@ -60,6 +60,35 @@ python3 twitter-digest/scripts/run_daily_digest.py
 
 On first run, a dedicated browser profile opens. Log in to X once in that browser. Later runs reuse the saved profile and default to headless collection.
 
+## Data Collection Sources
+
+There are three collection entry points:
+
+```bash
+# Browser-only collector
+python3 twitter-digest/scripts/browser_x_digest.py --include-dms
+
+# API-only collector, requires X_BEARER_TOKEN or --bearer-token
+X_BEARER_TOKEN=... python3 twitter-digest/scripts/api_x_digest.py --handle <handle>
+
+# Recommended upper-level wrapper
+python3 twitter-digest/scripts/run_daily_digest.py
+```
+
+`run_daily_digest.py` defaults to `--source auto`:
+
+- If `X_BEARER_TOKEN` or `TWITTER_BEARER_TOKEN` is configured, it uses the API collector.
+- Otherwise it falls back to the browser collector.
+
+Force a source:
+
+```bash
+python3 twitter-digest/scripts/run_daily_digest.py --source browser
+X_BEARER_TOKEN=... python3 twitter-digest/scripts/run_daily_digest.py --source api --handle <handle>
+```
+
+API mode is for stable public-data collection, including the official home timeline endpoint when the configured token has user-context timeline access. Browser mode is still required for X Chat / DM content unless a read-DM-capable API integration is configured.
+
 ## Test DM Collection
 
 ```bash
@@ -75,13 +104,14 @@ twitter-digest/.state/run/digest-input.md
 twitter-digest/.state/run/digest-input.json
 ```
 
-Use `digest-context.md` as the normal AI input. `digest-input.*` is raw browser capture for debugging.
+Use `digest-context.md` as the normal AI input. `digest-input.*` is raw collector capture for debugging.
 
 ## More Details
 
 See:
 
 ```text
+twitter-digest/DATA_COLLECTION.md
 twitter-digest/RUNBOOK.md
 twitter-digest/FUNCTION_RULES_FLOW.md
 ```

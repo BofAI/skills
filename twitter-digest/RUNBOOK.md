@@ -2,19 +2,50 @@
 
 ## 目标
 
-`twitter-digest` 通过本地已登录浏览器读取用户自己的 X/Twitter 页面，生成中文日报。
+`twitter-digest` 读取用户自己的 X/Twitter 数据并生成中文日报。抓数据层支持 API 和本地已登录浏览器两种来源。
 
-它不依赖 X Developer API，不要求用户复制 token/cookie，也不通过 MCP 服务读取 X 数据。
+默认入口是 `scripts/run_daily_digest.py`。如果配置了 X API token，它优先用 API 抓公开数据；如果没有 API 配置，它自动回退到浏览器抓取。读取 X Chat / DM 内容时仍使用本地浏览器，因为普通 API 配置通常没有私信读取能力。
 
 核心链路：
 
 ```text
-本地专用 Chrome/Chromium profile
--> 打开 x.com 页面
--> 读取页面 DOM
--> 生成 digest-context.md
+run_daily_digest.py
+-> 选择 API 或浏览器 collector
+-> 生成 digest-input.*
+-> 归一化生成 digest-context.md
 -> Agent 只基于 digest-context.md 写中文日报
 ```
+
+## 抓数据脚本分层
+
+当前有三层脚本：
+
+```text
+scripts/browser_x_digest.py
+  通过本地浏览器抓取数据。
+
+scripts/api_x_digest.py
+  通过 X API 抓取数据。
+
+scripts/run_daily_digest.py
+  上层入口。默认 --source auto：
+  - 检测到 X_BEARER_TOKEN / TWITTER_BEARER_TOKEN 时走 API。
+  - 没有 API 配置时走浏览器。
+```
+
+强制浏览器：
+
+```bash
+python3 twitter-digest/scripts/run_daily_digest.py --source browser
+```
+
+强制 API：
+
+```bash
+X_BEARER_TOKEN=... python3 twitter-digest/scripts/run_daily_digest.py --source api --handle <handle>
+```
+
+API 模式重点用于更稳定地抓公开数据。X Chat / DM 内容仍以浏览器模式为准；如果 API 模式无法读取 DM，会在 `digest-context` 的 Data Gaps 中标注。
 
 ## 安装与依赖检查
 

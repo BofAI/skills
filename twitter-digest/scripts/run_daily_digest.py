@@ -5,6 +5,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import os
 import subprocess
 import sys
 from pathlib import Path
@@ -25,6 +26,10 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--configure-only", action="store_true", help="Only save default account config; do not collect data.")
     parser.add_argument("--keywords", default="", help="Optional comma-separated search queries. Default is empty; the daily digest focuses on timeline, mentions, and DMs.")
     parser.add_argument("--out", default=str(DEFAULT_OUT_DIR))
+    parser.add_argument("--source", choices=("auto", "browser", "api"), default="auto", help="Data collection source. auto uses API when configured, otherwise browser.")
+    parser.add_argument("--api-base", default=os.environ.get("X_API_BASE_URL") or "https://api.x.com/2")
+    parser.add_argument("--user-id", default=os.environ.get("X_USER_ID") or os.environ.get("TWITTER_USER_ID") or "")
+    parser.add_argument("--bearer-token", default=os.environ.get("X_BEARER_TOKEN") or os.environ.get("TWITTER_BEARER_TOKEN") or "")
     parser.add_argument("--include-dms", action="store_true", help="Include visible DMs. This is already the default; kept for compatibility.")
     parser.add_argument("--no-dms", action="store_true", help="Skip X Messages collection for this run.")
     parser.add_argument("--dm-threads", type=int, default=5)
@@ -59,6 +64,12 @@ def save_config(handle: str | None, account_name: str | None) -> None:
     CONFIG_PATH.write_text(json.dumps(config, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
 
 
+def choose_source(requested: str, bearer_token: str) -> str:
+    if requested != "auto":
+        return requested
+    return "api" if bool(bearer_token) else "browser"
+
+
 def main() -> None:
     args = parse_args()
     if args.save_default:
@@ -68,7 +79,8 @@ def main() -> None:
         return
     config = load_config()
     handle = (args.handle or config.get("handle") or "").lstrip("@")
-    script = Path(__file__).with_name("browser_x_digest.py")
+    source = choose_source(args.source, args.bearer_token)
+    script = Path(__file__).with_name("api_x_digest.py" if source == "api" else "browser_x_digest.py")
     cmd = [
         sys.executable,
         str(script),
@@ -76,21 +88,32 @@ def main() -> None:
         args.keywords,
         "--out",
         args.out,
-        "--scrolls",
-        str(args.scrolls),
         "--max-public-items",
         str(args.max_public_items),
         "--public-window-hours",
         str(args.public_window_hours),
-        "--dm-threads",
-        str(args.dm_threads),
-        "--dm-scrolls",
-        str(args.dm_scrolls),
-        "--dm-max-messages",
-        str(args.dm_max_messages),
-        "--dm-window-hours",
-        str(args.dm_window_hours),
     ]
+    if source == "api":
+        cmd.extend(["--api-base", args.api_base])
+        if args.bearer_token:
+            cmd.extend(["--bearer-token", args.bearer_token])
+        if args.user_id:
+            cmd.extend(["--user-id", args.user_id])
+    else:
+        cmd.extend(
+            [
+                "--scrolls",
+                str(args.scrolls),
+                "--dm-threads",
+                str(args.dm_threads),
+                "--dm-scrolls",
+                str(args.dm_scrolls),
+                "--dm-max-messages",
+                str(args.dm_max_messages),
+                "--dm-window-hours",
+                str(args.dm_window_hours),
+            ]
+        )
     if args.handle:
         cmd.extend(["--handle", handle])
     elif handle:
@@ -100,12 +123,15 @@ def main() -> None:
         include_dms = True
     if include_dms:
         cmd.append("--include-dms")
-    if args.headed:
+    if source == "api" and include_dms:
+        print("API source selected. DM collection is limited; browser source is required for X Chat content.", flush=True)
+    if args.headed and source == "browser":
         cmd.append("--headed")
-    if args.headless:
+    if args.headless and source == "browser":
         cmd.append("--headless")
-    if args.non_interactive:
+    if args.non_interactive and source == "browser":
         cmd.append("--non-interactive")
+    print(f"Collecting X digest data via {source} source.", flush=True)
     subprocess.run(cmd, check=True)
     out_dir = Path(args.out)
     build_current_context_from_file(
@@ -119,6 +145,7 @@ def main() -> None:
         "debug_raw_markdown": str(out_dir / "digest-input.md"),
         "debug_raw_json": str(out_dir / "digest-input.json"),
         "memory": "disabled",
+        "source": source,
     }
     print(json.dumps(result, ensure_ascii=False, indent=2))
 

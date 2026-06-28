@@ -1,30 +1,39 @@
 ---
 name: twitter-digest
-description: Use when the user wants Claude Code or another agent to analyze their own X/Twitter mentions, home timeline, visible direct messages, reply opportunities, and daily social-media summaries through a local logged-in browser session.
+description: Use when the user wants Claude Code or another agent to analyze their own X/Twitter mentions, home timeline, visible direct messages, reply opportunities, and daily social-media summaries through API or local logged-in browser collection.
 ---
 
 # X/Twitter Digest
 
 ## Overview
 
-Use this skill to produce a concise Chinese daily digest from the user's own X/Twitter account. The only supported access path is local browser collection with a persistent dedicated Chromium profile.
+Use this skill to produce a concise Chinese daily digest from the user's own X/Twitter account. The recommended entry point is `scripts/run_daily_digest.py`, which selects API collection when API credentials are configured and otherwise falls back to local browser collection with a persistent dedicated Chromium profile.
 
 Load `references/x-twitter-digest.md` when you need implementation details, browser workflow rules, current-run context behavior, or the scoring rubric.
 
-## Browser-Only Access
+## Data Collection
 
-This skill intentionally uses only local browser automation.
-
-Default collection uses:
+There are three collection scripts:
 
 ```bash
-python3 twitter-digest/scripts/browser_x_digest.py
+python3 twitter-digest/scripts/browser_x_digest.py   # browser collector
+python3 twitter-digest/scripts/api_x_digest.py       # API collector
+python3 twitter-digest/scripts/run_daily_digest.py   # upper wrapper, --source auto
 ```
 
 For chat usage, run the wrapper:
 
 ```bash
 python3 twitter-digest/scripts/run_daily_digest.py
+```
+
+`run_daily_digest.py --source auto` uses `X_BEARER_TOKEN` / `TWITTER_BEARER_TOKEN` when present; otherwise it uses the browser collector. Browser mode is still required for X Chat / DM content unless a read-DM-capable API integration is configured.
+
+Force a source:
+
+```bash
+python3 twitter-digest/scripts/run_daily_digest.py --source browser
+X_BEARER_TOKEN=... python3 twitter-digest/scripts/run_daily_digest.py --source api --handle <handle>
 ```
 
 The first run opens a dedicated browser profile at `twitter-digest/.state/chrome-profile`. The user logs in to X once in that browser. Later runs default to headless collection and reuse the saved local browser session. If the saved login is unavailable, the script automatically opens a visible browser window for manual login.
@@ -70,8 +79,8 @@ Claude Code or other agents can use the installed skill by running the same brow
 - `twitter-digest/.state/config.json`: account defaults and preferences.
 - `twitter-digest/.state/run/digest-context.md`: the only normal input for AI daily-summary writing.
 - `twitter-digest/.state/run/digest-context.json`: machine-readable version of the same normalized facts.
-- `twitter-digest/.state/run/digest-input.md`: raw browser capture for debugging only.
-- `twitter-digest/.state/run/digest-input.json`: raw machine-readable browser capture for debugging only.
+- `twitter-digest/.state/run/digest-input.md`: raw collector capture for debugging only.
+- `twitter-digest/.state/run/digest-input.json`: raw machine-readable collector capture for debugging only.
 
 No `memory.json` or `daily/` archive is produced. Raw DM text or DM excerpts may exist only in the current run's private `twitter-digest/.state/run/digest-input.*` and `digest-context.*` files for immediate summarization/debugging. The run directory is created with owner-only permissions where supported. Run dates use the user's local timezone.
 
