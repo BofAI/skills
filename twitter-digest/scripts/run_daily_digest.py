@@ -7,7 +7,9 @@ import argparse
 import base64
 import json
 import os
+import platform
 import subprocess
+import shlex
 import sys
 import time
 import urllib.parse
@@ -147,6 +149,40 @@ def choose_source(requested: str, bearer_token: str) -> str:
     return "api" if bool(bearer_token) else "browser"
 
 
+def display_path(path: Path) -> str:
+    try:
+        return "~/" + str(path.expanduser().resolve().relative_to(Path.home()))
+    except ValueError:
+        return str(path)
+
+
+def open_config_in_terminal(extra_args: list[str]) -> bool:
+    if platform.system() != "Darwin":
+        return False
+    script = Path(__file__).with_name("configure_api.py")
+    command_parts = [
+        "cd",
+        shlex.quote(str(Path(__file__).resolve().parents[1])),
+        "&&",
+        shlex.quote(sys.executable),
+        shlex.quote(str(script)),
+        *[shlex.quote(arg) for arg in extra_args],
+        ";",
+        "echo",
+        ";",
+        "read -n 1 -s -r -p 'Configuration finished. Press any key to close this window...'",
+    ]
+    shell_command = " ".join(command_parts)
+    apple_script = f'tell application "Terminal" to do script {json.dumps(shell_command)}'
+    try:
+        subprocess.run(["osascript", "-e", apple_script], check=True)
+    except (FileNotFoundError, subprocess.CalledProcessError):
+        return False
+    print("Opened a Terminal window for X API configuration.", flush=True)
+    print(f"Config will be saved under: {display_path(Path(__file__).resolve().parents[1] / '.state' / 'api_config.json')}", flush=True)
+    return True
+
+
 def api_configured(config: dict, bearer_token: str) -> bool:
     if bearer_token:
         return True
@@ -161,9 +197,13 @@ def api_configured(config: dict, bearer_token: str) -> bool:
 def main() -> None:
     args = parse_args()
     if args.configure_api:
+        if not sys.stdin.isatty() and open_config_in_terminal([]):
+            return
         subprocess.run([sys.executable, str(Path(__file__).with_name("configure_api.py"))], check=True)
         return
     if args.configure_api_token:
+        if not sys.stdin.isatty() and open_config_in_terminal(["--paste-token"]):
+            return
         subprocess.run([sys.executable, str(Path(__file__).with_name("configure_api.py")), "--paste-token"], check=True)
         return
     if args.save_default:

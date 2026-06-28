@@ -14,6 +14,7 @@ import os
 import platform
 import secrets
 import subprocess
+import sys
 import time
 import urllib.parse
 import urllib.request
@@ -64,7 +65,7 @@ def display_path(path: Path) -> str:
 
 
 def apple_prompt(prompt: str, hidden: bool = False, buttons: list[str] | None = None) -> str | None:
-    if platform.system() != "Darwin" or not os.environ.get("DISPLAY", "") and not os.environ.get("TERM_PROGRAM", ""):
+    if platform.system() != "Darwin":
         return None
     button_list = buttons or ["Cancel", "Save"]
     script = [
@@ -130,6 +131,8 @@ def choose_mode() -> str:
     print("2. OAuth 2.0 PKCE authorization with Client ID")
     print("3. Paste existing OAuth2/user bearer token")
     print("4. Paste existing OAuth1 tokens")
+    if not sys.stdin.isatty():
+        raise SystemExit("No interactive terminal is available. Run through run_daily_digest.py --configure-api so it can open a Terminal window.")
     value = input("Mode [1]: ").strip()
     if value == "2":
         return "oauth2"
@@ -147,6 +150,8 @@ def prompt_value(label: str, default: str = "", hidden: bool = False) -> str:
     value = apple_prompt(prompt, hidden=hidden)
     if value is not None:
         return value or default
+    if not sys.stdin.isatty():
+        raise SystemExit("No interactive terminal is available. Run through run_daily_digest.py --configure-api so it can open a Terminal window.")
     if hidden:
         value = getpass.getpass(f"{prompt}: ")
     else:
