@@ -10,6 +10,7 @@
 - 上层摘要逻辑只读取 `digest-context.md`。
 - 不同数据源必须产出相同的页面结构，方便后续处理复用。
 - 用户操作从对话里触发。Agent 负责运行配置、授权、抓取和总结脚本；用户只在弹出的系统输入框或浏览器授权页里输入/确认。
+- 首次配置成功后，凭据保存在本地 `.state/api_config.json`；后续生成日报不再要求用户重复输入或授权，除非 token 被撤销、过期且无法刷新，或用户主动清除配置。
 
 ## 三层脚本
 
@@ -59,9 +60,10 @@ scripts/api_x_digest.py
 
 限制：
 
-- 默认不读取 X Chat / DM 正文。
+- `--include-dms` 时读取 `/2/dm_events`，需要 user-context auth 和 DM lookup 权限。
 - Home timeline endpoint 需要可访问该用户上下文的 token；如果账号权限、套餐或 token 类型不支持，会在 `home` 页面写入具体 `collection_error`。
-- App-only API key / app-only bearer token 不等于用户授权，不能保证读取用户 home timeline。
+- App-only API key / app-only bearer token 不等于用户授权，不能保证读取用户 home timeline 或 DM。
+- DM API 需要 X App / token 有 `dm.read` 相关权限；权限不足、tier 不支持或 rate limit 会写入 `api_dm_error` data gap。
 - API 权限不足、额度不足或 endpoint 不可用时，会把错误写入对应页面的 `collection_error`。
 
 ### 3. 上层入口脚本
@@ -123,6 +125,26 @@ Agent：运行 scripts/run_daily_digest.py --configure-api
 后续：run_daily_digest.py --source auto 自动走 API
 ```
 
+后续运行：
+
+```text
+用户：生成 X 日报
+Agent：运行 scripts/run_daily_digest.py
+脚本：读取 .state/api_config.json
+脚本：OAuth1 直接签名请求；OAuth2 如需 refresh 则自动 refresh
+脚本：采集 API 数据并生成 digest-context.md
+Agent：读取 digest-context.md 写中文日报
+```
+
+如果凭据失效：
+
+```text
+脚本：把 API endpoint 错误写入 data gap
+Agent：告知用户需要重新配置/授权
+用户：在对话里说“重新配置 X API”
+Agent：再次运行 scripts/run_daily_digest.py --configure-api
+```
+
 清除 API：
 
 ```text
@@ -177,6 +199,14 @@ DM page 尽量包含：
 - `dm_unreplied_thread_count`
 - `dm_captured_message_count`
 - `dm_threads`
+
+API DM 规则：
+
+- API 模式且默认请求 DM 时，先调用 `/2/dm_events`。
+- 按 `dm_conversation_id` 分组。
+- 只把最后一条不是用户发出的会话正文放进 `dm_threads`，用于判断是否需要回复。
+- 最后一条是用户发出的会话只计数，不展开正文。
+- 如果 `/2/dm_events` 返回权限、tier、认证或限流错误，写入 `api_dm_error` data gap，不把失败当作“无私信”。
 
 ## 稳定性策略
 

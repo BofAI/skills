@@ -22,8 +22,9 @@ API mode:
 - Intended for stable public-data collection.
 - Requires user-context authorization for user-owned timelines. App-only keys are not enough for home timeline reliability.
 - Reads the official reverse chronological home timeline when the token has user-context timeline access.
+- Reads `/2/dm_events` when DMs are requested and the token/app has DM lookup permission.
 - Records endpoint-level API failures as data gaps instead of silently treating them as empty pages.
-- DM content is recorded as a data gap unless a read-DM-capable API integration is configured.
+- DM lookup failures are recorded as `api_dm_error`; do not summarize them as empty inboxes.
 - Saved OAuth tokens are configured by the agent-triggered `run_daily_digest.py --configure-api` flow. OAuth1 PIN is the recommended path for user-owned local X Apps: the user provides only Consumer Key and Consumer Secret, authorizes the app, then pastes the PIN. OAuth2 tokens are refreshed automatically when a refresh token is saved.
 
 Chat-triggered API setup:

@@ -87,7 +87,7 @@ python3 twitter-digest/scripts/run_daily_digest.py --source browser
 X_BEARER_TOKEN=... python3 twitter-digest/scripts/run_daily_digest.py --source api --handle <handle>
 ```
 
-API mode is for stable public-data collection, including the official home timeline endpoint when the configured token has user-context timeline access. App-only API keys are not enough for user-context data. Browser mode is still required for X Chat / DM content unless a read-DM-capable API integration is configured.
+API mode is for stable collection, including the official home timeline endpoint when the configured token has user-context timeline access. When `--include-dms` is enabled, API mode also tries `/2/dm_events`; this requires user-context auth and DM lookup permission such as `dm.read`. App-only API keys are not enough for user-context data. If API DM lookup fails, the error is recorded as a data gap instead of being treated as an empty inbox.
 
 ## Configure API In Chat
 
@@ -120,6 +120,14 @@ The app's callback URL in X Developer Portal must match the redirect URI shown b
 ```text
 http://127.0.0.1:8765/callback
 ```
+
+For API DM lookup through OAuth2, include these scopes when configuring the X App / OAuth flow:
+
+```text
+dm.read tweet.read users.read offline.access
+```
+
+Use `dm.write` only if the app will send or delete messages; the digest skill only reads.
 
 On macOS prompts appear as system dialogs; non-GUI terminals fall back to hidden terminal input. The token is saved to:
 
