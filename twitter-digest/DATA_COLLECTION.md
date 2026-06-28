@@ -42,10 +42,10 @@ scripts/api_x_digest.py
 
 职责：
 
-- 使用 `X_BEARER_TOKEN` / `TWITTER_BEARER_TOKEN` 或 `--bearer-token`。
-- 主路径是 OAuth 1.0a PIN：用户只需要准备 X App 的 `CONSUMER_KEY` 和 `CONSUMER_SECRET`，使用 `scripts/run_daily_digest.py --configure-api` 让脚本打开授权页并换取 user access token / token secret。
-- 如果用户已经有 user access token，使用 `scripts/run_daily_digest.py --configure-api-token` 由脚本安全保存。
-- 如果用户使用 OAuth2 App，也可以用 `scripts/run_daily_digest.py --configure-api` 里的 OAuth2 PKCE 路径保存 user-context access token。
+- 使用已保存的 OAuth2 user-context token，或 `X_BEARER_TOKEN` / `TWITTER_BEARER_TOKEN` / `--bearer-token` 传入的 OAuth2 user token。
+- 主路径是 OAuth2 PKCE：用户准备 X App 的 `Client ID`，使用 `scripts/run_daily_digest.py --configure-api` 让脚本打开授权页并通过本地 callback 换取 user access token / refresh token。
+- 如果用户已经有 OAuth2 user access token，使用 `scripts/run_daily_digest.py --configure-api-token` 由脚本安全保存。
+- OAuth1 不再作为日报 API 配置路径，因为它不能可靠读取 DM；需要完整 DM 时走 OAuth2 或浏览器兜底。
 - 读取 home timeline：`/2/users/:id/timelines/reverse_chronological`。
 - 读取用户公开发帖。
 - 读取 mentions。
@@ -77,9 +77,9 @@ scripts/run_daily_digest.py
 - 统一入口。
 - 提供 `--configure-api`，由 Agent 在对话里触发 OAuth 配置。
 - 默认 `--source auto`。
-- 如果检测到环境变量 token，或 `.state/api_config.json` 里保存的 OAuth1/OAuth2 user-context credentials，走 API 抓取。
+- 如果检测到环境变量 token，或 `.state/api_config.json` 里保存的 OAuth2 user-context bearer token，走 API 抓取。
 - 如果没有 API token，走浏览器抓取。
-- 如果 OAuth2 access token 快过期且保存了 refresh token，自动刷新后再抓取。OAuth1 token 通常不需要 refresh。
+- 如果 OAuth2 access token 快过期且保存了 refresh token，自动刷新后再抓取。
 - 抓取完成后调用 `digest_context.py` 生成 `digest-context.*`。
 
 选择逻辑：
@@ -87,7 +87,7 @@ scripts/run_daily_digest.py
 ```text
 --source api      -> 强制 API
 --source browser  -> 强制浏览器
---source auto     -> 有 X_BEARER_TOKEN/TWITTER_BEARER_TOKEN 或已保存 OAuth1/OAuth2 token 用 API，否则浏览器
+--source auto     -> 有 X_BEARER_TOKEN/TWITTER_BEARER_TOKEN 或已保存 OAuth2 user token 用 API，否则浏览器；API 不可用时回退浏览器
 ```
 
 ## 对话触发流程
@@ -112,16 +112,16 @@ Agent：运行 scripts/run_daily_digest.py --configure-api-token
 后续：run_daily_digest.py --source auto 自动走 API
 ```
 
-配置 API，OAuth1 PIN 授权：
+配置 API，OAuth2 授权：
 
 ```text
 用户：配置 X API
 Agent：运行 scripts/run_daily_digest.py --configure-api
 脚本：弹出授权方式选择
-用户：选择 OAuth1 PIN，输入 CONSUMER_KEY 和 CONSUMER_SECRET
+用户：选择 OAuth2，输入 Client ID 和可选 Client Secret
 脚本：打开 X 授权页
-用户：在浏览器里授权 app，复制 X 显示的 PIN
-脚本：用 PIN 换取 access token 和 access token secret 并保存
+用户：在浏览器里授权 app
+脚本：通过本地 callback 换取 access token / refresh token 并保存
 后续：run_daily_digest.py --source auto 自动走 API
 ```
 
@@ -131,7 +131,7 @@ Agent：运行 scripts/run_daily_digest.py --configure-api
 用户：生成 X 日报
 Agent：运行 scripts/run_daily_digest.py
 脚本：读取 .state/api_config.json
-脚本：OAuth1 直接签名请求；OAuth2 如需 refresh 则自动 refresh
+脚本：OAuth2 如需 refresh 则自动 refresh
 脚本：采集 API 数据并生成 digest-context.md
 Agent：读取 digest-context.md 写中文日报
 ```

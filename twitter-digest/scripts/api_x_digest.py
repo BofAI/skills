@@ -395,7 +395,7 @@ def page(kind: str, url: str, items: list[dict[str, Any]], note: str = "", error
 
 def collect_api(args: argparse.Namespace) -> dict[str, Any]:
     if not args.bearer_token and len(build_oauth1_config(args)) != 4:
-        raise SystemExit("X API is not configured. Set X_BEARER_TOKEN or OAuth1 X_CONSUMER_KEY/X_CONSUMER_SECRET/X_ACCESS_TOKEN/X_ACCESS_TOKEN_SECRET.")
+        raise SystemExit("X API is not configured. Configure OAuth2 PKCE or set an OAuth2 user access token with X_BEARER_TOKEN.")
     user = resolve_user(args, args.handle, args.user_id)
     handle = user.get("username") or (args.handle or "").lstrip("@")
     user_id = user.get("id") or args.user_id

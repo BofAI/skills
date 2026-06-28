@@ -27,7 +27,7 @@ For chat usage, run the wrapper:
 python3 twitter-digest/scripts/run_daily_digest.py
 ```
 
-`run_daily_digest.py --source auto` uses saved OAuth1/OAuth2 user-context credentials, `X_BEARER_TOKEN`, or `TWITTER_BEARER_TOKEN` when present; otherwise it uses the browser collector. API mode also tries `/2/dm_events` when DMs are requested; if the app/token lacks DM lookup permission, record the data gap and do not call it an empty inbox.
+`run_daily_digest.py --source auto` uses saved OAuth2 user-context credentials, `X_BEARER_TOKEN`, or `TWITTER_BEARER_TOKEN` when present; otherwise it uses the browser collector. API mode also tries `/2/dm_events` when DMs are requested; if the app/token lacks DM lookup permission, record the data gap and do not call it an empty inbox.
 
 If the user asks to configure API access, trigger the OAuth/user-token setup from chat:
 
@@ -35,15 +35,15 @@ If the user asks to configure API access, trigger the OAuth/user-token setup fro
 python3 twitter-digest/scripts/run_daily_digest.py --configure-api
 ```
 
-This is an agent-triggered flow. It supports both paths:
+This is an agent-triggered flow. It supports OAuth2 user authorization:
 
-- OAuth1 PIN path: if the user has created an X Developer App, run `python3 twitter-digest/scripts/run_daily_digest.py --configure-api`. The user only needs the app's API Key / Consumer Key and API Key Secret / Consumer Secret. The script opens the X authorization page, the user authorizes the app and pastes the PIN, and the script saves the generated user access token plus token secret in `twitter-digest/.state/api_config.json`.
-- Existing token path: if the user says they already have tokens, run `python3 twitter-digest/scripts/run_daily_digest.py --configure-api-token` for an OAuth2/user bearer token, or `python3 twitter-digest/scripts/configure_api.py --paste-oauth1` for OAuth1 consumer/user token pairs.
-- OAuth2 path: if the user has an OAuth2 Client ID and callback URL, run `python3 twitter-digest/scripts/run_daily_digest.py --configure-api` and choose OAuth2 in the prompt.
+- OAuth2 path: if the user has an X Developer App OAuth2 `Client ID` and local callback URL, run `python3 twitter-digest/scripts/run_daily_digest.py --configure-api` and choose OAuth2 in the prompt. Request `dm.read tweet.read users.read offline.access`.
+- Existing token path: if the user says they already have an OAuth2 user access token, run `python3 twitter-digest/scripts/run_daily_digest.py --configure-api-token`.
+- OAuth1 PIN is not a supported normal setup path for this skill because it did not reliably return DM data during validation. Do not guide users to Consumer Key / Consumer Secret / PIN unless they are explicitly debugging legacy API behavior.
 
 If a refresh token is saved, later daily runs refresh the access token automatically. Do not ask the user to export environment variables manually. App-only API keys are not enough for user-context home timeline access.
 
-After API setup succeeds once, future daily digest runs should not ask the user for credentials again. Run `scripts/run_daily_digest.py`; it reads `.state/api_config.json` automatically. OAuth1 credentials are reused directly. OAuth2 credentials are refreshed automatically when a refresh token is saved. Only rerun `--configure-api` when the saved credentials are missing, revoked, expired without refresh, or the user explicitly asks to change accounts/apps.
+After API setup succeeds once, future daily digest runs should not ask the user for credentials again. Run `scripts/run_daily_digest.py`; it reads `.state/api_config.json` automatically. OAuth2 credentials are refreshed automatically when a refresh token is saved. Only rerun `--configure-api` when the saved credentials are missing, revoked, expired without refresh, or the user explicitly asks to change accounts/apps.
 
 If the user asks to clear API access, run:
 
@@ -55,7 +55,7 @@ All normal flows should be triggered from chat by the agent:
 
 - X 日报 / 生成日报: run `scripts/run_daily_digest.py`.
 - 用户已有 token / 输入 X token: run `scripts/run_daily_digest.py --configure-api-token`.
-- 配置 X API / 给 app 授权: run `scripts/run_daily_digest.py --configure-api` and choose OAuth1 PIN.
+- 配置 X API / 给 app 授权: run `scripts/run_daily_digest.py --configure-api` and choose OAuth2.
 - 清除 X API 配置: run `scripts/configure_api.py --clear`.
 - 调试浏览器: run `scripts/run_daily_digest.py --source browser --headed`.
 

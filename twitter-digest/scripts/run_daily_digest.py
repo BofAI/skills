@@ -174,7 +174,7 @@ def open_config_in_terminal(extra_args: list[str]) -> bool:
             "#!/bin/zsh",
             f"cd {shlex.quote(str(Path(__file__).resolve().parents[1]))}",
             "echo 'X API 配置向导'",
-            "echo '默认推荐：OAuth1 PIN，只需要 X Developer App 的 API Key 和 API Key Secret。'",
+            "echo '默认推荐：OAuth2 PKCE，需要 X Developer App 的 Client ID，并通过浏览器授权账号。'",
             "echo",
             " ".join([shlex.quote(sys.executable), shlex.quote(str(script)), *[shlex.quote(arg) for arg in extra_args]]),
             "echo",
@@ -195,14 +195,7 @@ def open_config_in_terminal(extra_args: list[str]) -> bool:
 
 
 def api_configured(config: dict, bearer_token: str) -> bool:
-    if bearer_token:
-        return True
-    return bool(
-        config.get("consumer_key")
-        and config.get("consumer_secret")
-        and config.get("access_token")
-        and config.get("access_token_secret")
-    )
+    return bool(bearer_token)
 
 
 def summarize_child_error(error: subprocess.CalledProcessError) -> str:
@@ -267,14 +260,6 @@ def main() -> None:
         child_env = os.environ.copy()
         if bearer_token:
             child_env["X_BEARER_TOKEN"] = bearer_token
-        for env_name, config_key in (
-            ("X_CONSUMER_KEY", "consumer_key"),
-            ("X_CONSUMER_SECRET", "consumer_secret"),
-            ("X_ACCESS_TOKEN", "access_token"),
-            ("X_ACCESS_TOKEN_SECRET", "access_token_secret"),
-        ):
-            if api_config.get(config_key):
-                child_env[env_name] = str(api_config[config_key])
         if user_id:
             cmd.extend(["--user-id", user_id])
     else:

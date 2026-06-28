@@ -68,7 +68,7 @@ There are three collection entry points:
 # Browser-only collector
 python3 twitter-digest/scripts/browser_x_digest.py --include-dms
 
-# API-only collector, requires OAuth1/OAuth2 user-context credentials or --bearer-token
+# API-only collector, requires OAuth2 user-context credentials or --bearer-token
 X_BEARER_TOKEN=... python3 twitter-digest/scripts/api_x_digest.py --handle <handle>
 
 # Recommended upper-level wrapper
@@ -97,15 +97,15 @@ Users should trigger every flow from chat. They do not need to export environmen
 python3 twitter-digest/scripts/run_daily_digest.py --configure-api
 ```
 
-For a local user-owned X Developer App, the smooth path is OAuth 1.0a PIN authorization. The user only needs the app's API Key / Consumer Key and API Key Secret / Consumer Secret. Ask the agent to run:
+For a local user-owned X Developer App, the supported API setup path is OAuth2 Authorization Code with PKCE. Ask the agent to run:
 
 ```bash
 python3 twitter-digest/scripts/run_daily_digest.py --configure-api
 ```
 
-Then choose `OAuth1 PIN`. The script opens the X authorization page; after the user authorizes the app and pastes the PIN, the script exchanges it for the user's access token and access token secret.
+Then choose `OAuth2`. The script asks for the X Developer App `Client ID`, opens the X authorization page, waits for the user to authorize the account, receives the local callback, exchanges it for a user-context access token and refresh token, then saves it.
 
-If the user already created an X Developer App and already has a user access token, use the direct token path:
+If the user already has an OAuth2 user access token, use the direct token path:
 
 ```bash
 python3 twitter-digest/scripts/run_daily_digest.py --configure-api-token
@@ -113,7 +113,7 @@ python3 twitter-digest/scripts/run_daily_digest.py --configure-api-token
 
 The script opens a hidden system prompt for the token, then asks for optional handle/user id and saves the config locally.
 
-OAuth2 authorization is optional when the user has an OAuth2 Client ID and wants to use the PKCE callback flow. The script asks for the X Developer App `Client ID`, opens the X authorization page, waits for the user to authorize the account, receives the local callback, exchanges it for a user-context access token, then saves it.
+OAuth1 is no longer exposed as a normal setup path for this skill because it did not reliably return DM data during validation. Use OAuth2 with user-context scopes for API collection; otherwise rely on the browser collector.
 
 The app's callback URL in X Developer Portal must match the redirect URI shown by the script, by default:
 
