@@ -480,8 +480,8 @@ def main() -> None:
             raise SystemExit("No access token provided. API configuration was not changed.")
         token_config = {"bearer_token": bearer_token.strip(), "auth_method": "pasted_user_access_token"}
     api_base = args.api_base or existing.get("api_base") or DEFAULT_API_BASE
-    handle = args.handle or prompt_value("X handle, optional", default=str(existing.get("handle") or ""), hidden=False)
-    user_id = args.user_id or prompt_value("X user id, optional", default=str(existing.get("user_id") or ""), hidden=False)
+    handle = args.handle or str(token_config.get("handle") or existing.get("handle") or "")
+    user_id = args.user_id or str(token_config.get("user_id") or existing.get("user_id") or "")
     config = {
         **token_config,
         "api_base": api_base.strip() or DEFAULT_API_BASE,
