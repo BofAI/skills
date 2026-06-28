@@ -7,7 +7,7 @@ Use this reference when implementing, auditing, or troubleshooting the X/Twitter
 The data collection layer has three scripts:
 
 - `scripts/browser_x_digest.py`: local browser collector. It launches a dedicated Chromium profile at `twitter-digest/.state/chrome-profile`, reads X page DOM, and is required for X Chat / DM content.
-- `scripts/api_x_digest.py`: official API collector. It uses `X_BEARER_TOKEN` / `TWITTER_BEARER_TOKEN` or `--bearer-token` and writes the same `digest-input.*` shape as the browser collector.
+- `scripts/api_x_digest.py`: official API collector. It uses a saved OAuth user-context access token, `X_BEARER_TOKEN` / `TWITTER_BEARER_TOKEN`, or `--bearer-token` and writes the same `digest-input.*` shape as the browser collector.
 - `scripts/run_daily_digest.py`: upper wrapper. Default `--source auto` uses API when configured, otherwise browser.
 
 Browser mode:
@@ -20,10 +20,19 @@ Browser mode:
 API mode:
 
 - Intended for stable public-data collection.
-- Requires API credentials.
+- Requires user-context authorization for user-owned timelines. App-only keys are not enough for home timeline reliability.
 - Reads the official reverse chronological home timeline when the token has user-context timeline access.
 - Records endpoint-level API failures as data gaps instead of silently treating them as empty pages.
 - DM content is recorded as a data gap unless a read-DM-capable API integration is configured.
+- Saved OAuth tokens are configured by the agent-triggered `run_daily_digest.py --configure-api` flow and refreshed automatically when possible.
+
+Chat-triggered API setup:
+
+```bash
+python3 twitter-digest/scripts/run_daily_digest.py --configure-api
+```
+
+The user should only interact with the system prompts and X OAuth browser page. Do not require the user to export env vars or paste tokens into shell history.
 
 Typical chat run:
 

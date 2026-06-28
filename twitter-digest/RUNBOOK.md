@@ -4,7 +4,7 @@
 
 `twitter-digest` 读取用户自己的 X/Twitter 数据并生成中文日报。抓数据层支持 API 和本地已登录浏览器两种来源。
 
-默认入口是 `scripts/run_daily_digest.py`。如果配置了 X API token，它优先用 API 抓公开数据；如果没有 API 配置，它自动回退到浏览器抓取。读取 X Chat / DM 内容时仍使用本地浏览器，因为普通 API 配置通常没有私信读取能力。
+默认入口是 `scripts/run_daily_digest.py`。如果已经通过对话内 OAuth 授权保存了 user-context token，或环境里配置了 X API token，它优先用 API 抓公开数据；如果没有 API 配置，它自动回退到浏览器抓取。读取 X Chat / DM 内容时仍使用本地浏览器，因为普通 API 配置通常没有私信读取能力。
 
 核心链路：
 
@@ -29,8 +29,9 @@ scripts/api_x_digest.py
 
 scripts/run_daily_digest.py
   上层入口。默认 --source auto：
-  - 检测到 X_BEARER_TOKEN / TWITTER_BEARER_TOKEN 时走 API。
+  - 检测到已保存 OAuth token 或 X_BEARER_TOKEN / TWITTER_BEARER_TOKEN 时走 API。
   - 没有 API 配置时走浏览器。
+  - 保存了 refresh token 时自动刷新过期 access token。
 ```
 
 强制浏览器：
@@ -46,6 +47,33 @@ X_BEARER_TOKEN=... python3 twitter-digest/scripts/run_daily_digest.py --source a
 ```
 
 API 模式重点用于更稳定地抓公开数据。X Chat / DM 内容仍以浏览器模式为准；如果 API 模式无法读取 DM，会在 `digest-context` 的 Data Gaps 中标注。
+
+## 对话内 API 授权
+
+用户不需要自己 export 环境变量。用户在对话里说“配置 X API”时，Agent 运行：
+
+```bash
+python3 twitter-digest/scripts/run_daily_digest.py --configure-api
+```
+
+推荐路径是 OAuth：
+
+1. 脚本弹出 OAuth / Paste Token 选择。
+2. 用户选择 OAuth。
+3. 脚本提示输入 X Developer App Client ID。
+4. 脚本打开 X 授权页。
+5. 用户在浏览器里登录/授权。
+6. 脚本通过本地 callback 收到授权码，换取 user-context access token。
+7. token 保存到 `twitter-digest/.state/api_config.json`，文件权限尽量设为 owner-only。
+8. 后续日报 `--source auto` 自动走 API；token 快过期时自动 refresh。
+
+X Developer App 里需要配置 callback URL，默认：
+
+```text
+http://127.0.0.1:8765/callback
+```
+
+如果用户已有 user-context access token，也可以在配置向导里选择 Paste Token。不要要求用户手动配置 shell 环境变量；这是调试路径，不是主流程。
 
 ## 安装与依赖检查
 

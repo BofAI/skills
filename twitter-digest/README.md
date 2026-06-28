@@ -68,7 +68,7 @@ There are three collection entry points:
 # Browser-only collector
 python3 twitter-digest/scripts/browser_x_digest.py --include-dms
 
-# API-only collector, requires X_BEARER_TOKEN or --bearer-token
+# API-only collector, requires OAuth user access token or --bearer-token
 X_BEARER_TOKEN=... python3 twitter-digest/scripts/api_x_digest.py --handle <handle>
 
 # Recommended upper-level wrapper
@@ -87,7 +87,46 @@ python3 twitter-digest/scripts/run_daily_digest.py --source browser
 X_BEARER_TOKEN=... python3 twitter-digest/scripts/run_daily_digest.py --source api --handle <handle>
 ```
 
-API mode is for stable public-data collection, including the official home timeline endpoint when the configured token has user-context timeline access. Browser mode is still required for X Chat / DM content unless a read-DM-capable API integration is configured.
+API mode is for stable public-data collection, including the official home timeline endpoint when the configured token has user-context timeline access. App-only API keys are not enough for user-context data. Browser mode is still required for X Chat / DM content unless a read-DM-capable API integration is configured.
+
+## Configure API In Chat
+
+Users should trigger every flow from chat. They do not need to export environment variables manually. Ask the agent to run:
+
+```bash
+python3 twitter-digest/scripts/run_daily_digest.py --configure-api
+```
+
+The recommended path is OAuth authorization. The script asks for the X Developer App `Client ID`, opens the X authorization page, waits for the user to authorize the account, receives the local callback, exchanges it for a user-context access token, then saves it.
+
+The app's callback URL in X Developer Portal must match the redirect URI shown by the script, by default:
+
+```text
+http://127.0.0.1:8765/callback
+```
+
+If the user already has a user-context access token, they can choose the paste-token path. On macOS prompts appear as system dialogs; non-GUI terminals fall back to hidden terminal input. The token is saved to:
+
+```text
+twitter-digest/.state/api_config.json
+```
+
+The file is created with owner-only permissions where supported. Later runs of `run_daily_digest.py --source auto` read this saved config and use API automatically. To clear it:
+
+```bash
+python3 twitter-digest/scripts/configure_api.py --clear
+```
+
+If OAuth returns a refresh token, later daily runs refresh the saved access token automatically before collection.
+
+Chat flow summary:
+
+```text
+生成 X 日报       -> agent runs scripts/run_daily_digest.py
+配置 X API       -> agent runs scripts/run_daily_digest.py --configure-api
+清除 X API 配置  -> agent runs scripts/configure_api.py --clear
+调试浏览器       -> agent runs scripts/run_daily_digest.py --source browser --headed
+```
 
 ## Test DM Collection
 
