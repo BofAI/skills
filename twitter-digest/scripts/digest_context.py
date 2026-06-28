@@ -63,6 +63,7 @@ def summarize_current_run(data: dict[str, Any]) -> dict[str, Any]:
     return {
         "generated_at": generated_at,
         "date": generated_at[:10],
+        "source": str(data.get("source") or "browser"),
         "handle": clean_handle(data.get("handle")),
         "post_counts": post_counts,
         "dm_status": dm_status,
@@ -77,6 +78,7 @@ def build_digest_facts(data: dict[str, Any], summary: dict[str, Any]) -> dict[st
         "run": {
             "generated_at": data.get("generated_at"),
             "date": summary.get("date"),
+            "source": summary.get("source"),
             "timezone": local_timezone_name(),
         },
         "account": {
@@ -173,7 +175,7 @@ def build_digest_facts(data: dict[str, Any], summary: dict[str, Any]) -> dict[st
                         "cards": normalize_context_assets(item.get("cards")),
                     }
                 )
-    if (summary.get("dm_status") or "") in {"blocked_by_x_chat_passcode", "visible_threads_unopened", "no_visible_threads"}:
+    if (summary.get("dm_status") or "") in {"blocked_by_x_chat_passcode", "visible_threads_unopened", "no_visible_threads", "api_dm_unavailable"}:
         facts["data_gaps"].append(
             {
                 "source": "messages",
@@ -336,6 +338,7 @@ def render_digest_context(summary: dict[str, Any], facts: dict[str, Any]) -> str
             "",
             f"- date: `{summary.get('date')}`",
             f"- handle: `@{summary.get('handle') or ''}`",
+            f"- source: `{summary.get('source') or 'browser'}`",
             f"- context policy: {summary.get('context_policy')}",
             f"- DM status: `{summary.get('dm_status')}`",
             (
@@ -369,6 +372,7 @@ def render_digest_facts(facts: dict[str, Any]) -> str:
         "",
         f"- date: `{(facts.get('run') or {}).get('date')}`",
         f"- generated_at: `{(facts.get('run') or {}).get('generated_at')}`",
+        f"- source: `{(facts.get('run') or {}).get('source') or 'browser'}`",
         f"- timezone: `{(facts.get('run') or {}).get('timezone')}`",
         f"- account: `@{(facts.get('account') or {}).get('handle') or ''}`",
         "",
