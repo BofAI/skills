@@ -27,7 +27,7 @@ For chat usage, run the wrapper:
 python3 twitter-digest/scripts/run_daily_digest.py
 ```
 
-`run_daily_digest.py --source auto` uses a saved OAuth user-context token, `X_BEARER_TOKEN`, or `TWITTER_BEARER_TOKEN` when present; otherwise it uses the browser collector. Browser mode is still required for X Chat / DM content unless a read-DM-capable API integration is configured.
+`run_daily_digest.py --source auto` uses saved OAuth1/OAuth2 user-context credentials, `X_BEARER_TOKEN`, or `TWITTER_BEARER_TOKEN` when present; otherwise it uses the browser collector. API mode also tries `/2/dm_events` when DMs are requested; if the app/token lacks DM lookup permission, record the data gap and do not call it an empty inbox.
 
 If the user asks to configure API access, trigger the OAuth/user-token setup from chat:
 
@@ -42,6 +42,8 @@ This is an agent-triggered flow. It supports both paths:
 - OAuth2 path: if the user has an OAuth2 Client ID and callback URL, run `python3 twitter-digest/scripts/run_daily_digest.py --configure-api` and choose OAuth2 in the prompt.
 
 If a refresh token is saved, later daily runs refresh the access token automatically. Do not ask the user to export environment variables manually. App-only API keys are not enough for user-context home timeline access.
+
+After API setup succeeds once, future daily digest runs should not ask the user for credentials again. Run `scripts/run_daily_digest.py`; it reads `.state/api_config.json` automatically. OAuth1 credentials are reused directly. OAuth2 credentials are refreshed automatically when a refresh token is saved. Only rerun `--configure-api` when the saved credentials are missing, revoked, expired without refresh, or the user explicitly asks to change accounts/apps.
 
 If the user asks to clear API access, run:
 

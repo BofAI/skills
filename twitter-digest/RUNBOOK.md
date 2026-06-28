@@ -78,6 +78,12 @@ CONSUMER_SECRET
 
 `ACCESS_TOKEN` 和 `ACCESS_TOKEN_SECRET` 由授权流程生成。
 
+配置成功后，后续日报不再要求用户输入 key、secret、PIN 或重新授权。`run_daily_digest.py` 会读取 `.state/api_config.json`：
+
+- OAuth1：直接用保存的 access token / token secret 签名请求。
+- OAuth2：如果保存了 refresh token，access token 快过期时自动 refresh。
+- 如果 token 被撤销、权限变更、tier 不支持或 API 返回 401/403/429，脚本把 endpoint 错误写入 data gap，Agent 再提示用户是否重新配置。
+
 OAuth2 PKCE 仍可用，但只适合用户已配置 Client ID 和 callback URL 的 App：
 
 1. 用户选择 OAuth2。

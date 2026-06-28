@@ -232,7 +232,7 @@ def main() -> None:
     if include_dms:
         cmd.append("--include-dms")
     if source == "api" and include_dms:
-        print("API source selected. DM collection is limited; browser source is required for X Chat content.", flush=True)
+        print("API source selected. Trying X API DM lookup; permission or tier failures will be recorded as data gaps.", flush=True)
     if args.headed and source == "browser":
         cmd.append("--headed")
     if args.headless and source == "browser":
