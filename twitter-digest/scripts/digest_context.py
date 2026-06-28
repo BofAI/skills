@@ -68,7 +68,7 @@ def summarize_current_run(data: dict[str, Any]) -> dict[str, Any]:
         "post_counts": post_counts,
         "dm_status": dm_status,
         "dm_counts": dm_counts,
-        "context_policy": "No long-term memory. Final summary uses only this run's browser capture.",
+        "context_policy": "No long-term memory. Final summary uses only this run's current collector capture.",
     }
 
 

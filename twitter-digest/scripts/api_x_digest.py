@@ -156,12 +156,11 @@ def tweet_params(max_results: int, hours: int) -> dict[str, Any]:
 def dm_params(max_results: int, hours: int) -> dict[str, Any]:
     return {
         "max_results": max(10, min(100, max_results)),
-        "start_time": window_start(hours),
         "dm_event.fields": "id,text,event_type,created_at,dm_conversation_id,sender_id,participant_ids,attachments,referenced_tweets",
         "expansions": "sender_id,participant_ids,attachments.media_keys,referenced_tweets.id",
         "user.fields": "username,name",
         "media.fields": "url,preview_image_url,alt_text,type",
-        "tweet.fields": "created_at,author_id,text,entities",
+        "post.fields": "created_at,author_id,text,entities",
     }
 
 
