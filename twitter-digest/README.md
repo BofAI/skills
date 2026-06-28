@@ -68,7 +68,7 @@ There are three collection entry points:
 # Browser-only collector
 python3 twitter-digest/scripts/browser_x_digest.py --include-dms
 
-# API-only collector, requires OAuth user access token or --bearer-token
+# API-only collector, requires OAuth1/OAuth2 user-context credentials or --bearer-token
 X_BEARER_TOKEN=... python3 twitter-digest/scripts/api_x_digest.py --handle <handle>
 
 # Recommended upper-level wrapper
@@ -97,7 +97,23 @@ Users should trigger every flow from chat. They do not need to export environmen
 python3 twitter-digest/scripts/run_daily_digest.py --configure-api
 ```
 
-The recommended path is OAuth authorization. The script asks for the X Developer App `Client ID`, opens the X authorization page, waits for the user to authorize the account, receives the local callback, exchanges it for a user-context access token, then saves it.
+For a local user-owned X Developer App, the smooth path is OAuth 1.0a PIN authorization. The user only needs the app's API Key / Consumer Key and API Key Secret / Consumer Secret. Ask the agent to run:
+
+```bash
+python3 twitter-digest/scripts/run_daily_digest.py --configure-api
+```
+
+Then choose `OAuth1 PIN`. The script opens the X authorization page; after the user authorizes the app and pastes the PIN, the script exchanges it for the user's access token and access token secret.
+
+If the user already created an X Developer App and already has a user access token, use the direct token path:
+
+```bash
+python3 twitter-digest/scripts/run_daily_digest.py --configure-api-token
+```
+
+The script opens a hidden system prompt for the token, then asks for optional handle/user id and saves the config locally.
+
+OAuth2 authorization is optional when the user has an OAuth2 Client ID and wants to use the PKCE callback flow. The script asks for the X Developer App `Client ID`, opens the X authorization page, waits for the user to authorize the account, receives the local callback, exchanges it for a user-context access token, then saves it.
 
 The app's callback URL in X Developer Portal must match the redirect URI shown by the script, by default:
 
@@ -105,7 +121,7 @@ The app's callback URL in X Developer Portal must match the redirect URI shown b
 http://127.0.0.1:8765/callback
 ```
 
-If the user already has a user-context access token, they can choose the paste-token path. On macOS prompts appear as system dialogs; non-GUI terminals fall back to hidden terminal input. The token is saved to:
+On macOS prompts appear as system dialogs; non-GUI terminals fall back to hidden terminal input. The token is saved to:
 
 ```text
 twitter-digest/.state/api_config.json
@@ -123,6 +139,7 @@ Chat flow summary:
 
 ```text
 生成 X 日报       -> agent runs scripts/run_daily_digest.py
+输入 X token     -> agent runs scripts/run_daily_digest.py --configure-api-token
 配置 X API       -> agent runs scripts/run_daily_digest.py --configure-api
 清除 X API 配置  -> agent runs scripts/configure_api.py --clear
 调试浏览器       -> agent runs scripts/run_daily_digest.py --source browser --headed

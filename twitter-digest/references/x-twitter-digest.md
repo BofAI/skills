@@ -7,7 +7,7 @@ Use this reference when implementing, auditing, or troubleshooting the X/Twitter
 The data collection layer has three scripts:
 
 - `scripts/browser_x_digest.py`: local browser collector. It launches a dedicated Chromium profile at `twitter-digest/.state/chrome-profile`, reads X page DOM, and is required for X Chat / DM content.
-- `scripts/api_x_digest.py`: official API collector. It uses a saved OAuth user-context access token, `X_BEARER_TOKEN` / `TWITTER_BEARER_TOKEN`, or `--bearer-token` and writes the same `digest-input.*` shape as the browser collector.
+- `scripts/api_x_digest.py`: official API collector. It uses saved OAuth1/OAuth2 user-context credentials, `X_BEARER_TOKEN` / `TWITTER_BEARER_TOKEN`, or `--bearer-token` and writes the same `digest-input.*` shape as the browser collector.
 - `scripts/run_daily_digest.py`: upper wrapper. Default `--source auto` uses API when configured, otherwise browser.
 
 Browser mode:
@@ -24,7 +24,7 @@ API mode:
 - Reads the official reverse chronological home timeline when the token has user-context timeline access.
 - Records endpoint-level API failures as data gaps instead of silently treating them as empty pages.
 - DM content is recorded as a data gap unless a read-DM-capable API integration is configured.
-- Saved OAuth tokens are configured by the agent-triggered `run_daily_digest.py --configure-api` flow and refreshed automatically when possible.
+- Saved OAuth tokens are configured by the agent-triggered `run_daily_digest.py --configure-api` flow. OAuth1 PIN is the recommended path for user-owned local X Apps: the user provides only Consumer Key and Consumer Secret, authorizes the app, then pastes the PIN. OAuth2 tokens are refreshed automatically when a refresh token is saved.
 
 Chat-triggered API setup:
 

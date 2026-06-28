@@ -6,6 +6,7 @@ from __future__ import annotations
 import argparse
 import base64
 import getpass
+import hmac
 import hashlib
 from http.server import BaseHTTPRequestHandler, HTTPServer
 import json
@@ -25,6 +26,9 @@ API_CONFIG_PATH = STATE_DIR / "api_config.json"
 DEFAULT_API_BASE = "https://api.x.com/2"
 AUTHORIZE_URL = "https://x.com/i/oauth2/authorize"
 TOKEN_URL = "https://api.x.com/2/oauth2/token"
+OAUTH1_REQUEST_TOKEN_URL = "https://api.twitter.com/oauth/request_token"
+OAUTH1_AUTHORIZE_URL = "https://api.twitter.com/oauth/authorize"
+OAUTH1_ACCESS_TOKEN_URL = "https://api.twitter.com/oauth/access_token"
 DEFAULT_REDIRECT_URI = "http://127.0.0.1:8765/callback"
 DEFAULT_SCOPES = "tweet.read users.read follows.read offline.access"
 
@@ -33,9 +37,15 @@ def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--bearer-token", help="X API bearer token. Omit to prompt securely.")
     parser.add_argument("--oauth", action="store_true", help="Run OAuth 2.0 Authorization Code with PKCE to get a user-context access token.")
+    parser.add_argument("--oauth1", action="store_true", help="Run OAuth 1.0a PIN authorization to get user access token and token secret.")
     parser.add_argument("--paste-token", action="store_true", help="Paste an existing user access token instead of running OAuth.")
+    parser.add_argument("--paste-oauth1", action="store_true", help="Paste existing OAuth 1.0a consumer/user tokens.")
     parser.add_argument("--client-id", default="")
     parser.add_argument("--client-secret", default="", help="Optional OAuth client secret for confidential apps.")
+    parser.add_argument("--consumer-key", default="")
+    parser.add_argument("--consumer-secret", default="")
+    parser.add_argument("--access-token", default="")
+    parser.add_argument("--access-token-secret", default="")
     parser.add_argument("--redirect-uri", default=DEFAULT_REDIRECT_URI)
     parser.add_argument("--scopes", default=DEFAULT_SCOPES)
     parser.add_argument("--api-base", default=DEFAULT_API_BASE)
@@ -104,20 +114,30 @@ def apple_choice(prompt: str, buttons: list[str]) -> str | None:
 
 def choose_mode() -> str:
     choice = apple_choice(
-        "Configure X API access. OAuth authorization is recommended for home timeline and user-context data.",
-        ["Cancel", "Paste Token", "OAuth"],
+        "Configure X API access. OAuth1 PIN is recommended when you already created an X Developer App with API Key/Secret.",
+        ["Cancel", "Paste Token", "OAuth2", "OAuth1 PIN"],
     )
-    if choice == "OAuth":
-        return "oauth"
+    if choice == "OAuth1 PIN":
+        return "oauth1"
+    if choice == "OAuth2":
+        return "oauth2"
     if choice == "Paste Token":
         return "paste"
     if choice == "Cancel":
         raise SystemExit("API configuration cancelled.")
     print("Choose API configuration mode:")
-    print("1. OAuth authorization (recommended)")
-    print("2. Paste existing user access token")
+    print("1. OAuth 1.0a PIN authorization with API Key/Secret (recommended for local user-owned X Apps)")
+    print("2. OAuth 2.0 PKCE authorization with Client ID")
+    print("3. Paste existing OAuth2/user bearer token")
+    print("4. Paste existing OAuth1 tokens")
     value = input("Mode [1]: ").strip()
-    return "paste" if value == "2" else "oauth"
+    if value == "2":
+        return "oauth2"
+    if value == "3":
+        return "paste"
+    if value == "4":
+        return "paste_oauth1"
+    return "oauth1"
 
 
 def prompt_value(label: str, default: str = "", hidden: bool = False) -> str:
@@ -146,6 +166,124 @@ def pkce_pair() -> tuple[str, str]:
     digest = hashlib.sha256(verifier.encode("ascii")).digest()
     challenge = base64.urlsafe_b64encode(digest).decode("ascii").rstrip("=")
     return verifier, challenge
+
+
+def quote(value: str) -> str:
+    return urllib.parse.quote(str(value), safe="~")
+
+
+def oauth1_header(
+    method: str,
+    url: str,
+    consumer_key: str,
+    consumer_secret: str,
+    token: str = "",
+    token_secret: str = "",
+    extra_params: dict[str, str] | None = None,
+) -> str:
+    params = {
+        "oauth_consumer_key": consumer_key,
+        "oauth_nonce": secrets.token_urlsafe(24),
+        "oauth_signature_method": "HMAC-SHA1",
+        "oauth_timestamp": str(int(time.time())),
+        "oauth_version": "1.0",
+    }
+    if token:
+        params["oauth_token"] = token
+    if extra_params:
+        params.update(extra_params)
+    parsed = urllib.parse.urlparse(url)
+    base_url = f"{parsed.scheme}://{parsed.netloc}{parsed.path}"
+    query_pairs = urllib.parse.parse_qsl(parsed.query, keep_blank_values=True)
+    signing_pairs = query_pairs + sorted(params.items())
+    normalized = "&".join(f"{quote(k)}={quote(v)}" for k, v in sorted(signing_pairs))
+    signature_base = "&".join([method.upper(), quote(base_url), quote(normalized)])
+    signing_key = f"{quote(consumer_secret)}&{quote(token_secret)}"
+    signature = base64.b64encode(hmac.new(signing_key.encode("utf-8"), signature_base.encode("utf-8"), hashlib.sha1).digest()).decode("ascii")
+    params["oauth_signature"] = signature
+    return "OAuth " + ", ".join(f'{quote(k)}="{quote(v)}"' for k, v in sorted(params.items()))
+
+
+def oauth1_post_form(
+    url: str,
+    consumer_key: str,
+    consumer_secret: str,
+    token: str = "",
+    token_secret: str = "",
+    extra_params: dict[str, str] | None = None,
+) -> dict[str, str]:
+    headers = {
+        "Authorization": oauth1_header("POST", url, consumer_key, consumer_secret, token, token_secret, extra_params),
+        "User-Agent": "twitter-digest/1.0",
+    }
+    request = urllib.request.Request(url, data=b"", headers=headers, method="POST")
+    try:
+        with urllib.request.urlopen(request, timeout=30) as response:
+            text = response.read().decode("utf-8")
+    except Exception as exc:
+        raise SystemExit(f"OAuth1 request failed: {exc}") from exc
+    return {key: values[0] for key, values in urllib.parse.parse_qs(text).items() if values}
+
+
+def run_oauth1_pin_flow(args: argparse.Namespace, existing: dict[str, str]) -> dict[str, str]:
+    consumer_key = args.consumer_key or prompt_value("X API Key / Consumer Key", default=str(existing.get("consumer_key") or ""))
+    consumer_secret = args.consumer_secret or prompt_value("X API Key Secret / Consumer Secret", hidden=True)
+    if not consumer_key or not consumer_secret:
+        raise SystemExit("Consumer key and consumer secret are required for OAuth1 authorization.")
+    request_token = oauth1_post_form(
+        OAUTH1_REQUEST_TOKEN_URL,
+        consumer_key,
+        consumer_secret,
+        extra_params={"oauth_callback": "oob"},
+    )
+    resource_token = str(request_token.get("oauth_token") or "")
+    resource_secret = str(request_token.get("oauth_token_secret") or "")
+    if not resource_token or not resource_secret:
+        raise SystemExit(f"OAuth1 request token response was incomplete: {request_token}")
+    authorization_url = OAUTH1_AUTHORIZE_URL + "?" + urllib.parse.urlencode({"oauth_token": resource_token})
+    print("Opening X OAuth1 authorization page...", flush=True)
+    print(f"If the browser does not open, visit: {authorization_url}", flush=True)
+    webbrowser.open(authorization_url)
+    pin = prompt_value("Paste the PIN shown by X after authorizing the app")
+    if not pin:
+        raise SystemExit("No OAuth verifier PIN provided. API configuration was not changed.")
+    access = oauth1_post_form(
+        OAUTH1_ACCESS_TOKEN_URL,
+        consumer_key,
+        consumer_secret,
+        token=resource_token,
+        token_secret=resource_secret,
+        extra_params={"oauth_verifier": pin.strip()},
+    )
+    access_token = str(access.get("oauth_token") or "")
+    access_token_secret = str(access.get("oauth_token_secret") or "")
+    if not access_token or not access_token_secret:
+        raise SystemExit(f"OAuth1 access token response was incomplete: {access}")
+    return {
+        "auth_method": "oauth1a_user_context",
+        "consumer_key": consumer_key.strip(),
+        "consumer_secret": consumer_secret.strip(),
+        "access_token": access_token,
+        "access_token_secret": access_token_secret,
+        "user_id": str(access.get("user_id") or ""),
+        "handle": str(access.get("screen_name") or ""),
+    }
+
+
+def paste_oauth1_tokens(args: argparse.Namespace, existing: dict[str, str]) -> dict[str, str]:
+    consumer_key = args.consumer_key or prompt_value("X API Key / Consumer Key", default=str(existing.get("consumer_key") or ""))
+    consumer_secret = args.consumer_secret or prompt_value("X API Key Secret / Consumer Secret", hidden=True)
+    access_token = args.access_token or prompt_value("User access token", default=str(existing.get("access_token") or ""), hidden=True)
+    access_token_secret = args.access_token_secret or prompt_value("User access token secret", hidden=True)
+    if not all([consumer_key, consumer_secret, access_token, access_token_secret]):
+        raise SystemExit("Consumer key, consumer secret, access token, and access token secret are required.")
+    return {
+        "auth_method": "oauth1a_user_context",
+        "consumer_key": consumer_key.strip(),
+        "consumer_secret": consumer_secret.strip(),
+        "access_token": access_token.strip(),
+        "access_token_secret": access_token_secret.strip(),
+    }
 
 
 class OAuthCallbackHandler(BaseHTTPRequestHandler):
@@ -300,7 +438,8 @@ def main() -> None:
             json.dumps(
                 {
                     "api_config": str(API_CONFIG_PATH),
-                    "configured": bool(config.get("bearer_token")),
+                    "configured": bool(config.get("bearer_token") or (config.get("access_token") and config.get("access_token_secret"))),
+                    "auth_method": config.get("auth_method") or "",
                     "api_base": config.get("api_base") or "",
                     "handle": config.get("handle") or "",
                     "user_id": config.get("user_id") or "",
@@ -312,10 +451,24 @@ def main() -> None:
         return
 
     existing = load_api_config()
-    mode = "oauth" if args.oauth else "paste" if args.paste_token or args.bearer_token else choose_mode()
-    if mode == "oauth":
+    mode = (
+        "oauth1"
+        if args.oauth1
+        else "oauth2"
+        if args.oauth
+        else "paste_oauth1"
+        if args.paste_oauth1
+        else "paste"
+        if args.paste_token or args.bearer_token
+        else choose_mode()
+    )
+    if mode == "oauth1":
+        token_config = run_oauth1_pin_flow(args, existing)
+    elif mode == "oauth2":
         token_config = run_oauth_flow(args, existing)
         bearer_token = token_config["bearer_token"]
+    elif mode == "paste_oauth1":
+        token_config = paste_oauth1_tokens(args, existing)
     else:
         bearer_token = args.bearer_token or prompt_value("Paste your OAuth user access token", hidden=True)
         if not bearer_token:
@@ -336,6 +489,7 @@ def main() -> None:
             {
                 "api_config": str(API_CONFIG_PATH),
                 "configured": True,
+                "auth_method": config.get("auth_method") or "",
                 "api_base": config["api_base"],
                 "handle": config["handle"],
                 "user_id": config["user_id"],

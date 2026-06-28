@@ -4,9 +4,13 @@
 from __future__ import annotations
 
 import argparse
+import base64
 import datetime as dt
+import hashlib
+import hmac
 import json
 import os
+import secrets
 import time
 import urllib.error
 import urllib.parse
@@ -26,6 +30,10 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--handle", help="Your X handle, with or without @.")
     parser.add_argument("--user-id", default=os.environ.get("X_USER_ID") or os.environ.get("TWITTER_USER_ID") or "")
     parser.add_argument("--bearer-token", default=os.environ.get("X_BEARER_TOKEN") or os.environ.get("TWITTER_BEARER_TOKEN") or "")
+    parser.add_argument("--consumer-key", default=os.environ.get("X_CONSUMER_KEY") or os.environ.get("TWITTER_CONSUMER_KEY") or "")
+    parser.add_argument("--consumer-secret", default=os.environ.get("X_CONSUMER_SECRET") or os.environ.get("TWITTER_CONSUMER_SECRET") or "")
+    parser.add_argument("--access-token", default=os.environ.get("X_ACCESS_TOKEN") or os.environ.get("TWITTER_ACCESS_TOKEN") or "")
+    parser.add_argument("--access-token-secret", default=os.environ.get("X_ACCESS_TOKEN_SECRET") or os.environ.get("TWITTER_ACCESS_TOKEN_SECRET") or "")
     parser.add_argument("--api-base", default=os.environ.get("X_API_BASE_URL") or API_BASE)
     parser.add_argument("--keywords", default="", help="Comma-separated keywords or queries for optional search.")
     parser.add_argument("--out", default=str(default_state_dir / "run"))
@@ -37,15 +45,68 @@ def parse_args() -> argparse.Namespace:
 
 
 def api_is_configured() -> bool:
-    return bool(os.environ.get("X_BEARER_TOKEN") or os.environ.get("TWITTER_BEARER_TOKEN"))
+    return bool(
+        os.environ.get("X_BEARER_TOKEN")
+        or os.environ.get("TWITTER_BEARER_TOKEN")
+        or (
+            os.environ.get("X_CONSUMER_KEY")
+            and os.environ.get("X_CONSUMER_SECRET")
+            and os.environ.get("X_ACCESS_TOKEN")
+            and os.environ.get("X_ACCESS_TOKEN_SECRET")
+        )
+    )
 
 
-def api_get(base_url: str, token: str, path: str, params: dict[str, Any] | None = None) -> dict[str, Any]:
+def quote(value: str) -> str:
+    return urllib.parse.quote(str(value), safe="~")
+
+
+def oauth1_header(method: str, url: str, oauth1: dict[str, str]) -> str:
+    params = {
+        "oauth_consumer_key": oauth1["consumer_key"],
+        "oauth_nonce": secrets.token_urlsafe(24),
+        "oauth_signature_method": "HMAC-SHA1",
+        "oauth_timestamp": str(int(time.time())),
+        "oauth_token": oauth1["access_token"],
+        "oauth_version": "1.0",
+    }
+    parsed = urllib.parse.urlparse(url)
+    base_url = f"{parsed.scheme}://{parsed.netloc}{parsed.path}"
+    query_pairs = urllib.parse.parse_qsl(parsed.query, keep_blank_values=True)
+    signing_pairs = query_pairs + list(params.items())
+    normalized = "&".join(f"{quote(k)}={quote(v)}" for k, v in sorted(signing_pairs))
+    signature_base = "&".join([method.upper(), quote(base_url), quote(normalized)])
+    signing_key = f"{quote(oauth1['consumer_secret'])}&{quote(oauth1['access_token_secret'])}"
+    signature = base64.b64encode(hmac.new(signing_key.encode("utf-8"), signature_base.encode("utf-8"), hashlib.sha1).digest()).decode("ascii")
+    params["oauth_signature"] = signature
+    return "OAuth " + ", ".join(f'{quote(k)}="{quote(v)}"' for k, v in sorted(params.items()))
+
+
+def build_oauth1_config(args: argparse.Namespace) -> dict[str, str]:
+    required = {
+        "consumer_key": args.consumer_key,
+        "consumer_secret": args.consumer_secret,
+        "access_token": args.access_token,
+        "access_token_secret": args.access_token_secret,
+    }
+    return {key: str(value) for key, value in required.items() if value}
+
+
+def auth_headers(args: argparse.Namespace, url: str) -> dict[str, str]:
+    if args.bearer_token:
+        return {"Authorization": f"Bearer {args.bearer_token}", "User-Agent": "twitter-digest/1.0"}
+    oauth1 = build_oauth1_config(args)
+    if len(oauth1) == 4:
+        return {"Authorization": oauth1_header("GET", url, oauth1), "User-Agent": "twitter-digest/1.0"}
+    return {"User-Agent": "twitter-digest/1.0"}
+
+
+def api_get(args: argparse.Namespace, path: str, params: dict[str, Any] | None = None) -> dict[str, Any]:
     query = urllib.parse.urlencode({k: v for k, v in (params or {}).items() if v is not None and v != ""})
-    url = base_url.rstrip("/") + path
+    url = args.api_base.rstrip("/") + path
     if query:
         url += "?" + query
-    request = urllib.request.Request(url, headers={"Authorization": f"Bearer {token}", "User-Agent": "twitter-digest/1.0"})
+    request = urllib.request.Request(url, headers=auth_headers(args, url))
     try:
         with urllib.request.urlopen(request, timeout=30) as response:
             return json.loads(response.read().decode("utf-8"))
@@ -56,19 +117,19 @@ def api_get(base_url: str, token: str, path: str, params: dict[str, Any] | None 
         raise RuntimeError(f"GET {path} failed: {exc}") from exc
 
 
-def resolve_user(base_url: str, token: str, handle: str | None, user_id: str | None) -> dict[str, str]:
+def resolve_user(args: argparse.Namespace, handle: str | None, user_id: str | None) -> dict[str, str]:
     if user_id:
-        result = api_get(base_url, token, f"/users/{user_id}", {"user.fields": "username,name"})
+        result = api_get(args, f"/users/{user_id}", {"user.fields": "username,name"})
         data = result.get("data") if isinstance(result, dict) else None
         if isinstance(data, dict):
             return {"id": str(data.get("id") or user_id), "username": str(data.get("username") or handle or ""), "name": str(data.get("name") or "")}
     if handle:
         clean = handle.lstrip("@")
-        result = api_get(base_url, token, f"/users/by/username/{urllib.parse.quote(clean)}", {"user.fields": "username,name"})
+        result = api_get(args, f"/users/by/username/{urllib.parse.quote(clean)}", {"user.fields": "username,name"})
         data = result.get("data") if isinstance(result, dict) else None
         if isinstance(data, dict):
             return {"id": str(data.get("id") or ""), "username": str(data.get("username") or clean), "name": str(data.get("name") or "")}
-    result = api_get(base_url, token, "/users/me", {"user.fields": "username,name"})
+    result = api_get(args, "/users/me", {"user.fields": "username,name"})
     data = result.get("data") if isinstance(result, dict) else None
     if isinstance(data, dict):
         return {"id": str(data.get("id") or ""), "username": str(data.get("username") or ""), "name": str(data.get("name") or "")}
@@ -92,8 +153,7 @@ def tweet_params(max_results: int, hours: int) -> dict[str, Any]:
 
 
 def collect_paginated(
-    base_url: str,
-    token: str,
+    args: argparse.Namespace,
     path: str,
     params: dict[str, Any],
     max_items: int,
@@ -108,7 +168,7 @@ def collect_paginated(
         if next_token:
             page_params[page_token_name] = next_token
         try:
-            result = api_get(base_url, token, path, page_params)
+            result = api_get(args, path, page_params)
         except RuntimeError as exc:
             errors.append(str(exc))
             break
@@ -201,9 +261,9 @@ def page(kind: str, url: str, items: list[dict[str, Any]], note: str = "", error
 
 
 def collect_api(args: argparse.Namespace) -> dict[str, Any]:
-    if not args.bearer_token:
-        raise SystemExit("X API is not configured. Set X_BEARER_TOKEN or TWITTER_BEARER_TOKEN.")
-    user = resolve_user(args.api_base, args.bearer_token, args.handle, args.user_id)
+    if not args.bearer_token and len(build_oauth1_config(args)) != 4:
+        raise SystemExit("X API is not configured. Set X_BEARER_TOKEN or OAuth1 X_CONSUMER_KEY/X_CONSUMER_SECRET/X_ACCESS_TOKEN/X_ACCESS_TOKEN_SECRET.")
+    user = resolve_user(args, args.handle, args.user_id)
     handle = user.get("username") or (args.handle or "").lstrip("@")
     user_id = user.get("id") or args.user_id
     max_items = max(1, int(args.max_public_items))
@@ -211,8 +271,7 @@ def collect_api(args: argparse.Namespace) -> dict[str, Any]:
     pages: list[dict[str, Any]] = []
 
     mentions_raw, mentions_includes, mentions_errors = collect_paginated(
-        args.api_base,
-        args.bearer_token,
+        args,
         f"/users/{user_id}/mentions",
         tweet_params(max_items, hours),
         max_items,
@@ -220,8 +279,7 @@ def collect_api(args: argparse.Namespace) -> dict[str, Any]:
     pages.append(page("mentions_notifications", f"{args.api_base}/users/{user_id}/mentions", normalize_tweets(mentions_raw, mentions_includes, "mentions"), error="; ".join(mentions_errors)))
 
     tweets_raw, tweets_includes, tweets_errors = collect_paginated(
-        args.api_base,
-        args.bearer_token,
+        args,
         f"/users/{user_id}/tweets",
         tweet_params(max_items, hours),
         max_items,
@@ -231,8 +289,7 @@ def collect_api(args: argparse.Namespace) -> dict[str, Any]:
     search_query = f"@{handle} -from:{handle}" if handle else ""
     if search_query:
         search_raw, search_includes, search_errors = collect_paginated(
-            args.api_base,
-            args.bearer_token,
+            args,
             "/tweets/search/recent",
             {**tweet_params(max_items, hours), "query": search_query},
             max_items,
@@ -242,8 +299,7 @@ def collect_api(args: argparse.Namespace) -> dict[str, Any]:
         pages.append(page("mentions_search", "", [], note="Skipped because handle was unavailable."))
 
     home_raw, home_includes, home_errors = collect_paginated(
-        args.api_base,
-        args.bearer_token,
+        args,
         f"/users/{user_id}/timelines/reverse_chronological",
         tweet_params(max_items, hours),
         max_items,
@@ -263,8 +319,7 @@ def collect_api(args: argparse.Namespace) -> dict[str, Any]:
 
     for index, keyword in enumerate([k.strip() for k in args.keywords.split(",") if k.strip()], start=1):
         raw, includes, errors = collect_paginated(
-            args.api_base,
-            args.bearer_token,
+            args,
             "/tweets/search/recent",
             {**tweet_params(max_items, hours), "query": keyword},
             max_items,
@@ -290,6 +345,7 @@ def collect_api(args: argparse.Namespace) -> dict[str, Any]:
     return {
         "generated_at": dt.datetime.now().astimezone().isoformat(),
         "source": "api",
+        "auth_method": "oauth1a_user_context" if len(build_oauth1_config(args)) == 4 and not args.bearer_token else "bearer",
         "api_base": args.api_base,
         "profile_dir": "",
         "handle": handle,
