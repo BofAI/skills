@@ -115,25 +115,25 @@ def apple_choice(prompt: str, buttons: list[str]) -> str | None:
 
 def choose_mode() -> str:
     choice = apple_choice(
-        "Configure X API access. OAuth1 PIN is recommended when you already created an X Developer App with API Key/Secret.",
-        ["Cancel", "Paste Token", "OAuth2", "OAuth1 PIN"],
+        "配置 X API。推荐选择 OAuth1 PIN：用户只需要准备 X Developer App 的 API Key 和 API Key Secret。",
+        ["取消", "粘贴 Token", "OAuth2", "OAuth1 PIN"],
     )
     if choice == "OAuth1 PIN":
         return "oauth1"
     if choice == "OAuth2":
         return "oauth2"
-    if choice == "Paste Token":
+    if choice == "粘贴 Token":
         return "paste"
-    if choice == "Cancel":
+    if choice == "取消":
         raise SystemExit("API configuration cancelled.")
-    print("Choose API configuration mode:")
-    print("1. OAuth 1.0a PIN authorization with API Key/Secret (recommended for local user-owned X Apps)")
-    print("2. OAuth 2.0 PKCE authorization with Client ID")
-    print("3. Paste existing OAuth2/user bearer token")
-    print("4. Paste existing OAuth1 tokens")
+    print("请选择 X API 配置方式：")
+    print("1. OAuth 1.0a PIN 授权：输入 API Key / API Key Secret，推荐")
+    print("2. OAuth 2.0 PKCE 授权：输入 Client ID，需要配置 callback")
+    print("3. 粘贴已有 OAuth2/user bearer token")
+    print("4. 粘贴已有 OAuth1 四件套")
     if not sys.stdin.isatty():
-        raise SystemExit("No interactive terminal is available. Run through run_daily_digest.py --configure-api so it can open a Terminal window.")
-    value = input("Mode [1]: ").strip()
+        raise SystemExit("当前没有可交互终端。请通过 run_daily_digest.py --configure-api 触发，它会打开 Terminal 窗口。")
+    value = input("请选择 [默认 1]: ").strip()
     if value == "2":
         return "oauth2"
     if value == "3":
@@ -151,7 +151,7 @@ def prompt_value(label: str, default: str = "", hidden: bool = False) -> str:
     if value is not None:
         return value or default
     if not sys.stdin.isatty():
-        raise SystemExit("No interactive terminal is available. Run through run_daily_digest.py --configure-api so it can open a Terminal window.")
+        raise SystemExit("当前没有可交互终端。请通过 run_daily_digest.py --configure-api 触发，它会打开 Terminal 窗口。")
     if hidden:
         value = getpass.getpass(f"{prompt}: ")
     else:
@@ -231,8 +231,8 @@ def oauth1_post_form(
 
 
 def run_oauth1_pin_flow(args: argparse.Namespace, existing: dict[str, str]) -> dict[str, str]:
-    consumer_key = args.consumer_key or prompt_value("X API Key / Consumer Key", default=str(existing.get("consumer_key") or ""))
-    consumer_secret = args.consumer_secret or prompt_value("X API Key Secret / Consumer Secret", hidden=True)
+    consumer_key = args.consumer_key or prompt_value("请输入 X API Key / Consumer Key", default=str(existing.get("consumer_key") or ""))
+    consumer_secret = args.consumer_secret or prompt_value("请输入 X API Key Secret / Consumer Secret", hidden=True)
     if not consumer_key or not consumer_secret:
         raise SystemExit("Consumer key and consumer secret are required for OAuth1 authorization.")
     request_token = oauth1_post_form(
@@ -246,10 +246,10 @@ def run_oauth1_pin_flow(args: argparse.Namespace, existing: dict[str, str]) -> d
     if not resource_token or not resource_secret:
         raise SystemExit(f"OAuth1 request token response was incomplete: {request_token}")
     authorization_url = OAUTH1_AUTHORIZE_URL + "?" + urllib.parse.urlencode({"oauth_token": resource_token})
-    print("Opening X OAuth1 authorization page...", flush=True)
-    print(f"If the browser does not open, visit: {authorization_url}", flush=True)
+    print("正在打开 X OAuth1 授权页面...", flush=True)
+    print(f"如果浏览器没有自动打开，请手动访问：{authorization_url}", flush=True)
     webbrowser.open(authorization_url)
-    pin = prompt_value("Paste the PIN shown by X after authorizing the app")
+    pin = prompt_value("授权完成后，请粘贴 X 页面显示的 PIN")
     if not pin:
         raise SystemExit("No OAuth verifier PIN provided. API configuration was not changed.")
     access = oauth1_post_form(
@@ -352,11 +352,11 @@ def exchange_code_for_token(
 
 
 def run_oauth_flow(args: argparse.Namespace, existing: dict[str, str]) -> dict[str, str]:
-    client_id = args.client_id or prompt_value("X OAuth Client ID", default=str(existing.get("client_id") or ""))
+    client_id = args.client_id or prompt_value("请输入 X OAuth Client ID", default=str(existing.get("client_id") or ""))
     if not client_id:
         raise SystemExit("Client ID is required for OAuth authorization.")
     client_secret = args.client_secret or prompt_value(
-        "X OAuth Client Secret, optional for public PKCE apps",
+        "请输入 X OAuth Client Secret，可选；public PKCE app 可留空",
         default=str(existing.get("client_secret") or ""),
         hidden=True,
     )
@@ -374,8 +374,8 @@ def run_oauth_flow(args: argparse.Namespace, existing: dict[str, str]) -> dict[s
         "code_challenge_method": "S256",
     }
     authorize_url = AUTHORIZE_URL + "?" + urllib.parse.urlencode(params)
-    print("Opening X OAuth authorization page...", flush=True)
-    print(f"Redirect URI must be configured in the X Developer App: {redirect_uri}", flush=True)
+    print("正在打开 X OAuth 授权页面...", flush=True)
+    print(f"请确认 X Developer App 已配置这个 Redirect URI：{redirect_uri}", flush=True)
     webbrowser.open(authorize_url)
     callback = wait_for_callback(redirect_uri)
     if callback.get("state") != state:
@@ -475,7 +475,7 @@ def main() -> None:
     elif mode == "paste_oauth1":
         token_config = paste_oauth1_tokens(args, existing)
     else:
-        bearer_token = args.bearer_token or prompt_value("Paste your OAuth user access token", hidden=True)
+        bearer_token = args.bearer_token or prompt_value("请粘贴 OAuth user access token", hidden=True)
         if not bearer_token:
             raise SystemExit("No access token provided. API configuration was not changed.")
         token_config = {"bearer_token": bearer_token.strip(), "auth_method": "pasted_user_access_token"}

@@ -11,6 +11,7 @@ import platform
 import subprocess
 import shlex
 import sys
+import tempfile
 import time
 import urllib.parse
 import urllib.request
@@ -160,26 +161,29 @@ def open_config_in_terminal(extra_args: list[str]) -> bool:
     if platform.system() != "Darwin":
         return False
     script = Path(__file__).with_name("configure_api.py")
-    command_parts = [
-        "cd",
-        shlex.quote(str(Path(__file__).resolve().parents[1])),
-        "&&",
-        shlex.quote(sys.executable),
-        shlex.quote(str(script)),
-        *[shlex.quote(arg) for arg in extra_args],
-        ";",
-        "echo",
-        ";",
-        "read -n 1 -s -r -p 'Configuration finished. Press any key to close this window...'",
-    ]
-    shell_command = " ".join(command_parts)
-    apple_script = f'tell application "Terminal" to do script {json.dumps(shell_command)}'
+    command_path = Path(tempfile.gettempdir()) / "twitter-digest-config.command"
+    shell_command = "\n".join(
+        [
+            "#!/bin/zsh",
+            f"cd {shlex.quote(str(Path(__file__).resolve().parents[1]))}",
+            "echo 'X API 配置向导'",
+            "echo '默认推荐：OAuth1 PIN，只需要 X Developer App 的 API Key 和 API Key Secret。'",
+            "echo",
+            " ".join([shlex.quote(sys.executable), shlex.quote(str(script)), *[shlex.quote(arg) for arg in extra_args]]),
+            "echo",
+            "echo '配置流程已结束。按任意键关闭这个窗口...'",
+            "read -k 1",
+            "",
+        ]
+    )
     try:
-        subprocess.run(["osascript", "-e", apple_script], check=True)
-    except (FileNotFoundError, subprocess.CalledProcessError):
+        command_path.write_text(shell_command, encoding="utf-8")
+        command_path.chmod(0o700)
+        subprocess.run(["open", "-a", "Terminal", str(command_path)], check=True)
+    except (OSError, subprocess.CalledProcessError):
         return False
-    print("Opened a Terminal window for X API configuration.", flush=True)
-    print(f"Config will be saved under: {display_path(Path(__file__).resolve().parents[1] / '.state' / 'api_config.json')}", flush=True)
+    print("已打开 Terminal 窗口用于配置 X API。", flush=True)
+    print(f"配置会保存到：{display_path(Path(__file__).resolve().parents[1] / '.state' / 'api_config.json')}", flush=True)
     return True
 
 
