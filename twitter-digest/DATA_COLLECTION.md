@@ -42,7 +42,9 @@ scripts/api_x_digest.py
 职责：
 
 - 使用 `X_BEARER_TOKEN` / `TWITTER_BEARER_TOKEN` 或 `--bearer-token`。
-- 更推荐使用 `scripts/run_daily_digest.py --configure-api` 走 OAuth 用户授权，由脚本保存 user-context access token。
+- 主路径是 OAuth 1.0a PIN：用户只需要准备 X App 的 `CONSUMER_KEY` 和 `CONSUMER_SECRET`，使用 `scripts/run_daily_digest.py --configure-api` 让脚本打开授权页并换取 user access token / token secret。
+- 如果用户已经有 user access token，使用 `scripts/run_daily_digest.py --configure-api-token` 由脚本安全保存。
+- 如果用户使用 OAuth2 App，也可以用 `scripts/run_daily_digest.py --configure-api` 里的 OAuth2 PKCE 路径保存 user-context access token。
 - 读取 home timeline：`/2/users/:id/timelines/reverse_chronological`。
 - 读取用户公开发帖。
 - 读取 mentions。
@@ -73,9 +75,9 @@ scripts/run_daily_digest.py
 - 统一入口。
 - 提供 `--configure-api`，由 Agent 在对话里触发 OAuth 配置。
 - 默认 `--source auto`。
-- 如果检测到环境变量 token 或 `.state/api_config.json` 里保存的 OAuth user access token，走 API 抓取。
+- 如果检测到环境变量 token，或 `.state/api_config.json` 里保存的 OAuth1/OAuth2 user-context credentials，走 API 抓取。
 - 如果没有 API token，走浏览器抓取。
-- 如果 OAuth access token 快过期且保存了 refresh token，自动刷新后再抓取。
+- 如果 OAuth2 access token 快过期且保存了 refresh token，自动刷新后再抓取。OAuth1 token 通常不需要 refresh。
 - 抓取完成后调用 `digest_context.py` 生成 `digest-context.*`。
 
 选择逻辑：
@@ -83,7 +85,7 @@ scripts/run_daily_digest.py
 ```text
 --source api      -> 强制 API
 --source browser  -> 强制浏览器
---source auto     -> 有 X_BEARER_TOKEN/TWITTER_BEARER_TOKEN 或已保存 OAuth token 用 API，否则浏览器
+--source auto     -> 有 X_BEARER_TOKEN/TWITTER_BEARER_TOKEN 或已保存 OAuth1/OAuth2 token 用 API，否则浏览器
 ```
 
 ## 对话触发流程
@@ -97,15 +99,27 @@ Agent：运行 scripts/run_daily_digest.py
 Agent：读取 digest-context.md 写中文日报
 ```
 
-配置 API：
+配置 API，已有 token：
+
+```text
+用户：输入 X token / 我已经有 token
+Agent：运行 scripts/run_daily_digest.py --configure-api-token
+脚本：弹出隐藏输入框
+用户：粘贴 user access token
+脚本：保存 token 到 .state/api_config.json
+后续：run_daily_digest.py --source auto 自动走 API
+```
+
+配置 API，OAuth1 PIN 授权：
 
 ```text
 用户：配置 X API
 Agent：运行 scripts/run_daily_digest.py --configure-api
-脚本：弹出 OAuth / Paste Token 选择
-用户：选择 OAuth，输入 X Developer App Client ID
-脚本：打开 X 授权页，用户在浏览器里授权
-脚本：本地 callback 接收授权码，换取 user-context access token 并保存
+脚本：弹出授权方式选择
+用户：选择 OAuth1 PIN，输入 CONSUMER_KEY 和 CONSUMER_SECRET
+脚本：打开 X 授权页
+用户：在浏览器里授权 app，复制 X 显示的 PIN
+脚本：用 PIN 换取 access token 和 access token secret 并保存
 后续：run_daily_digest.py --source auto 自动走 API
 ```
 

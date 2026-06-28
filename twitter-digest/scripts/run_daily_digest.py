@@ -34,6 +34,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--out", default=str(DEFAULT_OUT_DIR))
     parser.add_argument("--source", choices=("auto", "browser", "api"), default="auto", help="Data collection source. auto uses API when configured, otherwise browser.")
     parser.add_argument("--configure-api", action="store_true", help="Open a secure prompt to save X API credentials, then exit.")
+    parser.add_argument("--configure-api-token", action="store_true", help="Open a secure prompt to paste an existing X user access token, then exit.")
     parser.add_argument("--api-base", default=os.environ.get("X_API_BASE_URL") or "")
     parser.add_argument("--user-id", default=os.environ.get("X_USER_ID") or os.environ.get("TWITTER_USER_ID") or "")
     parser.add_argument("--bearer-token", default=os.environ.get("X_BEARER_TOKEN") or os.environ.get("TWITTER_BEARER_TOKEN") or "")
@@ -146,10 +147,24 @@ def choose_source(requested: str, bearer_token: str) -> str:
     return "api" if bool(bearer_token) else "browser"
 
 
+def api_configured(config: dict, bearer_token: str) -> bool:
+    if bearer_token:
+        return True
+    return bool(
+        config.get("consumer_key")
+        and config.get("consumer_secret")
+        and config.get("access_token")
+        and config.get("access_token_secret")
+    )
+
+
 def main() -> None:
     args = parse_args()
     if args.configure_api:
         subprocess.run([sys.executable, str(Path(__file__).with_name("configure_api.py"))], check=True)
+        return
+    if args.configure_api_token:
+        subprocess.run([sys.executable, str(Path(__file__).with_name("configure_api.py")), "--paste-token"], check=True)
         return
     if args.save_default:
         save_config(args.handle, args.account_name)
@@ -162,7 +177,7 @@ def main() -> None:
     api_base = args.api_base or str(api_config.get("api_base") or "https://api.x.com/2")
     user_id = args.user_id or str(api_config.get("user_id") or "")
     handle = (args.handle or api_config.get("handle") or config.get("handle") or "").lstrip("@")
-    source = choose_source(args.source, bearer_token)
+    source = args.source if args.source != "auto" else ("api" if api_configured(api_config, bearer_token) else "browser")
     script = Path(__file__).with_name("api_x_digest.py" if source == "api" else "browser_x_digest.py")
     cmd = [
         sys.executable,
@@ -178,10 +193,17 @@ def main() -> None:
     ]
     if source == "api":
         cmd.extend(["--api-base", api_base])
+        child_env = os.environ.copy()
         if bearer_token:
-            child_env = {**os.environ, "X_BEARER_TOKEN": bearer_token}
-        else:
-            child_env = os.environ.copy()
+            child_env["X_BEARER_TOKEN"] = bearer_token
+        for env_name, config_key in (
+            ("X_CONSUMER_KEY", "consumer_key"),
+            ("X_CONSUMER_SECRET", "consumer_secret"),
+            ("X_ACCESS_TOKEN", "access_token"),
+            ("X_ACCESS_TOKEN_SECRET", "access_token_secret"),
+        ):
+            if api_config.get(config_key):
+                child_env[env_name] = str(api_config[config_key])
         if user_id:
             cmd.extend(["--user-id", user_id])
     else:
