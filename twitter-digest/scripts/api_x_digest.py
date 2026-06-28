@@ -370,6 +370,18 @@ def normalize_dm_events(raw: list[dict[str, Any]], includes: dict[str, Any], cur
     }
 
 
+def filter_events_by_window(raw: list[dict[str, Any]], hours: int) -> list[dict[str, Any]]:
+    cutoff = dt.datetime.now(dt.timezone.utc) - dt.timedelta(hours=max(1, hours))
+    filtered = []
+    for event in raw:
+        if not isinstance(event, dict):
+            continue
+        event_time = parse_time(event.get("created_at"))
+        if event_time and event_time >= cutoff:
+            filtered.append(event)
+    return filtered
+
+
 def page(kind: str, url: str, items: list[dict[str, Any]], note: str = "", error: str = "") -> dict[str, Any]:
     result: dict[str, Any] = {"kind": kind, "url": url, "items": items}
     if note:
@@ -453,7 +465,8 @@ def collect_api(args: argparse.Namespace) -> dict[str, Any]:
             dm_params(max(10, int(args.dm_max_events)), hours),
             max(1, int(args.dm_max_events)),
         )
-        dm_summary = normalize_dm_events(dm_raw, dm_includes, user_id, max_threads=50)
+        dm_window_raw = filter_events_by_window(dm_raw, hours)
+        dm_summary = normalize_dm_events(dm_window_raw, dm_includes, user_id, max_threads=50)
         if dm_errors:
             dm_status = "api_dm_error"
             dm_note = "X API DM lookup failed. The app/token may lack dm.read access, the API tier may not include DM endpoints, or the request may be rate limited."
