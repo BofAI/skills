@@ -27,7 +27,28 @@ For chat usage, run the wrapper:
 python3 twitter-digest/scripts/run_daily_digest.py
 ```
 
-`run_daily_digest.py --source auto` uses `X_BEARER_TOKEN` / `TWITTER_BEARER_TOKEN` when present; otherwise it uses the browser collector. Browser mode is still required for X Chat / DM content unless a read-DM-capable API integration is configured.
+`run_daily_digest.py --source auto` uses a saved OAuth user-context token, `X_BEARER_TOKEN`, or `TWITTER_BEARER_TOKEN` when present; otherwise it uses the browser collector. Browser mode is still required for X Chat / DM content unless a read-DM-capable API integration is configured.
+
+If the user asks to configure API access, trigger the OAuth/user-token setup from chat:
+
+```bash
+python3 twitter-digest/scripts/run_daily_digest.py --configure-api
+```
+
+This is an agent-triggered flow. The script prompts for the X Developer App Client ID, opens the X OAuth authorization page, waits for the user to authorize in the browser, receives the local callback, and saves the user-context token in `twitter-digest/.state/api_config.json`. If a refresh token is saved, later daily runs refresh the access token automatically. Do not ask the user to export environment variables manually. App-only API keys are not enough for user-context home timeline access.
+
+If the user asks to clear API access, run:
+
+```bash
+python3 twitter-digest/scripts/configure_api.py --clear
+```
+
+All normal flows should be triggered from chat by the agent:
+
+- X 日报 / 生成日报: run `scripts/run_daily_digest.py`.
+- 配置 X API: run `scripts/run_daily_digest.py --configure-api`.
+- 清除 X API 配置: run `scripts/configure_api.py --clear`.
+- 调试浏览器: run `scripts/run_daily_digest.py --source browser --headed`.
 
 Force a source:
 
