@@ -8,7 +8,7 @@ twitter-digest/RUNBOOK.md
 
 ## 1. 功能
 
-`twitter-digest` 用本地浏览器读取用户自己的 X/Twitter 页面，并生成中文日报。
+`twitter-digest` 通过 X API 或本地已登录浏览器读取用户自己的 X/Twitter 数据，并生成中文日报。
 
 默认采集内容：
 
@@ -57,15 +57,16 @@ twitter-digest/.state/run/digest-context.md
 用途：
 
 - `digest-context.md/json`：最终总结主输入，包含本次采集归一化后的 `Final Summary Facts`。
-- `digest-input.md/json`：原始浏览器采集结果，只在需要核对细节或排查抓取问题时使用。
+- `digest-input.md/json`：原始采集结果，只在需要核对细节或排查抓取问题时使用。
 
 不生成长期 `memory.json`，不生成 `daily/` 历史归档。
 `twitter-digest/.state/run/` 会尽量设置为 700 权限，避免把当次 DM 原文放到全局可读的 `/tmp`。
 
 ## 3. 运行规则
 
-- 只使用本地浏览器抓取。
-- 不使用 X 开发者 API。
+- 默认入口 `run_daily_digest.py --source auto`：有 OAuth2 user-context API 配置时优先用 API 抓公开数据；没有 API 配置时用浏览器抓取。
+- DM / X Chat 以本地浏览器抓取为准；API DM 现阶段仅保留为 TODO/调试，不用于判断是否有私信。
+- API 不可用、权限不足、tier 不支持或限流时，记录数据缺口并回退浏览器路径。
 - 不使用 MCP。
 - 不要求用户复制 cookie 或 token。
 - 默认 headless 运行。

@@ -2,6 +2,16 @@
 
 本文用于 QA、产品或非研发同事验证 `twitter-digest`。按步骤操作即可，不需要理解内部代码。
 
+## 使用范围与限制
+
+- 本文是独立操作文档，不依赖 README。
+- 日报默认入口是 `scripts/run_daily_digest.py`。
+- API 用于公开数据：home timeline、mentions、profile。
+- DM / X Chat 以浏览器抓取为准；API DM 现阶段不作为可靠来源，也不参与批量对比测试。
+- 浏览器抓取只读取本地已登录浏览器页面能加载出来的内容，不代表完整 X 历史。
+- Skill 只读取和总结，不会自动发推、点赞、关注、回复、打开可疑链接或发送 DM。
+- 批量对比测试会把每轮历史数据保存在 `.state/compare-runs/`，这些文件可能包含账号内容，应按敏感数据处理。
+
 ## 一、安装 -> 配置 -> 运行
 
 ### 1. 准备条件
@@ -37,7 +47,7 @@ dm.read tweet.read users.read offline.access
 
 ```bash
 git clone -b twitter-digest-api-collector git@github.com:BofAI/skills.git /tmp/bofai-skills
-cd /tmp/bofai-skills
+cd /tmp/bofai-skills/skills
 python3 twitter-digest/scripts/install.py
 ```
 
