@@ -174,17 +174,17 @@ def build_digest_facts(data: dict[str, Any], summary: dict[str, Any]) -> dict[st
             if not isinstance(item, dict):
                 continue
             facts["public"]["items"].append(
-                    {
-                        "kind": kind,
-                        "time": item.get("time") or "",
-                        "url": item.get("url") or "",
-                        "author_url": item.get("authorUrl") or "",
-                        "text_excerpt": compact_text(item.get("text"))[:700],
-                        "external_links": normalize_context_assets(item.get("externalLinks")),
-                        "media": normalize_context_assets(item.get("media")),
-                        "cards": normalize_context_assets(item.get("cards")),
-                    }
-                )
+                {
+                    "kind": kind,
+                    "time": item.get("time") or "",
+                    "url": item.get("url") or "",
+                    "author_url": item.get("authorUrl") or "",
+                    "text_excerpt": compact_text(item.get("text"))[:700],
+                    "external_links": normalize_context_assets(item.get("externalLinks")),
+                    "media": normalize_context_assets(item.get("media")),
+                    "cards": normalize_context_assets(item.get("cards")),
+                }
+            )
     if (summary.get("dm_status") or "") in {"blocked_by_x_chat_passcode", "visible_threads_unopened", "no_visible_threads", "api_dm_unavailable", "api_dm_error", "api_dm_todo"}:
         facts["data_gaps"].append(
             {
