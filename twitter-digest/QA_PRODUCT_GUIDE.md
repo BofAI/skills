@@ -28,8 +28,8 @@
 测试当前 PR 分支时，在 Claude Code 或 Terminal 里运行：
 
 ```bash
-git clone -b twitter-digest-api-collector git@github.com:BofAI/skills.git /tmp/bofai-skills
-cd /tmp/bofai-skills/skills
+git clone -b twitter-digest-api-collector git@github.com:BofAI/skills.git bofai-skills
+cd bofai-skills
 python3 twitter-digest/scripts/install.py
 ```
 

@@ -248,7 +248,7 @@ rm -rf twitter-digest/.state/chrome-profile
 
    ```bash
    git clone git@github.com:BofAI/skills.git
-   cd skills/skills
+   cd skills
    git checkout twitter-digest-api-collector
    ```
 
