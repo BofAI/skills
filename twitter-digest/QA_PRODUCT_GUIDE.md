@@ -142,6 +142,14 @@ twitter-digest/.state/run/digest-context.md
 - 是否明确写出数据缺口。
 - 是否没有自动发推、点赞、关注、回复或打开可疑链接。
 
+如果 Agent 需要检查本次采集计数或 JSON 状态，应运行固定命令：
+
+```bash
+python3 twitter-digest/scripts/inspect_digest.py
+```
+
+不要允许 Agent 现场拼 `python3 -c` 或临时脚本来遍历 JSON。固定检查脚本只输出计数、状态和数据缺口，不输出 DM 正文。
+
 ### 6. 清除或重配
 
 清除 API 配置：

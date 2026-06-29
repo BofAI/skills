@@ -290,6 +290,14 @@ twitter-digest/.state/run/digest-context.md
 
 Agent 只基于 `digest-context.md` 生成中文日报。
 
+如果需要检查本次采集计数、DM 状态或数据缺口，不要临时写 `python3 -c` 或 shell 片段遍历 JSON。使用固定检查脚本：
+
+```bash
+python3 twitter-digest/scripts/inspect_digest.py
+```
+
+该脚本只输出计数、加载状态和数据缺口，不输出 DM 正文。
+
 默认结构：
 
 ```markdown

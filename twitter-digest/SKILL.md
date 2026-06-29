@@ -58,6 +58,7 @@ All normal flows should be triggered from chat by the agent:
 - 用户已有 token / 输入 X token: run `scripts/run_daily_digest.py --configure-api-token`.
 - 配置 X API / 给 app 授权: run `scripts/run_daily_digest.py --configure-api`.
 - 验证 X API 配置: run `scripts/configure_api.py --verify`.
+- 检查本次采集计数 / JSON 结构: run `scripts/inspect_digest.py`.
 - 清除 X API 配置: run `scripts/configure_api.py --clear`.
 - 调试浏览器: run `scripts/run_daily_digest.py --source browser --headed`.
 - 对比 API 和浏览器抓取 / 稳定性测试: run `scripts/compare_collectors.py --rounds 3 --interval-sec 120`. Load `COLLECTOR_COMPARISON_TEST.md` before interpreting the report.
@@ -87,7 +88,7 @@ Default scope:
 
 Public timeline/profile/mentions pages use the same daily-window loading model as DMs: by default the collector scrolls each public page up to 40 rounds, keeps up to 300 public items, and stops early when loaded post timestamps show content beyond the 24-hour digest window (`--scrolls 40`, `--max-public-items 300`, `--public-window-hours 24`).
 
-Read only `twitter-digest/.state/run/digest-context.md` when writing the Chinese digest. Its `Final Summary Facts` section is the content source for the final summary. Use `digest-input.md` only when debugging collection issues, not during normal summarization. Do not add content from older runs.
+Read only `twitter-digest/.state/run/digest-context.md` when writing the Chinese digest. Its `Final Summary Facts` section is the content source for the final summary. Use `digest-input.md` only when debugging collection issues, not during normal summarization. Do not add content from older runs. Do not write ad-hoc `python3 -c`, shell, or temporary scripts to inspect JSON structure during normal summarization. If counts or non-content structure must be checked, run the built-in `python3 twitter-digest/scripts/inspect_digest.py`, which does not print DM bodies.
 
 ## Install
 

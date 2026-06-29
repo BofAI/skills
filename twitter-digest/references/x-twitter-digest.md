@@ -86,6 +86,14 @@ Outputs:
 - `twitter-digest/.state/run/digest-context.json`: normalized current-run facts.
 - `twitter-digest/.state/run/digest-context.md`: primary final summary input. Read this first.
 
+Normal summary writing must not use ad-hoc `python3 -c`, shell, or temporary scripts to inspect JSON structure. If the agent needs a low-sensitive count/status view, use:
+
+```bash
+python3 twitter-digest/scripts/inspect_digest.py
+```
+
+This prints counts, load status, and data gaps without printing DM message bodies. Use it instead of writing custom inspection snippets.
+
 Collector comparison testing:
 
 ```bash
