@@ -13,11 +13,65 @@ from __future__ import annotations
 import datetime as dt
 import re
 import time
-from typing import Any
+from typing import Any, TypedDict
 
 from cdp_client import cdp_call, cdp_eval, wait_for_cdp_page_ws
 from dom_script_loader import load_dom_script
 from public_scraper import extract_main_text
+
+
+class DmAsset(TypedDict, total=False):
+    url: str
+    type: str
+    poster: str
+    alt: str
+    label: str
+
+
+class DmMessage(TypedDict, total=False):
+    sender: str
+    time: str
+    text: str
+    links: list[DmAsset]
+    media: list[DmAsset]
+
+
+class DmTarget(TypedDict, total=False):
+    target_type: str
+    url: str
+    label: str
+    time_hint: str
+    replied: bool
+    reply_reason: str
+    today: bool
+    x: float
+    y: float
+
+
+class DmThread(TypedDict, total=False):
+    url: str
+    label: str
+    participant: str
+    target_type: str
+    replied: bool
+    reply_reason: str
+    today: bool
+    message_count: int
+    dm_scrolls_used: int
+    dm_load_complete: bool
+    dm_window_exceeded: bool
+    dm_hit_message_cap: bool
+    messages: list[DmMessage]
+    text: str
+    collection_status: str
+    collection_error: str
+
+
+class DmListInfo(TypedDict, total=False):
+    targets: list[DmTarget]
+    scrolls_used: int
+    load_complete: bool
+    stable_rounds: int
 
 
 DM_EMPTY_MARKERS = ("no messages", "welcome to your inbox")
@@ -122,7 +176,7 @@ def collect_dm_threads(ws_url: str, max_threads: int, dm_scrolls: int, dm_max_me
     if not thread_targets:
         return no_unreplied_targets_result(main_text, all_targets, today_targets, counts, list_info)
 
-    threads: list[dict[str, Any]] = []
+    threads: list[DmThread] = []
     seen_targets: set[str] = set()
     for target in thread_targets[: max(max_threads, 0)]:
         if dm_target_key(target) in seen_targets:
@@ -132,6 +186,7 @@ def collect_dm_threads(ws_url: str, max_threads: int, dm_scrolls: int, dm_max_me
         cdp_call(ws_url, "Page.navigate", {"url": "https://x.com/messages"})
         wait_for_dm_ready(ws_url, timeout_sec=DM_READY_AFTER_NAV_TIMEOUT_SEC)
 
+    captured_message_count = total_dm_message_count(threads)
     return with_dm_list_metadata(
         {
             "dm_status": "captured_unreplied_threads" if threads else "no_unreplied_threads",
@@ -140,10 +195,10 @@ def collect_dm_threads(ws_url: str, max_threads: int, dm_scrolls: int, dm_max_me
                 f"waiting for your reply: {counts['dm_unreplied_thread_count']}. Opened up to {max_threads} waiting-reply thread(s); "
                 f"scanned DM list with {list_info['scrolls_used']} downward scroll round(s); "
                 f"loaded up to {dm_max_messages} message bubbles per thread with {dm_scrolls} upward scroll round(s); "
-                f"captured message bubbles: {sum(int(thread.get('message_count') or 0) for thread in threads)}."
+                f"captured message bubbles: {captured_message_count}."
             ),
             "dm_threads": threads,
-            "dm_captured_message_count": sum(int(thread.get("message_count") or 0) for thread in threads),
+            "dm_captured_message_count": captured_message_count,
             **counts,
         },
         list_info,
@@ -153,10 +208,10 @@ def collect_dm_threads(ws_url: str, max_threads: int, dm_scrolls: int, dm_max_me
 
 def no_unreplied_targets_result(
     main_text: str,
-    all_targets: list[dict[str, Any]],
-    today_targets: list[dict[str, Any]],
+    all_targets: list[DmTarget],
+    today_targets: list[DmTarget],
     counts: dict[str, int],
-    list_info: dict[str, Any],
+    list_info: DmListInfo,
 ) -> dict[str, Any]:
     if today_targets:
         status = "no_unreplied_threads"
@@ -180,7 +235,7 @@ def no_unreplied_targets_result(
     )
 
 
-def with_dm_list_metadata(result: dict[str, Any], list_info: dict[str, Any], target_count: int) -> dict[str, Any]:
+def with_dm_list_metadata(result: dict[str, Any], list_info: DmListInfo, target_count: int) -> dict[str, Any]:
     return {
         **result,
         "dm_list_scrolls_used": int(list_info.get("scrolls_used") or 0),
@@ -189,7 +244,7 @@ def with_dm_list_metadata(result: dict[str, Any], list_info: dict[str, Any], tar
     }
 
 
-def open_dm_thread(ws_url: str, target: dict[str, Any], dm_scrolls: int, dm_max_messages: int, dm_window_hours: int) -> dict[str, Any]:
+def open_dm_thread(ws_url: str, target: DmTarget, dm_scrolls: int, dm_max_messages: int, dm_window_hours: int) -> DmThread:
     if not open_dm_target(ws_url, target):
         return skipped_dm_thread(target, "Could not relocate DM row after scanning the thread list.")
     wait_for_dm_conversation_content(ws_url, timeout_sec=DM_CONVERSATION_READY_TIMEOUT_SEC)
@@ -209,7 +264,7 @@ def open_dm_thread(ws_url: str, target: dict[str, Any], dm_scrolls: int, dm_max_
     }
 
 
-def open_dm_target(ws_url: str, target: dict[str, Any]) -> bool:
+def open_dm_target(ws_url: str, target: DmTarget) -> bool:
     has_click_point = float(target.get("x") or 0) > 0 and float(target.get("y") or 0) > 0
     if has_click_point:
         cdp_call(ws_url, "Page.navigate", {"url": "https://x.com/messages"})
@@ -224,7 +279,7 @@ def open_dm_target(ws_url: str, target: dict[str, Any]) -> bool:
     return False
 
 
-def skipped_dm_thread(target: dict[str, Any], error: str) -> dict[str, Any]:
+def skipped_dm_thread(target: DmTarget, error: str) -> DmThread:
     return {
         **dm_thread_identity(target),
         "message_count": 0,
@@ -239,7 +294,7 @@ def skipped_dm_thread(target: dict[str, Any], error: str) -> dict[str, Any]:
     }
 
 
-def dm_thread_identity(target: dict[str, Any]) -> dict[str, Any]:
+def dm_thread_identity(target: DmTarget) -> DmThread:
     return {
         "url": str(target.get("url") or ""),
         "label": str(target.get("label") or ""),
@@ -254,7 +309,7 @@ def dm_thread_identity(target: dict[str, Any]) -> dict[str, Any]:
 # Conversation-list scanning
 
 
-def load_dm_thread_list_targets(ws_url: str, max_scrolls: int = 20) -> dict[str, Any]:
+def load_dm_thread_list_targets(ws_url: str, max_scrolls: int = 20) -> DmListInfo:
     scroll_limit = max(0, int(max_scrolls))
     targets = extract_dm_thread_targets(ws_url)
     previous_today = len(today_dm_targets(targets))
@@ -303,7 +358,7 @@ def dm_list_scan_should_stop(total_targets: int, today_targets_count: int, stabl
     return reached_older_threads_after_today and stable_rounds >= DM_LIST_OLDER_AFTER_TODAY_STABLE_ROUNDS
 
 
-def restore_dm_thread_list_position(ws_url: str, target: dict[str, Any]) -> bool:
+def restore_dm_thread_list_position(ws_url: str, target: DmTarget) -> bool:
     key = dm_target_key(target)
     for _ in range(DM_ROW_RELOCATE_MAX_SCROLLS):
         candidates = {dm_target_key(item): item for item in extract_dm_thread_targets(ws_url)}
@@ -330,10 +385,10 @@ def wait_for_dm_conversation_content(ws_url: str, timeout_sec: int = 12) -> None
             return
         time.sleep(DM_CONVERSATION_READY_POLL_SEC)
 
-def dm_target_key(target: dict[str, Any]) -> str:
+def dm_target_key(target: DmTarget) -> str:
     return str(target.get("url") or target.get("label") or f"{target.get('x')}:{target.get('y')}")
 
-def dm_participant(target: dict[str, Any]) -> str:
+def dm_participant(target: DmTarget) -> str:
     label = " ".join(str(target.get("label") or "").split())
     handle = re.search(r"@([A-Za-z0-9_]{1,15})", label)
     if handle:
@@ -346,13 +401,13 @@ def dm_participant(target: dict[str, Any]) -> str:
     )[0]
     return first_chunk.strip(" -·•|")[:80] or label[:80]
 
-def unreplied_dm_targets(targets: list[dict[str, Any]]) -> list[dict[str, Any]]:
+def unreplied_dm_targets(targets: list[DmTarget]) -> list[DmTarget]:
     return [target for target in targets if not bool(target.get("replied"))]
 
-def today_dm_targets(targets: list[dict[str, Any]]) -> list[dict[str, Any]]:
+def today_dm_targets(targets: list[DmTarget]) -> list[DmTarget]:
     return [target for target in targets if bool(target.get("today"))]
 
-def dm_counts(targets: list[dict[str, Any]]) -> dict[str, int]:
+def dm_counts(targets: list[DmTarget]) -> dict[str, int]:
     replied_count = len([target for target in targets if bool(target.get("replied"))])
     visible_count = len(targets)
     return {
@@ -360,6 +415,9 @@ def dm_counts(targets: list[dict[str, Any]]) -> dict[str, int]:
         "dm_replied_thread_count": replied_count,
         "dm_unreplied_thread_count": max(visible_count - replied_count, 0),
     }
+
+def total_dm_message_count(threads: list[DmThread]) -> int:
+    return sum(int(thread.get("message_count") or 0) for thread in threads)
 
 def dm_target_has_self_reply(label: str) -> bool:
     normalized = " ".join(label.split())
@@ -429,12 +487,12 @@ def count_dm_messages(ws_url: str) -> int:
     value = cdp_eval(ws_url, script)
     return int(value) if isinstance(value, (int, float)) else 0
 
-def extract_dm_messages(ws_url: str, max_messages: int = 300) -> list[dict[str, Any]]:
+def extract_dm_messages(ws_url: str, max_messages: int = 300) -> list[DmMessage]:
     script = load_dom_script("extract_dm_messages.js") % max(1, int(max_messages))
     value = cdp_eval(ws_url, script)
     if not isinstance(value, list):
         return []
-    messages: list[dict[str, Any]] = []
+    messages: list[DmMessage] = []
     for item in value:
         if not isinstance(item, dict):
             continue
@@ -452,17 +510,17 @@ def extract_dm_messages(ws_url: str, max_messages: int = 300) -> list[dict[str, 
         )
     return messages
 
-def normalize_assets(value: Any, kind: str) -> list[dict[str, str]]:
+def normalize_assets(value: Any, kind: str) -> list[DmAsset]:
     if not isinstance(value, list):
         return []
-    out: list[dict[str, str]] = []
+    out: list[DmAsset] = []
     for item in value:
         if not isinstance(item, dict):
             continue
         url = str(item.get("url") or "").strip()
         if not url:
             continue
-        normalized: dict[str, str] = {"url": url[:1200]}
+        normalized: DmAsset = {"url": url[:1200]}
         if kind == "media":
             normalized["type"] = str(item.get("type") or "media")[:40]
             if item.get("poster"):
@@ -475,7 +533,7 @@ def normalize_assets(value: Any, kind: str) -> list[dict[str, str]]:
         out.append(normalized)
     return out[:10]
 
-def render_dm_messages(messages: list[dict[str, Any]]) -> str:
+def render_dm_messages(messages: list[DmMessage]) -> str:
     lines = []
     for message in messages:
         sender = "me" if message.get("sender") == "me" else "other"
@@ -577,28 +635,31 @@ def dm_messages_page_is_readable(ws_url: str, text: str) -> bool:
 # Conversation target parsing
 
 
-def extract_dm_thread_targets(ws_url: str) -> list[dict[str, Any]]:
+def extract_dm_thread_targets(ws_url: str) -> list[DmTarget]:
     script = load_dom_script("extract_dm_thread_targets.js")
     value = cdp_eval(ws_url, script)
     if not isinstance(value, list):
         return []
-    out: list[dict[str, Any]] = []
+    out: list[DmTarget] = []
     for item in value:
         if isinstance(item, dict):
-            out.append(
-                {
-                    "target_type": str(item.get("target_type") or ""),
-                    "url": str(item.get("url") or ""),
-                    "label": str(item.get("label") or ""),
-                    "time_hint": str(item.get("time_hint") or ""),
-                    "replied": bool(item.get("replied")) or dm_target_has_self_reply(str(item.get("label") or "")),
-                    "reply_reason": str(item.get("reply_reason") or ""),
-                    "today": dm_target_is_today(str(item.get("label") or ""), str(item.get("time_hint") or "")),
-                    "x": float(item.get("x") or 0),
-                    "y": float(item.get("y") or 0),
-                }
-            )
+            out.append(normalize_dm_target(item))
     return dedupe_dm_targets(out)
+
+def normalize_dm_target(item: dict[str, Any]) -> DmTarget:
+    label = str(item.get("label") or "")
+    time_hint = str(item.get("time_hint") or "")
+    return {
+        "target_type": str(item.get("target_type") or ""),
+        "url": str(item.get("url") or ""),
+        "label": label,
+        "time_hint": time_hint,
+        "replied": bool(item.get("replied")) or dm_target_has_self_reply(label),
+        "reply_reason": str(item.get("reply_reason") or ""),
+        "today": dm_target_is_today(label, time_hint),
+        "x": float(item.get("x") or 0),
+        "y": float(item.get("y") or 0),
+    }
 
 def dm_target_is_today(label: str, time_hint: str = "") -> bool:
     combined = " ".join(part for part in (time_hint, label) if part)
@@ -632,8 +693,8 @@ def dm_time_hint_is_today(value: str) -> bool:
             return True
     return False
 
-def dedupe_dm_targets(targets: list[dict[str, Any]]) -> list[dict[str, Any]]:
-    deduped: dict[str, dict[str, Any]] = {}
+def dedupe_dm_targets(targets: list[DmTarget]) -> list[DmTarget]:
+    deduped: dict[str, DmTarget] = {}
     for target in targets:
         key = str(target.get("url") or dm_participant(target) or target.get("label") or "").lower()
         if not key:
