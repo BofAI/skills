@@ -103,7 +103,7 @@ For a local user-owned X Developer App, the supported API setup path is OAuth2 A
 python3 twitter-digest/scripts/run_daily_digest.py --configure-api
 ```
 
-Then choose `OAuth2`. The script asks for the X Developer App `Client ID`, opens the X authorization page, waits for the user to authorize the account, receives the local callback, exchanges it for a user-context access token and refresh token, then saves it.
+The script uses OAuth2 directly. It asks for the X Developer App `Client ID`, opens the X authorization page, waits for the user to authorize the account, receives the local callback, exchanges it for a user-context access token and refresh token, then saves it.
 
 If the user already has an OAuth2 user access token, use the direct token path:
 

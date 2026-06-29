@@ -58,16 +58,15 @@ python3 twitter-digest/scripts/run_daily_digest.py --configure-api
 
 推荐路径是 OAuth2 PKCE，适合用户自己申请的本地 X Developer App：
 
-1. 脚本弹出 OAuth / Paste Token 选择。
-2. 用户选择 OAuth2。
-3. 脚本提示输入 X App 的 Client ID。
-4. 脚本提示输入 X App 的 Client Secret；public PKCE app 可留空。
-5. 脚本打开 X 授权页。
-6. 用户在浏览器里授权 app。
-7. 脚本通过本地 callback 收到授权码。
-8. 脚本换取 user access token 和 refresh token。
-9. token 保存到 `twitter-digest/.state/api_config.json`，文件权限尽量设为 owner-only。
-10. 后续日报 `--source auto` 自动走 API。
+1. 脚本直接进入 OAuth2 配置。
+2. 脚本提示输入 X App 的 Client ID。
+3. 脚本提示输入 X App 的 Client Secret；public PKCE app 可留空。
+4. 脚本打开 X 授权页。
+5. 用户在浏览器里授权 app。
+6. 脚本通过本地 callback 收到授权码。
+7. 脚本换取 user access token 和 refresh token。
+8. token 保存到 `twitter-digest/.state/api_config.json`，文件权限尽量设为 owner-only。
+9. 后续日报 `--source auto` 自动走 API。
 
 用户只需要准备：
 
@@ -91,7 +90,7 @@ X Developer App 里需要配置 callback URL，默认：
 http://127.0.0.1:8765/callback
 ```
 
-如果用户已有 user-context access token，也可以在配置向导里选择 Paste Token。不要要求用户手动配置 shell 环境变量；这是调试路径，不是主流程。
+如果用户已有 user-context access token，可以单独运行 `python3 twitter-digest/scripts/run_daily_digest.py --configure-api-token`。不要要求用户手动配置 shell 环境变量；这是调试路径，不是主流程。
 
 ## 安装与依赖检查
 

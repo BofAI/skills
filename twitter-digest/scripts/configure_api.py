@@ -80,51 +80,6 @@ def apple_prompt(prompt: str, hidden: bool = False, buttons: list[str] | None = 
     return result.stdout.strip()
 
 
-def apple_choice(prompt: str, buttons: list[str]) -> str | None:
-    if platform.system() != "Darwin":
-        return None
-    command = (
-        "display dialog "
-        + json.dumps(prompt)
-        + " buttons {"
-        + ", ".join(json.dumps(button) for button in buttons)
-        + "} default button "
-        + json.dumps(buttons[-1])
-    )
-    try:
-        result = subprocess.run(
-            ["osascript", "-e", command, "-e", "button returned of result"],
-            check=True,
-            text=True,
-            capture_output=True,
-        )
-    except (FileNotFoundError, subprocess.CalledProcessError):
-        return None
-    return result.stdout.strip()
-
-
-def choose_mode() -> str:
-    choice = apple_choice(
-        "配置 X API。推荐选择 OAuth2：需要 X Developer App 的 Client ID，并在浏览器里授权账号。OAuth1 不再作为日报 API 路径使用，因为它不能可靠读取 DM。",
-        ["取消", "粘贴 Token", "OAuth2"],
-    )
-    if choice == "OAuth2":
-        return "oauth2"
-    if choice == "粘贴 Token":
-        return "paste"
-    if choice == "取消":
-        raise SystemExit("API configuration cancelled.")
-    print("请选择 X API 配置方式：")
-    print("1. OAuth 2.0 PKCE 授权：输入 Client ID，需要配置 callback，推荐")
-    print("2. 粘贴已有 OAuth2/user bearer token")
-    if not sys.stdin.isatty():
-        raise SystemExit("当前没有可交互终端。请通过 run_daily_digest.py --configure-api 触发，它会打开 Terminal 窗口。")
-    value = input("请选择 [默认 1]: ").strip()
-    if value == "2":
-        return "paste"
-    return "oauth2"
-
-
 def prompt_value(label: str, default: str = "", hidden: bool = False) -> str:
     prompt = f"{label}"
     if default and not hidden:
@@ -320,13 +275,7 @@ def main() -> None:
         return
 
     existing = load_api_config()
-    mode = (
-        "oauth2"
-        if args.oauth
-        else "paste"
-        if args.paste_token or args.bearer_token
-        else choose_mode()
-    )
+    mode = "paste" if args.paste_token or args.bearer_token else "oauth2"
     if mode == "oauth2":
         token_config = run_oauth_flow(args, existing)
         bearer_token = token_config["bearer_token"]
