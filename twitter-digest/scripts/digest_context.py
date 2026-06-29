@@ -103,6 +103,7 @@ def build_digest_facts(data: dict[str, Any], summary: dict[str, Any]) -> dict[st
             "counts": summary.get("dm_counts") or {},
             "threads": [],
         },
+        "todo_items": [],
         "data_gaps": [],
     }
 
@@ -121,6 +122,15 @@ def build_digest_facts(data: dict[str, Any], summary: dict[str, Any]) -> dict[st
         if kind == "messages":
             if page.get("dm_note"):
                 facts["dms"]["note"] = str(page.get("dm_note") or "")
+            for todo in page.get("todo_items") or []:
+                if isinstance(todo, dict):
+                    facts["todo_items"].append(
+                        {
+                            "source": str(todo.get("source") or kind),
+                            "status": str(todo.get("status") or page.get("dm_status") or "todo"),
+                            "detail": str(todo.get("detail") or page.get("dm_note") or ""),
+                        }
+                    )
             for thread in page.get("dm_threads") or []:
                 if not isinstance(thread, dict):
                     continue
@@ -175,12 +185,20 @@ def build_digest_facts(data: dict[str, Any], summary: dict[str, Any]) -> dict[st
                         "cards": normalize_context_assets(item.get("cards")),
                     }
                 )
-    if (summary.get("dm_status") or "") in {"blocked_by_x_chat_passcode", "visible_threads_unopened", "no_visible_threads", "api_dm_unavailable", "api_dm_error"}:
+    if (summary.get("dm_status") or "") in {"blocked_by_x_chat_passcode", "visible_threads_unopened", "no_visible_threads", "api_dm_unavailable", "api_dm_error", "api_dm_todo"}:
         facts["data_gaps"].append(
             {
                 "source": "messages",
                 "status": summary.get("dm_status"),
                 "detail": facts["dms"].get("note") or "DM content was incomplete or unavailable.",
+            }
+        )
+    if (summary.get("dm_status") or "") == "api_dm_todo" and not facts["todo_items"]:
+        facts["todo_items"].append(
+            {
+                "source": "messages",
+                "status": "api_dm_todo",
+                "detail": facts["dms"].get("note") or "API DM was inconclusive; use browser DM collection before making a final DM claim.",
             }
         )
     return facts
@@ -408,6 +426,12 @@ def render_digest_facts(facts: dict[str, Any]) -> str:
         )
     if not dms.get("threads"):
         lines.append("| none | - | 0 | no | no_opened_unreplied_threads | |")
+
+    lines.extend(["", "## TODO List", ""])
+    for todo in facts.get("todo_items") or []:
+        lines.append(f"- `{todo.get('source')}` `{todo.get('status')}`: {todo.get('detail')}")
+    if not facts.get("todo_items"):
+        lines.append("- None")
 
     context_threads = [
         thread

@@ -45,7 +45,7 @@ scripts/api_x_digest.py
 - 使用已保存的 OAuth2 user-context token，或 `X_BEARER_TOKEN` / `TWITTER_BEARER_TOKEN` / `--bearer-token` 传入的 OAuth2 user token。
 - 主路径是 OAuth2 PKCE：用户准备 X App 的 `Client ID`，使用 `scripts/run_daily_digest.py --configure-api` 让脚本打开授权页并通过本地 callback 换取 user access token / refresh token。
 - 如果用户已经有 OAuth2 user access token，使用 `scripts/run_daily_digest.py --configure-api-token` 由脚本安全保存。
-- OAuth1 不再作为日报 API 配置路径，因为它不能可靠读取 DM；需要完整 DM 时走 OAuth2 或浏览器兜底。
+- OAuth1 不再作为日报 API 配置路径，因为它不能可靠读取 DM；需要完整 DM 时走 OAuth2，API DM 拿不到时走浏览器脚本。
 - 读取 home timeline：`/2/users/:id/timelines/reverse_chronological`。
 - 读取用户公开发帖。
 - 读取 mentions。
@@ -63,7 +63,8 @@ scripts/api_x_digest.py
 - `--include-dms` 时读取 `/2/dm_events`，需要 user-context auth 和 DM lookup 权限。
 - Home timeline endpoint 需要可访问该用户上下文的 token；如果账号权限、套餐或 token 类型不支持，会在 `home` 页面写入具体 `collection_error`。
 - App-only API key / app-only bearer token 不等于用户授权，不能保证读取用户 home timeline 或 DM。
-- DM API 需要 X App / token 有 `dm.read` 相关权限；权限不足、tier 不支持或 rate limit 会写入 `api_dm_error` data gap。
+- DM API 需要 X App / token 有 `dm.read` 相关权限；权限不足、tier 不支持、rate limit、返回 0 条或无法确认是否需要回复时，会写入 `api_dm_todo` 和 data gap。
+- API DM 不等同于网页 X Chat。XChat / 加密私信可能不会出现在 `/2/dm_events`。API DM 拿不到时只放入 TODO List，不总结成“没有私信”。
 - API 权限不足、额度不足或 endpoint 不可用时，会把错误写入对应页面的 `collection_error`。
 
 ### 3. 上层入口脚本
@@ -91,6 +92,13 @@ scripts/run_daily_digest.py
 ```
 
 ## 对话触发流程
+
+底层只保留两个抓取脚本：
+
+```text
+scripts/api_x_digest.py      -> 官方 API 抓取：home timeline、mentions、profile、可用时的 DM events
+scripts/browser_x_digest.py  -> 浏览器抓取：X Chat / 加密 DM / API 拿不到的网页内容
+```
 
 普通日报：
 
@@ -206,7 +214,8 @@ API DM 规则：
 - 按 `dm_conversation_id` 分组。
 - 只把最后一条不是用户发出的会话正文放进 `dm_threads`，用于判断是否需要回复。
 - 最后一条是用户发出的会话只计数，不展开正文。
-- 如果 `/2/dm_events` 返回权限、tier、认证或限流错误，写入 `api_dm_error` data gap，不把失败当作“无私信”。
+- 如果 `/2/dm_events` 返回权限、tier、认证或限流错误，写入 `api_dm_todo` data gap，不把失败当作“无私信”。
+- 如果 `/2/dm_events` 返回 0 条，或 API 返回的事件不能确认是否需要回复，也写入 `api_dm_todo` TODO List；需要完整 DM 时改跑 `scripts/browser_x_digest.py` 或 `run_daily_digest.py --source browser`。
 
 ## 稳定性策略
 
