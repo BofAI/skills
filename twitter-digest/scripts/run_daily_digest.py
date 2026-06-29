@@ -14,6 +14,7 @@ import tempfile
 from pathlib import Path
 
 from api_config_store import API_CONFIG_PATH, load_api_config, refresh_oauth_token_if_needed
+from collector_commands import api_collector_command, browser_collector_command, summarize_collector_error
 from digest_context import build_current_context_from_file
 from script_utils import display_path
 
@@ -58,7 +59,8 @@ def load_config() -> dict:
         return {}
     try:
         return json.loads(CONFIG_PATH.read_text(encoding="utf-8"))
-    except Exception:
+    except (OSError, json.JSONDecodeError) as exc:
+        print(f"Could not read saved twitter-digest config {CONFIG_PATH}: {exc}", flush=True)
         return {}
 
 
@@ -126,81 +128,44 @@ def api_configured(bearer_token: str) -> bool:
 
 def summarize_child_error(error: subprocess.CalledProcessError) -> str:
     text = "\n".join(part for part in [error.stdout or "", error.stderr or ""] if part)
-    if not text:
-        return f"collector exited with code {error.returncode}"
-    markers = [
-        "client-not-enrolled",
-        "Appropriate Level of API Access",
-        "Forbidden",
-        "Unauthorized",
-        "HTTP 403",
-        "HTTP 401",
-    ]
-    matched = [marker for marker in markers if marker in text]
-    if matched:
-        return "; ".join(dict.fromkeys(matched))
-    compact = " ".join(text.split())
-    return compact[:500]
+    return summarize_collector_error(text, returncode=error.returncode)
 
 
 def api_command(args: argparse.Namespace, out_dir: str, api_base: str, user_id: str, handle: str) -> list[str]:
-    cmd = [
+    return api_collector_command(
         sys.executable,
-        str(Path(__file__).with_name("api_x_digest.py")),
-        "--keywords",
-        args.keywords,
-        "--out",
+        Path(__file__).resolve().parent,
         out_dir,
-        "--max-public-items",
-        str(args.max_public_items),
-        "--public-window-hours",
-        str(args.public_window_hours),
-        "--api-base",
-        api_base,
-        "--dm-max-events",
-        str(args.dm_max_events),
-    ]
-    if user_id:
-        cmd.extend(["--user-id", user_id])
-    if handle:
-        cmd.extend(["--handle", handle])
-    return cmd
+        keywords=args.keywords,
+        max_public_items=args.max_public_items,
+        public_window_hours=args.public_window_hours,
+        dm_max_events=args.dm_max_events,
+        api_base=api_base,
+        user_id=user_id,
+        handle=handle,
+    )
 
 
 def browser_command(args: argparse.Namespace, out_dir: str, handle: str, include_dms: bool, dm_only: bool = False) -> list[str]:
-    cmd = [
+    return browser_collector_command(
         sys.executable,
-        str(Path(__file__).with_name("browser_x_digest.py")),
-        "--keywords",
-        args.keywords,
-        "--out",
+        Path(__file__).resolve().parent,
         out_dir,
-        "--max-public-items",
-        "1" if dm_only else str(args.max_public_items),
-        "--public-window-hours",
-        str(args.public_window_hours),
-        "--scrolls",
-        "0" if dm_only else str(args.scrolls),
-        "--dm-threads",
-        str(args.dm_threads),
-        "--dm-scrolls",
-        str(args.dm_scrolls),
-        "--dm-max-messages",
-        str(args.dm_max_messages),
-        "--dm-window-hours",
-        str(args.dm_window_hours),
-    ]
-    if handle:
-        cmd.extend(["--handle", handle])
-    if include_dms:
-        cmd.append("--include-dms")
-    if args.headed:
-        cmd.append("--headed")
-    if args.headless:
-        cmd.append("--headless")
-    if args.non_interactive:
-        cmd.append("--non-interactive")
-    return cmd
+        keywords=args.keywords,
+        max_public_items=args.max_public_items,
+        public_window_hours=args.public_window_hours,
+        scrolls=args.scrolls,
+        dm_threads=args.dm_threads,
+        dm_scrolls=args.dm_scrolls,
+        dm_max_messages=args.dm_max_messages,
+        dm_window_hours=args.dm_window_hours,
+        handle=handle,
+        include_dms=include_dms,
+        dm_only=dm_only,
+        headed=args.headed,
+        headless=args.headless,
+        non_interactive=args.non_interactive,
+    )
 
 
 def run_api_command(cmd: list[str], env: dict[str, str]) -> None:

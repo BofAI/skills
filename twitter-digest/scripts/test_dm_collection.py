@@ -4,9 +4,11 @@
 from __future__ import annotations
 
 import argparse
-import importlib.util
 import json
 from pathlib import Path
+
+from browser_lifecycle import ensure_logged_in, stop_browser
+from browser_x_digest import collect_page
 
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -26,27 +28,16 @@ def parse_args() -> argparse.Namespace:
     return parser.parse_args()
 
 
-def load_browser_module():
-    module_path = Path(__file__).with_name("browser_x_digest.py")
-    spec = importlib.util.spec_from_file_location("browser_x_digest", module_path)
-    if spec is None or spec.loader is None:
-        raise SystemExit(f"Could not load {module_path}")
-    module = importlib.util.module_from_spec(spec)
-    spec.loader.exec_module(module)
-    return module
-
-
 def main() -> None:
     args = parse_args()
-    mod = load_browser_module()
-    proc, port, *_ = mod.ensure_logged_in(
+    proc, port, *_ = ensure_logged_in(
         Path(args.profile_dir).expanduser().resolve(),
         args.login_timeout_sec,
         args.headed,
         args.non_interactive,
     )
     try:
-        result = mod.collect_page(
+        result = collect_page(
             port,
             {"kind": "messages", "url": "https://x.com/messages"},
             scrolls=1,
@@ -56,7 +47,7 @@ def main() -> None:
             dm_window_hours=args.dm_window_hours,
         )
     finally:
-        mod.stop_browser(proc)
+        stop_browser(proc)
 
     summary = {
         "dm_status": result.get("dm_status"),

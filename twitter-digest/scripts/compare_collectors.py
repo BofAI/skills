@@ -4,7 +4,6 @@
 from __future__ import annotations
 
 import argparse
-import datetime as dt
 import json
 import os
 import subprocess
@@ -14,7 +13,9 @@ from pathlib import Path
 from typing import Any
 
 from api_config_store import load_api_config, refresh_oauth_token_if_needed
+from collector_commands import api_collector_command, browser_collector_command, summarize_collector_error
 from digest_context import build_current_context_from_file
+from script_utils import now_iso, now_stamp
 
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -46,10 +47,6 @@ def parse_args() -> argparse.Namespace:
     return parser.parse_args()
 
 
-def now_stamp() -> str:
-    return dt.datetime.now().astimezone().strftime("%Y%m%d-%H%M%S")
-
-
 def load_bearer_token() -> str:
     config = refresh_oauth_token_if_needed(load_api_config())
     return str(config.get("bearer_token") or os.environ.get("X_BEARER_TOKEN") or os.environ.get("TWITTER_BEARER_TOKEN") or "")
@@ -67,29 +64,8 @@ def run_command(cmd: list[str], out_dir: Path, env: dict[str, str] | None = None
         "ok": result.returncode == 0,
         "returncode": result.returncode,
         "duration_sec": round(duration, 2),
-        "error_summary": summarize_error(error_text),
+        "error_summary": summarize_collector_error(error_text),
     }
-
-
-def summarize_error(text: str) -> str:
-    if not text:
-        return ""
-    markers = [
-        "client-not-enrolled",
-        "Appropriate Level of API Access",
-        "Unauthorized",
-        "Forbidden",
-        "HTTP 401",
-        "HTTP 403",
-        "HTTP 429",
-        "Too Many Requests",
-        "Timed out",
-        "passcode",
-    ]
-    matched = [marker for marker in markers if marker in text]
-    if matched:
-        return "; ".join(dict.fromkeys(matched))
-    return " ".join(text.split())[:500]
 
 
 def api_command(args: argparse.Namespace, out_dir: Path) -> tuple[list[str], dict[str, str]]:
@@ -97,58 +73,38 @@ def api_command(args: argparse.Namespace, out_dir: Path) -> tuple[list[str], dic
     env = os.environ.copy()
     if token:
         env["X_BEARER_TOKEN"] = token
-    cmd = [
+    cmd = api_collector_command(
         sys.executable,
-        str(ROOT / "scripts" / "api_x_digest.py"),
-        "--out",
-        str(out_dir),
-        "--keywords",
-        args.keywords,
-        "--max-public-items",
-        str(args.max_public_items),
-        "--public-window-hours",
-        str(args.public_window_hours),
-        "--dm-max-events",
-        str(args.dm_max_events),
-    ]
-    if args.handle:
-        cmd.extend(["--handle", args.handle.lstrip("@")])
+        ROOT / "scripts",
+        out_dir,
+        keywords=args.keywords,
+        max_public_items=args.max_public_items,
+        public_window_hours=args.public_window_hours,
+        dm_max_events=args.dm_max_events,
+        handle=args.handle,
+    )
     return cmd, env
 
 
 def browser_command(args: argparse.Namespace, out_dir: Path) -> list[str]:
-    cmd = [
+    return browser_collector_command(
         sys.executable,
-        str(ROOT / "scripts" / "browser_x_digest.py"),
-        "--out",
-        str(out_dir),
-        "--keywords",
-        args.keywords,
-        "--max-public-items",
-        str(args.max_public_items),
-        "--public-window-hours",
-        str(args.public_window_hours),
-        "--scrolls",
-        str(args.scrolls),
-        "--dm-threads",
-        str(args.dm_threads),
-        "--dm-scrolls",
-        str(args.dm_scrolls),
-        "--dm-max-messages",
-        str(args.dm_max_messages),
-        "--dm-window-hours",
-        str(args.dm_window_hours),
-        "--include-dms",
-    ]
-    if args.handle:
-        cmd.extend(["--handle", args.handle.lstrip("@")])
-    if args.headed:
-        cmd.append("--headed")
-    if args.headless:
-        cmd.append("--headless")
-    if args.non_interactive:
-        cmd.append("--non-interactive")
-    return cmd
+        ROOT / "scripts",
+        out_dir,
+        keywords=args.keywords,
+        max_public_items=args.max_public_items,
+        public_window_hours=args.public_window_hours,
+        scrolls=args.scrolls,
+        dm_threads=args.dm_threads,
+        dm_scrolls=args.dm_scrolls,
+        dm_max_messages=args.dm_max_messages,
+        dm_window_hours=args.dm_window_hours,
+        handle=args.handle,
+        include_dms=True,
+        headed=args.headed,
+        headless=args.headless,
+        non_interactive=args.non_interactive,
+    )
 
 
 def build_context_if_possible(out_dir: Path) -> None:
@@ -163,7 +119,8 @@ def load_digest(out_dir: Path) -> dict[str, Any]:
         return {}
     try:
         data = json.loads(path.read_text(encoding="utf-8"))
-    except Exception:
+    except (OSError, json.JSONDecodeError) as exc:
+        print(f"Could not read digest output {path}: {exc}", flush=True)
         return {}
     return data if isinstance(data, dict) else {}
 
@@ -223,7 +180,8 @@ def collect_data_gaps(out_dir: Path) -> list[dict[str, Any]]:
         return []
     try:
         data = json.loads(path.read_text(encoding="utf-8"))
-    except Exception:
+    except (OSError, json.JSONDecodeError) as exc:
+        print(f"Could not read digest context {path}: {exc}", flush=True)
         return []
     facts = data.get("facts") if isinstance(data, dict) else {}
     gaps = facts.get("data_gaps") if isinstance(facts, dict) else []
@@ -266,7 +224,7 @@ def run_round(args: argparse.Namespace, run_root: Path, index: int) -> dict[str,
     api_dir = round_dir / "api"
     browser_dir = round_dir / "browser"
     round_dir.mkdir(parents=True, exist_ok=True)
-    result: dict[str, Any] = {"round": index, "started_at": dt.datetime.now().astimezone().isoformat()}
+    result: dict[str, Any] = {"round": index, "started_at": now_iso()}
 
     if args.skip_api:
         api_result = {"ok": False, "returncode": None, "duration_sec": 0, "error_summary": "skipped"}
@@ -285,7 +243,7 @@ def run_round(args: argparse.Namespace, run_root: Path, index: int) -> dict[str,
         build_context_if_possible(browser_dir)
     result["browser"] = source_summary("browser", browser_dir, browser_result)
     result["comparison"] = compare_sources(api_dir, browser_dir)
-    result["finished_at"] = dt.datetime.now().astimezone().isoformat()
+    result["finished_at"] = now_iso()
     (round_dir / "round-summary.json").write_text(json.dumps(result, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
     (round_dir / "round-summary.md").write_text(render_round_markdown(result), encoding="utf-8")
     return result
@@ -293,7 +251,7 @@ def run_round(args: argparse.Namespace, run_root: Path, index: int) -> dict[str,
 
 def aggregate(rounds: list[dict[str, Any]], run_root: Path) -> dict[str, Any]:
     report = {
-        "generated_at": dt.datetime.now().astimezone().isoformat(),
+        "generated_at": now_iso(),
         "round_count": len(rounds),
         "rounds": rounds,
         "stability": {
@@ -467,7 +425,7 @@ def main() -> None:
     except PermissionError:
         pass
     metadata = {
-        "started_at": dt.datetime.now().astimezone().isoformat(),
+        "started_at": now_iso(),
         "rounds": rounds,
         "interval_sec": interval,
         "args": {key: value for key, value in vars(args).items() if key not in {"bearer_token"}},

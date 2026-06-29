@@ -4,12 +4,12 @@
 from __future__ import annotations
 
 import argparse
-import datetime as dt
 import json
 import re
 from pathlib import Path
 from typing import Any
 
+from script_utils import local_timezone_name, now_iso
 
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description=__doc__)
@@ -510,15 +510,6 @@ def md_inline(value: Any) -> str:
 
 def clean_handle(value: Any) -> str:
     return str(value or "").strip().lstrip("@")
-
-
-def now_iso() -> str:
-    return dt.datetime.now(dt.timezone.utc).isoformat()
-
-
-def local_timezone_name() -> str:
-    tz = dt.datetime.now().astimezone().tzinfo
-    return str(tz) if tz else "local"
 
 
 def main() -> None:
