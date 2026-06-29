@@ -70,7 +70,7 @@ def apple_prompt(prompt: str, hidden: bool = False, buttons: list[str] | None = 
     command = " ".join(script)
     try:
         result = subprocess.run(
-        ["osascript", "-e", command, "-e", "text returned of result"],
+            ["osascript", "-e", command, "-e", "text returned of result"],
             check=True,
             text=True,
             capture_output=True,

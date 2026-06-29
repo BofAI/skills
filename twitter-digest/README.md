@@ -191,6 +191,7 @@ Use `digest-context.md` as the normal AI input. `digest-input.*` is raw collecto
 See:
 
 ```text
+twitter-digest/QA_PRODUCT_USAGE_AND_TESTING.md
 twitter-digest/DATA_COLLECTION.md
 twitter-digest/RUNBOOK.md
 twitter-digest/FUNCTION_RULES_FLOW.md

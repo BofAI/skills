@@ -25,6 +25,8 @@ CONFIG_PATH = STATE_DIR / "config.json"
 API_CONFIG_PATH = STATE_DIR / "api_config.json"
 DEFAULT_OUT_DIR = STATE_DIR / "run"
 TOKEN_URL = "https://api.x.com/2/oauth2/token"
+DEFAULT_API_PUBLIC_ITEMS = 300
+DEFAULT_BROWSER_PUBLIC_ITEMS = 100
 
 
 def parse_args() -> argparse.Namespace:
@@ -49,7 +51,12 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--dm-max-events", type=int, default=300, help="Maximum Direct Message API events kept per run.")
     parser.add_argument("--dm-window-hours", type=int, default=0, help="Stop loading older DM history once messages beyond this window are detected. 0 means load full available thread history.")
     parser.add_argument("--scrolls", type=int, default=40, help="Maximum scroll rounds per public page.")
-    parser.add_argument("--max-public-items", type=int, default=300, help="Maximum public post items kept per run.")
+    parser.add_argument(
+        "--max-public-items",
+        type=int,
+        default=None,
+        help="Override maximum public post items for both collectors. Defaults: API 300, browser 100.",
+    )
     parser.add_argument("--public-window-hours", type=int, default=24, help="Stop loading older public timeline items once posts beyond this window are detected.")
     parser.add_argument("--headless", action="store_true", help="Run browser collection headlessly. This is the default when login is already saved.")
     parser.add_argument("--headed", action="store_true", help="Force a visible browser window for debugging or manual login.")
@@ -229,6 +236,14 @@ def summarize_child_error(error: subprocess.CalledProcessError) -> str:
     return compact[:500]
 
 
+def api_public_item_limit(args: argparse.Namespace) -> int:
+    return max(1, int(args.max_public_items if args.max_public_items is not None else DEFAULT_API_PUBLIC_ITEMS))
+
+
+def browser_public_item_limit(args: argparse.Namespace) -> int:
+    return max(1, int(args.max_public_items if args.max_public_items is not None else DEFAULT_BROWSER_PUBLIC_ITEMS))
+
+
 def api_command(args: argparse.Namespace, out_dir: str, api_base: str, user_id: str, handle: str) -> list[str]:
     cmd = [
         sys.executable,
@@ -238,7 +253,7 @@ def api_command(args: argparse.Namespace, out_dir: str, api_base: str, user_id: 
         "--out",
         out_dir,
         "--max-public-items",
-        str(args.max_public_items),
+        str(api_public_item_limit(args)),
         "--public-window-hours",
         str(args.public_window_hours),
         "--api-base",
@@ -262,7 +277,7 @@ def browser_command(args: argparse.Namespace, out_dir: str, handle: str, include
         "--out",
         out_dir,
         "--max-public-items",
-        "1" if dm_only else str(args.max_public_items),
+        "1" if dm_only else str(browser_public_item_limit(args)),
         "--public-window-hours",
         str(args.public_window_hours),
         "--scrolls",
@@ -385,7 +400,10 @@ def main() -> None:
             source = "browser"
             run_browser_command(browser_command(args, args.out, handle, include_dms))
         else:
-            print(f"API collection failed: {summary}", file=sys.stderr, flush=True)
+            source_label = "API" if source == "api" else "Browser"
+            if source == "api+browser_dm":
+                source_label = "API + browser DM"
+            print(f"{source_label} collection failed: {summary}", file=sys.stderr, flush=True)
             raise SystemExit(exc.returncode) from exc
     out_dir = Path(args.out)
     build_current_context_from_file(

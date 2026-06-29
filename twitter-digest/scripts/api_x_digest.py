@@ -62,16 +62,22 @@ def api_get(args: argparse.Namespace, path: str, params: dict[str, Any] | None =
 
 def resolve_user(args: argparse.Namespace, handle: str | None, user_id: str | None) -> dict[str, str]:
     if user_id:
-        result = api_get(args, f"/users/{user_id}", {"user.fields": "username,name"})
-        data = result.get("data") if isinstance(result, dict) else None
-        if isinstance(data, dict):
-            return {"id": str(data.get("id") or user_id), "username": str(data.get("username") or handle or ""), "name": str(data.get("name") or "")}
+        try:
+            result = api_get(args, f"/users/{user_id}", {"user.fields": "username,name"})
+            data = result.get("data") if isinstance(result, dict) else None
+            if isinstance(data, dict):
+                return {"id": str(data.get("id") or user_id), "username": str(data.get("username") or handle or ""), "name": str(data.get("name") or "")}
+        except RuntimeError:
+            pass
     if handle:
         clean = handle.lstrip("@")
-        result = api_get(args, f"/users/by/username/{urllib.parse.quote(clean)}", {"user.fields": "username,name"})
-        data = result.get("data") if isinstance(result, dict) else None
-        if isinstance(data, dict):
-            return {"id": str(data.get("id") or ""), "username": str(data.get("username") or clean), "name": str(data.get("name") or "")}
+        try:
+            result = api_get(args, f"/users/by/username/{urllib.parse.quote(clean)}", {"user.fields": "username,name"})
+            data = result.get("data") if isinstance(result, dict) else None
+            if isinstance(data, dict):
+                return {"id": str(data.get("id") or ""), "username": str(data.get("username") or clean), "name": str(data.get("name") or "")}
+        except RuntimeError:
+            pass
     result = api_get(args, "/users/me", {"user.fields": "username,name"})
     data = result.get("data") if isinstance(result, dict) else None
     if isinstance(data, dict):
@@ -117,6 +123,7 @@ def collect_paginated(
     includes: dict[str, Any] = {"users": [], "media": [], "tweets": []}
     errors: list[str] = []
     next_token = ""
+    seen_ids: set[str] = set()
     while len(items) < max_items:
         page_params = dict(params)
         if next_token:
@@ -127,8 +134,18 @@ def collect_paginated(
             errors.append(str(exc))
             break
         data = result.get("data") if isinstance(result, dict) else None
+        new_items: list[dict[str, Any]] = []
         if isinstance(data, list):
-            items.extend([item for item in data if isinstance(item, dict)])
+            for item in data:
+                if not isinstance(item, dict):
+                    continue
+                item_id = str(item.get("id") or "")
+                if item_id and item_id in seen_ids:
+                    continue
+                if item_id:
+                    seen_ids.add(item_id)
+                new_items.append(item)
+            items.extend(new_items)
         inc = result.get("includes") if isinstance(result, dict) else None
         if isinstance(inc, dict):
             for key in includes:
@@ -137,7 +154,7 @@ def collect_paginated(
                     includes[key].extend(item for item in value if isinstance(item, dict))
         meta = result.get("meta") if isinstance(result, dict) else {}
         next_token = str(meta.get("next_token") or "") if isinstance(meta, dict) else ""
-        if not next_token or not data:
+        if not next_token or not data or (isinstance(data, list) and not new_items):
             break
         time.sleep(0.2)
     return items[:max_items], includes, errors
@@ -184,14 +201,12 @@ def normalize_tweets(raw: list[dict[str, Any]], includes: dict[str, Any], source
             ref_id = str(ref.get("id") or "")
             if ref_username and ref_id:
                 cards.append({"url": f"https://x.com/{ref_username}/status/{ref_id}", "text": str(ref_tweet.get("text") or ref.get("type") or "")[:500]})
-        text = str(tweet.get("text") or "")
         metrics = tweet.get("public_metrics") if isinstance(tweet.get("public_metrics"), dict) else {}
-        if metrics:
-            text += " " + " ".join(f"{key}={value}" for key, value in metrics.items())
         out.append(
             {
                 "api_source": source_kind,
-                "text": text,
+                "text": str(tweet.get("text") or ""),
+                "metrics": metrics,
                 "url": url,
                 "links": [link.get("url") for link in external_links],
                 "externalLinks": external_links,
@@ -367,6 +382,7 @@ def collect_api(args: argparse.Namespace) -> dict[str, Any]:
             "/tweets/search/recent",
             {**tweet_params(max_items, hours), "query": search_query},
             max_items,
+            page_token_name="next_token",
         )
         pages.append(page("mentions_search", f"{args.api_base}/tweets/search/recent?q={urllib.parse.quote(search_query)}", normalize_tweets(search_raw, search_includes, "mentions_search"), error="; ".join(search_errors)))
     else:
@@ -397,6 +413,7 @@ def collect_api(args: argparse.Namespace) -> dict[str, Any]:
             "/tweets/search/recent",
             {**tweet_params(max_items, hours), "query": keyword},
             max_items,
+            page_token_name="next_token",
         )
         pages.append(page(f"keyword_{index}", f"{args.api_base}/tweets/search/recent?q={urllib.parse.quote(keyword)}", normalize_tweets(raw, includes, f"keyword_{index}"), error="; ".join(errors)))
 

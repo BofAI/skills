@@ -21,6 +21,8 @@ ROOT = Path(__file__).resolve().parents[1]
 DEFAULT_OUT = ROOT / ".state" / "compare-runs"
 MIN_INTERVAL_SEC = 120
 PUBLIC_KINDS = ["home", "own_profile", "mentions_search", "mentions_notifications"]
+DEFAULT_API_PUBLIC_ITEMS = 300
+DEFAULT_BROWSER_PUBLIC_ITEMS = 100
 
 
 def parse_args() -> argparse.Namespace:
@@ -30,7 +32,12 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--out-dir", default=str(DEFAULT_OUT), help="Directory for archived comparison runs.")
     parser.add_argument("--handle", default="", help="Optional X handle override.")
     parser.add_argument("--keywords", default="", help="Optional comma-separated keyword searches.")
-    parser.add_argument("--max-public-items", type=int, default=300)
+    parser.add_argument(
+        "--max-public-items",
+        type=int,
+        default=None,
+        help="Override maximum public post items for both collectors. Defaults: API 300, browser 100.",
+    )
     parser.add_argument("--public-window-hours", type=int, default=24)
     parser.add_argument("--scrolls", type=int, default=40)
     parser.add_argument("--dm-threads", type=int, default=5)
@@ -92,6 +99,14 @@ def summarize_error(text: str) -> str:
     return " ".join(text.split())[:500]
 
 
+def api_public_item_limit(args: argparse.Namespace) -> int:
+    return max(1, int(args.max_public_items if args.max_public_items is not None else DEFAULT_API_PUBLIC_ITEMS))
+
+
+def browser_public_item_limit(args: argparse.Namespace) -> int:
+    return max(1, int(args.max_public_items if args.max_public_items is not None else DEFAULT_BROWSER_PUBLIC_ITEMS))
+
+
 def api_command(args: argparse.Namespace, out_dir: Path) -> tuple[list[str], dict[str, str]]:
     token = load_bearer_token()
     env = os.environ.copy()
@@ -105,7 +120,7 @@ def api_command(args: argparse.Namespace, out_dir: Path) -> tuple[list[str], dic
         "--keywords",
         args.keywords,
         "--max-public-items",
-        str(args.max_public_items),
+        str(api_public_item_limit(args)),
         "--public-window-hours",
         str(args.public_window_hours),
         "--dm-max-events",
@@ -125,7 +140,7 @@ def browser_command(args: argparse.Namespace, out_dir: Path) -> list[str]:
         "--keywords",
         args.keywords,
         "--max-public-items",
-        str(args.max_public_items),
+        str(browser_public_item_limit(args)),
         "--public-window-hours",
         str(args.public_window_hours),
         "--scrolls",

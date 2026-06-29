@@ -20,6 +20,13 @@ from pathlib import Path
 from typing import Any
 
 
+PUBLIC_STAGNANT_ROUND_LIMIT = 4
+PUBLIC_SLOW_SCROLL_ROUNDS = 3
+PUBLIC_INITIAL_SCROLL_WAIT_SEC = 2
+PUBLIC_LATER_SCROLL_WAIT_SEC = 1
+DEFAULT_BROWSER_PUBLIC_ITEMS = 100
+
+
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description=__doc__)
     default_state_dir = Path(__file__).resolve().parents[1] / ".state"
@@ -28,7 +35,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--out", default=str(default_state_dir / "run"), help="Output directory.")
     parser.add_argument("--profile-dir", default=str(default_state_dir / "chrome-profile"))
     parser.add_argument("--scrolls", type=int, default=40, help="Maximum scroll rounds per public page.")
-    parser.add_argument("--max-public-items", type=int, default=300, help="Maximum public post items kept per run.")
+    parser.add_argument("--max-public-items", type=int, default=DEFAULT_BROWSER_PUBLIC_ITEMS, help="Maximum public post items kept per run.")
     parser.add_argument("--public-window-hours", type=int, default=24, help="Stop loading older public timeline items once posts beyond this window are detected.")
     parser.add_argument("--login-timeout-sec", type=int, default=300)
     parser.add_argument("--include-dms", action="store_true", help="Also visit X messages and capture visible conversation text.")
@@ -86,7 +93,11 @@ def launch_browser(profile_dir: Path, start_url: str, headless: bool) -> tuple[s
     if headless:
         command.extend(["--headless=new", "--disable-gpu", "--window-size=1440,1200"])
     proc = subprocess.Popen(command, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
-    wait_for_cdp(port)
+    try:
+        wait_for_cdp(port)
+    except BaseException:
+        stop_browser(proc)
+        raise
     return proc, port
 
 
@@ -190,10 +201,10 @@ def collect_page(
     page: dict[str, str],
     scrolls: int,
     dm_threads: int = 5,
-    dm_scrolls: int = 40,
-    dm_max_messages: int = 300,
-    dm_window_hours: int = 24,
-    max_public_items: int = 300,
+    dm_scrolls: int = 200,
+    dm_max_messages: int = 2000,
+    dm_window_hours: int = 0,
+    max_public_items: int = DEFAULT_BROWSER_PUBLIC_ITEMS,
     public_window_hours: int = 24,
 ) -> dict[str, Any]:
     ws_url = wait_for_cdp_page_ws(port)
@@ -215,6 +226,8 @@ def collect_page(
             cdp_call(ws_url, "Page.navigate", {"url": page["url"]})
             time.sleep(8)
             extra = collect_messages_page(ws_url, dm_threads, dm_scrolls, dm_max_messages, dm_window_hours)
+            if dm_collection_looks_premature(extra):
+                mark_dm_loading_gap(extra)
         return {"kind": page["kind"], "url": page["url"], "items": [], **extra}
     extra = collect_public_items(ws_url, max_scrolls=scrolls, max_items=max_public_items, window_hours=public_window_hours)
     return {"kind": page["kind"], "url": page["url"], **extra}
@@ -228,8 +241,10 @@ def collect_public_items(ws_url: str, max_scrolls: int, max_items: int, window_h
     stagnant_rounds = 0
     previous_count = 0
     window_exceeded = False
+    scrolls_used = 0
 
     for scroll_index in range(scroll_limit):
+        scrolls_used = scroll_index + 1
         posts = dedupe_items([*posts, *extract_articles(ws_url)])
         if len(posts) >= item_limit:
             break
@@ -240,18 +255,20 @@ def collect_public_items(ws_url: str, max_scrolls: int, max_items: int, window_h
             stagnant_rounds += 1
         else:
             stagnant_rounds = 0
-        if stagnant_rounds >= 4:
+        if stagnant_rounds >= PUBLIC_STAGNANT_ROUND_LIMIT:
             break
         previous_count = len(posts)
         cdp_eval(ws_url, "window.scrollBy(0, Math.max(900, window.innerHeight * 0.9));")
-        time.sleep(2 if scroll_index < 3 else 1)
+        wait_sec = PUBLIC_INITIAL_SCROLL_WAIT_SEC if scroll_index < PUBLIC_SLOW_SCROLL_ROUNDS else PUBLIC_LATER_SCROLL_WAIT_SEC
+        time.sleep(wait_sec)
 
     posts = dedupe_items([*posts, *extract_articles(ws_url)])
+    window_exceeded = window_exceeded or public_posts_beyond_window(posts, window)
     if len(posts) > item_limit:
         posts = posts[:item_limit]
     return {
         "items": posts,
-        "public_scrolls_used": min(scroll_limit, max(0, scroll_index + 1 if "scroll_index" in locals() else 0)),
+        "public_scrolls_used": min(scroll_limit, scrolls_used),
         "public_window_exceeded": window_exceeded,
         "public_max_items": item_limit,
         "public_window_hours": window,
@@ -298,8 +315,27 @@ def dm_collection_looks_premature(extra: dict[str, Any]) -> bool:
         return False
     if "start conversation" not in text:
         return False
-    conversation_markers = ("you:", "you sent", "now", " min", "m ", "h ", "today", "今天")
-    return not any(marker in text for marker in conversation_markers)
+    conversation_markers = [
+        r"\byou\s*:",
+        r"\byou sent\b",
+        r"\bnow\b",
+        r"\b\d+\s*(m|min|mins|minute|minutes|h|hr|hrs|hour|hours)\b",
+        r"\btoday\b",
+        r"今天",
+    ]
+    return not any(re.search(marker, text, re.IGNORECASE) for marker in conversation_markers)
+
+
+def mark_dm_loading_gap(extra: dict[str, Any]) -> None:
+    original_status = str(extra.get("dm_status") or "unknown")
+    extra["dm_original_status"] = original_status
+    extra["dm_status"] = "dm_page_loading_timeout"
+    extra["dm_note"] = (
+        "X Messages still looked like a loading skeleton after retry. "
+        f"The provisional status was `{original_status}`, but this should be treated as a DM loading gap, not as an empty inbox."
+    )
+    extra["collection_status"] = "partial"
+    extra["collection_error"] = "X Messages page did not finish loading; DM conversation counts may be incomplete."
 
 
 def collect_dm_threads(ws_url: str, max_threads: int, dm_scrolls: int, dm_max_messages: int, dm_window_hours: int) -> dict[str, Any]:
@@ -1611,6 +1647,13 @@ def main() -> None:
                         args.max_public_items,
                         args.public_window_hours,
                     )
+                    if result.get("dm_status") == "blocked_by_x_chat_passcode":
+                        result["dm_note"] = (
+                            "X Chat was still blocked by the passcode screen after the visible-browser recovery step. "
+                            "Complete passcode setup or entry until the inbox is visible, then rerun the digest."
+                        )
+                        result["collection_status"] = "partial"
+                        result["collection_error"] = "X Chat passcode screen remained after recovery."
                     if resume_headless_after_passcode:
                         print("X Chat passcode was completed. DM collection finished in the visible browser; returning to headless mode...")
                         stop_browser(proc)

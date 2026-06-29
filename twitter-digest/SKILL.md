@@ -7,24 +7,26 @@ description: Use when the user wants Claude Code or another agent to analyze the
 
 ## Overview
 
-Use this skill to produce a concise Chinese daily digest from the user's own X/Twitter account. The recommended entry point is `scripts/run_daily_digest.py`, which selects API collection when API credentials are configured and otherwise falls back to local browser collection with a persistent dedicated Chromium profile.
+Use this skill to produce a concise Chinese daily digest from the user's own X/Twitter account. The recommended entry point is the installed `scripts/run_daily_digest.py`, which selects API collection when API credentials are configured and otherwise falls back to local browser collection with a persistent dedicated Chromium profile.
+
+Use the installed command form for normal chat-triggered runs. Claude Code should run `python3 ~/.claude/skills/twitter-digest/scripts/run_daily_digest.py`; Codex should replace `~/.claude` with `~/.codex`. Do not run the source-checkout path after installation unless you are intentionally developing the skill.
 
 Load `references/x-twitter-digest.md` when you need implementation details, browser workflow rules, current-run context behavior, or the scoring rubric.
 
 ## Data Collection
 
-There are three collection scripts:
+There are three collection scripts in the installed skill:
 
 ```bash
-python3 twitter-digest/scripts/browser_x_digest.py   # browser collector
-python3 twitter-digest/scripts/api_x_digest.py       # API collector
-python3 twitter-digest/scripts/run_daily_digest.py   # upper wrapper, --source auto
+python3 ~/.claude/skills/twitter-digest/scripts/run_daily_digest.py   # upper wrapper, --source auto
+python3 ~/.claude/skills/twitter-digest/scripts/browser_x_digest.py   # browser collector
+python3 ~/.claude/skills/twitter-digest/scripts/api_x_digest.py       # API collector
 ```
 
 For chat usage, run the wrapper:
 
 ```bash
-python3 twitter-digest/scripts/run_daily_digest.py
+python3 ~/.claude/skills/twitter-digest/scripts/run_daily_digest.py
 ```
 
 `run_daily_digest.py --source auto` uses saved OAuth2 user-context credentials, `X_BEARER_TOKEN`, or `TWITTER_BEARER_TOKEN` for public data when present; otherwise it uses the browser collector. During the current X API limitation, normal daily runs use API for public data and browser collection for all DM/X Chat content. Treat API DM lookup as TODO / waiting for X to fix XChat-encrypted DM coverage; do not use API DM to decide whether the user has private messages.
@@ -32,39 +34,39 @@ python3 twitter-digest/scripts/run_daily_digest.py
 If the user asks to configure API access, trigger the OAuth/user-token setup from chat:
 
 ```bash
-python3 twitter-digest/scripts/run_daily_digest.py --configure-api
+python3 ~/.claude/skills/twitter-digest/scripts/run_daily_digest.py --configure-api
 ```
 
 This is an agent-triggered flow. It supports OAuth2 user authorization:
 
-- OAuth2 path: if the user has an X Developer App OAuth2 `Client ID` and local callback URL, run `python3 twitter-digest/scripts/run_daily_digest.py --configure-api`. It goes directly into OAuth2 setup. Request `dm.read tweet.read users.read offline.access`.
-- Existing token path: if the user says they already have an OAuth2 user access token, run `python3 twitter-digest/scripts/run_daily_digest.py --configure-api-token`.
+- OAuth2 path: if the user has an X Developer App OAuth2 `Client ID` and local callback URL, run `python3 ~/.claude/skills/twitter-digest/scripts/run_daily_digest.py --configure-api`. It goes directly into OAuth2 setup. Request `dm.read tweet.read users.read offline.access`.
+- Existing token path: if the user says they already have an OAuth2 user access token, run `python3 ~/.claude/skills/twitter-digest/scripts/run_daily_digest.py --configure-api-token`.
 - OAuth1 PIN is not a supported normal setup path for this skill because it did not reliably return DM data during validation. Do not guide users to Consumer Key / Consumer Secret / PIN unless they are explicitly debugging legacy API behavior.
 
 If a refresh token is saved, later daily runs refresh the access token automatically. Do not ask the user to export environment variables manually. App-only API keys are not enough for user-context home timeline access.
 
-After API setup succeeds once, future daily digest runs should not ask the user for credentials again. Run `scripts/run_daily_digest.py`; it reads `.state/api_config.json` automatically. OAuth2 credentials are refreshed automatically when a refresh token is saved. Only rerun `--configure-api` when the saved credentials are missing, revoked, expired without refresh, or the user explicitly asks to change accounts/apps.
+After API setup succeeds once, future daily digest runs should not ask the user for credentials again. Run `python3 ~/.claude/skills/twitter-digest/scripts/run_daily_digest.py`; it reads `.state/api_config.json` automatically. OAuth2 credentials are refreshed automatically when a refresh token is saved. Only rerun `--configure-api` when the saved credentials are missing, revoked, expired without refresh, or the user explicitly asks to change accounts/apps.
 
 If the user asks to clear API access, run:
 
 ```bash
-python3 twitter-digest/scripts/configure_api.py --clear
+python3 ~/.claude/skills/twitter-digest/scripts/configure_api.py --clear
 ```
 
 All normal flows should be triggered from chat by the agent:
 
-- X 日报 / 生成日报: run `scripts/run_daily_digest.py`.
-- 用户已有 token / 输入 X token: run `scripts/run_daily_digest.py --configure-api-token`.
-- 配置 X API / 给 app 授权: run `scripts/run_daily_digest.py --configure-api`.
-- 清除 X API 配置: run `scripts/configure_api.py --clear`.
-- 调试浏览器: run `scripts/run_daily_digest.py --source browser --headed`.
-- 对比 API 和浏览器抓取 / 稳定性测试: run `scripts/compare_collectors.py --rounds 3 --interval-sec 120`. Load `COLLECTOR_COMPARISON_TEST.md` before interpreting the report.
+- X 日报 / 生成日报: run `python3 ~/.claude/skills/twitter-digest/scripts/run_daily_digest.py`.
+- 用户已有 token / 输入 X token: run `python3 ~/.claude/skills/twitter-digest/scripts/run_daily_digest.py --configure-api-token`.
+- 配置 X API / 给 app 授权: run `python3 ~/.claude/skills/twitter-digest/scripts/run_daily_digest.py --configure-api`.
+- 清除 X API 配置: run `python3 ~/.claude/skills/twitter-digest/scripts/configure_api.py --clear`.
+- 调试浏览器: run `python3 ~/.claude/skills/twitter-digest/scripts/run_daily_digest.py --source browser --headed`.
+- 对比 API 和浏览器抓取 / 稳定性测试: run `python3 ~/.claude/skills/twitter-digest/scripts/compare_collectors.py --rounds 3 --interval-sec 120`. Load `COLLECTOR_COMPARISON_TEST.md` before interpreting the report.
 
 Force a source:
 
 ```bash
-python3 twitter-digest/scripts/run_daily_digest.py --source browser
-X_BEARER_TOKEN=... python3 twitter-digest/scripts/run_daily_digest.py --source api --handle <handle>
+python3 ~/.claude/skills/twitter-digest/scripts/run_daily_digest.py --source browser
+X_BEARER_TOKEN=... python3 ~/.claude/skills/twitter-digest/scripts/run_daily_digest.py --source api --handle <handle>
 ```
 
 The first run opens a dedicated browser profile at `twitter-digest/.state/chrome-profile`. The user logs in to X once in that browser. Later runs default to headless collection and reuse the saved local browser session. If the saved login is unavailable, the script automatically opens a visible browser window for manual login. The skill has two collector scripts: `scripts/api_x_digest.py` for official API public data, and `scripts/browser_x_digest.py` for browser-visible X Chat / encrypted DM content. API-visible DM events remain TODO-only until X fixes or documents reliable XChat coverage.
@@ -72,7 +74,7 @@ The first run opens a dedicated browser profile at `twitter-digest/.state/chrome
 DM reading is enabled by default and only reads visible local browser content. To skip DMs for a run:
 
 ```bash
-python3 twitter-digest/scripts/run_daily_digest.py --no-dms
+python3 ~/.claude/skills/twitter-digest/scripts/run_daily_digest.py --no-dms
 ```
 
 Default scope:
@@ -83,7 +85,7 @@ Default scope:
 - Today's visible DM conversations, with only conversations whose latest preview is not from the user opened for content.
 - Optional keyword searches only when the user explicitly passes `--keywords`.
 
-Public timeline/profile/mentions pages use the same daily-window loading model as DMs: by default the collector scrolls each public page up to 40 rounds, keeps up to 300 public items, and stops early when loaded post timestamps show content beyond the 24-hour digest window (`--scrolls 40`, `--max-public-items 300`, `--public-window-hours 24`).
+Public timeline/profile/mentions pages use the same daily-window loading model as DMs: by default the browser collector scrolls each public page up to 40 rounds, keeps up to 100 public items, and stops early when loaded post timestamps show content beyond the 24-hour digest window. API public collection keeps up to 300 public items by default. Passing `--max-public-items N` overrides both collectors for that run (`--scrolls 40`, browser default `--max-public-items 100`, API default `--max-public-items 300`, `--public-window-hours 24`).
 
 Read only `twitter-digest/.state/run/digest-context.md` when writing the Chinese digest. Its `Final Summary Facts` section is the content source for the final summary. Use `digest-input.md` only when debugging collection issues, not during normal summarization. Do not add content from older runs.
 
@@ -124,31 +126,31 @@ No `memory.json` or `daily/` archive is produced. Raw DM text or DM excerpts may
 When the user asks for an X daily digest or X 日报, run:
 
 ```bash
-python3 twitter-digest/scripts/run_daily_digest.py
+python3 ~/.claude/skills/twitter-digest/scripts/run_daily_digest.py
 ```
 
 If they ask to skip DMs:
 
 ```bash
-python3 twitter-digest/scripts/run_daily_digest.py --no-dms
+python3 ~/.claude/skills/twitter-digest/scripts/run_daily_digest.py --no-dms
 ```
 
 If the authenticated handle is not detected or the user corrects it:
 
 ```bash
-python3 twitter-digest/scripts/run_daily_digest.py --handle <handle> --account-name "<显示名>" --save-default
+python3 ~/.claude/skills/twitter-digest/scripts/run_daily_digest.py --handle <handle> --account-name "<显示名>" --save-default
 ```
 
 For debugging or manual inspection:
 
 ```bash
-python3 twitter-digest/scripts/run_daily_digest.py --headed
+python3 ~/.claude/skills/twitter-digest/scripts/run_daily_digest.py --headed
 ```
 
 For unattended scheduled runs that should not block on passcode recovery:
 
 ```bash
-python3 twitter-digest/scripts/run_daily_digest.py --non-interactive
+python3 ~/.claude/skills/twitter-digest/scripts/run_daily_digest.py --non-interactive
 ```
 
 Do not ask the user to copy cookies or configure another service. If the script opens a visible browser window, tell the user to log in or resolve the visible X challenge there.

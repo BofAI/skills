@@ -158,7 +158,7 @@ python3 twitter-digest/scripts/install.py --skip-browser-check
 
 ```text
 --scrolls 40
---max-public-items 300
+--max-public-items 100  # browser default; API default is 300
 --public-window-hours 24
 ```
 
@@ -168,7 +168,7 @@ python3 twitter-digest/scripts/install.py --skip-browser-check
 2. 读取已加载的 `article`。
 3. 滚动页面并继续读取。
 4. 去重。
-5. 最多保留 300 条公开帖子。
+5. 浏览器最多保留 100 条公开帖子；API 最多保留 300 条公开帖子。
 6. 如果已加载帖子的时间戳显示超过 24 小时窗口，提前停止。
 
 每条公开帖子会尽量提取：
