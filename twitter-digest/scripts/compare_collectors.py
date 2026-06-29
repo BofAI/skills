@@ -33,8 +33,10 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--keywords", default="", help="Optional comma-separated keyword searches.")
     parser.add_argument("--max-public-items", type=int, default=300)
     parser.add_argument("--public-window-hours", type=int, default=24)
+    parser.add_argument("--min-public-scrolls", type=int, default=5)
     parser.add_argument("--scrolls", type=int, default=40)
     parser.add_argument("--dm-threads", type=int, default=5)
+    parser.add_argument("--dm-list-scrolls", type=int, default=20)
     parser.add_argument("--dm-scrolls", type=int, default=200)
     parser.add_argument("--dm-max-messages", type=int, default=2000)
     parser.add_argument("--dm-window-hours", type=int, default=0)
@@ -94,8 +96,10 @@ def browser_command(args: argparse.Namespace, out_dir: Path) -> list[str]:
         keywords=args.keywords,
         max_public_items=args.max_public_items,
         public_window_hours=args.public_window_hours,
+        min_public_scrolls=args.min_public_scrolls,
         scrolls=args.scrolls,
         dm_threads=args.dm_threads,
+        dm_list_scrolls=args.dm_list_scrolls,
         dm_scrolls=args.dm_scrolls,
         dm_max_messages=args.dm_max_messages,
         dm_window_hours=args.dm_window_hours,

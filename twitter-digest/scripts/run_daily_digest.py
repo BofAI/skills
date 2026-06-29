@@ -41,11 +41,13 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--include-dms", action="store_true", help="Include visible DMs. This is already the default; kept for compatibility.")
     parser.add_argument("--no-dms", action="store_true", help="Skip X Messages collection for this run.")
     parser.add_argument("--dm-threads", type=int, default=5)
+    parser.add_argument("--dm-list-scrolls", type=int, default=20, help="Maximum downward scroll rounds used to scan today's DM conversation list.")
     parser.add_argument("--dm-scrolls", type=int, default=200, help="Maximum upward scroll rounds per opened DM thread.")
     parser.add_argument("--dm-max-messages", type=int, default=2000, help="Maximum message bubbles kept per opened DM thread.")
     parser.add_argument("--dm-max-events", type=int, default=300, help="Maximum Direct Message API events kept per run.")
     parser.add_argument("--dm-window-hours", type=int, default=0, help="Stop loading older DM history once messages beyond this window are detected. 0 means load full available thread history.")
     parser.add_argument("--scrolls", type=int, default=40, help="Maximum scroll rounds per public page.")
+    parser.add_argument("--min-public-scrolls", type=int, default=5, help="Minimum public-page scroll rounds before early stop rules can end collection.")
     parser.add_argument("--max-public-items", type=int, default=300, help="Maximum public post items kept per run.")
     parser.add_argument("--public-window-hours", type=int, default=24, help="Stop loading older public timeline items once posts beyond this window are detected.")
     parser.add_argument("--headless", action="store_true", help="Run browser collection headlessly. This is the default when login is already saved.")
@@ -154,8 +156,10 @@ def browser_command(args: argparse.Namespace, out_dir: str, handle: str, include
         keywords=args.keywords,
         max_public_items=args.max_public_items,
         public_window_hours=args.public_window_hours,
+        min_public_scrolls=args.min_public_scrolls,
         scrolls=args.scrolls,
         dm_threads=args.dm_threads,
+        dm_list_scrolls=args.dm_list_scrolls,
         dm_scrolls=args.dm_scrolls,
         dm_max_messages=args.dm_max_messages,
         dm_window_hours=args.dm_window_hours,

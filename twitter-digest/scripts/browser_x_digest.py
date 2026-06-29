@@ -25,11 +25,13 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--out", default=str(default_state_dir / "run"), help="Output directory.")
     parser.add_argument("--profile-dir", default=str(default_state_dir / "chrome-profile"))
     parser.add_argument("--scrolls", type=int, default=40, help="Maximum scroll rounds per public page.")
+    parser.add_argument("--min-public-scrolls", type=int, default=5, help="Minimum public-page scroll rounds before early stop rules can end collection.")
     parser.add_argument("--max-public-items", type=int, default=300, help="Maximum public post items kept per run.")
     parser.add_argument("--public-window-hours", type=int, default=24, help="Stop loading older public timeline items once posts beyond this window are detected.")
     parser.add_argument("--login-timeout-sec", type=int, default=300)
     parser.add_argument("--include-dms", action="store_true", help="Also visit X messages and capture visible conversation text.")
     parser.add_argument("--dm-threads", type=int, default=5, help="Maximum recent DM threads to open when --include-dms is set.")
+    parser.add_argument("--dm-list-scrolls", type=int, default=20, help="Maximum downward scroll rounds used to scan today's DM conversation list.")
     parser.add_argument("--dm-scrolls", type=int, default=200, help="Maximum upward scroll rounds per opened DM thread.")
     parser.add_argument("--dm-max-messages", type=int, default=2000, help="Maximum message bubbles kept per opened DM thread.")
     parser.add_argument("--dm-window-hours", type=int, default=0, help="Stop loading older DM history once messages beyond this window are detected. 0 means load the full thread available in the browser.")
@@ -65,11 +67,13 @@ def collect_page(
     page: dict[str, str],
     scrolls: int,
     dm_threads: int = 5,
+    dm_list_scrolls: int = 20,
     dm_scrolls: int = 40,
     dm_max_messages: int = 300,
     dm_window_hours: int = 24,
     max_public_items: int = 300,
     public_window_hours: int = 24,
+    min_public_scrolls: int = 5,
 ) -> dict[str, Any]:
     ws_url = wait_for_cdp_page_ws(port)
     cdp_call(ws_url, "Page.enable")
@@ -85,14 +89,14 @@ def collect_page(
         }
     if page["kind"] == "messages":
         wait_for_dm_ready(ws_url, timeout_sec=20)
-        extra = collect_messages_page(ws_url, dm_threads, dm_scrolls, dm_max_messages, dm_window_hours)
+        extra = collect_messages_page(ws_url, dm_threads, dm_scrolls, dm_max_messages, dm_window_hours, dm_list_scrolls)
         if dm_collection_looks_premature(extra):
             cdp_call(ws_url, "Page.navigate", {"url": page["url"]})
             wait_for_dm_ready(ws_url, timeout_sec=20)
-            extra = collect_messages_page(ws_url, dm_threads, dm_scrolls, dm_max_messages, dm_window_hours)
+            extra = collect_messages_page(ws_url, dm_threads, dm_scrolls, dm_max_messages, dm_window_hours, dm_list_scrolls)
         return {"kind": page["kind"], "url": page["url"], "items": [], **extra}
     wait_for_public_page_ready(ws_url, timeout_sec=20)
-    extra = collect_public_items(ws_url, max_scrolls=scrolls, max_items=max_public_items, window_hours=public_window_hours)
+    extra = collect_public_items(ws_url, max_scrolls=scrolls, max_items=max_public_items, window_hours=public_window_hours, min_scrolls=min_public_scrolls)
     return {"kind": page["kind"], "url": page["url"], **extra}
 
 
@@ -157,11 +161,13 @@ def main() -> None:
                     page,
                     args.scrolls,
                     args.dm_threads,
+                    args.dm_list_scrolls,
                     args.dm_scrolls,
                     args.dm_max_messages,
                     args.dm_window_hours,
                     args.max_public_items,
                     args.public_window_hours,
+                    args.min_public_scrolls,
                 )
                 if page["kind"] == "messages" and result.get("dm_status") == "blocked_by_x_chat_passcode":
                     if args.non_interactive:
@@ -188,11 +194,13 @@ def main() -> None:
                             page,
                             args.scrolls,
                             args.dm_threads,
+                            args.dm_list_scrolls,
                             args.dm_scrolls,
                             args.dm_max_messages,
                             args.dm_window_hours,
                             args.max_public_items,
                             args.public_window_hours,
+                            args.min_public_scrolls,
                         )
                     else:
                         result["dm_note"] = (

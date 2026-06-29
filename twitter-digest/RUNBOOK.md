@@ -170,6 +170,7 @@ python3 twitter-digest/scripts/install.py --skip-browser-check
 
 ```text
 --scrolls 40
+--min-public-scrolls 5
 --max-public-items 300
 --public-window-hours 24
 ```
@@ -224,6 +225,7 @@ today visible = last_from_me + waiting_reply
 
 ```text
 --dm-scrolls 200
+--dm-list-scrolls 20
 --dm-max-messages 2000
 --dm-window-hours 0
 ```
@@ -232,6 +234,7 @@ today visible = last_from_me + waiting_reply
 
 - 最多向上滚动 200 次。
 - 最多保留 2000 条消息气泡。
+- `--dm-list-scrolls 20` 表示先向下扫描左侧会话列表，尽量覆盖今天会话。
 - `--dm-window-hours 0` 表示不按 24 小时截断 DM 历史。
 - 会尽量滚到对话顶部。
 - 如果没有滚到顶部或命中消息上限，会在 `digest-context` 里记录 `dm_thread_incomplete`。

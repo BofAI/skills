@@ -20,6 +20,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--profile-dir", default=str(DEFAULT_PROFILE_DIR))
     parser.add_argument("--login-timeout-sec", type=int, default=300)
     parser.add_argument("--dm-threads", type=int, default=5)
+    parser.add_argument("--dm-list-scrolls", type=int, default=20)
     parser.add_argument("--dm-scrolls", type=int, default=200)
     parser.add_argument("--dm-max-messages", type=int, default=2000)
     parser.add_argument("--dm-window-hours", type=int, default=0)
@@ -42,6 +43,7 @@ def main() -> None:
             {"kind": "messages", "url": "https://x.com/messages"},
             scrolls=1,
             dm_threads=args.dm_threads,
+            dm_list_scrolls=args.dm_list_scrolls,
             dm_scrolls=args.dm_scrolls,
             dm_max_messages=args.dm_max_messages,
             dm_window_hours=args.dm_window_hours,
@@ -55,6 +57,8 @@ def main() -> None:
         "last_from_me": result.get("dm_replied_thread_count", 0),
         "waiting_reply": result.get("dm_unreplied_thread_count", 0),
         "captured_messages": result.get("dm_captured_message_count", 0),
+        "list_scrolls_used": result.get("dm_list_scrolls_used", 0),
+        "list_load_complete": result.get("dm_list_load_complete", False),
         "dm_note": result.get("dm_note", ""),
         "threads": [],
     }

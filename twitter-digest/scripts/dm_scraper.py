@@ -12,7 +12,7 @@ from dom_script_loader import load_dom_script
 from public_scraper import extract_main_text
 
 
-def collect_messages_page(ws_url: str, dm_threads: int, dm_scrolls: int, dm_max_messages: int, dm_window_hours: int) -> dict[str, Any]:
+def collect_messages_page(ws_url: str, dm_threads: int, dm_scrolls: int, dm_max_messages: int, dm_window_hours: int, dm_list_scrolls: int = 20) -> dict[str, Any]:
     extra: dict[str, Any] = {}
     extra["visible_text"] = extract_main_text(ws_url)
     extra.update(
@@ -22,6 +22,7 @@ def collect_messages_page(ws_url: str, dm_threads: int, dm_scrolls: int, dm_max_
             dm_scrolls=dm_scrolls,
             dm_max_messages=dm_max_messages,
             dm_window_hours=dm_window_hours,
+            dm_list_scrolls=dm_list_scrolls,
         )
     )
     return extra
@@ -36,7 +37,7 @@ def dm_collection_looks_premature(extra: dict[str, Any]) -> bool:
     conversation_markers = ("you:", "you sent", "now", " min", "m ", "h ", "today", "今天")
     return not any(marker in text for marker in conversation_markers)
 
-def collect_dm_threads(ws_url: str, max_threads: int, dm_scrolls: int, dm_max_messages: int, dm_window_hours: int) -> dict[str, Any]:
+def collect_dm_threads(ws_url: str, max_threads: int, dm_scrolls: int, dm_max_messages: int, dm_window_hours: int, dm_list_scrolls: int = 20) -> dict[str, Any]:
     main_text = wait_for_dm_ready(ws_url)
     if is_dm_passcode_screen(main_text):
         return {
@@ -46,7 +47,8 @@ def collect_dm_threads(ws_url: str, max_threads: int, dm_scrolls: int, dm_max_me
             **dm_counts([]),
         }
 
-    all_targets = extract_dm_thread_targets(ws_url)
+    list_info = load_dm_thread_list_targets(ws_url, max_scrolls=dm_list_scrolls)
+    all_targets = list_info["targets"]
     today_targets = today_dm_targets(all_targets)
     thread_targets = unreplied_dm_targets(today_targets)
     counts = dm_counts(today_targets)
@@ -59,6 +61,8 @@ def collect_dm_threads(ws_url: str, max_threads: int, dm_scrolls: int, dm_max_me
                     "but every latest preview appears to be from you."
                 ),
                 "dm_threads": [],
+                "dm_list_scrolls_used": list_info["scrolls_used"],
+                "dm_list_load_complete": list_info["load_complete"],
                 **counts,
             }
         if all_targets:
@@ -66,6 +70,8 @@ def collect_dm_threads(ws_url: str, max_threads: int, dm_scrolls: int, dm_max_me
                 "dm_status": "no_today_threads",
                 "dm_note": f"DM conversation list was visible with {len(all_targets)} older thread target(s), but no today conversation targets were found.",
                 "dm_threads": [],
+                "dm_list_scrolls_used": list_info["scrolls_used"],
+                "dm_list_load_complete": list_info["load_complete"],
                 **counts,
             }
         if looks_like_dm_list_text(main_text):
@@ -73,24 +79,50 @@ def collect_dm_threads(ws_url: str, max_threads: int, dm_scrolls: int, dm_max_me
                 "dm_status": "visible_threads_unopened",
                 "dm_note": "DM conversation list text was visible, but no unreplied openable conversation link or row target could be detected.",
                 "dm_threads": [],
+                "dm_list_scrolls_used": list_info["scrolls_used"],
+                "dm_list_load_complete": list_info["load_complete"],
                 **counts,
             }
         return {
             "dm_status": "no_visible_threads",
             "dm_note": "No DM conversation links or clickable conversation rows were visible after waiting for the messages page.",
             "dm_threads": [],
+            "dm_list_scrolls_used": list_info["scrolls_used"],
+            "dm_list_load_complete": list_info["load_complete"],
             **counts,
         }
 
     threads: list[dict[str, Any]] = []
     seen_targets: set[str] = set()
-    for _ in range(max(max_threads, 0)):
-        thread_targets = [target for target in unreplied_dm_targets(today_dm_targets(extract_dm_thread_targets(ws_url))) if dm_target_key(target) not in seen_targets]
-        if not thread_targets:
-            break
-        target = thread_targets[0]
+    for target in thread_targets[: max(max_threads, 0)]:
+        if dm_target_key(target) in seen_targets:
+            continue
         seen_targets.add(dm_target_key(target))
         if float(target.get("x") or 0) > 0 and float(target.get("y") or 0) > 0:
+            cdp_call(ws_url, "Page.navigate", {"url": "https://x.com/messages"})
+            wait_for_dm_ready(ws_url, timeout_sec=8)
+            if not restore_dm_thread_list_position(ws_url, target):
+                threads.append(
+                    {
+                        "url": str(target.get("url") or ""),
+                        "label": str(target.get("label") or ""),
+                        "participant": dm_participant(target),
+                        "target_type": str(target.get("target_type") or ""),
+                        "replied": bool(target.get("replied")),
+                        "reply_reason": str(target.get("reply_reason") or ""),
+                        "today": bool(target.get("today")),
+                        "message_count": 0,
+                        "dm_scrolls_used": 0,
+                        "dm_load_complete": False,
+                        "dm_window_exceeded": False,
+                        "dm_hit_message_cap": False,
+                        "messages": [],
+                        "text": "",
+                        "collection_status": "skipped",
+                        "collection_error": "Could not relocate DM row after scanning the thread list.",
+                    }
+                )
+                continue
             click_point(ws_url, float(target.get("x") or 0), float(target.get("y") or 0))
         elif target.get("url"):
             cdp_call(ws_url, "Page.navigate", {"url": str(target["url"])})
@@ -125,13 +157,73 @@ def collect_dm_threads(ws_url: str, max_threads: int, dm_scrolls: int, dm_max_me
         "dm_note": (
             f"Today visible DM threads: {counts['dm_visible_thread_count']}; latest from you: {counts['dm_replied_thread_count']}; "
             f"waiting for your reply: {counts['dm_unreplied_thread_count']}. Opened up to {max_threads} waiting-reply thread(s); "
+            f"scanned DM list with {list_info['scrolls_used']} downward scroll round(s); "
             f"loaded up to {dm_max_messages} message bubbles per thread with {dm_scrolls} upward scroll round(s); "
             f"captured message bubbles: {sum(int(thread.get('message_count') or 0) for thread in threads)}."
         ),
         "dm_threads": threads,
         "dm_captured_message_count": sum(int(thread.get("message_count") or 0) for thread in threads),
+        "dm_list_scrolls_used": list_info["scrolls_used"],
+        "dm_list_load_complete": list_info["load_complete"],
+        "dm_list_target_count": len(all_targets),
         **counts,
     }
+
+def load_dm_thread_list_targets(ws_url: str, max_scrolls: int = 20) -> dict[str, Any]:
+    scroll_limit = max(0, int(max_scrolls))
+    targets = extract_dm_thread_targets(ws_url)
+    previous_today = len(today_dm_targets(targets))
+    previous_total = len(targets)
+    stable_rounds = 0
+    scrolls_used = 0
+    at_bottom = False
+
+    for _ in range(scroll_limit):
+        if at_bottom and stable_rounds >= 1:
+            break
+        info = scroll_dm_thread_list_down(ws_url)
+        scrolls_used += 1
+        time.sleep(1.0)
+        current = dedupe_dm_targets([*targets, *extract_dm_thread_targets(ws_url)])
+        current_today = len(today_dm_targets(current))
+        current_total = len(current)
+        at_bottom = bool(info.get("at_bottom"))
+        if current_today <= previous_today and current_total <= previous_total:
+            stable_rounds += 1
+        else:
+            stable_rounds = 0
+        targets = current
+        previous_today = current_today
+        previous_total = current_total
+        if stable_rounds >= 4:
+            break
+        if current_total > 0 and current_today > 0 and current_today < current_total and stable_rounds >= 2:
+            break
+
+    return {
+        "targets": targets,
+        "scrolls_used": scrolls_used,
+        "load_complete": at_bottom or stable_rounds >= 4,
+        "stable_rounds": stable_rounds,
+    }
+
+def scroll_dm_thread_list_down(ws_url: str) -> dict[str, Any]:
+    script = load_dom_script("scroll_dm_thread_list_down.js")
+    value = cdp_eval(ws_url, script)
+    return value if isinstance(value, dict) else {}
+
+def restore_dm_thread_list_position(ws_url: str, target: dict[str, Any]) -> bool:
+    key = dm_target_key(target)
+    for _ in range(8):
+        candidates = {dm_target_key(item): item for item in extract_dm_thread_targets(ws_url)}
+        current = candidates.get(key)
+        if current:
+            target["x"] = current.get("x") or target.get("x")
+            target["y"] = current.get("y") or target.get("y")
+            return True
+        scroll_dm_thread_list_down(ws_url)
+        time.sleep(0.5)
+    return False
 
 def wait_for_dm_conversation_content(ws_url: str, timeout_sec: int = 12) -> None:
     deadline = time.time() + timeout_sec

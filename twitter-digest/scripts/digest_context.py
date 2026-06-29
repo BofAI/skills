@@ -122,6 +122,25 @@ def build_digest_facts(data: dict[str, Any], summary: dict[str, Any]) -> dict[st
         if kind == "messages":
             if page.get("dm_note"):
                 facts["dms"]["note"] = str(page.get("dm_note") or "")
+            if page.get("dm_list_scrolls_used") is not None:
+                facts["dms"]["list_load"] = {
+                    "scrolls_used": int(page.get("dm_list_scrolls_used") or 0),
+                    "load_complete": bool(page.get("dm_list_load_complete")),
+                    "target_count": int(page.get("dm_list_target_count") or page.get("dm_visible_thread_count") or 0),
+                }
+            if page.get("dm_list_load_complete") is False:
+                facts["data_gaps"].append(
+                    {
+                        "source": "messages",
+                        "status": "dm_list_incomplete",
+                        "detail": (
+                            "DM conversation list may not be fully scanned. "
+                            f"list_scrolls_used={int(page.get('dm_list_scrolls_used') or 0)}, "
+                            f"today_visible={int(page.get('dm_visible_thread_count') or 0)}, "
+                            f"waiting_reply={int(page.get('dm_unreplied_thread_count') or 0)}."
+                        ),
+                    }
+                )
             for todo in page.get("todo_items") or []:
                 if isinstance(todo, dict):
                     facts["todo_items"].append(
@@ -406,6 +425,14 @@ def render_digest_facts(facts: dict[str, Any]) -> str:
         ),
         "- rule: summarize only `waiting_reply` threads with `should_summarize: true`; count noise but do not expand it.",
     ]
+    list_load = dms.get("list_load") if isinstance(dms.get("list_load"), dict) else {}
+    if list_load:
+        lines.append(
+            "- list load: "
+            f"scrolls_used `{int(list_load.get('scrolls_used') or 0)}`, "
+            f"load_complete `{bool(list_load.get('load_complete'))}`, "
+            f"targets_seen `{int(list_load.get('target_count') or 0)}`"
+        )
     if dms.get("note"):
         lines.append(f"- note: {dms.get('note')}")
     lines.extend(["", "| participant | reply_state | messages | summarize | noise_reason | excerpt |", "|---|---|---:|---|---|---|"])
