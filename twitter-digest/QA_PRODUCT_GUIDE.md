@@ -36,8 +36,11 @@ python3 twitter-digest/scripts/install.py
 安装成功后应看到：
 
 ```text
-~/.claude/skills/twitter-digest
+Codex 里运行安装：~/.codex/skills/twitter-digest
+Claude Code 里运行安装：~/.claude/skills/twitter-digest
 ```
+
+安装脚本会按当前工具自动选择安装目录；需要指定时可加 `--client codex` 或 `--client claude`。
 
 如果安装脚本提示缺浏览器，先安装 Chrome / Chromium / Edge / Brave 后重试。
 
@@ -275,7 +278,7 @@ comparison-report.md
 
 普通 QA 可按以下标准判断：
 
-- 安装成功，skill 出现在 `~/.claude/skills/twitter-digest`。
+- 安装成功，skill 出现在当前工具对应目录：Codex 为 `~/.codex/skills/twitter-digest`，Claude Code 为 `~/.claude/skills/twitter-digest`。
 - `配置 X API` 直接进入 OAuth2，无 OAuth1 干扰。
 - 首次登录浏览器后，后续日报能复用登录态。
 - `生成今日 X 日报` 能产出中文日报。

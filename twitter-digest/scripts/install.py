@@ -1,10 +1,11 @@
 #!/usr/bin/env python3
-"""Install twitter-digest into a local Claude Code skills directory."""
+"""Install twitter-digest into the active agent client's local skills directory."""
 
 from __future__ import annotations
 
 import argparse
 import datetime as dt
+import os
 import shutil as shutil_module
 import shutil
 import sys
@@ -13,9 +14,30 @@ from pathlib import Path
 from script_utils import display_path
 
 
+def detect_client() -> str:
+    if any(key.startswith("CODEX_") for key in os.environ):
+        return "codex"
+    if any(key.startswith("CLAUDE") for key in os.environ):
+        return "claude"
+    codex_dir = Path.home() / ".codex" / "skills"
+    claude_dir = Path.home() / ".claude" / "skills"
+    if codex_dir.exists() and not claude_dir.exists():
+        return "codex"
+    if claude_dir.exists() and not codex_dir.exists():
+        return "claude"
+    return "claude"
+
+
+def default_skills_dir(client: str) -> Path:
+    if client == "codex":
+        return Path.home() / ".codex" / "skills"
+    return Path.home() / ".claude" / "skills"
+
+
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--skills-dir", default=str(Path.home() / ".claude" / "skills"))
+    parser.add_argument("--client", choices=("auto", "codex", "claude"), default="auto", help="Target agent client. auto installs into the detected current tool's skills directory.")
+    parser.add_argument("--skills-dir", default="", help="Override the target skills directory.")
     parser.add_argument("--copy", action="store_true", help="Copy files instead of creating a symlink. This is the default.")
     parser.add_argument("--symlink", action="store_true", help="Install as a symlink for local skill development.")
     parser.add_argument("--skip-browser-check", action="store_true", help="Skip checking for a supported Chromium browser.")
@@ -135,7 +157,11 @@ def main() -> None:
     check_runtime(args.skip_browser_check)
     root = skill_root()
     copy = args.copy or not args.symlink
-    target = install_skill(root, Path(args.skills_dir).expanduser(), copy, args.dry_run)
+    client = detect_client() if args.client == "auto" else args.client
+    skills_dir = Path(args.skills_dir).expanduser() if args.skills_dir else default_skills_dir(client)
+    print(f"Target client: {client}", flush=True)
+    print(f"Target skills dir: {display_path(skills_dir)}", flush=True)
+    target = install_skill(root, skills_dir, copy, args.dry_run)
     if not args.dry_run:
         print(f"Installed skill path: {display_path(target)}", flush=True)
 

@@ -20,6 +20,18 @@ cd skills
 python3 twitter-digest/scripts/install.py
 ```
 
+To ask Codex to install this skill for itself, paste this into Codex:
+
+```text
+请帮我安装这个 Codex skill：
+
+git clone -b twitter-digest-api-collector git@github.com:BofAI/skills.git bofai-skills \
+  && cd bofai-skills \
+  && python3 twitter-digest/scripts/install.py --client codex
+
+安装后请确认 ~/.codex/skills/twitter-digest 存在。首次运行日报时，如果弹出浏览器，请让我登录 X。
+```
+
 To ask Claude Code to install this skill for itself, paste this into Claude Code:
 
 ```text
@@ -27,7 +39,7 @@ To ask Claude Code to install this skill for itself, paste this into Claude Code
 
 git clone -b twitter-digest-api-collector git@github.com:BofAI/skills.git bofai-skills \
   && cd bofai-skills \
-  && python3 twitter-digest/scripts/install.py
+  && python3 twitter-digest/scripts/install.py --client claude
 
 安装后请确认 ~/.claude/skills/twitter-digest 存在。首次运行日报时，如果弹出浏览器，请让我登录 X。
 ```
@@ -39,15 +51,16 @@ After the PR is merged, use the main branch version:
 
 git clone git@github.com:BofAI/skills.git bofai-skills \
   && cd bofai-skills \
-  && python3 twitter-digest/scripts/install.py
+  && python3 twitter-digest/scripts/install.py --client claude
 
 安装后请确认 ~/.claude/skills/twitter-digest 存在。首次运行日报时，如果弹出浏览器，请让我登录 X。
 ```
 
-The installer copies the skill to:
+The installer chooses the target by client:
 
 ```text
-~/.claude/skills/twitter-digest
+Codex: ~/.codex/skills/twitter-digest
+Claude Code: ~/.claude/skills/twitter-digest
 ```
 
 It also checks for Python 3.10+ and a supported Chromium browser: Google Chrome, Chromium, Microsoft Edge, or Brave.

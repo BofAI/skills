@@ -100,6 +100,18 @@ http://127.0.0.1:8765/callback
 python3 twitter-digest/scripts/install.py
 ```
 
+安装脚本默认安装到当前工具对应的 skills 目录：
+
+- 在 Codex 里运行：`~/.codex/skills/twitter-digest`
+- 在 Claude Code 里运行：`~/.claude/skills/twitter-digest`
+
+如需显式指定：
+
+```bash
+python3 twitter-digest/scripts/install.py --client codex
+python3 twitter-digest/scripts/install.py --client claude
+```
+
 安装脚本会检查：
 
 - Python 3.10+
