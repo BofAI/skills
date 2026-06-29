@@ -34,6 +34,13 @@ python3 twitter-digest/scripts/run_daily_digest.py --configure-api
 ```
 
 The user should only interact with the system prompts and X OAuth browser page. Do not require the user to export env vars or paste tokens into shell history.
+After configuration, verify saved credentials only with the built-in command:
+
+```bash
+python3 twitter-digest/scripts/configure_api.py --verify
+```
+
+Do not write ad-hoc `python3 -c` snippets or temporary verification scripts in chat. The built-in verifier calls `/users/me`, backfills `handle` / `user_id`, and does not print the token.
 
 Typical chat run:
 

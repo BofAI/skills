@@ -77,7 +77,21 @@ twitter-digest/.state/api_config.json
 输入 X token
 ```
 
-这不是普通用户主流程，只用于调试或已有 token 的情况。
+这不是 QA 主流程，只用于研发调试。QA/产品测试默认只使用 ZC 提供的 OAuth2 Client ID / Client Secret。
+
+配置后如果需要检查状态，在 Claude Code 里说：
+
+```text
+检查 X API 配置
+```
+
+Agent 应运行：
+
+```bash
+python3 twitter-digest/scripts/configure_api.py --verify
+```
+
+不要让 Agent 现场拼 `python3 -c` 或临时脚本来验证 token；内置验证命令会调用 `/users/me`，自动补全 handle / user_id，并且不会打印 token。
 
 ### 4. 首次运行日报
 

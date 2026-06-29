@@ -37,9 +37,10 @@ python3 twitter-digest/scripts/run_daily_digest.py --configure-api
 
 This is an agent-triggered flow. It supports OAuth2 user authorization:
 
-- OAuth2 path: if the user has an X Developer App OAuth2 `Client ID` and local callback URL, run `python3 twitter-digest/scripts/run_daily_digest.py --configure-api`. It goes directly into OAuth2 setup. Request `dm.read tweet.read users.read offline.access`.
+- OAuth2 path: if the user has an X Developer App OAuth2 `Client ID` / `Client Secret` and local callback URL, run `python3 twitter-digest/scripts/run_daily_digest.py --configure-api`. It goes directly into OAuth2 setup. Request `dm.read tweet.read users.read offline.access`.
 - Existing token path: if the user says they already have an OAuth2 user access token, run `python3 twitter-digest/scripts/run_daily_digest.py --configure-api-token`.
 - OAuth1 PIN is not a supported normal setup path for this skill because it did not reliably return DM data during validation. Do not guide users to Consumer Key / Consumer Secret / PIN unless they are explicitly debugging legacy API behavior.
+- Do not write ad-hoc inline Python or shell snippets to verify tokens. Use the built-in verifier: `python3 twitter-digest/scripts/configure_api.py --verify`. It calls `/users/me`, backfills `handle` / `user_id`, and does not print the token.
 
 If a refresh token is saved, later daily runs refresh the access token automatically. Do not ask the user to export environment variables manually. App-only API keys are not enough for user-context home timeline access.
 
@@ -56,6 +57,7 @@ All normal flows should be triggered from chat by the agent:
 - X 日报 / 生成日报: run `scripts/run_daily_digest.py`.
 - 用户已有 token / 输入 X token: run `scripts/run_daily_digest.py --configure-api-token`.
 - 配置 X API / 给 app 授权: run `scripts/run_daily_digest.py --configure-api`.
+- 验证 X API 配置: run `scripts/configure_api.py --verify`.
 - 清除 X API 配置: run `scripts/configure_api.py --clear`.
 - 调试浏览器: run `scripts/run_daily_digest.py --source browser --headed`.
 - 对比 API 和浏览器抓取 / 稳定性测试: run `scripts/compare_collectors.py --rounds 3 --interval-sec 120`. Load `COLLECTOR_COMPARISON_TEST.md` before interpreting the report.

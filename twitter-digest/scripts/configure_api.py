@@ -14,11 +14,12 @@ import secrets
 import subprocess
 import sys
 import time
+import urllib.error
 import urllib.parse
 import urllib.request
 import webbrowser
 
-from api_config_store import API_CONFIG_PATH, DEFAULT_API_BASE, clear_api_config, load_api_config, save_api_config
+from api_config_store import API_CONFIG_PATH, DEFAULT_API_BASE, clear_api_config, load_api_config, refresh_oauth_token_if_needed, save_api_config
 from script_utils import display_path
 
 AUTHORIZE_URL = "https://x.com/i/oauth2/authorize"
@@ -41,6 +42,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--handle", default="")
     parser.add_argument("--clear", action="store_true", help="Remove saved API credentials.")
     parser.add_argument("--show-status", action="store_true", help="Show whether API credentials are saved.")
+    parser.add_argument("--verify", action="store_true", help="Verify the saved API token with /users/me and backfill handle/user_id.")
     return parser.parse_args()
 
 
@@ -212,6 +214,51 @@ def run_oauth_flow(args: argparse.Namespace, existing: dict[str, str]) -> dict[s
     }
 
 
+def summarize_http_error(exc: BaseException) -> str:
+    if isinstance(exc, urllib.error.HTTPError):
+        body = ""
+        try:
+            body = exc.read().decode("utf-8", errors="replace")
+        except Exception:
+            body = ""
+        compact = " ".join(body.split())[:300]
+        return f"HTTP {exc.code}: {compact}" if compact else f"HTTP {exc.code}"
+    return str(exc)
+
+
+def verify_api_config(config: dict[str, object], save: bool = True) -> dict[str, object]:
+    config = refresh_oauth_token_if_needed(dict(config))
+    token = str(config.get("bearer_token") or "")
+    if not token:
+        return {"verified": False, "error": "No saved API bearer token."}
+    base = str(config.get("api_base") or DEFAULT_API_BASE).rstrip("/")
+    request = urllib.request.Request(
+        f"{base}/users/me?user.fields=username,name",
+        headers={"Authorization": f"Bearer {token}"},
+    )
+    try:
+        with urllib.request.urlopen(request, timeout=30) as response:
+            payload = json.loads(response.read().decode("utf-8"))
+    except Exception as exc:
+        return {"verified": False, "error": summarize_http_error(exc)}
+    user = payload.get("data") if isinstance(payload, dict) else {}
+    if not isinstance(user, dict):
+        return {"verified": False, "error": "users/me response did not include data."}
+    updated = dict(config)
+    if user.get("username"):
+        updated["handle"] = str(user.get("username") or "").lstrip("@")
+    if user.get("id"):
+        updated["user_id"] = str(user.get("id") or "")
+    if save:
+        save_api_config(updated)
+    return {
+        "verified": True,
+        "handle": updated.get("handle") or "",
+        "user_id": updated.get("user_id") or "",
+        "name": user.get("name") or "",
+    }
+
+
 def main() -> None:
     args = parse_args()
     if args.clear:
@@ -235,6 +282,18 @@ def main() -> None:
             )
         )
         return
+    if args.verify:
+        config = load_api_config()
+        result = verify_api_config(config, save=True)
+        result.update(
+            {
+                "api_config": str(API_CONFIG_PATH),
+                "configured": bool(config.get("bearer_token")),
+                "auth_method": config.get("auth_method") or "",
+            }
+        )
+        print(json.dumps(result, ensure_ascii=False, indent=2))
+        return
 
     existing = load_api_config()
     mode = "paste" if args.paste_token or args.bearer_token else "oauth2"
@@ -256,15 +315,18 @@ def main() -> None:
         "user_id": user_id.strip(),
     }
     save_api_config(config)
+    verification = verify_api_config(config, save=True)
+    saved = load_api_config()
     print(
         json.dumps(
             {
                 "api_config": str(API_CONFIG_PATH),
                 "configured": True,
-                "auth_method": config.get("auth_method") or "",
-                "api_base": config["api_base"],
-                "handle": config["handle"],
-                "user_id": config["user_id"],
+                "auth_method": saved.get("auth_method") or config.get("auth_method") or "",
+                "api_base": saved.get("api_base") or config["api_base"],
+                "handle": saved.get("handle") or config["handle"],
+                "user_id": saved.get("user_id") or config["user_id"],
+                "verification": verification,
                 "next_step": "Run scripts/run_daily_digest.py; --source auto will use the saved API token.",
             },
             ensure_ascii=False,
