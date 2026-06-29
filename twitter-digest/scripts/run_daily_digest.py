@@ -151,12 +151,6 @@ def save_config(handle: str | None, account_name: str | None) -> None:
     CONFIG_PATH.write_text(json.dumps(config, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
 
 
-def choose_source(requested: str, bearer_token: str) -> str:
-    if requested != "auto":
-        return requested
-    return "api" if bool(bearer_token) else "browser"
-
-
 def display_path(path: Path) -> str:
     try:
         return "~/" + str(path.expanduser().resolve().relative_to(Path.home()))
