@@ -177,6 +177,12 @@ def main() -> None:
                         headless = False
                         wait_for_login(port, args.login_timeout_sec, interactive=True)
                     if wait_for_dm_passcode_resolution(port, args.login_timeout_sec):
+                        if resume_headless_after_passcode:
+                            print("X Chat passcode was completed. Returning to headless mode before DM collection...")
+                            stop_browser(proc)
+                            proc, port = launch_browser(profile_dir, "https://x.com/messages", headless=True)
+                            headless = True
+                            wait_for_login(port, args.login_timeout_sec, interactive=False)
                         result = collect_page(
                             port,
                             page,
@@ -188,12 +194,6 @@ def main() -> None:
                             args.max_public_items,
                             args.public_window_hours,
                         )
-                        if resume_headless_after_passcode:
-                            print("X Chat passcode was completed. DM collection finished in the visible browser; returning to headless mode...")
-                            stop_browser(proc)
-                            proc, port = launch_browser(profile_dir, "https://x.com/messages", headless=True)
-                            headless = True
-                            wait_for_login(port, args.login_timeout_sec, interactive=False)
                     else:
                         result["dm_note"] = (
                             "Timed out waiting for X Messages to become readable after passcode handling. "

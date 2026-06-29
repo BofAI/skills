@@ -74,7 +74,11 @@ def ensure_logged_in(profile_dir: Path, timeout_sec: int, force_headed: bool, no
     stop_browser(proc)
     proc, port = launch_browser(profile_dir, "https://x.com/home", headless=False)
     wait_for_login(port, timeout_sec, interactive=True)
-    return proc, port, False, True
+    print("X login completed. Returning to headless collection...")
+    stop_browser(proc)
+    proc, port = launch_browser(profile_dir, "https://x.com/home", headless=True)
+    wait_for_login(port, timeout_sec, interactive=False)
+    return proc, port, True, True
 
 def is_logged_in(port: int) -> bool:
     try:
