@@ -19,6 +19,8 @@ import urllib.request
 from pathlib import Path
 from typing import Any
 
+from digest_io import write_digest_output
+
 
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description=__doc__)
@@ -208,16 +210,27 @@ def collect_page(
             "collection_status": "error",
             "collection_error": navigate_result["_cdp_error"],
         }
-    time.sleep(5)
     if page["kind"] == "messages":
+        wait_for_dm_ready(ws_url, timeout_sec=20)
         extra = collect_messages_page(ws_url, dm_threads, dm_scrolls, dm_max_messages, dm_window_hours)
         if dm_collection_looks_premature(extra):
             cdp_call(ws_url, "Page.navigate", {"url": page["url"]})
-            time.sleep(8)
+            wait_for_dm_ready(ws_url, timeout_sec=20)
             extra = collect_messages_page(ws_url, dm_threads, dm_scrolls, dm_max_messages, dm_window_hours)
         return {"kind": page["kind"], "url": page["url"], "items": [], **extra}
+    wait_for_public_page_ready(ws_url, timeout_sec=20)
     extra = collect_public_items(ws_url, max_scrolls=scrolls, max_items=max_public_items, window_hours=public_window_hours)
     return {"kind": page["kind"], "url": page["url"], **extra}
+
+
+def wait_for_public_page_ready(ws_url: str, timeout_sec: int = 20) -> None:
+    deadline = time.time() + timeout_sec
+    while time.time() < deadline:
+        if extract_articles(ws_url):
+            return
+        if len(extract_main_text(ws_url)) > 80:
+            return
+        time.sleep(0.5)
 
 
 def collect_public_items(ws_url: str, max_scrolls: int, max_items: int, window_hours: int) -> dict[str, Any]:
@@ -228,8 +241,10 @@ def collect_public_items(ws_url: str, max_scrolls: int, max_items: int, window_h
     stagnant_rounds = 0
     previous_count = 0
     window_exceeded = False
+    scrolls_used = 0
 
     for scroll_index in range(scroll_limit):
+        scrolls_used = scroll_index + 1
         posts = dedupe_items([*posts, *extract_articles(ws_url)])
         if len(posts) >= item_limit:
             break
@@ -251,7 +266,7 @@ def collect_public_items(ws_url: str, max_scrolls: int, max_items: int, window_h
         posts = posts[:item_limit]
     return {
         "items": posts,
-        "public_scrolls_used": min(scroll_limit, max(0, scroll_index + 1 if "scroll_index" in locals() else 0)),
+        "public_scrolls_used": min(scroll_limit, scrolls_used),
         "public_window_exceeded": window_exceeded,
         "public_max_items": item_limit,
         "public_window_hours": window,
@@ -360,7 +375,7 @@ def collect_dm_threads(ws_url: str, max_threads: int, dm_scrolls: int, dm_max_me
             click_point(ws_url, float(target.get("x") or 0), float(target.get("y") or 0))
         elif target.get("url"):
             cdp_call(ws_url, "Page.navigate", {"url": str(target["url"])})
-        time.sleep(4)
+        wait_for_dm_conversation_content(ws_url, timeout_sec=12)
         load_info = load_dm_thread_history(ws_url, max_scrolls=dm_scrolls, target_messages=dm_max_messages, window_hours=dm_window_hours)
         messages = extract_dm_messages(ws_url, max_messages=dm_max_messages)
         thread_text = render_dm_messages(messages) or extract_dm_conversation_text(ws_url)
@@ -398,6 +413,17 @@ def collect_dm_threads(ws_url: str, max_threads: int, dm_scrolls: int, dm_max_me
         "dm_captured_message_count": sum(int(thread.get("message_count") or 0) for thread in threads),
         **counts,
     }
+
+
+def wait_for_dm_conversation_content(ws_url: str, timeout_sec: int = 12) -> None:
+    deadline = time.time() + timeout_sec
+    while time.time() < deadline:
+        if count_dm_messages(ws_url) > 0:
+            return
+        text = extract_dm_conversation_text(ws_url)
+        if text and not is_dm_passcode_screen(text) and len(text.split()) > 3:
+            return
+        time.sleep(0.5)
 
 
 def dm_target_key(target: dict[str, Any]) -> str:
@@ -495,8 +521,7 @@ def get_dm_history_state(ws_url: str) -> dict[str, Any]:
     || document.querySelector('main')
     || document.body;
   const scroller = findScroller(panel);
-  const roots = Array.from(panel.querySelectorAll('div[data-testid^="message-"]'))
-    .filter((node) => !String(node.getAttribute('data-testid') || '').startsWith('message-text-'));
+  const roots = messageRoots(panel);
   const first = roots[0];
   return {
     count: roots.length,
@@ -517,6 +542,20 @@ def get_dm_history_state(ws_url: str) -> dict[str, Any]:
     const testid = node.getAttribute('data-testid') || '';
     const rect = node.getBoundingClientRect();
     return `${testid}:${Math.round(rect.top)}:${text.slice(0, 160)}`;
+  }
+  function messageRoots(root) {
+    const byMessage = Array.from(root.querySelectorAll('div[data-testid^="message-"]'))
+      .filter((node) => !String(node.getAttribute('data-testid') || '').startsWith('message-text-'));
+    if (byMessage.length) return byMessage;
+    const byText = Array.from(root.querySelectorAll('[data-testid^="message-text-"]'))
+      .map((node) => node.closest('li, [role="group"]') || node.parentElement)
+      .filter(Boolean);
+    if (byText.length) return Array.from(new Set(byText));
+    return Array.from(root.querySelectorAll('li, [role="group"]')).filter((node) => {
+      const text = (node.innerText || '').replace(/\s+/g, ' ').trim();
+      const rect = node.getBoundingClientRect();
+      return text.length > 0 && text.length < 4000 && rect.width > 40 && rect.height > 16;
+    });
   }
 })()
 """
@@ -569,13 +608,13 @@ def dm_loaded_beyond_window(ws_url: str, window_hours: int) -> bool:
     for (const item of items) {
       const text = clean(item.innerText || '');
       if (!text) continue;
-      if (!item.querySelector('div[data-testid^="message-"]')) {
+      const roots = messageRoots(item);
+      if (!roots.length) {
         const day = dayLabel(text);
         if (day) currentDay = day;
         continue;
       }
-      for (const root of Array.from(item.querySelectorAll('div[data-testid^="message-"]'))) {
-        if (String(root.getAttribute('data-testid') || '').startsWith('message-text-')) continue;
+      for (const root of roots) {
         const timeText = firstTimeText(root);
         const when = parseMessageDate(currentDay, timeText);
         if (!when) continue;
@@ -643,6 +682,21 @@ def dm_loaded_beyond_window(ws_url: str, window_hours: int) -> bool:
   }
   function clean(text) { return (text || '').replace(/\s+/g, ' ').trim(); }
   function isTimeText(text) { return /^(\d{1,2}:\d{2}\s?(AM|PM)?|\d{1,2}:\d{2}|上午\s*\d{1,2}:\d{2}|下午\s*\d{1,2}:\d{2})$/i.test(text); }
+  function messageRoots(root) {
+    const byMessage = Array.from(root.querySelectorAll('div[data-testid^="message-"]'))
+      .filter((node) => !String(node.getAttribute('data-testid') || '').startsWith('message-text-'));
+    if (byMessage.length) return byMessage;
+    const byText = Array.from(root.querySelectorAll('[data-testid^="message-text-"]'))
+      .map((node) => node.closest('li, [role="group"]') || node.parentElement)
+      .filter(Boolean);
+    if (byText.length) return Array.from(new Set(byText));
+    if (root.matches && root.matches('li, [role="group"]')) {
+      const text = clean(root.innerText || '');
+      const rect = root.getBoundingClientRect();
+      if (text.length > 0 && text.length < 4000 && rect.width > 40 && rect.height > 16) return [root];
+    }
+    return [];
+  }
 })()
 """ % max(1, int(window_hours))
     return bool(cdp_eval(ws_url, script))
@@ -655,8 +709,7 @@ def count_dm_messages(ws_url: str) -> int:
     || document.querySelector('[data-testid="dm-conversation-content"]')
     || document.querySelector('main')
     || document.body;
-  const roots = Array.from(panel.querySelectorAll('div[data-testid^="message-"]'))
-    .filter((node) => !String(node.getAttribute('data-testid') || '').startsWith('message-text-'));
+  const roots = messageRoots(panel);
   return roots.filter((node) => {
     const bubble = node.querySelector('[data-testid^="message-text-"]');
     const text = bubbleText(bubble || node);
@@ -678,6 +731,20 @@ def count_dm_messages(ws_url: str) -> int:
   }
   function clean(text) { return (text || '').replace(/\s+/g, ' ').trim(); }
   function isTimeText(text) { return /^(\d{1,2}:\d{2}\s?(AM|PM)?|\d{1,2}:\d{2}|上午\s*\d{1,2}:\d{2}|下午\s*\d{1,2}:\d{2})$/i.test(text); }
+  function messageRoots(root) {
+    const byMessage = Array.from(root.querySelectorAll('div[data-testid^="message-"]'))
+      .filter((node) => !String(node.getAttribute('data-testid') || '').startsWith('message-text-'));
+    if (byMessage.length) return byMessage;
+    const byText = Array.from(root.querySelectorAll('[data-testid^="message-text-"]'))
+      .map((node) => node.closest('li, [role="group"]') || node.parentElement)
+      .filter(Boolean);
+    if (byText.length) return Array.from(new Set(byText));
+    return Array.from(root.querySelectorAll('li, [role="group"]')).filter((node) => {
+      const text = clean(node.innerText || '');
+      const rect = node.getBoundingClientRect();
+      return text.length > 0 && text.length < 4000 && rect.width > 40 && rect.height > 16;
+    });
+  }
 })()
 """
     value = cdp_eval(ws_url, script)
@@ -691,8 +758,7 @@ def extract_dm_messages(ws_url: str, max_messages: int = 300) -> list[dict[str, 
     || document.querySelector('[data-testid="dm-conversation-content"]')
     || document.querySelector('main')
     || document.body;
-  const roots = Array.from(panel.querySelectorAll('div[data-testid^="message-"]'))
-    .filter((node) => !String(node.getAttribute('data-testid') || '').startsWith('message-text-'));
+  const roots = messageRoots(panel);
   const out = [];
   const seen = new Set();
   for (const node of roots) {
@@ -780,6 +846,20 @@ def extract_dm_messages(ws_url: str, max_messages: int = 300) -> list[dict[str, 
     } catch {
       return '';
     }
+  }
+  function messageRoots(root) {
+    const byMessage = Array.from(root.querySelectorAll('div[data-testid^="message-"]'))
+      .filter((node) => !String(node.getAttribute('data-testid') || '').startsWith('message-text-'));
+    if (byMessage.length) return byMessage;
+    const byText = Array.from(root.querySelectorAll('[data-testid^="message-text-"]'))
+      .map((node) => node.closest('li, [role="group"]') || node.parentElement)
+      .filter(Boolean);
+    if (byText.length) return Array.from(new Set(byText));
+    return Array.from(root.querySelectorAll('li, [role="group"]')).filter((node) => {
+      const text = clean(node.innerText || '');
+      const rect = node.getBoundingClientRect();
+      return text.length > 0 && text.length < 4000 && rect.width > 40 && rect.height > 16;
+    });
   }
 })()
 """ % max(1, int(max_messages))
@@ -1300,63 +1380,6 @@ def dedupe_items(items: list[dict[str, Any]]) -> list[dict[str, Any]]:
     return out
 
 
-def render_markdown(data: dict[str, Any]) -> str:
-    lines = [
-        "# X 浏览器采集输入",
-        "",
-        f"- 生成时间: `{data['generated_at']}`",
-        f"- 浏览器 profile: `{data['profile_dir']}`",
-        f"- 当前账号: `{data.get('handle') or ''}`",
-        "",
-    ]
-    for page in data["pages"]:
-        lines.extend([f"## {page['kind']}", "", f"Source: {page['url']}", ""])
-        lines.append(f"采集条数: `{len(page.get('items', []))}`")
-        lines.append("")
-        for item in page["items"][:80]:
-            text = " ".join(str(item.get("text") or "").split())
-            url = item.get("url") or ""
-            timestamp = item.get("time") or ""
-            lines.append(f"- `{timestamp}` {url}")
-            lines.append(f"  {text[:1000]}")
-        if page.get("visible_text"):
-            lines.extend(["", "页面可见文本摘录:", "", str(page["visible_text"])[:3000]])
-        if page.get("dm_status"):
-            lines.extend(["", f"DM 状态: `{page['dm_status']}`"])
-            lines.append(
-                "DM 会话统计: "
-                f"今日可见 `{int(page.get('dm_visible_thread_count') or 0)}` / "
-                f"最后我发出 `{int(page.get('dm_replied_thread_count') or 0)}` / "
-                f"等我回复 `{int(page.get('dm_unreplied_thread_count') or 0)}`"
-            )
-            lines.append(f"DM 消息统计: 已打开等我回复会话中捕获消息气泡 `{int(page.get('dm_captured_message_count') or 0)}`")
-            if page.get("dm_note"):
-                lines.append(str(page["dm_note"]))
-        if page.get("collection_error"):
-            lines.extend(["", f"采集错误: `{page['collection_error']}`"])
-        for thread in page.get("dm_threads", [])[:20]:
-            participant = thread.get("participant") or thread.get("label") or thread.get("url")
-            lines.extend(["", f"### DM thread: {participant}", ""])
-            if participant:
-                lines.append(f"会话对象: `{participant}`")
-                lines.append(f"会话状态: `{'最后我发出' if thread.get('replied') else '等我回复'}`")
-                lines.append(f"消息数量: `{int(thread.get('message_count') or 0)}`")
-                lines.append("发信人判断: 使用会话对象/消息气泡判断；引用帖、转发卡片或链接预览里的作者不是 DM 发信人。")
-                lines.append("")
-            lines.append(str(thread.get("text") or "")[:3000])
-        lines.append("")
-    lines.extend(
-        [
-            "## 数据缺口",
-            "",
-            "- 浏览器采集依赖 X 页面结构和已加载的可见内容。",
-            "- 日报默认使用较小滚动次数；需要更全覆盖时再提高 `--scrolls`。",
-            "- DM 属于私密内容。只有用户明确同意本地读取时才使用 `--include-dms`。",
-        ]
-    )
-    return "\n".join(lines) + "\n"
-
-
 def wait_for_cdp(port: int) -> None:
     url = f"http://127.0.0.1:{port}/json/version"
     deadline = time.time() + 30
@@ -1517,18 +1540,14 @@ def recv_exact(sock: socket.socket, size: int) -> bytes:
     return bytes(chunks)
 
 
-def ensure_private_dir(path: Path) -> None:
-    path.mkdir(parents=True, exist_ok=True)
-    try:
-        path.chmod(0o700)
-    except PermissionError:
-        pass
-
-
-def write_digest_output(out_dir: Path, data: dict[str, Any]) -> None:
-    ensure_private_dir(out_dir)
-    (out_dir / "digest-input.json").write_text(json.dumps(data, ensure_ascii=False, indent=2), encoding="utf-8")
-    (out_dir / "digest-input.md").write_text(render_markdown(data), encoding="utf-8")
+def error_page(page: dict[str, str], exc: BaseException) -> dict[str, Any]:
+    return {
+        "kind": page.get("kind") or "unknown",
+        "url": page.get("url") or "",
+        "items": [],
+        "collection_status": "error",
+        "collection_error": str(exc) or exc.__class__.__name__,
+    }
 
 
 def main() -> None:
@@ -1572,57 +1591,66 @@ def main() -> None:
         }
         for page in pages:
             print(f"Collecting {page['kind']}: {page['url']}")
-            if page["kind"] == "messages" and headless:
-                stop_browser(proc)
-                proc, port = launch_browser(profile_dir, "https://x.com/messages", headless=True)
-                wait_for_login(port, args.login_timeout_sec, interactive=False)
-            result = collect_page(
-                port,
-                page,
-                args.scrolls,
-                args.dm_threads,
-                args.dm_scrolls,
-                args.dm_max_messages,
-                args.dm_window_hours,
-                args.max_public_items,
-                args.public_window_hours,
-            )
-            if page["kind"] == "messages" and result.get("dm_status") == "blocked_by_x_chat_passcode":
-                if args.non_interactive:
-                    result["dm_note"] = "X Chat passcode is required. Non-interactive mode skipped DM recovery for this run."
-                    data["pages"].append(result)
-                    continue
-                resume_headless_after_passcode = bool(headless)
-                if headless:
-                    print("DM passcode screen detected in headless mode. Reopening X Messages in a visible browser window...")
+            try:
+                if page["kind"] == "messages" and headless:
                     stop_browser(proc)
-                    proc, port = launch_browser(profile_dir, "https://x.com/messages", headless=False)
-                    headless = False
-                    wait_for_login(port, args.login_timeout_sec, interactive=True)
-                if wait_for_dm_passcode_resolution(port, args.login_timeout_sec):
-                    result = collect_page(
-                        port,
-                        page,
-                        args.scrolls,
-                        args.dm_threads,
-                        args.dm_scrolls,
-                        args.dm_max_messages,
-                        args.dm_window_hours,
-                        args.max_public_items,
-                        args.public_window_hours,
-                    )
-                    if resume_headless_after_passcode:
-                        print("X Chat passcode was completed. DM collection finished in the visible browser; returning to headless mode...")
+                    proc, port = launch_browser(profile_dir, "https://x.com/messages", headless=True)
+                    wait_for_login(port, args.login_timeout_sec, interactive=False)
+                result = collect_page(
+                    port,
+                    page,
+                    args.scrolls,
+                    args.dm_threads,
+                    args.dm_scrolls,
+                    args.dm_max_messages,
+                    args.dm_window_hours,
+                    args.max_public_items,
+                    args.public_window_hours,
+                )
+                if page["kind"] == "messages" and result.get("dm_status") == "blocked_by_x_chat_passcode":
+                    if args.non_interactive:
+                        result["dm_note"] = "X Chat passcode is required. Non-interactive mode skipped DM recovery for this run."
+                        data["pages"].append(result)
+                        write_digest_output(out_dir, data)
+                        continue
+                    resume_headless_after_passcode = bool(headless)
+                    if headless:
+                        print("DM passcode screen detected in headless mode. Reopening X Messages in a visible browser window...")
                         stop_browser(proc)
-                        proc, port = launch_browser(profile_dir, "https://x.com/messages", headless=True)
-                        headless = True
-                        wait_for_login(port, args.login_timeout_sec, interactive=False)
-                else:
-                    result["dm_note"] = (
-                        "Timed out waiting for X Messages to become readable after passcode handling. "
-                        "Keep the visible browser window open, complete passcode setup or entry until the inbox is visible, then rerun the digest."
-                    )
+                        proc, port = launch_browser(profile_dir, "https://x.com/messages", headless=False)
+                        headless = False
+                        wait_for_login(port, args.login_timeout_sec, interactive=True)
+                    if wait_for_dm_passcode_resolution(port, args.login_timeout_sec):
+                        result = collect_page(
+                            port,
+                            page,
+                            args.scrolls,
+                            args.dm_threads,
+                            args.dm_scrolls,
+                            args.dm_max_messages,
+                            args.dm_window_hours,
+                            args.max_public_items,
+                            args.public_window_hours,
+                        )
+                        if resume_headless_after_passcode:
+                            print("X Chat passcode was completed. DM collection finished in the visible browser; returning to headless mode...")
+                            stop_browser(proc)
+                            proc, port = launch_browser(profile_dir, "https://x.com/messages", headless=True)
+                            headless = True
+                            wait_for_login(port, args.login_timeout_sec, interactive=False)
+                    else:
+                        result["dm_note"] = (
+                            "Timed out waiting for X Messages to become readable after passcode handling. "
+                            "Keep the visible browser window open, complete passcode setup or entry until the inbox is visible, then rerun the digest."
+                        )
+            except SystemExit as exc:
+                result = error_page(page, exc)
+                print(f"Collection failed for {page['kind']}: {result['collection_error']}", flush=True)
+            except Exception as exc:
+                result = error_page(page, exc)
+                print(f"Collection failed for {page['kind']}: {result['collection_error']}", flush=True)
             data["pages"].append(result)
+            write_digest_output(out_dir, data)
         write_digest_output(out_dir, data)
         print(json.dumps({"out_dir": str(out_dir), "pages": len(data["pages"]), "headless": headless}, indent=2))
     finally:

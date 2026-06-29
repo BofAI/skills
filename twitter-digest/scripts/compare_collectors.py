@@ -13,8 +13,8 @@ import time
 from pathlib import Path
 from typing import Any
 
+from api_config_store import load_api_config, refresh_oauth_token_if_needed
 from digest_context import build_current_context_from_file
-from run_daily_digest import load_api_config, refresh_oauth_token_if_needed
 
 
 ROOT = Path(__file__).resolve().parents[1]

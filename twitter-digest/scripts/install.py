@@ -10,6 +10,8 @@ import shutil
 import sys
 from pathlib import Path
 
+from script_utils import display_path
+
 
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description=__doc__)
@@ -23,16 +25,6 @@ def parse_args() -> argparse.Namespace:
 
 def skill_root() -> Path:
     return Path(__file__).resolve().parents[1]
-
-
-def display_path(path: Path) -> str:
-    expanded = path.expanduser()
-    if not expanded.is_absolute():
-        expanded = Path.cwd() / expanded
-    try:
-        return "~/" + str(expanded.relative_to(Path.home()))
-    except ValueError:
-        return str(expanded)
 
 
 def browser_candidates() -> list[str]:

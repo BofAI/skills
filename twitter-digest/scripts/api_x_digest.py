@@ -15,7 +15,7 @@ import urllib.request
 from pathlib import Path
 from typing import Any
 
-from browser_x_digest import write_digest_output
+from digest_io import write_digest_output
 
 
 API_BASE = "https://api.x.com/2"

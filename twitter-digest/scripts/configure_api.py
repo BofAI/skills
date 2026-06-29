@@ -9,7 +9,6 @@ import getpass
 import hashlib
 from http.server import BaseHTTPRequestHandler, HTTPServer
 import json
-import os
 import platform
 import secrets
 import subprocess
@@ -18,12 +17,10 @@ import time
 import urllib.parse
 import urllib.request
 import webbrowser
-from pathlib import Path
 
+from api_config_store import API_CONFIG_PATH, DEFAULT_API_BASE, clear_api_config, load_api_config, save_api_config
+from script_utils import display_path
 
-STATE_DIR = Path(__file__).resolve().parents[1] / ".state"
-API_CONFIG_PATH = STATE_DIR / "api_config.json"
-DEFAULT_API_BASE = "https://api.x.com/2"
 AUTHORIZE_URL = "https://x.com/i/oauth2/authorize"
 TOKEN_URL = "https://api.x.com/2/oauth2/token"
 DEFAULT_REDIRECT_URI = "http://127.0.0.1:8765/callback"
@@ -45,13 +42,6 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--clear", action="store_true", help="Remove saved API credentials.")
     parser.add_argument("--show-status", action="store_true", help="Show whether API credentials are saved.")
     return parser.parse_args()
-
-
-def display_path(path: Path) -> str:
-    try:
-        return "~/" + str(path.expanduser().resolve().relative_to(Path.home()))
-    except ValueError:
-        return str(path)
 
 
 def apple_prompt(prompt: str, hidden: bool = False, buttons: list[str] | None = None) -> str | None:
@@ -220,34 +210,6 @@ def run_oauth_flow(args: argparse.Namespace, existing: dict[str, str]) -> dict[s
         "redirect_uri": redirect_uri.strip(),
         "scopes": scopes.strip(),
     }
-
-
-def save_api_config(config: dict[str, str]) -> None:
-    STATE_DIR.mkdir(parents=True, exist_ok=True)
-    try:
-        STATE_DIR.chmod(0o700)
-    except PermissionError:
-        pass
-    API_CONFIG_PATH.write_text(json.dumps(config, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
-    try:
-        API_CONFIG_PATH.chmod(0o600)
-    except PermissionError:
-        pass
-
-
-def load_api_config() -> dict[str, str]:
-    if not API_CONFIG_PATH.exists():
-        return {}
-    try:
-        data = json.loads(API_CONFIG_PATH.read_text(encoding="utf-8"))
-    except Exception:
-        return {}
-    return data if isinstance(data, dict) else {}
-
-
-def clear_api_config() -> None:
-    if API_CONFIG_PATH.exists():
-        API_CONFIG_PATH.unlink()
 
 
 def main() -> None:
