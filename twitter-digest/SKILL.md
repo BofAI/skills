@@ -18,6 +18,13 @@ Use a stable installed command form for normal chat-triggered runs. This keeps C
 
 In command examples below, `RUN_DAILY_DIGEST` means the matching installed command above for the current agent. Do not rely on `python3 twitter-digest/scripts/run_daily_digest.py` after installation unless you are intentionally working inside a source checkout.
 
+For summary writing, read the installed current-run context with the agent's file Read tool, not Bash. The normal context path is:
+
+- Claude Code: `~/.claude/skills/twitter-digest/.state/run/digest-context.md`
+- Codex: `~/.codex/skills/twitter-digest/.state/run/digest-context.md`
+
+Do not use `cat`, `head`, `tail`, `grep`, `sed`, `python3 -c`, or temporary scripts to read or inspect `digest-context.*` / `digest-input.*` during normal analysis. Those shell reads cause extra Claude Code Bash permission prompts and may expose private DM text in command output.
+
 Load `references/x-twitter-digest.md` when you need implementation details, browser workflow rules, current-run context behavior, or the scoring rubric.
 
 ## Data Collection
@@ -98,7 +105,7 @@ Default scope:
 
 Public timeline/profile/mentions pages use the same daily-window loading model as DMs: by default the collector scrolls each public page up to 40 rounds, keeps up to 300 public items, waits for DOM growth after each scroll, and only allows early stop after at least 5 scroll rounds when loaded post timestamps show content beyond the 24-hour digest window (`--scrolls 40`, `--min-public-scrolls 5`, `--max-public-items 300`, `--public-window-hours 24`).
 
-Read only `twitter-digest/.state/run/digest-context.md` when writing the Chinese digest. Its `Final Summary Facts` section is the content source for the final summary. Use `digest-input.md` only when debugging collection issues, not during normal summarization. Do not add content from older runs. Do not write ad-hoc `python3 -c`, shell, or temporary scripts to inspect JSON structure during normal summarization. If counts or non-content structure must be checked, run the built-in `python3 twitter-digest/scripts/inspect_digest.py`, which does not print DM bodies.
+Read only the installed `digest-context.md` with the file Read tool when writing the Chinese digest. Its `Final Summary Facts` section is the content source for the final summary. Use `digest-input.md` only when debugging collection issues, not during normal summarization. Do not add content from older runs. Do not write ad-hoc `python3 -c`, shell, or temporary scripts to inspect JSON structure during normal summarization. If counts or non-content structure must be checked, run the built-in `scripts/inspect_digest.py`, which does not print DM bodies.
 
 ## Install
 
@@ -110,13 +117,13 @@ python3 twitter-digest/scripts/install.py
 
 Default install targets the current agent client: Codex installs to `~/.codex/skills/twitter-digest`, Claude Code installs to `~/.claude/skills/twitter-digest`. Use `--client codex`, `--client claude`, or `--skills-dir` to override. Local development can use `--symlink`.
 
-For Claude Code, the skill cannot silently grant itself Bash permission. On first use, approve the visible `run_daily_digest.py` command and choose "don't ask again" if appropriate. For a global opt-in during install, run:
+For Claude Code, the skill cannot silently grant itself Bash permission or file access outside the project. On first use, approve the visible `run_daily_digest.py` command and choose "don't ask again" if appropriate. For a global opt-in during install, run:
 
 ```bash
-python3 twitter-digest/scripts/install.py --client claude --allow-claude-commands
+python3 twitter-digest/scripts/install.py --client claude --allow-claude-commands --allow-claude-state-read
 ```
 
-This explicitly adds one Claude Code Bash allow rule for `python3 ~/.claude/skills/twitter-digest/scripts/run_daily_digest.py:*`. It does not bypass permissions globally and does not grant arbitrary Bash access.
+This explicitly adds one Claude Code Bash allow rule for `python3 ~/.claude/skills/twitter-digest/scripts/run_daily_digest.py:*` and adds `~/.claude/skills/twitter-digest/.state` to Claude Code `additionalDirectories` so the Read tool can read `digest-context.md` without a separate file-access prompt. It does not bypass permissions globally and does not grant arbitrary Bash access.
 
 The installer checks for Python 3.10+ and a supported Chromium browser before installing. Supported browsers are Google Chrome, Chromium, Microsoft Edge, and Brave. If the browser will be installed later, use `--skip-browser-check`.
 
@@ -129,10 +136,10 @@ Claude Code or other agents can use the installed skill by running the same brow
 `scripts/run_daily_digest.py` does not write long-term memory. Each run writes only current-run files:
 
 - `twitter-digest/.state/config.json`: account defaults and preferences.
-- `twitter-digest/.state/run/digest-context.md`: the only normal input for AI daily-summary writing.
-- `twitter-digest/.state/run/digest-context.json`: machine-readable version of the same normalized facts.
-- `twitter-digest/.state/run/digest-input.md`: raw collector capture for debugging only.
-- `twitter-digest/.state/run/digest-input.json`: raw machine-readable collector capture for debugging only.
+- `<installed-skill>/.state/run/digest-context.md`: the only normal input for AI daily-summary writing.
+- `<installed-skill>/.state/run/digest-context.json`: machine-readable version of the same normalized facts.
+- `<installed-skill>/.state/run/digest-input.md`: raw collector capture for debugging only.
+- `<installed-skill>/.state/run/digest-input.json`: raw machine-readable collector capture for debugging only.
 
 No `memory.json` or `daily/` archive is produced. Raw DM text or DM excerpts may exist only in the current run's private `twitter-digest/.state/run/digest-input.*` and `digest-context.*` files for immediate summarization/debugging. The run directory is created with owner-only permissions where supported. Run dates use the user's local timezone.
 

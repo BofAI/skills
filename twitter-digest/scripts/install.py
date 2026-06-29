@@ -50,6 +50,14 @@ def parse_args() -> argparse.Namespace:
             "This only applies when installing for Claude Code."
         ),
     )
+    parser.add_argument(
+        "--allow-claude-state-read",
+        action="store_true",
+        help=(
+            "Opt in to adding the installed twitter-digest .state directory to Claude Code additionalDirectories "
+            "so analysis can read digest-context.md without a file-access prompt."
+        ),
+    )
     parser.add_argument("--dry-run", action="store_true")
     return parser.parse_args()
 
@@ -185,24 +193,49 @@ def claude_bash_allow_rule(target: Path) -> str:
     return f"Bash(python3 {command_path}:*)"
 
 
-def write_claude_allow_rule(target: Path, dry_run: bool) -> None:
-    settings_path = Path.home() / ".claude" / "settings.json"
-    rule = claude_bash_allow_rule(target)
-    if dry_run:
-        print(f"Would add Claude Code Bash allow rule to {display_path(settings_path)}: {rule}", flush=True)
-        return
+def claude_state_read_directory(target: Path) -> str:
+    state_dir = target.expanduser() / ".state"
+    try:
+        return "~/" + str(state_dir.relative_to(Path.home()))
+    except ValueError:
+        return str(state_dir)
 
-    settings: dict[str, object]
-    if settings_path.exists():
-        try:
-            settings = json.loads(settings_path.read_text(encoding="utf-8"))
-        except json.JSONDecodeError as exc:
-            raise SystemExit(f"Cannot update Claude Code settings because {display_path(settings_path)} is not valid JSON: {exc}") from exc
-        if not isinstance(settings, dict):
-            raise SystemExit(f"Cannot update Claude Code settings because {display_path(settings_path)} does not contain a JSON object.")
-    else:
-        settings = {}
 
+def load_claude_settings(settings_path: Path) -> dict[str, object]:
+    if not settings_path.exists():
+        return {}
+    try:
+        settings = json.loads(settings_path.read_text(encoding="utf-8"))
+    except json.JSONDecodeError as exc:
+        raise SystemExit(f"Cannot update Claude Code settings because {display_path(settings_path)} is not valid JSON: {exc}") from exc
+    if not isinstance(settings, dict):
+        raise SystemExit(f"Cannot update Claude Code settings because {display_path(settings_path)} does not contain a JSON object.")
+    return settings
+
+
+def save_claude_settings(settings_path: Path, settings: dict[str, object]) -> None:
+    settings_path.parent.mkdir(parents=True, exist_ok=True)
+    settings_path.write_text(json.dumps(settings, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
+    try:
+        settings_path.chmod(0o600)
+    except PermissionError:
+        pass
+
+
+def add_list_setting(settings: dict[str, object], key: str, value: str) -> bool:
+    existing = settings.get(key)
+    if existing is None:
+        existing = []
+        settings[key] = existing
+    if not isinstance(existing, list):
+        raise SystemExit(f"Cannot update Claude Code settings because {key} is not a list.")
+    if value in existing:
+        return False
+    existing.append(value)
+    return True
+
+
+def add_claude_bash_allow_rule(settings: dict[str, object], rule: str) -> bool:
     permissions = settings.get("permissions")
     if not isinstance(permissions, dict):
         permissions = {}
@@ -212,18 +245,40 @@ def write_claude_allow_rule(target: Path, dry_run: bool) -> None:
         allow = []
         permissions["allow"] = allow
     if not isinstance(allow, list):
-        raise SystemExit(f"Cannot update Claude Code settings because permissions.allow in {display_path(settings_path)} is not a list.")
+        raise SystemExit("Cannot update Claude Code settings because permissions.allow is not a list.")
     if rule in allow:
-        print(f"Claude Code Bash allow rule already present: {rule}", flush=True)
-        return
+        return False
     allow.append(rule)
-    settings_path.parent.mkdir(parents=True, exist_ok=True)
-    settings_path.write_text(json.dumps(settings, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
-    try:
-        settings_path.chmod(0o600)
-    except PermissionError:
-        pass
-    print(f"Added Claude Code Bash allow rule: {rule}", flush=True)
+    return True
+
+
+def write_claude_settings(target: Path, dry_run: bool, allow_commands: bool, allow_state_read: bool) -> None:
+    settings_path = Path.home() / ".claude" / "settings.json"
+    rule = claude_bash_allow_rule(target)
+    state_dir = claude_state_read_directory(target)
+    if dry_run:
+        if allow_commands:
+            print(f"Would add Claude Code Bash allow rule to {display_path(settings_path)}: {rule}", flush=True)
+        if allow_state_read:
+            print(f"Would add Claude Code additional directory to {display_path(settings_path)}: {state_dir}", flush=True)
+        return
+
+    settings = load_claude_settings(settings_path)
+    changed = False
+    if allow_commands:
+        if add_claude_bash_allow_rule(settings, rule):
+            changed = True
+            print(f"Added Claude Code Bash allow rule: {rule}", flush=True)
+        else:
+            print(f"Claude Code Bash allow rule already present: {rule}", flush=True)
+    if allow_state_read:
+        if add_list_setting(settings, "additionalDirectories", state_dir):
+            changed = True
+            print(f"Added Claude Code additional directory: {state_dir}", flush=True)
+        else:
+            print(f"Claude Code additional directory already present: {state_dir}", flush=True)
+    if changed:
+        save_claude_settings(settings_path, settings)
 
 
 def main() -> None:
@@ -236,11 +291,11 @@ def main() -> None:
     print(f"Target client: {client}", flush=True)
     print(f"Target skills dir: {display_path(skills_dir)}", flush=True)
     target = install_skill(root, skills_dir, copy, args.dry_run)
-    if args.allow_claude_commands:
+    if args.allow_claude_commands or args.allow_claude_state_read:
         if client != "claude":
-            print("--allow-claude-commands requested, but target client is not Claude Code; skipping Claude Code settings update.", flush=True)
+            print("Claude Code settings update requested, but target client is not Claude Code; skipping Claude Code settings update.", flush=True)
         else:
-            write_claude_allow_rule(target, args.dry_run)
+            write_claude_settings(target, args.dry_run, args.allow_claude_commands, args.allow_claude_state_read)
     if not args.dry_run:
         print(f"Installed skill path: {display_path(target)}", flush=True)
 

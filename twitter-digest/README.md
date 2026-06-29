@@ -39,7 +39,7 @@ To ask Claude Code to install this skill for itself, paste this into Claude Code
 
 git clone -b twitter-digest-api-collector git@github.com:BofAI/skills.git bofai-skills \
   && cd bofai-skills \
-  && python3 twitter-digest/scripts/install.py --client claude --allow-claude-commands
+  && python3 twitter-digest/scripts/install.py --client claude --allow-claude-commands --allow-claude-state-read
 
 安装后请确认 ~/.claude/skills/twitter-digest 存在。首次运行日报时，如果 Claude Code 弹出 Bash 授权，批准 `python3 ~/.claude/skills/twitter-digest/scripts/run_daily_digest.py`；如果弹出浏览器，请让我登录 X。
 ```
@@ -51,7 +51,7 @@ After the PR is merged, use the main branch version:
 
 git clone git@github.com:BofAI/skills.git bofai-skills \
   && cd bofai-skills \
-  && python3 twitter-digest/scripts/install.py --client claude --allow-claude-commands
+  && python3 twitter-digest/scripts/install.py --client claude --allow-claude-commands --allow-claude-state-read
 
 安装后请确认 ~/.claude/skills/twitter-digest 存在。首次运行日报时，如果 Claude Code 弹出 Bash 授权，批准 `python3 ~/.claude/skills/twitter-digest/scripts/run_daily_digest.py`；如果弹出浏览器，请让我登录 X。
 ```
@@ -74,7 +74,7 @@ Claude Code: python3 ~/.claude/skills/twitter-digest/scripts/run_daily_digest.py
 Codex:       python3 ~/.codex/skills/twitter-digest/scripts/run_daily_digest.py
 ```
 
-Claude Code cannot let a skill silently grant itself Bash permission. Either approve the first visible `run_daily_digest.py` prompt and choose "don't ask again", or install with `--allow-claude-commands` to explicitly add one global allow rule for that command.
+Claude Code cannot let a skill silently grant itself Bash permission or file access outside the project. Either approve the first visible `run_daily_digest.py` prompt and any file-access prompt, or install with `--allow-claude-commands --allow-claude-state-read` to explicitly add one global command allow rule and one `.state` read directory.
 
 ## First Run
 
@@ -209,6 +209,14 @@ twitter-digest/.state/run/digest-input.json
 ```
 
 Use `digest-context.md` as the normal AI input. `digest-input.*` is raw collector capture for debugging.
+
+During analysis/summary writing, the agent should use its file Read tool to read:
+
+```text
+~/.claude/skills/twitter-digest/.state/run/digest-context.md
+```
+
+Do not use `cat`, `head`, `grep`, `python3 -c`, or temporary scripts to read the context file during normal summary generation; those shell reads create extra Claude Code permission prompts.
 
 ## More Details
 
