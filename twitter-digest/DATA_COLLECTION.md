@@ -60,11 +60,12 @@ scripts/api_x_digest.py
 
 限制：
 
-- `--include-dms` 时读取 `/2/dm_events`，需要 user-context auth 和 DM lookup 权限。
+- `run_daily_digest.py` 的正常日报路径不使用 API DM 做最终判断；DM / X Chat 一律由浏览器脚本读取。
+- `api_x_digest.py --include-dms` 保留为 TODO/调试路径：它会尝试 `/2/dm_events`，但结果只作为 API 可见事件参考。
 - Home timeline endpoint 需要可访问该用户上下文的 token；如果账号权限、套餐或 token 类型不支持，会在 `home` 页面写入具体 `collection_error`。
 - App-only API key / app-only bearer token 不等于用户授权，不能保证读取用户 home timeline 或 DM。
 - DM API 需要 X App / token 有 `dm.read` 相关权限；权限不足、tier 不支持、rate limit、返回 0 条或无法确认是否需要回复时，会写入 `api_dm_todo` 和 data gap。
-- API DM 不等同于网页 X Chat。XChat / 加密私信可能不会出现在 `/2/dm_events`。API DM 拿不到时只放入 TODO List，不总结成“没有私信”。
+- API DM 不等同于网页 X Chat。XChat / 加密私信可能不会出现在 `/2/dm_events`。现阶段 API DM 标记为 TODO，等待 X 修复或明确文档；日报 DM 以浏览器脚本为准。
 - API 权限不足、额度不足或 endpoint 不可用时，会把错误写入对应页面的 `collection_error`。
 
 ### 3. 上层入口脚本
@@ -96,7 +97,7 @@ scripts/run_daily_digest.py
 底层只保留两个抓取脚本：
 
 ```text
-scripts/api_x_digest.py      -> 官方 API 抓取：home timeline、mentions、profile、可用时的 DM events
+scripts/api_x_digest.py      -> 官方 API 抓取：home timeline、mentions、profile；API DM 仅作为 TODO/调试
 scripts/browser_x_digest.py  -> 浏览器抓取：X Chat / 加密 DM / API 拿不到的网页内容
 ```
 
@@ -208,14 +209,15 @@ DM page 尽量包含：
 - `dm_captured_message_count`
 - `dm_threads`
 
-API DM 规则：
+API DM TODO / 调试规则：
 
-- API 模式且默认请求 DM 时，先调用 `/2/dm_events`。
+- 正常日报不使用 API DM 做最终判断；`run_daily_digest.py` 会用浏览器补 DM。
+- 只有直接运行 `api_x_digest.py --include-dms` 做调试时，才调用 `/2/dm_events`。
 - 按 `dm_conversation_id` 分组。
 - 只把最后一条不是用户发出的会话正文放进 `dm_threads`，用于判断是否需要回复。
 - 最后一条是用户发出的会话只计数，不展开正文。
 - 如果 `/2/dm_events` 返回权限、tier、认证或限流错误，写入 `api_dm_todo` data gap，不把失败当作“无私信”。
-- 如果 `/2/dm_events` 返回 0 条，或 API 返回的事件不能确认是否需要回复，也写入 `api_dm_todo` TODO List；需要完整 DM 时改跑 `scripts/browser_x_digest.py` 或 `run_daily_digest.py --source browser`。
+- 如果 `/2/dm_events` 返回 0 条，或 API 返回的事件不能确认是否需要回复，也写入 `api_dm_todo` TODO List；完整 DM 以 `scripts/browser_x_digest.py` 或 `run_daily_digest.py` 的浏览器 DM 页为准。
 
 ## 稳定性策略
 

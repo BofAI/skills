@@ -87,7 +87,7 @@ python3 twitter-digest/scripts/run_daily_digest.py --source browser
 X_BEARER_TOKEN=... python3 twitter-digest/scripts/run_daily_digest.py --source api --handle <handle>
 ```
 
-API mode is for stable public-data collection, including the official home timeline endpoint when the configured token has user-context timeline access. When `--include-dms` is enabled, API mode also tries `/2/dm_events`; this requires user-context auth and DM lookup permission such as `dm.read`. App-only API keys are not enough for user-context data. If API DM lookup fails, returns zero events, or cannot confirm waiting-reply conversations, the run records an `api_dm_todo` TODO/data gap instead of treating it as an empty inbox. Use the browser collector for X Chat / encrypted DMs.
+API mode is for stable public-data collection, including the official home timeline endpoint when the configured token has user-context timeline access. Normal daily runs use API for public data and the browser collector for X Chat / DM content. API DM lookup is marked TODO because XChat / encrypted DMs may not appear in `/2/dm_events`; do not use API DM to conclude there are no private messages. App-only API keys are not enough for user-context data.
 
 ## Configure API In Chat
 

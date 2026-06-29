@@ -27,7 +27,7 @@ For chat usage, run the wrapper:
 python3 twitter-digest/scripts/run_daily_digest.py
 ```
 
-`run_daily_digest.py --source auto` uses saved OAuth2 user-context credentials, `X_BEARER_TOKEN`, or `TWITTER_BEARER_TOKEN` when present; otherwise it uses the browser collector. API mode also tries `/2/dm_events` when DMs are requested. If API DM fails, returns zero events, or cannot confirm waiting-reply conversations, record `api_dm_todo` in TODO/data gaps and do not call it an empty inbox. Use browser collection as the authoritative path for X Chat / encrypted DMs.
+`run_daily_digest.py --source auto` uses saved OAuth2 user-context credentials, `X_BEARER_TOKEN`, or `TWITTER_BEARER_TOKEN` for public data when present; otherwise it uses the browser collector. During the current X API limitation, normal daily runs use API for public data and browser collection for all DM/X Chat content. Treat API DM lookup as TODO / waiting for X to fix XChat-encrypted DM coverage; do not use API DM to decide whether the user has private messages.
 
 If the user asks to configure API access, trigger the OAuth/user-token setup from chat:
 
@@ -66,7 +66,7 @@ python3 twitter-digest/scripts/run_daily_digest.py --source browser
 X_BEARER_TOKEN=... python3 twitter-digest/scripts/run_daily_digest.py --source api --handle <handle>
 ```
 
-The first run opens a dedicated browser profile at `twitter-digest/.state/chrome-profile`. The user logs in to X once in that browser. Later runs default to headless collection and reuse the saved local browser session. If the saved login is unavailable, the script automatically opens a visible browser window for manual login. The skill has two collector scripts: `scripts/api_x_digest.py` for official API public data and API-visible DM events, and `scripts/browser_x_digest.py` for browser-visible X Chat / encrypted DM content.
+The first run opens a dedicated browser profile at `twitter-digest/.state/chrome-profile`. The user logs in to X once in that browser. Later runs default to headless collection and reuse the saved local browser session. If the saved login is unavailable, the script automatically opens a visible browser window for manual login. The skill has two collector scripts: `scripts/api_x_digest.py` for official API public data, and `scripts/browser_x_digest.py` for browser-visible X Chat / encrypted DM content. API-visible DM events remain TODO-only until X fixes or documents reliable XChat coverage.
 
 DM reading is enabled by default and only reads visible local browser content. To skip DMs for a run:
 
