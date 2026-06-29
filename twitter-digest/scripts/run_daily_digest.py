@@ -188,7 +188,7 @@ def open_config_in_terminal(extra_args: list[str]) -> bool:
     return True
 
 
-def api_configured(config: dict, bearer_token: str) -> bool:
+def api_configured(bearer_token: str) -> bool:
     return bool(bearer_token)
 
 
@@ -209,6 +209,30 @@ def summarize_child_error(error: subprocess.CalledProcessError) -> str:
         return "; ".join(dict.fromkeys(matched))
     compact = " ".join(text.split())
     return compact[:500]
+
+
+def api_command(args: argparse.Namespace, out_dir: str, api_base: str, user_id: str, handle: str) -> list[str]:
+    cmd = [
+        sys.executable,
+        str(Path(__file__).with_name("api_x_digest.py")),
+        "--keywords",
+        args.keywords,
+        "--out",
+        out_dir,
+        "--max-public-items",
+        str(args.max_public_items),
+        "--public-window-hours",
+        str(args.public_window_hours),
+        "--api-base",
+        api_base,
+        "--dm-max-events",
+        str(args.dm_max_events),
+    ]
+    if user_id:
+        cmd.extend(["--user-id", user_id])
+    if handle:
+        cmd.extend(["--handle", handle])
+    return cmd
 
 
 def browser_command(args: argparse.Namespace, out_dir: str, handle: str, include_dms: bool, dm_only: bool = False) -> list[str]:
@@ -247,10 +271,35 @@ def browser_command(args: argparse.Namespace, out_dir: str, handle: str, include
     return cmd
 
 
+def run_api_command(cmd: list[str], env: dict[str, str]) -> None:
+    completed = subprocess.run(cmd, check=True, env=env, capture_output=True, text=True)
+    if completed.stdout:
+        print(completed.stdout.strip(), flush=True)
+
+
+def run_browser_command(cmd: list[str]) -> None:
+    subprocess.run(cmd, check=True)
+
+
 def merge_api_public_with_browser_dm(api_out: Path, browser_out: Path, final_out: Path) -> None:
     api_data = json.loads((api_out / "digest-input.json").read_text(encoding="utf-8"))
     browser_data = json.loads((browser_out / "digest-input.json").read_text(encoding="utf-8"))
     browser_messages = [page for page in browser_data.get("pages", []) if isinstance(page, dict) and page.get("kind") == "messages"]
+    if not browser_messages:
+        browser_messages = [
+            {
+                "kind": "messages",
+                "url": "https://x.com/messages",
+                "items": [],
+                "dm_status": "no_visible_threads",
+                "dm_note": "Browser DM collection completed but did not produce a messages page.",
+                "dm_threads": [],
+                "dm_visible_thread_count": 0,
+                "dm_replied_thread_count": 0,
+                "dm_unreplied_thread_count": 0,
+                "dm_captured_message_count": 0,
+            }
+        ]
     merged_pages = [page for page in api_data.get("pages", []) if not (isinstance(page, dict) and page.get("kind") == "messages")]
     merged_pages.extend(browser_messages)
     api_data["pages"] = merged_pages
@@ -283,87 +332,40 @@ def main() -> None:
     api_base = args.api_base or str(api_config.get("api_base") or "https://api.x.com/2")
     user_id = args.user_id or str(api_config.get("user_id") or "")
     handle = (args.handle or api_config.get("handle") or config.get("handle") or "").lstrip("@")
-    source = args.source if args.source != "auto" else ("api" if api_configured(api_config, bearer_token) else "browser")
+    source = args.source if args.source != "auto" else ("api" if api_configured(bearer_token) else "browser")
     include_dms = not args.no_dms
     if args.include_dms:
         include_dms = True
-    script = Path(__file__).with_name("api_x_digest.py" if source == "api" else "browser_x_digest.py")
-    cmd = [
-        sys.executable,
-        str(script),
-        "--keywords",
-        args.keywords,
-        "--out",
-        args.out,
-        "--max-public-items",
-        str(args.max_public_items),
-        "--public-window-hours",
-        str(args.public_window_hours),
-    ]
     if source == "api":
-        cmd.extend(["--api-base", api_base])
-        cmd.extend(["--dm-max-events", str(args.dm_max_events)])
+        cmd = api_command(args, args.out, api_base, user_id, handle)
         child_env = os.environ.copy()
         if bearer_token:
             child_env["X_BEARER_TOKEN"] = bearer_token
-        if user_id:
-            cmd.extend(["--user-id", user_id])
     else:
+        cmd = browser_command(args, args.out, handle, include_dms)
         child_env = None
-        cmd.extend(
-            [
-                "--scrolls",
-                str(args.scrolls),
-                "--dm-threads",
-                str(args.dm_threads),
-                "--dm-scrolls",
-                str(args.dm_scrolls),
-                "--dm-max-messages",
-                str(args.dm_max_messages),
-                "--dm-window-hours",
-                str(args.dm_window_hours),
-            ]
-        )
-    if args.handle:
-        cmd.extend(["--handle", handle])
-    elif handle:
-        cmd.extend(["--handle", handle])
-    if include_dms and source != "api":
-        cmd.append("--include-dms")
     if source == "api" and include_dms:
         print("API source selected for public data. Browser collection will be used for X Chat/DM.", flush=True)
-    if args.headed and source == "browser":
-        cmd.append("--headed")
-    if args.headless and source == "browser":
-        cmd.append("--headless")
-    if args.non_interactive and source == "browser":
-        cmd.append("--non-interactive")
     print(f"Collecting X digest data via {source} source.", flush=True)
     try:
         if source == "api":
             if include_dms:
                 with tempfile.TemporaryDirectory(prefix="x-digest-api-") as api_tmp, tempfile.TemporaryDirectory(prefix="x-digest-browser-dm-") as browser_tmp:
-                    cmd[cmd.index("--out") + 1] = api_tmp
-                    completed = subprocess.run(cmd, check=True, env=child_env, capture_output=True, text=True)
-                    if completed.stdout:
-                        print(completed.stdout.strip(), flush=True)
+                    run_api_command(api_command(args, api_tmp, api_base, user_id, handle), child_env)
                     print("Collecting X Chat/DM via browser source.", flush=True)
-                    subprocess.run(browser_command(args, browser_tmp, handle, include_dms=True, dm_only=True), check=True)
+                    run_browser_command(browser_command(args, browser_tmp, handle, include_dms=True, dm_only=True))
                     merge_api_public_with_browser_dm(Path(api_tmp), Path(browser_tmp), Path(args.out))
                     source = "api+browser_dm"
             else:
-                completed = subprocess.run(cmd, check=True, env=child_env, capture_output=True, text=True)
-                if completed.stdout:
-                    print(completed.stdout.strip(), flush=True)
+                run_api_command(cmd, child_env)
         else:
-            subprocess.run(cmd, check=True, env=child_env)
+            run_browser_command(cmd)
     except subprocess.CalledProcessError as exc:
         summary = summarize_child_error(exc)
         if args.source == "auto" and source == "api":
             print(f"API collection unavailable ({summary}). Falling back to browser collection.", flush=True)
             source = "browser"
-            cmd = browser_command(args, args.out, handle, include_dms)
-            subprocess.run(cmd, check=True)
+            run_browser_command(browser_command(args, args.out, handle, include_dms))
         else:
             print(f"API collection failed: {summary}", file=sys.stderr, flush=True)
             raise SystemExit(exc.returncode) from exc
