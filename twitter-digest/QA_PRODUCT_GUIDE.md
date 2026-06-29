@@ -16,30 +16,12 @@
 
 ### 1. 准备条件
 
-本机需要：
+环境和 X App 已配置好。测试前只需要私信找 ZC 要两项：
 
-- macOS 或可运行 Claude Code 的桌面环境。
-- Python 3.10+。
-- 一个 Chromium 内核浏览器：Google Chrome、Chromium、Microsoft Edge 或 Brave。
-- 可以登录的 X/Twitter 账号。
+- OAuth2 Client ID
+- OAuth2 Client Secret
 
-如果要测试 API 模式，还需要：
-
-- X Developer App。
-- OAuth2 Client ID。
-- X Developer Portal 里配置 callback URL：
-
-```text
-http://127.0.0.1:8765/callback
-```
-
-推荐 OAuth scopes：
-
-```text
-dm.read tweet.read users.read offline.access
-```
-
-说明：当前日报里 DM 以浏览器抓取为准；API 主要用于公开数据，比如 home、mentions、profile。
+拿到后按下面步骤操作即可。当前日报里 DM 以浏览器抓取为准；API 主要用于公开数据，比如 home、mentions、profile。
 
 ### 2. 安装 Skill
 
@@ -77,8 +59,8 @@ python3 twitter-digest/scripts/run_daily_digest.py --configure-api
 
 1. 自动打开一个 Terminal 配置窗口。
 2. 不出现 OAuth1 / 多种方式选择，直接进入 OAuth2。
-3. 输入 X Developer App 的 Client ID。
-4. Client Secret 如果没有可以留空。
+3. 输入 ZC 提供的 OAuth2 Client ID。
+4. 输入 ZC 提供的 OAuth2 Client Secret。
 5. 浏览器打开 X 授权页。
 6. 用户在浏览器里授权当前 X 账号。
 7. 配置保存到：
