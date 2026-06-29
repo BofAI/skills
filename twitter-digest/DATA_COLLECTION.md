@@ -126,8 +126,8 @@ Agent：运行 scripts/run_daily_digest.py --configure-api-token
 ```text
 用户：配置 X API
 Agent：运行 scripts/run_daily_digest.py --configure-api
-脚本：弹出授权方式选择
-用户：选择 OAuth2，输入 Client ID 和可选 Client Secret
+脚本：直接进入 OAuth2 配置
+用户：输入 Client ID 和可选 Client Secret
 脚本：打开 X 授权页
 用户：在浏览器里授权 app
 脚本：通过本地 callback 换取 access token / refresh token 并保存

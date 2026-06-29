@@ -166,14 +166,32 @@ def open_config_in_terminal(extra_args: list[str]) -> bool:
     shell_command = "\n".join(
         [
             "#!/bin/zsh",
+            "set +e",
+            "terminal_tty=$(tty)",
             f"cd {shlex.quote(str(Path(__file__).resolve().parents[1]))}",
             "echo 'X API 配置向导'",
-            "echo '默认推荐：OAuth2 PKCE，需要 X Developer App 的 Client ID，并通过浏览器授权账号。'",
+            "echo '使用 OAuth2 PKCE，需要 X Developer App 的 Client ID，并通过浏览器授权账号。'",
             "echo",
             " ".join([shlex.quote(sys.executable), shlex.quote(str(script)), *[shlex.quote(arg) for arg in extra_args]]),
+            "status=$?",
             "echo",
             "echo '配置流程已结束。Terminal 将自动关闭。'",
-            "",
+            "{ sleep 0.5; osascript <<OSA >/dev/null 2>&1",
+            "set targetTTY to \"$terminal_tty\"",
+            "tell application \"Terminal\"",
+            "  repeat with w in windows",
+            "    repeat with t in tabs of w",
+            "      if (tty of t) is targetTTY then",
+            "        close w",
+            "        return",
+            "      end if",
+            "    end repeat",
+            "  end repeat",
+            "end tell",
+            "OSA",
+            "} >/dev/null 2>&1 &",
+            "disown",
+            "exit $status",
         ]
     )
     try:
@@ -311,9 +329,9 @@ def merge_api_public_with_browser_dm(api_out: Path, browser_out: Path, final_out
 def main() -> None:
     args = parse_args()
     if args.configure_api:
-        if not sys.stdin.isatty() and open_config_in_terminal([]):
+        if not sys.stdin.isatty() and open_config_in_terminal(["--oauth"]):
             return
-        subprocess.run([sys.executable, str(Path(__file__).with_name("configure_api.py"))], check=True)
+        subprocess.run([sys.executable, str(Path(__file__).with_name("configure_api.py")), "--oauth"], check=True)
         return
     if args.configure_api_token:
         if not sys.stdin.isatty() and open_config_in_terminal(["--paste-token"]):
