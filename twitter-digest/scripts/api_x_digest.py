@@ -469,17 +469,21 @@ def collect_api(args: argparse.Namespace) -> dict[str, Any]:
         dm_window_raw = filter_events_by_window(dm_raw, hours)
         dm_summary = normalize_dm_events(dm_window_raw, dm_includes, user_id, max_threads=50)
         if dm_errors:
-            dm_status = "api_dm_error"
-            dm_note = "X API DM lookup failed. The app/token may lack dm.read access, the API tier may not include DM endpoints, or the request may be rate limited."
+            dm_status = "api_dm_todo"
+            dm_note = "TODO: X API DM lookup failed. Do not treat this as an empty inbox; use browser DM collection if DM coverage is required."
+            dm_todo_detail = "API DM request failed; check OAuth2 dm.read scope, Project/API access, rate limits, or use browser DM collection."
         elif dm_summary["visible_count"] == 0:
-            dm_status = "no_today_threads"
-            dm_note = "X API returned no DM events in the digest window."
+            dm_status = "api_dm_todo"
+            dm_note = "TODO: X API returned 0 DM events in the digest window. XChat/encrypted messages may not be exposed through DM Events API; use browser DM collection if DM coverage is required."
+            dm_todo_detail = "API DM returned 0 events; verify with browser X Chat before saying there are no DMs."
         elif dm_summary["unreplied_count"] == 0:
-            dm_status = "no_unreplied_threads"
-            dm_note = "X API returned DM conversations, but their latest captured messages are from the user or do not need a reply."
+            dm_status = "api_dm_todo"
+            dm_note = "TODO: X API returned DM events but no waiting-reply conversation. Browser X Chat should be checked before concluding no DM action is needed."
+            dm_todo_detail = "API DM has events but no waiting-reply thread; browser DM collection remains authoritative for XChat/encrypted conversations."
         else:
             dm_status = "captured_unreplied_threads"
             dm_note = "X API DM lookup captured recent waiting-reply conversations. API events are limited by X API retention, permissions, and rate limits."
+            dm_todo_detail = ""
         messages_page = {
             "kind": "messages",
             "url": f"{args.api_base}/dm_events",
@@ -492,6 +496,14 @@ def collect_api(args: argparse.Namespace) -> dict[str, Any]:
             "dm_unreplied_thread_count": dm_summary["unreplied_count"],
             "dm_captured_message_count": dm_summary["captured_messages"],
         }
+        if dm_todo_detail:
+            messages_page["todo_items"] = [
+                {
+                    "source": "messages",
+                    "status": dm_status,
+                    "detail": dm_todo_detail,
+                }
+            ]
         if dm_errors:
             messages_page["collection_status"] = "error"
             messages_page["collection_error"] = "; ".join(dm_errors)

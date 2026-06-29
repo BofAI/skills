@@ -24,7 +24,7 @@ API mode:
 - Reads the official reverse chronological home timeline when the token has user-context timeline access.
 - Reads `/2/dm_events` when DMs are requested and the token/app has DM lookup permission.
 - Records endpoint-level API failures as data gaps instead of silently treating them as empty pages.
-- DM lookup failures are recorded as `api_dm_error`; do not summarize them as empty inboxes.
+- DM lookup failures, zero-event API responses, and inconclusive API DM results are recorded as `api_dm_todo`; do not summarize them as empty inboxes. Use browser collection for X Chat / encrypted DMs.
 - Saved OAuth tokens are configured by the agent-triggered `run_daily_digest.py --configure-api` flow. OAuth2 PKCE is the supported path for user-owned local X Apps: the user provides the Client ID, authorizes the app in the browser, and the script saves the access token plus refresh token. OAuth2 tokens are refreshed automatically when a refresh token is saved.
 
 Chat-triggered API setup:
