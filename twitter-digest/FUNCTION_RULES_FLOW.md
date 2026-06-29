@@ -151,6 +151,7 @@ DM 默认读取。
 - 默认安全上限是向上滚动 200 次，并最多保留 2000 条消息气泡；`--dm-window-hours 0` 表示不按 24 小时窗口截断 DM 历史。
 - 如果没有滚到顶部或命中消息上限，会在 `digest-context` 的数据缺口里记录 `dm_thread_incomplete`，不能假装完整。
 - 如果会话列表没有扫到底，会在 `digest-context` 的数据缺口里记录 `dm_list_incomplete`，日报需要说明可能还有会话未覆盖。
+- 如果 X Messages 显示骨架屏、占位条或右侧 `Start Conversation` 但左侧会话列表仍未真实加载，脚本会自动重载 `/messages`，最多重试 3 次；仍失败时记录 `dm_page_loading_timeout`，不能写成“没有私信”。
 - `digest-context.md` 会为需要总结的等我回复会话输出 `DM Thread Context`，最多带 2000 条已加载消息，并保留 raw label、URL、加载状态等原始信息，方便模型理解复杂上下文。
 - 默认只打开今天等我回复的会话。
 - 发信人以 `participant` / `会话对象` 和消息气泡方向为准，不能把引用帖、转发卡片、链接预览里的作者当作 DM 发信人。

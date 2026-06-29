@@ -59,6 +59,8 @@ def main() -> None:
         "captured_messages": result.get("dm_captured_message_count", 0),
         "list_scrolls_used": result.get("dm_list_scrolls_used", 0),
         "list_load_complete": result.get("dm_list_load_complete", False),
+        "retry_attempts": result.get("dm_retry_attempts", 0),
+        "loading_state": result.get("dm_loading_state", {}),
         "dm_note": result.get("dm_note", ""),
         "threads": [],
     }

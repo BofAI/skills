@@ -88,12 +88,22 @@ def collect_page(
             "collection_error": navigate_result["_cdp_error"],
         }
     if page["kind"] == "messages":
-        wait_for_dm_ready(ws_url, timeout_sec=20)
-        extra = collect_messages_page(ws_url, dm_threads, dm_scrolls, dm_max_messages, dm_window_hours, dm_list_scrolls)
-        if dm_collection_looks_premature(extra):
-            cdp_call(ws_url, "Page.navigate", {"url": page["url"]})
-            wait_for_dm_ready(ws_url, timeout_sec=20)
+        extra: dict[str, Any] = {}
+        for attempt in range(1, 4):
+            wait_for_dm_ready(ws_url, timeout_sec=25)
             extra = collect_messages_page(ws_url, dm_threads, dm_scrolls, dm_max_messages, dm_window_hours, dm_list_scrolls)
+            if not dm_collection_looks_premature(extra):
+                break
+            extra["dm_retry_attempts"] = attempt
+            if attempt < 3:
+                print(f"X Messages still appears to be loading or incomplete. Reloading messages page (attempt {attempt + 1}/3)...", flush=True)
+                cdp_call(ws_url, "Page.navigate", {"url": page["url"]})
+                wait_for_dm_ready(ws_url, timeout_sec=25)
+        if dm_collection_looks_premature(extra) and extra.get("dm_status") == "dm_page_loading_timeout":
+            extra["dm_note"] = (
+                "X Messages page stayed in a loading/skeleton state after 3 attempts. "
+                "DM content was not treated as empty; rerun later or use --headed to inspect the page."
+            )
         return {"kind": page["kind"], "url": page["url"], "items": [], **extra}
     wait_for_public_page_ready(ws_url, timeout_sec=20)
     extra = collect_public_items(ws_url, max_scrolls=scrolls, max_items=max_public_items, window_hours=public_window_hours, min_scrolls=min_public_scrolls)

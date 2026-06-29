@@ -204,7 +204,7 @@ def build_digest_facts(data: dict[str, Any], summary: dict[str, Any]) -> dict[st
                     "cards": normalize_context_assets(item.get("cards")),
                 }
             )
-    if (summary.get("dm_status") or "") in {"blocked_by_x_chat_passcode", "visible_threads_unopened", "no_visible_threads", "api_dm_unavailable", "api_dm_error", "api_dm_todo"}:
+    if (summary.get("dm_status") or "") in {"blocked_by_x_chat_passcode", "visible_threads_unopened", "no_visible_threads", "dm_page_loading_timeout", "api_dm_unavailable", "api_dm_error", "api_dm_todo"}:
         facts["data_gaps"].append(
             {
                 "source": "messages",

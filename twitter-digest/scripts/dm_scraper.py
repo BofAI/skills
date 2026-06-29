@@ -15,6 +15,19 @@ from public_scraper import extract_main_text
 def collect_messages_page(ws_url: str, dm_threads: int, dm_scrolls: int, dm_max_messages: int, dm_window_hours: int, dm_list_scrolls: int = 20) -> dict[str, Any]:
     extra: dict[str, Any] = {}
     extra["visible_text"] = extract_main_text(ws_url)
+    loading_state = dm_page_loading_state(ws_url)
+    extra["dm_loading_state"] = loading_state
+    if bool(loading_state.get("loading")):
+        return {
+            **extra,
+            "dm_status": "dm_page_loading_timeout",
+            "dm_note": (
+                "X Messages page still showed skeleton/loading placeholders or Start Conversation before the "
+                "conversation list became readable. The collector will retry before treating DMs as unavailable."
+            ),
+            "dm_threads": [],
+            **dm_counts([]),
+        }
     extra.update(
         collect_dm_threads(
             ws_url,
@@ -30,6 +43,11 @@ def collect_messages_page(ws_url: str, dm_threads: int, dm_scrolls: int, dm_max_
 def dm_collection_looks_premature(extra: dict[str, Any]) -> bool:
     status = str(extra.get("dm_status") or "")
     text = " ".join(str(extra.get("visible_text") or "").lower().split())
+    if status == "dm_page_loading_timeout":
+        return True
+    loading_state = extra.get("dm_loading_state") if isinstance(extra.get("dm_loading_state"), dict) else {}
+    if bool(loading_state.get("loading")):
+        return True
     if status not in {"no_today_threads", "no_visible_threads", "visible_threads_unopened"}:
         return False
     if "start conversation" not in text:
@@ -409,12 +427,21 @@ def wait_for_dm_ready(ws_url: str, timeout_sec: int = 20) -> str:
             return text
         if extract_dm_thread_targets(ws_url):
             return text
+        state = dm_page_loading_state(ws_url)
+        if bool(state.get("loading")):
+            time.sleep(1)
+            continue
         normalized = " ".join(text.lower().split())
         empty_markers = ["no messages", "welcome to your inbox"]
         if any(marker in normalized for marker in empty_markers):
             return text
         time.sleep(1)
     return last_text
+
+def dm_page_loading_state(ws_url: str) -> dict[str, Any]:
+    script = load_dom_script("dm_page_loading_state.js")
+    value = cdp_eval(ws_url, script)
+    return value if isinstance(value, dict) else {}
 
 def looks_like_dm_list_text(text: str) -> bool:
     lines = [line.strip() for line in text.splitlines() if line.strip()]
