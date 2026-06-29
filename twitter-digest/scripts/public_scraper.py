@@ -71,6 +71,7 @@ def collect_public_items(ws_url: str, max_scrolls: int, max_items: int, window_h
     posts = dedupe_items([*posts, *extract_articles(ws_url)])
     if len(posts) > item_limit:
         posts = posts[:item_limit]
+    window_exceeded = public_posts_beyond_window(posts, window)
     return {
         "items": posts,
         "public_scrolls_used": min(scroll_limit, scrolls_used),

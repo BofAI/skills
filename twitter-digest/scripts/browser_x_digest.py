@@ -33,7 +33,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--profile-dir", default=str(default_state_dir / "chrome-profile"), help="Dedicated browser profile directory used to persist X login/session state.")
     parser.add_argument("--scrolls", type=int, default=40, help="Maximum scroll rounds per public page.")
     parser.add_argument("--min-public-scrolls", type=int, default=5, help="Minimum public-page scroll rounds before early stop rules can end collection.")
-    parser.add_argument("--max-public-items", type=int, default=300, help="Maximum public post items kept per run.")
+    parser.add_argument("--max-public-items", type=int, default=100, help="Maximum public post items kept per browser run.")
     parser.add_argument("--public-window-hours", type=int, default=24, help="Stop loading older public timeline items once posts beyond this window are detected.")
     parser.add_argument("--login-timeout-sec", type=int, default=300)
     parser.add_argument("--include-dms", action="store_true", help="Also visit X messages and capture visible conversation text.")
@@ -75,10 +75,10 @@ def collect_page(
     scrolls: int,
     dm_threads: int = 5,
     dm_list_scrolls: int = 20,
-    dm_scrolls: int = 40,
-    dm_max_messages: int = 300,
-    dm_window_hours: int = 24,
-    max_public_items: int = 300,
+    dm_scrolls: int = 200,
+    dm_max_messages: int = 2000,
+    dm_window_hours: int = 0,
+    max_public_items: int = 100,
     public_window_hours: int = 24,
     min_public_scrolls: int = 5,
 ) -> dict[str, Any]:
@@ -131,7 +131,12 @@ def collect_messages_with_retries(
             print(f"X Messages still appears to be loading or incomplete. Reloading messages page (attempt {attempt + 1}/{max_attempts})...", flush=True)
             cdp_call(ws_url, "Page.navigate", {"url": url})
             wait_for_dm_ready(ws_url, timeout_sec=25)
-    if dm_collection_looks_premature(extra) and extra.get("dm_status") == "dm_page_loading_timeout":
+    if dm_collection_looks_premature(extra):
+        original_status = str(extra.get("dm_status") or "unknown")
+        extra["dm_original_status"] = original_status
+        extra["dm_status"] = "dm_page_loading_timeout"
+        extra["collection_status"] = "partial"
+        extra["collection_error"] = "X Messages did not finish loading before retry budget was exhausted."
         extra["dm_note"] = (
             f"X Messages page stayed in a loading/skeleton state after {max_attempts} attempts. "
             "DM content was not treated as empty; rerun later or use --headed to inspect the page."

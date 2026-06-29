@@ -20,6 +20,8 @@ from script_utils import display_path, open_script_in_terminal, rerun_from_insta
 STATE_DIR = Path(__file__).resolve().parents[1] / ".state"
 CONFIG_PATH = STATE_DIR / "config.json"
 DEFAULT_OUT_DIR = STATE_DIR / "run"
+DEFAULT_API_PUBLIC_ITEMS = 300
+DEFAULT_BROWSER_PUBLIC_ITEMS = 100
 
 
 def parse_args() -> argparse.Namespace:
@@ -46,7 +48,12 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--dm-window-hours", type=int, default=0, help="Stop loading older DM history once messages beyond this window are detected. 0 means load full available thread history.")
     parser.add_argument("--scrolls", type=int, default=40, help="Maximum scroll rounds per public page.")
     parser.add_argument("--min-public-scrolls", type=int, default=5, help="Minimum public-page scroll rounds before early stop rules can end collection.")
-    parser.add_argument("--max-public-items", type=int, default=300, help="Maximum public post items kept per run.")
+    parser.add_argument(
+        "--max-public-items",
+        type=int,
+        default=None,
+        help="Override maximum public post items for both collectors. Defaults: API 300, browser 100.",
+    )
     parser.add_argument("--public-window-hours", type=int, default=24, help="Stop loading older public timeline items once posts beyond this window are detected.")
     parser.add_argument("--headless", action="store_true", help="Run browser collection headlessly. This is the default when login is already saved.")
     parser.add_argument("--headed", action="store_true", help="Force a visible browser window for debugging or manual login.")
@@ -99,13 +106,21 @@ def summarize_child_error(error: subprocess.CalledProcessError) -> str:
     return summarize_collector_error(text, returncode=error.returncode)
 
 
+def api_public_item_limit(args: argparse.Namespace) -> int:
+    return max(1, int(args.max_public_items if args.max_public_items is not None else DEFAULT_API_PUBLIC_ITEMS))
+
+
+def browser_public_item_limit(args: argparse.Namespace) -> int:
+    return max(1, int(args.max_public_items if args.max_public_items is not None else DEFAULT_BROWSER_PUBLIC_ITEMS))
+
+
 def api_command(args: argparse.Namespace, out_dir: str, api_base: str, user_id: str, handle: str) -> list[str]:
     return api_collector_command(
         sys.executable,
         Path(__file__).resolve().parent,
         out_dir,
         keywords=args.keywords,
-        max_public_items=args.max_public_items,
+        max_public_items=api_public_item_limit(args),
         public_window_hours=args.public_window_hours,
         dm_max_events=args.dm_max_events,
         api_base=api_base,
@@ -120,7 +135,7 @@ def browser_command(args: argparse.Namespace, out_dir: str, handle: str, include
         Path(__file__).resolve().parent,
         out_dir,
         keywords=args.keywords,
-        max_public_items=args.max_public_items,
+        max_public_items=browser_public_item_limit(args),
         public_window_hours=args.public_window_hours,
         min_public_scrolls=args.min_public_scrolls,
         scrolls=args.scrolls,

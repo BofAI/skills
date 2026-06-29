@@ -22,6 +22,8 @@ ROOT = Path(__file__).resolve().parents[1]
 DEFAULT_OUT = ROOT / ".state" / "compare-runs"
 MIN_INTERVAL_SEC = 120
 PUBLIC_KINDS = ["home", "own_profile", "mentions_search", "mentions_notifications"]
+DEFAULT_API_PUBLIC_ITEMS = 300
+DEFAULT_BROWSER_PUBLIC_ITEMS = 100
 
 
 def parse_args() -> argparse.Namespace:
@@ -31,7 +33,12 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--out-dir", default=str(DEFAULT_OUT), help="Directory for archived comparison runs.")
     parser.add_argument("--handle", default="", help="Optional X handle override.")
     parser.add_argument("--keywords", default="", help="Optional comma-separated keyword searches.")
-    parser.add_argument("--max-public-items", type=int, default=300)
+    parser.add_argument(
+        "--max-public-items",
+        type=int,
+        default=None,
+        help="Override maximum public post items for both collectors. Defaults: API 300, browser 100.",
+    )
     parser.add_argument("--public-window-hours", type=int, default=24)
     parser.add_argument("--min-public-scrolls", type=int, default=5)
     parser.add_argument("--scrolls", type=int, default=40)
@@ -52,6 +59,14 @@ def parse_args() -> argparse.Namespace:
 def load_bearer_token() -> str:
     config = refresh_oauth_token_if_needed(load_api_config())
     return str(config.get("bearer_token") or os.environ.get("X_BEARER_TOKEN") or os.environ.get("TWITTER_BEARER_TOKEN") or "")
+
+
+def api_public_item_limit(args: argparse.Namespace) -> int:
+    return max(1, int(args.max_public_items if args.max_public_items is not None else DEFAULT_API_PUBLIC_ITEMS))
+
+
+def browser_public_item_limit(args: argparse.Namespace) -> int:
+    return max(1, int(args.max_public_items if args.max_public_items is not None else DEFAULT_BROWSER_PUBLIC_ITEMS))
 
 
 def run_command(cmd: list[str], out_dir: Path, env: dict[str, str] | None = None) -> dict[str, Any]:
@@ -80,7 +95,7 @@ def api_command(args: argparse.Namespace, out_dir: Path) -> tuple[list[str], dic
         ROOT / "scripts",
         out_dir,
         keywords=args.keywords,
-        max_public_items=args.max_public_items,
+        max_public_items=api_public_item_limit(args),
         public_window_hours=args.public_window_hours,
         dm_max_events=args.dm_max_events,
         handle=args.handle,
@@ -94,7 +109,7 @@ def browser_command(args: argparse.Namespace, out_dir: Path) -> list[str]:
         ROOT / "scripts",
         out_dir,
         keywords=args.keywords,
-        max_public_items=args.max_public_items,
+        max_public_items=browser_public_item_limit(args),
         public_window_hours=args.public_window_hours,
         min_public_scrolls=args.min_public_scrolls,
         scrolls=args.scrolls,
