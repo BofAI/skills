@@ -159,6 +159,22 @@ Chat flow summary:
 python3 twitter-digest/scripts/test_dm_collection.py
 ```
 
+## Compare API And Browser Collection
+
+Run API and browser collectors once per round, keep every round's raw data, and generate a final comparison report:
+
+```bash
+python3 twitter-digest/scripts/compare_collectors.py --rounds 3 --interval-sec 120
+```
+
+The runner enforces a minimum 120-second delay between rounds. Reports are written under:
+
+```text
+twitter-digest/.state/compare-runs/<timestamp>/
+```
+
+See `twitter-digest/COLLECTOR_COMPARISON_TEST.md` for the full agent test plan.
+
 ## Main Outputs
 
 ```text
@@ -178,4 +194,5 @@ See:
 twitter-digest/DATA_COLLECTION.md
 twitter-digest/RUNBOOK.md
 twitter-digest/FUNCTION_RULES_FLOW.md
+twitter-digest/COLLECTOR_COMPARISON_TEST.md
 ```
