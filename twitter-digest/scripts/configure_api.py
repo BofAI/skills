@@ -34,15 +34,9 @@ def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--bearer-token", help="X API bearer token. Omit to prompt securely.")
     parser.add_argument("--oauth", action="store_true", help="Run OAuth 2.0 Authorization Code with PKCE to get a user-context access token.")
-    parser.add_argument("--oauth1", action="store_true", help=argparse.SUPPRESS)
     parser.add_argument("--paste-token", action="store_true", help="Paste an existing user access token instead of running OAuth.")
-    parser.add_argument("--paste-oauth1", action="store_true", help=argparse.SUPPRESS)
     parser.add_argument("--client-id", default="")
     parser.add_argument("--client-secret", default="", help="Optional OAuth client secret for confidential apps.")
-    parser.add_argument("--consumer-key", default="")
-    parser.add_argument("--consumer-secret", default="")
-    parser.add_argument("--access-token", default="")
-    parser.add_argument("--access-token-secret", default="")
     parser.add_argument("--redirect-uri", default=DEFAULT_REDIRECT_URI)
     parser.add_argument("--scopes", default=DEFAULT_SCOPES)
     parser.add_argument("--api-base", default=DEFAULT_API_BASE)
@@ -326,8 +320,6 @@ def main() -> None:
         return
 
     existing = load_api_config()
-    if args.oauth1 or args.paste_oauth1:
-        raise SystemExit("OAuth1 is no longer supported for twitter-digest API setup. Use OAuth2 PKCE with dm.read, tweet.read, users.read, and offline.access scopes.")
     mode = (
         "oauth2"
         if args.oauth

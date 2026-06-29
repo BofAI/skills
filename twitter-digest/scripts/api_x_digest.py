@@ -4,13 +4,9 @@
 from __future__ import annotations
 
 import argparse
-import base64
 import datetime as dt
-import hashlib
-import hmac
 import json
 import os
-import secrets
 import sys
 import time
 import urllib.error
@@ -31,10 +27,6 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--handle", help="Your X handle, with or without @.")
     parser.add_argument("--user-id", default=os.environ.get("X_USER_ID") or os.environ.get("TWITTER_USER_ID") or "")
     parser.add_argument("--bearer-token", default=os.environ.get("X_BEARER_TOKEN") or os.environ.get("TWITTER_BEARER_TOKEN") or "")
-    parser.add_argument("--consumer-key", default=os.environ.get("X_CONSUMER_KEY") or os.environ.get("TWITTER_CONSUMER_KEY") or "")
-    parser.add_argument("--consumer-secret", default=os.environ.get("X_CONSUMER_SECRET") or os.environ.get("TWITTER_CONSUMER_SECRET") or "")
-    parser.add_argument("--access-token", default=os.environ.get("X_ACCESS_TOKEN") or os.environ.get("TWITTER_ACCESS_TOKEN") or "")
-    parser.add_argument("--access-token-secret", default=os.environ.get("X_ACCESS_TOKEN_SECRET") or os.environ.get("TWITTER_ACCESS_TOKEN_SECRET") or "")
     parser.add_argument("--api-base", default=os.environ.get("X_API_BASE_URL") or API_BASE)
     parser.add_argument("--keywords", default="", help="Comma-separated keywords or queries for optional search.")
     parser.add_argument("--out", default=str(default_state_dir / "run"))
@@ -46,60 +38,9 @@ def parse_args() -> argparse.Namespace:
     return parser.parse_args()
 
 
-def api_is_configured() -> bool:
-    return bool(
-        os.environ.get("X_BEARER_TOKEN")
-        or os.environ.get("TWITTER_BEARER_TOKEN")
-        or (
-            os.environ.get("X_CONSUMER_KEY")
-            and os.environ.get("X_CONSUMER_SECRET")
-            and os.environ.get("X_ACCESS_TOKEN")
-            and os.environ.get("X_ACCESS_TOKEN_SECRET")
-        )
-    )
-
-
-def quote(value: str) -> str:
-    return urllib.parse.quote(str(value), safe="~")
-
-
-def oauth1_header(method: str, url: str, oauth1: dict[str, str]) -> str:
-    params = {
-        "oauth_consumer_key": oauth1["consumer_key"],
-        "oauth_nonce": secrets.token_urlsafe(24),
-        "oauth_signature_method": "HMAC-SHA1",
-        "oauth_timestamp": str(int(time.time())),
-        "oauth_token": oauth1["access_token"],
-        "oauth_version": "1.0",
-    }
-    parsed = urllib.parse.urlparse(url)
-    base_url = f"{parsed.scheme}://{parsed.netloc}{parsed.path}"
-    query_pairs = urllib.parse.parse_qsl(parsed.query, keep_blank_values=True)
-    signing_pairs = query_pairs + list(params.items())
-    normalized = "&".join(f"{quote(k)}={quote(v)}" for k, v in sorted(signing_pairs))
-    signature_base = "&".join([method.upper(), quote(base_url), quote(normalized)])
-    signing_key = f"{quote(oauth1['consumer_secret'])}&{quote(oauth1['access_token_secret'])}"
-    signature = base64.b64encode(hmac.new(signing_key.encode("utf-8"), signature_base.encode("utf-8"), hashlib.sha1).digest()).decode("ascii")
-    params["oauth_signature"] = signature
-    return "OAuth " + ", ".join(f'{quote(k)}="{quote(v)}"' for k, v in sorted(params.items()))
-
-
-def build_oauth1_config(args: argparse.Namespace) -> dict[str, str]:
-    required = {
-        "consumer_key": args.consumer_key,
-        "consumer_secret": args.consumer_secret,
-        "access_token": args.access_token,
-        "access_token_secret": args.access_token_secret,
-    }
-    return {key: str(value) for key, value in required.items() if value}
-
-
-def auth_headers(args: argparse.Namespace, url: str) -> dict[str, str]:
+def auth_headers(args: argparse.Namespace) -> dict[str, str]:
     if args.bearer_token:
         return {"Authorization": f"Bearer {args.bearer_token}", "User-Agent": "twitter-digest/1.0"}
-    oauth1 = build_oauth1_config(args)
-    if len(oauth1) == 4:
-        return {"Authorization": oauth1_header("GET", url, oauth1), "User-Agent": "twitter-digest/1.0"}
     return {"User-Agent": "twitter-digest/1.0"}
 
 
@@ -108,7 +49,7 @@ def api_get(args: argparse.Namespace, path: str, params: dict[str, Any] | None =
     url = args.api_base.rstrip("/") + path
     if query:
         url += "?" + query
-    request = urllib.request.Request(url, headers=auth_headers(args, url))
+    request = urllib.request.Request(url, headers=auth_headers(args))
     try:
         with urllib.request.urlopen(request, timeout=30) as response:
             return json.loads(response.read().decode("utf-8"))
@@ -394,7 +335,7 @@ def page(kind: str, url: str, items: list[dict[str, Any]], note: str = "", error
 
 
 def collect_api(args: argparse.Namespace) -> dict[str, Any]:
-    if not args.bearer_token and len(build_oauth1_config(args)) != 4:
+    if not args.bearer_token:
         raise SystemExit("X API is not configured. Configure OAuth2 PKCE or set an OAuth2 user access token with X_BEARER_TOKEN.")
     user = resolve_user(args, args.handle, args.user_id)
     handle = user.get("username") or (args.handle or "").lstrip("@")
@@ -512,7 +453,7 @@ def collect_api(args: argparse.Namespace) -> dict[str, Any]:
     return {
         "generated_at": dt.datetime.now().astimezone().isoformat(),
         "source": "api",
-        "auth_method": "oauth1a_user_context" if len(build_oauth1_config(args)) == 4 and not args.bearer_token else "bearer",
+        "auth_method": "oauth2_user_context",
         "api_base": args.api_base,
         "profile_dir": "",
         "handle": handle,
