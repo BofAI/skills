@@ -5,6 +5,7 @@ from __future__ import annotations
 
 import argparse
 import datetime as dt
+import json
 import os
 import shutil as shutil_module
 import shutil
@@ -41,6 +42,14 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--copy", action="store_true", help="Copy files instead of creating a symlink. This is the default.")
     parser.add_argument("--symlink", action="store_true", help="Install as a symlink for local skill development.")
     parser.add_argument("--skip-browser-check", action="store_true", help="Skip checking for a supported Chromium browser.")
+    parser.add_argument(
+        "--allow-claude-commands",
+        action="store_true",
+        help=(
+            "Opt in to adding a Claude Code global Bash allow rule for the installed run_daily_digest.py command. "
+            "This only applies when installing for Claude Code."
+        ),
+    )
     parser.add_argument("--dry-run", action="store_true")
     return parser.parse_args()
 
@@ -167,6 +176,56 @@ def install_skill(root: Path, skills_dir: Path, copy: bool, dry_run: bool) -> Pa
     return target
 
 
+def claude_bash_allow_rule(target: Path) -> str:
+    script = target.expanduser() / "scripts" / "run_daily_digest.py"
+    try:
+        command_path = "~/" + str(script.relative_to(Path.home()))
+    except ValueError:
+        command_path = str(script)
+    return f"Bash(python3 {command_path}:*)"
+
+
+def write_claude_allow_rule(target: Path, dry_run: bool) -> None:
+    settings_path = Path.home() / ".claude" / "settings.json"
+    rule = claude_bash_allow_rule(target)
+    if dry_run:
+        print(f"Would add Claude Code Bash allow rule to {display_path(settings_path)}: {rule}", flush=True)
+        return
+
+    settings: dict[str, object]
+    if settings_path.exists():
+        try:
+            settings = json.loads(settings_path.read_text(encoding="utf-8"))
+        except json.JSONDecodeError as exc:
+            raise SystemExit(f"Cannot update Claude Code settings because {display_path(settings_path)} is not valid JSON: {exc}") from exc
+        if not isinstance(settings, dict):
+            raise SystemExit(f"Cannot update Claude Code settings because {display_path(settings_path)} does not contain a JSON object.")
+    else:
+        settings = {}
+
+    permissions = settings.get("permissions")
+    if not isinstance(permissions, dict):
+        permissions = {}
+        settings["permissions"] = permissions
+    allow = permissions.get("allow")
+    if allow is None:
+        allow = []
+        permissions["allow"] = allow
+    if not isinstance(allow, list):
+        raise SystemExit(f"Cannot update Claude Code settings because permissions.allow in {display_path(settings_path)} is not a list.")
+    if rule in allow:
+        print(f"Claude Code Bash allow rule already present: {rule}", flush=True)
+        return
+    allow.append(rule)
+    settings_path.parent.mkdir(parents=True, exist_ok=True)
+    settings_path.write_text(json.dumps(settings, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
+    try:
+        settings_path.chmod(0o600)
+    except PermissionError:
+        pass
+    print(f"Added Claude Code Bash allow rule: {rule}", flush=True)
+
+
 def main() -> None:
     args = parse_args()
     check_runtime(args.skip_browser_check)
@@ -177,6 +236,11 @@ def main() -> None:
     print(f"Target client: {client}", flush=True)
     print(f"Target skills dir: {display_path(skills_dir)}", flush=True)
     target = install_skill(root, skills_dir, copy, args.dry_run)
+    if args.allow_claude_commands:
+        if client != "claude":
+            print("--allow-claude-commands requested, but target client is not Claude Code; skipping Claude Code settings update.", flush=True)
+        else:
+            write_claude_allow_rule(target, args.dry_run)
     if not args.dry_run:
         print(f"Installed skill path: {display_path(target)}", flush=True)
 
