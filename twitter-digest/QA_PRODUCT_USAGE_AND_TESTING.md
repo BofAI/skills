@@ -197,9 +197,53 @@ python3 ~/.claude/skills/twitter-digest/scripts/compare_collectors.py --rounds 1
 
 ## 7. 测试数据支持
 
-下面是现有测试报告里的关键数据摘录。QA / 产品只需要看这些汇总数字；如果要追查单轮细节，再打开原始报告目录里的 `comparison-report.md`、`digest-context.md`、`stdout.log` 和 `stderr.log`。
+下面汇总了用户提供截图报告、下载报告和本地 `.state/compare-runs` 报告里的关键数据。QA / 产品先看这里的汇总数字；如果要追查单轮细节，再打开原始报告目录里的 `comparison-report.md`、`digest-context.md`、`stdout.log` 和 `stderr.log`。
 
-### 7.1 API vs Browser 20 轮对比
+### 7.1 测试证据矩阵
+
+| 证据来源 | 轮次 | API 成功 | Browser 成功 | 关键数据 | 支持的结论 |
+|---|---:|---:|---:|---|---|
+| 用户截图：早期 3 轮 API vs Browser | `3` | 可运行但覆盖差 | 可运行 | home：API `1.0` vs Browser `9.0`；own_profile：API `1.0` vs Browser `13.3`；mentions API `0`、Browser `6/1` | 早期 API 配置/权限或接口选择不完整，不能只看 API 判断“没有内容” |
+| 本地报告：`20260629-112851` | `2` | `2/2` | `2/2` | home：API `37.0` vs Browser `7.0`；mentions_notifications：API `1.0` vs Browser `2.0` | 两条链路都能跑通，但 UI 和 API 覆盖面不同 |
+| 本地报告：`20260629-120526` | `20` | `20/20` | `20/20` | home：API `35.9` vs Browser `10.7`；mentions_search：API `1.0` vs Browser `0.0`；mentions_notifications：API `1.0` vs Browser `2.0` | 配置稳定后，API public 与 Browser public 都稳定；DM 由浏览器补齐 |
+| 用户截图：20 轮 API=300 对比 | `20` | `20/20` | `20/20` | home：API `300.0` vs Browser `11.7`；own_profile：API `1.0` vs Browser `10.0`；mentions_search：API `1.0` vs Browser `0.0`；mentions_notifications：API `1.0` vs Browser `4.0` | API public 能拿到更完整结构化首页数据，browser 更接近当前 UI 可见内容 |
+| 下载报告：`comparison-report-20260629-190844.md` | `20` | `19/20` | `20/20` | home：API `199.6` vs Browser `11.1`；mentions_search：API `5.5` vs Browser `0.0`；mentions_notifications：API `5.2` vs Browser `6.0` | API public 整体更适合作为公开数据主路径；browser 负责 DM 和 UI 兜底 |
+| 下载报告：headless browser 10 轮 | `10` | 未执行 | `10/10` | data gap `0`；平均耗时 `89.75s`；今日 DM 会话每轮 `1`，最后我发出每轮 `1`，等我回复每轮 `0` | 无头浏览器链路稳定，适合作为 DM/X Chat 标准路径 |
+
+综合样本：
+
+- 已纳入可读报告和截图摘要共 `75` 轮：`3 + 2 + 20 + 20 + 20 + 10`。
+- 其中 Browser 成功样本 `75/75`；有 `1` 轮 DM 状态为 `visible_threads_unopened`，表示会话列表可见但未打开正文，不等于浏览器采集失败。
+- 已配置 API 的 20 轮长测至少两组：一组 `20/20`，一组 `19/20`。
+- Browser DM 在长测中持续可读或能明确给出状态；API DM 始终不作为判断依据。
+
+### 7.2 用户截图：早期 3 轮 API vs Browser 差异
+
+报告来源：用户提供截图。
+
+| 页面 | API 均值 | Browser 均值 | API 空轮次 |
+|---|---:|---:|---:|
+| home | `1.0` | `9.0` | `0/3` |
+| own_profile | `1.0` | `13.3` | `0/3` |
+| mentions_search | `0.0` | `6.0` | `3/3` |
+| mentions_notifications | `0.0` | `1.0` | `3/3` |
+
+这组数据是早期问题暴露样本：API 当时对 mentions 和首页覆盖明显不足，不能作为“没有 @ / 没有热点”的依据。后续修复方向是 API public 保留，但必须保留 browser fallback，并且 DM 只看浏览器。
+
+### 7.3 用户截图：20 轮 API=300 对比
+
+报告来源：用户提供截图。
+
+| 页面 | API 平均 | Browser 平均 | API 空轮次 | Browser 空轮次 |
+|---|---:|---:|---:|---:|
+| home | `300.0` | `11.7` | `0` | `0` |
+| own_profile | `1.0` | `10.0` | `0` | `0` |
+| mentions_search | `1.0` | `0.0` | `0` | `20` |
+| mentions_notifications | `1.0` | `4.0` | `0` | `0` |
+
+这组数据支持当前默认值：API public 默认抓 `300` 条，Browser public 默认抓 `100` 条但会按 24h 窗口提前停止。公开信息上 API 更适合做主路径，browser 更适合校验 UI 和补齐 DM。
+
+### 7.4 下载报告：API vs Browser 20 轮对比
 
 报告来源：`comparison-report-20260629-190844.md`
 
@@ -222,7 +266,7 @@ python3 ~/.claude/skills/twitter-digest/scripts/compare_collectors.py --rounds 1
 
 这组数据说明：API public 能稳定提供结构化公开数据，home 数量明显高于浏览器 UI；mentions 两条线 API 和浏览器覆盖面不同，因此不能用“数量完全一致”做验收。DM 仍只能看浏览器。
 
-### 7.2 本地 API vs Browser 20 轮对比
+### 7.5 本地 API vs Browser 20 轮对比
 
 报告来源：`twitter-digest/.state/compare-runs/20260629-120526/comparison-report.md`
 
@@ -248,7 +292,23 @@ python3 ~/.claude/skills/twitter-digest/scripts/compare_collectors.py --rounds 1
 
 这组数据说明：在已配置 API 的环境里，API 和浏览器都能连续稳定完成 20 轮；公开数据两边数量不同是预期现象，DM 由浏览器稳定补齐。
 
-### 7.3 Headless Browser 10 轮稳定性
+### 7.6 本地 API vs Browser 2 轮冒烟
+
+报告来源：`twitter-digest/.state/compare-runs/20260629-112851/comparison-report.md`
+
+| 指标 | 结果 |
+|---|---:|
+| 测试轮次 | `2` |
+| API 成功率 | `2/2` |
+| Browser 成功率 | `2/2` |
+| API home | 平均 `37.0` |
+| Browser home | 平均 `7.0` |
+| API mentions_notifications | 平均 `1.0` |
+| Browser mentions_notifications | 平均 `2.0` |
+
+这组数据是短冒烟样本，用来证明安装后的 API/browser 双链路都能跑通；不能单独作为长期稳定性结论。
+
+### 7.7 Headless Browser 10 轮稳定性
 
 报告来源：`twitter_digest_headless_10_round_test_report.md`
 
@@ -277,7 +337,18 @@ python3 ~/.claude/skills/twitter-digest/scripts/compare_collectors.py --rounds 1
 
 这组数据说明：无头浏览器在连续 10 轮里没有登录态丢失、DevTools 超时、passcode 阻塞或页面级 data gap。DM 结果是“今日可见 1 个会话，最后一条都是我发出，无需回复”，不是“没有私信”。
 
-### 7.4 产品使用结论
+### 7.8 失败 smoke 报告说明
+
+本地还有两份 smoke 报告：`compare-test-smoke/20260629-111155` 和 `compare-test-smoke/20260629-130441`。这两份都是 `1` 轮、API 和 Browser 均 `0/1`，用于暴露配置/环境前置问题，不作为产品能力验收样本。
+
+这类失败报告在 QA 判断时只用于排查：
+
+- API token 是否配置完成。
+- 浏览器是否安装并能启动。
+- X 登录态是否存在。
+- 当前运行目录是否是已安装 skill，而不是临时源码目录。
+
+### 7.9 产品使用结论
 
 - 除 DM 外，公开数据默认优先 API。
 - DM / X Chat 永远浏览器为准。
