@@ -6,9 +6,7 @@ from __future__ import annotations
 import argparse
 import json
 import os
-import platform
 import subprocess
-import shlex
 import sys
 import tempfile
 from pathlib import Path
@@ -16,7 +14,7 @@ from pathlib import Path
 from api_config_store import API_CONFIG_PATH, load_api_config, refresh_oauth_token_if_needed
 from collector_commands import api_collector_command, browser_collector_command, summarize_collector_error
 from digest_context import build_current_context_from_file
-from script_utils import display_path
+from script_utils import display_path, open_script_in_terminal, rerun_from_installed_if_needed
 
 
 STATE_DIR = Path(__file__).resolve().parents[1] / ".state"
@@ -77,47 +75,15 @@ def save_config(handle: str | None, account_name: str | None) -> None:
 
 
 def open_config_in_terminal(extra_args: list[str]) -> bool:
-    if platform.system() != "Darwin":
-        return False
     script = Path(__file__).with_name("configure_api.py")
-    command_path = Path(tempfile.gettempdir()) / "twitter-digest-config.command"
-    shell_command = "\n".join(
-        [
-            "#!/bin/zsh",
-            "set +e",
-            "terminal_tty=$(tty)",
-            f"cd {shlex.quote(str(Path(__file__).resolve().parents[1]))}",
-            "echo 'X API 配置向导'",
-            "echo '使用 OAuth2 PKCE，需要 X Developer App 的 Client ID，并通过浏览器授权账号。'",
-            "echo",
-            " ".join([shlex.quote(sys.executable), shlex.quote(str(script)), *[shlex.quote(arg) for arg in extra_args]]),
-            "status=$?",
-            "echo",
-            "echo '配置流程已结束。Terminal 将自动关闭。'",
-            "{ sleep 1; osascript <<OSA >/dev/null 2>&1",
-            "set targetTTY to \"$terminal_tty\"",
-            "tell application \"Terminal\"",
-            "  repeat with w in windows",
-            "    repeat with t in tabs of w",
-            "      if ((tty of t) as string) is targetTTY then",
-            "        close w saving no",
-            "        return",
-            "      end if",
-            "    end repeat",
-            "  end repeat",
-            "  if (count of windows) > 0 then close front window saving no",
-            "end tell",
-            "OSA",
-            "} >/dev/null 2>&1 &",
-            "disown",
-            "exit $status",
-        ]
+    opened = open_script_in_terminal(
+        script=script,
+        args=extra_args,
+        cwd=Path(__file__).resolve().parents[1],
+        heading="X API 配置向导",
+        description="使用 OAuth2 PKCE，需要 X Developer App 的 Client ID，并通过浏览器授权账号。",
     )
-    try:
-        command_path.write_text(shell_command, encoding="utf-8")
-        command_path.chmod(0o700)
-        subprocess.run(["open", "-a", "Terminal", str(command_path)], check=True)
-    except (OSError, subprocess.CalledProcessError):
+    if not opened:
         return False
     print("已打开 Terminal 窗口用于配置 X API。", flush=True)
     print(f"配置会保存到：{display_path(Path(__file__).resolve().parents[1] / '.state' / 'api_config.json')}", flush=True)
@@ -211,6 +177,7 @@ def merge_api_public_with_browser_dm(api_out: Path, browser_out: Path, final_out
 
 
 def main() -> None:
+    rerun_from_installed_if_needed(__file__)
     args = parse_args()
     if args.configure_api:
         if not sys.stdin.isatty() and open_config_in_terminal(["--oauth"]):

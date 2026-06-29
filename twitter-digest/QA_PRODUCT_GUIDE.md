@@ -42,6 +42,15 @@ Claude Code 里运行安装：~/.claude/skills/twitter-digest
 
 安装脚本会按当前工具自动选择安装目录；需要指定时可加 `--client codex` 或 `--client claude`。
 
+安装完成后，配置和运行都以已安装目录为准：
+
+```text
+Codex: ~/.codex/skills/twitter-digest
+Claude Code: ~/.claude/skills/twitter-digest
+```
+
+如果 Agent 误从临时 clone/source 目录运行配置脚本，脚本会自动切回已安装目录，避免把 `.state/api_config.json` 写到 `/tmp` 或临时项目里。
+
 如果安装脚本提示缺浏览器，先安装 Chrome / Chromium / Edge / Brave 后重试。
 
 ### 3. 配置 X API
@@ -60,7 +69,7 @@ python3 twitter-digest/scripts/run_daily_digest.py --configure-api
 
 期望流程：
 
-1. 自动打开一个 Terminal 配置窗口。
+1. 自动打开一个 Terminal 配置窗口；不要在后台 shell 里直接跑交互输入。
 2. 不出现 OAuth1 / 多种方式选择，直接进入 OAuth2。
 3. 输入 ZC 提供的 OAuth2 Client ID。
 4. 输入 ZC 提供的 OAuth2 Client Secret。
@@ -69,7 +78,7 @@ python3 twitter-digest/scripts/run_daily_digest.py --configure-api
 7. 配置保存到：
 
 ```text
-twitter-digest/.state/api_config.json
+~/.claude/skills/twitter-digest/.state/api_config.json
 ```
 
 8. Terminal 配置窗口结束后应自动关闭。

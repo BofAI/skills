@@ -9,6 +9,8 @@ description: Use when the user wants Claude Code or another agent to analyze the
 
 Use this skill to produce a concise Chinese daily digest from the user's own X/Twitter account. The recommended entry point is `scripts/run_daily_digest.py`, which selects API collection when API credentials are configured and otherwise falls back to local browser collection with a persistent dedicated Chromium profile.
 
+After installation, configuration and daily runs should use the installed skill copy, not a temporary clone/source checkout. Installed locations are `~/.claude/skills/twitter-digest` for Claude Code and `~/.codex/skills/twitter-digest` for Codex. If `run_daily_digest.py` or `configure_api.py` is accidentally run from a source checkout while an installed copy exists, the script automatically re-runs the installed copy so `.state` is written to the installed skill directory.
+
 Load `references/x-twitter-digest.md` when you need implementation details, browser workflow rules, current-run context behavior, or the scoring rubric.
 
 ## Data Collection
@@ -39,6 +41,7 @@ This is an agent-triggered flow. It supports OAuth2 user authorization:
 
 - OAuth2 path: if the user has an X Developer App OAuth2 `Client ID` / `Client Secret` and local callback URL, run `python3 twitter-digest/scripts/run_daily_digest.py --configure-api`. It goes directly into OAuth2 setup. Request `dm.read tweet.read users.read offline.access`.
 - Existing token path: if the user says they already have an OAuth2 user access token, run `python3 twitter-digest/scripts/run_daily_digest.py --configure-api-token`.
+- If the agent is not inside an interactive Terminal, do not background `configure_api.py` yourself. Use `run_daily_digest.py --configure-api`; it opens a real Terminal window for secure input and OAuth callback handling. `configure_api.py --oauth` also self-opens Terminal when invoked non-interactively, but the wrapper is the primary path.
 - OAuth1 PIN is not a supported normal setup path for this skill because it did not reliably return DM data during validation. Do not guide users to Consumer Key / Consumer Secret / PIN unless they are explicitly debugging legacy API behavior.
 - Do not write ad-hoc inline Python or shell snippets to verify tokens. Use the built-in verifier: `python3 twitter-digest/scripts/configure_api.py --verify`. It calls `/users/me`, backfills `handle` / `user_id`, and does not print the token.
 

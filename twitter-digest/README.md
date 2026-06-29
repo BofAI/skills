@@ -65,6 +65,7 @@ Claude Code: ~/.claude/skills/twitter-digest
 
 It also checks for Python 3.10+ and a supported Chromium browser: Google Chrome, Chromium, Microsoft Edge, or Brave.
 Reinstalling preserves the existing installed `.state` directory, including saved API and browser-session settings. The installer still excludes `.state` from the development checkout.
+After installation, configure and run the installed copy. If a script is accidentally started from a temporary clone while an installed copy exists, it automatically re-runs the installed copy so state is saved under `~/.claude/skills/twitter-digest/.state` or `~/.codex/skills/twitter-digest/.state`.
 
 ## First Run
 
@@ -117,7 +118,7 @@ For a local user-owned X Developer App, the supported API setup path is OAuth2 A
 python3 twitter-digest/scripts/run_daily_digest.py --configure-api
 ```
 
-The script uses OAuth2 directly. It asks for the X Developer App `Client ID`, opens the X authorization page, waits for the user to authorize the account, receives the local callback, exchanges it for a user-context access token and refresh token, then saves it.
+The script uses OAuth2 directly. It asks for the X Developer App `Client ID`, opens the X authorization page, waits for the user to authorize the account, receives the local callback, exchanges it for a user-context access token and refresh token, then saves it. In a non-interactive agent session, it opens a real Terminal window for Client ID / Secret input and closes it after the flow ends.
 
 If the user already has an OAuth2 user access token, use the direct token path:
 

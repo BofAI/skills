@@ -18,9 +18,10 @@ import urllib.error
 import urllib.parse
 import urllib.request
 import webbrowser
+from pathlib import Path
 
 from api_config_store import API_CONFIG_PATH, DEFAULT_API_BASE, clear_api_config, load_api_config, refresh_oauth_token_if_needed, save_api_config
-from script_utils import display_path
+from script_utils import display_path, open_script_in_terminal, rerun_from_installed_if_needed
 
 AUTHORIZE_URL = "https://x.com/i/oauth2/authorize"
 TOKEN_URL = "https://api.x.com/2/oauth2/token"
@@ -80,7 +81,7 @@ def prompt_value(label: str, default: str = "", hidden: bool = False) -> str:
     if value is not None:
         return value or default
     if not sys.stdin.isatty():
-        raise SystemExit("当前没有可交互终端。请通过 run_daily_digest.py --configure-api 触发，它会打开 Terminal 窗口。")
+        raise SystemExit("当前没有可交互终端。请通过已安装 skill 的 run_daily_digest.py --configure-api 触发，或在 Terminal 中运行本命令。")
     if hidden:
         value = getpass.getpass(f"{prompt}: ")
     else:
@@ -260,7 +261,22 @@ def verify_api_config(config: dict[str, object], save: bool = True) -> dict[str,
 
 
 def main() -> None:
+    rerun_from_installed_if_needed(__file__)
     args = parse_args()
+    needs_prompt = not (args.clear or args.show_status or args.verify or args.bearer_token)
+    if needs_prompt and not sys.stdin.isatty():
+        opened = open_script_in_terminal(
+            script=Path(__file__).resolve(),
+            args=sys.argv[1:],
+            cwd=Path(__file__).resolve().parents[1],
+            heading="X API 配置向导",
+            description="请在这个 Terminal 窗口里输入 Client ID / Secret，并在浏览器里完成 X OAuth2 授权。",
+        )
+        if opened:
+            print("已打开 Terminal 窗口用于配置 X API。", flush=True)
+            print(f"配置会保存到：{display_path(API_CONFIG_PATH)}", flush=True)
+            return
+        raise SystemExit("当前没有可交互终端，且无法自动打开 Terminal。请在 Terminal 中运行该配置命令。")
     if args.clear:
         clear_api_config()
         print(json.dumps({"api_config": str(API_CONFIG_PATH), "configured": False, "cleared": True}, ensure_ascii=False, indent=2))
