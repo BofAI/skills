@@ -117,20 +117,7 @@ python3 twitter-digest/scripts/run_daily_digest.py
 
 ### 5. 正常输出
 
-脚本成功后会生成：
-
-```text
-twitter-digest/.state/run/digest-context.md
-twitter-digest/.state/run/digest-context.json
-twitter-digest/.state/run/digest-input.md
-twitter-digest/.state/run/digest-input.json
-```
-
-Agent 生成日报时应只读：
-
-```text
-twitter-digest/.state/run/digest-context.md
-```
+QA/产品只需要看 Claude Code 对话框里最终输出的中文 X 日报，不需要打开或检查脚本生成的 `json/md` 文件。
 
 产品验收日报时重点看：
 
@@ -142,7 +129,11 @@ twitter-digest/.state/run/digest-context.md
 - 是否明确写出数据缺口。
 - 是否没有自动发推、点赞、关注、回复或打开可疑链接。
 
-如果 Agent 需要检查本次采集计数或 JSON 状态，应运行固定命令：
+以下内容只用于研发排查，不是 QA 必须操作：
+
+- 脚本会在本地生成 `twitter-digest/.state/run/digest-context.*` 和 `digest-input.*`。
+- Agent 正常生成日报时应只读 `twitter-digest/.state/run/digest-context.md`。
+- 如果 Agent 需要检查本次采集计数或 JSON 状态，应运行固定命令：
 
 ```bash
 python3 twitter-digest/scripts/inspect_digest.py
@@ -150,7 +141,9 @@ python3 twitter-digest/scripts/inspect_digest.py
 
 不要允许 Agent 现场拼 `python3 -c` 或临时脚本来遍历 JSON。固定检查脚本只输出计数、状态和数据缺口，不输出 DM 正文。
 
-### 6. 清除或重配
+### 6. 清除或重配（可选操作，非必须）
+
+这一节只在账号配错、token 失效、需要换 X 账号、或需要重新登录浏览器时使用。正常安装、配置、运行不需要执行。
 
 清除 API 配置：
 
