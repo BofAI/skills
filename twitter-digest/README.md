@@ -64,6 +64,7 @@ Claude Code: ~/.claude/skills/twitter-digest
 ```
 
 It also checks for Python 3.10+ and a supported Chromium browser: Google Chrome, Chromium, Microsoft Edge, or Brave.
+Reinstalling preserves the existing installed `.state` directory, including saved API and browser-session settings. The installer still excludes `.state` from the development checkout.
 
 ## First Run
 

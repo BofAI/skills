@@ -102,7 +102,7 @@ Default install targets the current agent client: Codex installs to `~/.codex/sk
 
 The installer checks for Python 3.10+ and a supported Chromium browser before installing. Supported browsers are Google Chrome, Chromium, Microsoft Edge, and Brave. If the browser will be installed later, use `--skip-browser-check`.
 
-The installer moves old `twitter-briefing`, `twitter-briefing.bak`, or existing `twitter-digest` installs into the selected skills directory's `.backups/` folder and disables their `SKILL.md` files so the current agent does not load duplicate old skills. It does not copy `.state` from the development checkout.
+The installer moves old `twitter-briefing`, `twitter-briefing.bak`, or existing `twitter-digest` installs into the selected skills directory's `.backups/` folder and disables their `SKILL.md` files so the current agent does not load duplicate old skills. It preserves `.state` from an existing installed `twitter-digest` copy during reinstall, but does not copy `.state` from the development checkout.
 
 Claude Code or other agents can use the installed skill by running the same browser scripts.
 

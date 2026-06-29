@@ -109,15 +109,26 @@ def disable_backup_skill_marker(path: Path) -> None:
         marker.rename(path / "SKILL.md.disabled")
 
 
-def move_to_hidden_backup(path: Path, skills_dir: Path, dry_run: bool) -> None:
+def move_to_hidden_backup(path: Path, skills_dir: Path, dry_run: bool) -> Path:
     backup = backup_path(skills_dir, path.name)
     if dry_run:
         print(f"Would move existing install to hidden backup: {display_path(path)} -> {display_path(backup)}", flush=True)
-        return
+        return backup
     backup.parent.mkdir(parents=True, exist_ok=True)
     path.rename(backup)
     disable_backup_skill_marker(backup)
     print(f"Existing install moved to hidden backup: {display_path(backup)}", flush=True)
+    return backup
+
+
+def restore_state_from_backup(backup: Path | None, target: Path) -> None:
+    if not backup:
+        return
+    state_dir = backup / ".state"
+    if not state_dir.exists() or not state_dir.is_dir():
+        return
+    shutil.copytree(state_dir, target / ".state", dirs_exist_ok=True)
+    print(f"Preserved existing state: {display_path(target / '.state')}", flush=True)
 
 
 def cleanup_legacy_installs(skills_dir: Path, dry_run: bool) -> None:
@@ -133,18 +144,22 @@ def install_skill(root: Path, skills_dir: Path, copy: bool, dry_run: bool) -> Pa
         action = "copy" if copy else "symlink"
         cleanup_legacy_installs(skills_dir, dry_run=True)
         if target.exists() or target.is_symlink():
-            move_to_hidden_backup(target, skills_dir, dry_run=True)
+            backup = move_to_hidden_backup(target, skills_dir, dry_run=True)
+            if copy and (target / ".state").exists():
+                print(f"Would preserve existing state from: {display_path(backup / '.state')}", flush=True)
         print(f"Would {action} skill to: {display_path(target)}", flush=True)
         return target
     skills_dir.mkdir(parents=True, exist_ok=True)
     cleanup_legacy_installs(skills_dir, dry_run=False)
+    existing_backup: Path | None = None
     if target.is_symlink() or target.exists():
         if target.is_symlink() and target.resolve() == root and not copy:
             print(f"Skill already installed: {display_path(target)}", flush=True)
             return target
-        move_to_hidden_backup(target, skills_dir, dry_run=False)
+        existing_backup = move_to_hidden_backup(target, skills_dir, dry_run=False)
     if copy:
         shutil.copytree(root, target, ignore=shutil.ignore_patterns(".state", "__pycache__", "*.pyc"))
+        restore_state_from_backup(existing_backup, target)
         print(f"Copied skill to: {display_path(target)}", flush=True)
     else:
         target.symlink_to(root, target_is_directory=True)
