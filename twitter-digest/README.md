@@ -15,7 +15,7 @@ python3 twitter-digest/scripts/install.py
 For testing the current PR branch before it is merged:
 
 ```bash
-git clone -b twitter-digest-skill git@github.com:BofAI/skills.git
+git clone -b twitter-digest-api-collector git@github.com:BofAI/skills.git
 cd skills/skills
 python3 twitter-digest/scripts/install.py
 ```
@@ -25,7 +25,7 @@ To ask Claude Code to install this skill for itself, paste this into Claude Code
 ```text
 请帮我安装这个 Claude Code skill：
 
-git clone -b twitter-digest-skill git@github.com:BofAI/skills.git /tmp/bofai-skills \
+git clone -b twitter-digest-api-collector git@github.com:BofAI/skills.git /tmp/bofai-skills \
   && cd /tmp/bofai-skills/skills \
   && python3 twitter-digest/scripts/install.py
 

@@ -248,7 +248,7 @@ rm -rf twitter-digest/.state/chrome-profile
    ```bash
    git clone git@github.com:BofAI/skills.git
    cd skills/skills
-   git checkout twitter-digest-skill
+   git checkout twitter-digest-api-collector
    ```
 
 2. 运行：
