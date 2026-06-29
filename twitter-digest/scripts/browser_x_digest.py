@@ -1,5 +1,12 @@
 #!/usr/bin/env python3
-"""Collect X/Twitter digest input through a persistent local browser session."""
+"""Collect X/Twitter digest input through a persistent local browser session.
+
+Module map:
+- CLI options: translate chat-facing requests into collector settings.
+- Page routing: decide whether a page uses public scraping or DM scraping.
+- Message retries: recover from X Messages loading/skeleton states.
+- Main orchestration: browser lifecycle, passcode recovery, incremental output.
+"""
 
 from __future__ import annotations
 
@@ -23,7 +30,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--handle", help="Your X handle, with or without @. If omitted, the script tries to detect it from the logged-in page.")
     parser.add_argument("--keywords", default="", help="Comma-separated keywords or queries for hotspot search.")
     parser.add_argument("--out", default=str(default_state_dir / "run"), help="Output directory.")
-    parser.add_argument("--profile-dir", default=str(default_state_dir / "chrome-profile"))
+    parser.add_argument("--profile-dir", default=str(default_state_dir / "chrome-profile"), help="Dedicated browser profile directory used to persist X login/session state.")
     parser.add_argument("--scrolls", type=int, default=40, help="Maximum scroll rounds per public page.")
     parser.add_argument("--min-public-scrolls", type=int, default=5, help="Minimum public-page scroll rounds before early stop rules can end collection.")
     parser.add_argument("--max-public-items", type=int, default=300, help="Maximum public post items kept per run.")
@@ -38,7 +45,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--headless", action="store_true", help="Run without a visible browser window. This is the default after first login.")
     parser.add_argument("--headed", action="store_true", help="Force a visible browser window for debugging or manual login.")
     parser.add_argument("--non-interactive", action="store_true", help="Do not open a visible browser for DM passcode recovery; record a data gap instead.")
-    parser.add_argument("--keep-browser-open", action="store_true")
+    parser.add_argument("--keep-browser-open", action="store_true", help="Leave the launched browser process running after collection for manual debugging.")
     return parser.parse_args()
 
 

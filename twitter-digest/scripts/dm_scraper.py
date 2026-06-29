@@ -1,4 +1,12 @@
-"""X Direct Message scraping helpers."""
+"""X Direct Message scraping helpers.
+
+Module map:
+- Page-level collection: read the X Messages page and decide the DM status.
+- Conversation-list scanning: scan today's visible threads and classify reply state.
+- Conversation loading: open waiting-reply threads and load enough history.
+- Readiness detection: distinguish empty inbox, loading skeleton, and passcode screens.
+- Target parsing: normalize DOM-extracted thread rows into Python dictionaries.
+"""
 
 from __future__ import annotations
 
@@ -30,6 +38,21 @@ DM_PASSCODE_PHRASES = (
     "recover your encryption keys",
     "encryption keys",
 )
+DM_LIST_STABLE_STOP_ROUNDS = 4
+DM_LIST_OLDER_AFTER_TODAY_STABLE_ROUNDS = 2
+DM_LIST_BOTTOM_CONFIRM_ROUNDS = 1
+DM_LIST_SCROLL_SETTLE_SEC = 1.0
+DM_ROW_RELOCATE_MAX_SCROLLS = 8
+DM_ROW_RELOCATE_SETTLE_SEC = 0.5
+DM_CONVERSATION_READY_TIMEOUT_SEC = 12
+DM_CONVERSATION_READY_MIN_WORDS = 3
+DM_CONVERSATION_READY_POLL_SEC = 0.5
+DM_READY_AFTER_NAV_TIMEOUT_SEC = 8
+DM_READY_POLL_SEC = 1.0
+DM_HISTORY_SCROLL_SETTLE_SEC = 0.8
+DM_HISTORY_TOP_CONFIRM_ROUNDS = 1
+DM_PASSCODE_POLL_SEC = 3.0
+DM_PASSCODE_NOTICE_INTERVAL_SEC = 15.0
 
 
 # Page-level collection
@@ -107,7 +130,7 @@ def collect_dm_threads(ws_url: str, max_threads: int, dm_scrolls: int, dm_max_me
         seen_targets.add(dm_target_key(target))
         threads.append(open_dm_thread(ws_url, target, dm_scrolls, dm_max_messages, dm_window_hours))
         cdp_call(ws_url, "Page.navigate", {"url": "https://x.com/messages"})
-        wait_for_dm_ready(ws_url, timeout_sec=8)
+        wait_for_dm_ready(ws_url, timeout_sec=DM_READY_AFTER_NAV_TIMEOUT_SEC)
 
     return with_dm_list_metadata(
         {
@@ -169,7 +192,7 @@ def with_dm_list_metadata(result: dict[str, Any], list_info: dict[str, Any], tar
 def open_dm_thread(ws_url: str, target: dict[str, Any], dm_scrolls: int, dm_max_messages: int, dm_window_hours: int) -> dict[str, Any]:
     if not open_dm_target(ws_url, target):
         return skipped_dm_thread(target, "Could not relocate DM row after scanning the thread list.")
-    wait_for_dm_conversation_content(ws_url, timeout_sec=12)
+    wait_for_dm_conversation_content(ws_url, timeout_sec=DM_CONVERSATION_READY_TIMEOUT_SEC)
     load_info = load_dm_thread_history(ws_url, max_scrolls=dm_scrolls, target_messages=dm_max_messages, window_hours=dm_window_hours)
     messages = extract_dm_messages(ws_url, max_messages=dm_max_messages)
     thread_text = render_dm_messages(messages) or extract_dm_conversation_text(ws_url)
@@ -190,7 +213,7 @@ def open_dm_target(ws_url: str, target: dict[str, Any]) -> bool:
     has_click_point = float(target.get("x") or 0) > 0 and float(target.get("y") or 0) > 0
     if has_click_point:
         cdp_call(ws_url, "Page.navigate", {"url": "https://x.com/messages"})
-        wait_for_dm_ready(ws_url, timeout_sec=8)
+        wait_for_dm_ready(ws_url, timeout_sec=DM_READY_AFTER_NAV_TIMEOUT_SEC)
         if not restore_dm_thread_list_position(ws_url, target):
             return False
         click_point(ws_url, float(target.get("x") or 0), float(target.get("y") or 0))
@@ -241,11 +264,11 @@ def load_dm_thread_list_targets(ws_url: str, max_scrolls: int = 20) -> dict[str,
     at_bottom = False
 
     for _ in range(scroll_limit):
-        if at_bottom and stable_rounds >= 1:
+        if at_bottom and stable_rounds >= DM_LIST_BOTTOM_CONFIRM_ROUNDS:
             break
         info = scroll_dm_thread_list_down(ws_url)
         scrolls_used += 1
-        time.sleep(1.0)
+        time.sleep(DM_LIST_SCROLL_SETTLE_SEC)
         current = dedupe_dm_targets([*targets, *extract_dm_thread_targets(ws_url)])
         current_today = len(today_dm_targets(current))
         current_total = len(current)
@@ -263,7 +286,7 @@ def load_dm_thread_list_targets(ws_url: str, max_scrolls: int = 20) -> dict[str,
     return {
         "targets": targets,
         "scrolls_used": scrolls_used,
-        "load_complete": at_bottom or stable_rounds >= 4,
+        "load_complete": at_bottom or stable_rounds >= DM_LIST_STABLE_STOP_ROUNDS,
         "stable_rounds": stable_rounds,
     }
 
@@ -274,15 +297,15 @@ def scroll_dm_thread_list_down(ws_url: str) -> dict[str, Any]:
 
 
 def dm_list_scan_should_stop(total_targets: int, today_targets_count: int, stable_rounds: int) -> bool:
-    if stable_rounds >= 4:
+    if stable_rounds >= DM_LIST_STABLE_STOP_ROUNDS:
         return True
     reached_older_threads_after_today = total_targets > 0 and today_targets_count > 0 and today_targets_count < total_targets
-    return reached_older_threads_after_today and stable_rounds >= 2
+    return reached_older_threads_after_today and stable_rounds >= DM_LIST_OLDER_AFTER_TODAY_STABLE_ROUNDS
 
 
 def restore_dm_thread_list_position(ws_url: str, target: dict[str, Any]) -> bool:
     key = dm_target_key(target)
-    for _ in range(8):
+    for _ in range(DM_ROW_RELOCATE_MAX_SCROLLS):
         candidates = {dm_target_key(item): item for item in extract_dm_thread_targets(ws_url)}
         current = candidates.get(key)
         if current:
@@ -290,7 +313,7 @@ def restore_dm_thread_list_position(ws_url: str, target: dict[str, Any]) -> bool
             target["y"] = current.get("y") or target.get("y")
             return True
         scroll_dm_thread_list_down(ws_url)
-        time.sleep(0.5)
+        time.sleep(DM_ROW_RELOCATE_SETTLE_SEC)
     return False
 
 
@@ -303,9 +326,9 @@ def wait_for_dm_conversation_content(ws_url: str, timeout_sec: int = 12) -> None
         if count_dm_messages(ws_url) > 0:
             return
         text = extract_dm_conversation_text(ws_url)
-        if text and not is_dm_passcode_screen(text) and len(text.split()) > 3:
+        if text and not is_dm_passcode_screen(text) and len(text.split()) > DM_CONVERSATION_READY_MIN_WORDS:
             return
-        time.sleep(0.5)
+        time.sleep(DM_CONVERSATION_READY_POLL_SEC)
 
 def dm_target_key(target: dict[str, Any]) -> str:
     return str(target.get("url") or target.get("label") or f"{target.get('x')}:{target.get('y')}")
@@ -357,7 +380,7 @@ def load_dm_thread_history(ws_url: str, max_scrolls: int, target_messages: int, 
     while scrolls_used < scroll_limit and not reached_top and not window_exceeded and not hit_message_cap:
         info = scroll_dm_messages_up(ws_url)
         scrolls_used += 1
-        time.sleep(0.8)
+        time.sleep(DM_HISTORY_SCROLL_SETTLE_SEC)
         state = get_dm_history_state(ws_url)
         current_count = int(state.get("count") or 0)
         current_top_signature = str(state.get("top_signature") or "")
@@ -373,7 +396,7 @@ def load_dm_thread_history(ws_url: str, max_scrolls: int, target_messages: int, 
             stable_top_rounds = 0
         last_count = max(last_count, current_count)
         last_top_signature = current_top_signature or last_top_signature
-        if reached_top and stable_top_rounds >= 1:
+        if reached_top and stable_top_rounds >= DM_HISTORY_TOP_CONFIRM_ROUNDS:
             break
 
     return {
@@ -487,12 +510,12 @@ def wait_for_dm_ready(ws_url: str, timeout_sec: int = 20) -> str:
             return text
         state = dm_page_loading_state(ws_url)
         if bool(state.get("loading")):
-            time.sleep(1)
+            time.sleep(DM_READY_POLL_SEC)
             continue
         normalized = " ".join(text.lower().split())
         if any(marker in normalized for marker in DM_EMPTY_MARKERS):
             return text
-        time.sleep(1)
+        time.sleep(DM_READY_POLL_SEC)
     return last_text
 
 def dm_page_loading_state(ws_url: str) -> dict[str, Any]:
@@ -525,17 +548,17 @@ def wait_for_dm_passcode_resolution(port: int, timeout_sec: int) -> bool:
     deadline = time.time() + timeout_sec
     last_notice = 0.0
     while time.time() < deadline:
-        time.sleep(3)
+        time.sleep(DM_PASSCODE_POLL_SEC)
         main_text = extract_main_text(ws_url)
         if is_dm_passcode_screen(main_text):
-            if time.time() - last_notice > 15:
+            if time.time() - last_notice > DM_PASSCODE_NOTICE_INTERVAL_SEC:
                 print("Still waiting for X Chat passcode to be completed in the opened browser window.")
                 last_notice = time.time()
             continue
         if dm_messages_page_is_readable(ws_url, main_text):
             print("X Chat messages are readable. Resuming DM collection...")
             return True
-        if time.time() - last_notice > 15:
+        if time.time() - last_notice > DM_PASSCODE_NOTICE_INTERVAL_SEC:
             print("Passcode screen is not readable yet or messages are still loading. Keep the visible browser open until X Messages shows the inbox.")
             last_notice = time.time()
     return False

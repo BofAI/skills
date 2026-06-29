@@ -1,4 +1,10 @@
-"""Public X page scraping helpers."""
+"""Public X page scraping helpers.
+
+Module map:
+- Readiness: wait until the public page has article nodes or meaningful text.
+- Scrolling: load timeline/profile/search content through the 24-hour window.
+- Extraction: run DOM scripts and normalize/dedupe public post dictionaries.
+"""
 
 from __future__ import annotations
 
@@ -10,14 +16,27 @@ from cdp_client import cdp_call, cdp_eval, wait_for_cdp_page_ws
 from dom_script_loader import load_dom_script
 
 
+PUBLIC_READY_MIN_TEXT_LENGTH = 80
+PUBLIC_READY_POLL_SEC = 0.5
+PUBLIC_SCROLL_STAGNANT_LIMIT = 6
+PUBLIC_INITIAL_GROWTH_TIMEOUT_SEC = 6
+PUBLIC_LATER_GROWTH_TIMEOUT_SEC = 4
+PUBLIC_INITIAL_GROWTH_ROUNDS = 3
+PUBLIC_GROWTH_READY_SETTLE_SEC = 0.4
+PUBLIC_GROWTH_POLL_SEC = 0.5
+PUBLIC_GROWTH_STABLE_TICKS = 3
+PUBLIC_SCROLL_JS = "window.scrollBy(0, Math.max(900, window.innerHeight * 0.9));"
+HANDLE_DETECT_SETTLE_SEC = 5
+
+
 def wait_for_public_page_ready(ws_url: str, timeout_sec: int = 20) -> None:
     deadline = time.time() + timeout_sec
     while time.time() < deadline:
         if extract_articles(ws_url):
             return
-        if len(extract_main_text(ws_url)) > 80:
+        if len(extract_main_text(ws_url)) > PUBLIC_READY_MIN_TEXT_LENGTH:
             return
-        time.sleep(0.5)
+        time.sleep(PUBLIC_READY_POLL_SEC)
 
 def collect_public_items(ws_url: str, max_scrolls: int, max_items: int, window_hours: int, min_scrolls: int = 5) -> dict[str, Any]:
     posts: list[dict[str, Any]] = []
@@ -42,11 +61,12 @@ def collect_public_items(ws_url: str, max_scrolls: int, max_items: int, window_h
             stagnant_rounds += 1
         else:
             stagnant_rounds = 0
-        if stagnant_rounds >= 6 and scrolls_used >= minimum_scrolls:
+        if stagnant_rounds >= PUBLIC_SCROLL_STAGNANT_LIMIT and scrolls_used >= minimum_scrolls:
             break
         previous_count = len(posts)
-        cdp_eval(ws_url, "window.scrollBy(0, Math.max(900, window.innerHeight * 0.9));")
-        wait_for_public_growth(ws_url, previous_count, timeout_sec=6 if scroll_index < 3 else 4)
+        cdp_eval(ws_url, PUBLIC_SCROLL_JS)
+        timeout_sec = PUBLIC_INITIAL_GROWTH_TIMEOUT_SEC if scroll_index < PUBLIC_INITIAL_GROWTH_ROUNDS else PUBLIC_LATER_GROWTH_TIMEOUT_SEC
+        wait_for_public_growth(ws_url, previous_count, timeout_sec=timeout_sec)
 
     posts = dedupe_items([*posts, *extract_articles(ws_url)])
     if len(posts) > item_limit:
@@ -68,16 +88,16 @@ def wait_for_public_growth(ws_url: str, previous_count: int, timeout_sec: int = 
     while time.time() < deadline:
         current_count = len(extract_articles(ws_url))
         if current_count > previous_count:
-            time.sleep(0.4)
+            time.sleep(PUBLIC_GROWTH_READY_SETTLE_SEC)
             return
         if current_count == last_count:
             stable_ticks += 1
         else:
             stable_ticks = 0
-        if stable_ticks >= 3 and current_count > 0:
+        if stable_ticks >= PUBLIC_GROWTH_STABLE_TICKS and current_count > 0:
             return
         last_count = current_count
-        time.sleep(0.5)
+        time.sleep(PUBLIC_GROWTH_POLL_SEC)
 
 def public_posts_beyond_window(posts: list[dict[str, Any]], window_hours: int) -> bool:
     now = dt.datetime.now(dt.timezone.utc)
@@ -112,7 +132,7 @@ def detect_handle(port: int) -> str | None:
         cdp_call(ws_url, "Page.enable")
         cdp_call(ws_url, "Runtime.enable")
         cdp_call(ws_url, "Page.navigate", {"url": "https://x.com/home"})
-        time.sleep(5)
+        time.sleep(HANDLE_DETECT_SETTLE_SEC)
         script = load_dom_script("detect_handle.js")
         value = cdp_eval(ws_url, script)
         return str(value).lstrip("@") if value else None
