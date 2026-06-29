@@ -172,8 +172,7 @@ def open_config_in_terminal(extra_args: list[str]) -> bool:
             "echo",
             " ".join([shlex.quote(sys.executable), shlex.quote(str(script)), *[shlex.quote(arg) for arg in extra_args]]),
             "echo",
-            "echo '配置流程已结束。按任意键关闭这个窗口...'",
-            "read -k 1",
+            "echo '配置流程已结束。Terminal 将自动关闭。'",
             "",
         ]
     )
