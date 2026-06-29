@@ -85,7 +85,7 @@ Collector comparison testing:
 python3 twitter-digest/scripts/compare_collectors.py --rounds 3 --interval-sec 120
 ```
 
-One round means one complete API collection plus one complete browser collection. The comparison runner keeps per-round raw outputs and writes `comparison-report.md/json` under `twitter-digest/.state/compare-runs/<timestamp>/`. It enforces a minimum 120-second delay between rounds to reduce API rate-limit risk. Read `COLLECTOR_COMPARISON_TEST.md` before interpreting these reports. Browser DM remains authoritative; API DM is TODO/debug only.
+One round means one complete public-data API collection plus one complete browser collection. The comparison runner keeps per-round raw outputs and writes `comparison-report.md/json` under `twitter-digest/.state/compare-runs/<timestamp>/`. It enforces a minimum 120-second delay between rounds to reduce API rate-limit risk. Read `COLLECTOR_COMPARISON_TEST.md` before interpreting these reports. Browser DM remains authoritative; API DM is intentionally not tested.
 
 ## Browser Collection Rules
 

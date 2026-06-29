@@ -62,11 +62,12 @@ def run_command(cmd: list[str], out_dir: Path, env: dict[str, str] | None = None
     duration = time.time() - started
     (out_dir / "stdout.log").write_text(result.stdout, encoding="utf-8")
     (out_dir / "stderr.log").write_text(result.stderr, encoding="utf-8")
+    error_text = result.stderr if result.stderr.strip() else result.stdout if result.returncode != 0 else ""
     return {
         "ok": result.returncode == 0,
         "returncode": result.returncode,
         "duration_sec": round(duration, 2),
-        "error_summary": summarize_error(result.stderr or result.stdout),
+        "error_summary": summarize_error(error_text),
     }
 
 
@@ -109,7 +110,6 @@ def api_command(args: argparse.Namespace, out_dir: Path) -> tuple[list[str], dic
         str(args.public_window_hours),
         "--dm-max-events",
         str(args.dm_max_events),
-        "--include-dms",
     ]
     if args.handle:
         cmd.extend(["--handle", args.handle.lstrip("@")])
@@ -337,7 +337,7 @@ def aggregate_completeness(rounds: list[dict[str, Any]]) -> dict[str, Any]:
         }
     return {
         "public": public,
-        "dm_note": "Browser DM is authoritative for X Chat / encrypted conversations; API DM is TODO/debug only.",
+        "dm_note": "API DM is intentionally not tested here. Browser DM is authoritative for X Chat / encrypted conversations.",
     }
 
 
@@ -448,7 +448,7 @@ def render_report_markdown(report: dict[str, Any]) -> str:
             "",
             "- API and browser public counts can differ because API returns structured endpoints while browser reads currently loaded UI.",
             "- Browser DM is authoritative for X Chat / encrypted conversations.",
-            "- API DM `api_dm_todo` or zero events is not evidence of no DMs.",
+            "- API DM is intentionally not tested by this comparison runner.",
             "- Review per-round `digest-input.json`, `digest-context.md`, `stdout.log`, and `stderr.log` before concluding a bug.",
             "",
         ]
