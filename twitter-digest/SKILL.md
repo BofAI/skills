@@ -1,103 +1,90 @@
 ---
 name: twitter-digest
-description: Use when the user wants Claude Code or another agent to analyze their own X/Twitter mentions, home timeline, visible direct messages, reply opportunities, and daily social-media summaries through API or local logged-in browser collection.
+description: Use when the user wants Claude Code or another agent to analyze their own X/Twitter mentions, home timeline, visible direct messages, reply opportunities, and daily social-media summaries through the hosted X MCP plus local logged-in browser collection for X Chat/DM.
 ---
 
 # X/Twitter Digest
 
 ## Overview
 
-Use this skill to produce a concise Chinese daily digest from the user's own X/Twitter account. The recommended entry point is the installed `scripts/run_daily_digest.py`, which selects API collection when API credentials are configured and otherwise falls back to local browser collection with a persistent dedicated Chromium profile.
+Use this skill to produce a concise Chinese X/Twitter digest from the user's own account. The current architecture is MCP-first:
 
-Use the installed command form for normal chat-triggered runs. Claude Code should run `python3 ~/.claude/skills/twitter-digest/scripts/run_daily_digest.py`; Codex should replace `~/.claude` with `~/.codex`. Do not run the source-checkout path after installation unless you are intentionally developing the skill.
+- Public/account data comes from the hosted X MCP installed in the AI client.
+- X Chat/DM content comes from the local browser collector because encrypted X Chat may not be fully exposed through API/MCP.
+- No local public-data API script is used. The agent calls MCP tools directly and writes the final digest from those tool results.
 
-Load `references/x-twitter-digest.md` when you need implementation details, browser workflow rules, current-run context behavior, or the scoring rubric.
+Load `references/x-twitter-digest.md` only when you need implementation details, browser rules, or the scoring rubric.
 
-## Data Collection
+## Required X MCP
 
-There are three collection scripts in the installed skill:
-
-```bash
-python3 ~/.claude/skills/twitter-digest/scripts/run_daily_digest.py   # upper wrapper, --source auto
-python3 ~/.claude/skills/twitter-digest/scripts/browser_x_digest.py   # browser collector
-python3 ~/.claude/skills/twitter-digest/scripts/api_x_digest.py       # API collector
-```
-
-For chat usage, run the wrapper:
+The AI client should expose an MCP server named `xapi` or similar. Configure it through `xurl`, not by asking the user to paste tokens into chat:
 
 ```bash
-python3 ~/.claude/skills/twitter-digest/scripts/run_daily_digest.py
+npm install -g @xdevplatform/xurl
+xurl auth apps add my-app --client-id YOUR_CLIENT_ID --client-secret YOUR_CLIENT_SECRET --redirect-uri http://localhost:8080/callback
+xurl auth oauth2 --app my-app
+xurl auth default my-app
 ```
 
-`run_daily_digest.py --source auto` uses saved OAuth2 user-context credentials, `X_BEARER_TOKEN`, or `TWITTER_BEARER_TOKEN` for public data when present; otherwise it uses the browser collector. During the current X API limitation, normal daily runs use API for public data and browser collection for all DM/X Chat content. Treat API DM lookup as TODO / waiting for X to fix XChat-encrypted DM coverage; do not use API DM to decide whether the user has private messages.
+For Codex:
 
-If the user asks to configure API access, trigger the OAuth/user-token setup from chat:
+```toml
+[mcp_servers.xapi]
+command = "xurl"
+args = ["mcp", "https://api.x.com/mcp"]
 
-```bash
-python3 ~/.claude/skills/twitter-digest/scripts/run_daily_digest.py --configure-api
+[mcp_servers.x-docs]
+url = "https://docs.x.com/mcp"
 ```
 
-This is an agent-triggered flow. It supports OAuth2 user authorization:
+For a specific authorized X user:
 
-- OAuth2 path: if the user has an X Developer App OAuth2 `Client ID` and local callback URL, run `python3 ~/.claude/skills/twitter-digest/scripts/run_daily_digest.py --configure-api`. It goes directly into OAuth2 setup. Request `dm.read tweet.read users.read offline.access`.
-- Existing token path: if the user says they already have an OAuth2 user access token, run `python3 ~/.claude/skills/twitter-digest/scripts/run_daily_digest.py --configure-api-token`.
-- OAuth1 PIN is not a supported normal setup path for this skill because it did not reliably return DM data during validation. Do not guide users to Consumer Key / Consumer Secret / PIN unless they are explicitly debugging legacy API behavior.
-
-If a refresh token is saved, later daily runs refresh the access token automatically. Do not ask the user to export environment variables manually. App-only API keys are not enough for user-context home timeline access.
-
-After API setup succeeds once, future daily digest runs should not ask the user for credentials again. Run `python3 ~/.claude/skills/twitter-digest/scripts/run_daily_digest.py`; it reads `.state/api_config.json` automatically. OAuth2 credentials are refreshed automatically when a refresh token is saved. Only rerun `--configure-api` when the saved credentials are missing, revoked, expired without refresh, or the user explicitly asks to change accounts/apps.
-
-If the user asks to clear API access, run:
-
-```bash
-python3 ~/.claude/skills/twitter-digest/scripts/configure_api.py --clear
+```toml
+args = ["mcp", "-u", "USERNAME", "https://api.x.com/mcp"]
 ```
 
-All normal flows should be triggered from chat by the agent:
+The X Developer App must allow the exact redirect URI used by `xurl`, commonly:
 
-- X 日报 / 生成日报: run `python3 ~/.claude/skills/twitter-digest/scripts/run_daily_digest.py`.
-- 用户已有 token / 输入 X token: run `python3 ~/.claude/skills/twitter-digest/scripts/run_daily_digest.py --configure-api-token`.
-- 配置 X API / 给 app 授权: run `python3 ~/.claude/skills/twitter-digest/scripts/run_daily_digest.py --configure-api`.
-- 清除 X API 配置: run `python3 ~/.claude/skills/twitter-digest/scripts/configure_api.py --clear`.
-- 调试浏览器: run `python3 ~/.claude/skills/twitter-digest/scripts/run_daily_digest.py --source browser --headed`.
-- 对比 API 和浏览器抓取 / 稳定性测试: run `python3 ~/.claude/skills/twitter-digest/scripts/compare_collectors.py --rounds 3 --interval-sec 120`. Load `COLLECTOR_COMPARISON_TEST.md` before interpreting the report.
-
-Force a source:
-
-```bash
-python3 ~/.claude/skills/twitter-digest/scripts/run_daily_digest.py --source browser
-X_BEARER_TOKEN=... python3 ~/.claude/skills/twitter-digest/scripts/run_daily_digest.py --source api --handle <handle>
+```text
+http://localhost:8080/callback
 ```
 
-The first run opens a dedicated browser profile at `twitter-digest/.state/chrome-profile`. The user logs in to X once in that browser. Later runs default to headless collection and reuse the saved local browser session. If the saved login is unavailable, the script automatically opens a visible browser window for manual login. The skill has two collector scripts: `scripts/api_x_digest.py` for official API public data, and `scripts/browser_x_digest.py` for browser-visible X Chat / encrypted DM content. API-visible DM events remain TODO-only until X fixes or documents reliable XChat coverage.
+Use `Read and write and Direct message` permissions if the user wants the broad default `xurl` scopes. Client ID and Client Secret are entered in the local terminal only.
 
-DM reading is enabled by default and only reads visible local browser content. To skip DMs for a run:
+## Skill Structure
 
-```bash
-python3 ~/.claude/skills/twitter-digest/scripts/run_daily_digest.py --no-dms
-```
+- `X MCP`: primary source for home timeline, mentions, own posts, user lookup, recent search, trends/news/articles when relevant, and optional keyword searches.
+- `scripts/collect_browser_dm.py`: command-line collector for visible X Chat/DM. It writes `browser-dm-context.md/json`.
+- `lib/browser_dm_core.py`: internal browser/CDP implementation used by `collect_browser_dm.py`.
+- `.state/run/browser-dm-context.md|json`: current-run browser DM facts. Treat these as sensitive when they include DM text.
 
-Default scope:
+## Collection Rules
 
-- Mentions of the authenticated handle.
-- Home timeline hotspots.
-- Own profile activity.
-- Today's visible DM conversations, with only conversations whose latest preview is not from the user opened for content.
-- Optional keyword searches only when the user explicitly passes `--keywords`.
-
-Public timeline/profile/mentions pages use the same daily-window loading model as DMs: by default the browser collector scrolls each public page up to 40 rounds, keeps up to 100 public items, and stops early when loaded post timestamps show content beyond the 24-hour digest window. API public collection keeps up to 300 public items by default. Passing `--max-public-items N` overrides both collectors for that run (`--scrolls 40`, browser default `--max-public-items 100`, API default `--max-public-items 300`, `--public-window-hours 24`).
-
-Read only `twitter-digest/.state/run/digest-context.md` when writing the Chinese digest. Its `Final Summary Facts` section is the content source for the final summary. Use `digest-input.md` only when debugging collection issues, not during normal summarization. Do not add content from older runs.
+- For X 日报 / 周报, call X MCP tools directly for public/account data.
+- Run the browser collector only when DM/X Chat coverage is needed.
+- If browser collection is used, use the installed command path:
+  - Codex: `python3 ~/.codex/skills/twitter-digest/scripts/collect_browser_dm.py`
+  - Claude Code: `python3 ~/.claude/skills/twitter-digest/scripts/collect_browser_dm.py`
+- Do not treat `xurl dms` or MCP DM returning 0 events as proof that browser X Chat is empty.
+- Do not send, like, follow, accept DM requests, or open suspicious links unless the user explicitly asks after reviewing a draft.
 
 ## Install
 
 From the repository `skills/` directory:
 
+Codex:
+
+```bash
+python3 twitter-digest/scripts/install.py --skills-dir ~/.codex/skills
+```
+
+Claude Code:
+
 ```bash
 python3 twitter-digest/scripts/install.py
 ```
 
-Default install copies the skill to `~/.claude/skills/twitter-digest`. Local development can use `--symlink`.
+Default install copies the skill to `~/.claude/skills/twitter-digest`. Use `--skills-dir ~/.codex/skills` for Codex. Local development can use `--symlink`.
 
 The installer checks for Python 3.10+ and a supported Chromium browser before installing. Supported browsers are Google Chrome, Chromium, Microsoft Edge, and Brave. If the browser will be installed later, use `--skip-browser-check`.
 
@@ -107,59 +94,42 @@ Claude Code or other agents can use the installed skill by running the same brow
 
 ## Run Outputs
 
-`scripts/run_daily_digest.py` does not write long-term memory. Each run writes only current-run files:
+`scripts/collect_browser_dm.py` does not write long-term memory. Each run writes only current-run browser DM files:
 
-- `twitter-digest/.state/config.json`: account defaults and preferences.
-- `twitter-digest/.state/run/digest-context.md`: the only normal input for AI daily-summary writing.
-- `twitter-digest/.state/run/digest-context.json`: machine-readable version of the same normalized facts.
-- `twitter-digest/.state/run/digest-input.md`: raw collector capture for debugging only.
-- `twitter-digest/.state/run/digest-input.json`: raw machine-readable collector capture for debugging only.
+- `twitter-digest/.state/run/browser-dm-context.md`: readable browser DM context.
+- `twitter-digest/.state/run/browser-dm-context.json`: machine-readable browser DM context.
 
-No `memory.json` or `daily/` archive is produced. Raw DM text or DM excerpts may exist only in the current run's private `twitter-digest/.state/run/digest-input.*` and `digest-context.*` files for immediate summarization/debugging. The run directory is created with owner-only permissions where supported. Run dates use the user's local timezone.
-
-`scripts/compare_collectors.py` is an explicit testing tool, not the normal daily digest path. It intentionally archives historical comparison rounds under `twitter-digest/.state/compare-runs/<timestamp>/` so agents can compare API and browser completeness over time. Keep those files local and treat them as sensitive.
+No `memory.json`, `daily/` archive, API token cache, or public-data capture is produced by the MCP-first flow. Public data stays in the agent's MCP tool results. Raw DM text may exist only in the current run's private `.state/run/browser-dm-context.*` files for immediate summarization/debugging.
 
 ## Workflow
 
 ### 1. Collect
 
-When the user asks for an X daily digest or X 日报, run:
+When the user asks for an X daily digest, weekly digest, or X 日报/周报:
+
+1. Use X MCP for public/account data: authenticated user, home timeline, mentions, own posts, and explicit keyword/search queries.
+2. Use an appropriate time window for the request: 24 hours for daily digest, 7 days for weekly digest unless the user asks otherwise.
+3. If DMs are included, run browser collection for visible X Chat/DM:
+
+Codex:
 
 ```bash
-python3 ~/.claude/skills/twitter-digest/scripts/run_daily_digest.py
+python3 ~/.codex/skills/twitter-digest/scripts/collect_browser_dm.py
 ```
 
-If they ask to skip DMs:
+Claude Code:
 
 ```bash
-python3 ~/.claude/skills/twitter-digest/scripts/run_daily_digest.py --no-dms
+python3 ~/.claude/skills/twitter-digest/scripts/collect_browser_dm.py
 ```
 
-If the authenticated handle is not detected or the user corrects it:
-
-```bash
-python3 ~/.claude/skills/twitter-digest/scripts/run_daily_digest.py --handle <handle> --account-name "<显示名>" --save-default
-```
-
-For debugging or manual inspection:
-
-```bash
-python3 ~/.claude/skills/twitter-digest/scripts/run_daily_digest.py --headed
-```
-
-For unattended scheduled runs that should not block on passcode recovery:
-
-```bash
-python3 ~/.claude/skills/twitter-digest/scripts/run_daily_digest.py --non-interactive
-```
-
-Do not ask the user to copy cookies or configure another service. If the script opens a visible browser window, tell the user to log in or resolve the visible X challenge there.
+If the saved browser profile is not logged in, the script opens a visible browser window and waits for the user to log in. If X Chat asks for passcode setup, passcode entry, or encryption-key recovery, the script opens or reuses a visible browser window, waits for the user to complete the challenge, then retries DM collection. For debugging, add `--headed`.
 
 ### 2. Protect Privacy
 
 Treat browser sessions, cookies observed internally by the script, DMs, phone numbers, emails, private handles, and screenshots as sensitive. Do not post, reply, like, follow, block, open suspicious links, accept DM requests, or send DMs unless the user explicitly asks after reviewing a draft.
 
-Browser DM collection only reads message content visible in the logged-in local browser. If X Chat shows a passcode setup, passcode entry, or end-to-end-encryption recovery screen during headless collection, the script should automatically reopen X Messages in a visible browser window, wait for the user to complete it, then retry DM collection. In `--non-interactive` mode, record the DM data gap and continue without blocking. Do not choose, enter, or store a passcode for the user.
+Browser DM collection only reads message content visible in the logged-in local browser. If X Chat shows a passcode setup, passcode entry, or end-to-end-encryption recovery screen, wait for the user to complete it in the visible browser and retry collection. In `--non-interactive` mode only, record the DM data gap and continue. Do not choose, enter, or store a passcode for the user.
 
 ### 3. Analyze
 
@@ -184,7 +154,7 @@ For waiting-reply DMs, still summarize selectively. Count all waiting-reply conv
 
 For DM sender attribution, use the thread `participant` / `会话对象` and message bubble direction. Do not treat authors inside quoted posts, repost cards, link previews, or embedded tweet text as the DM sender. If a DM contains a shared post by `Marco` inside a conversation with `@jerry`, the DM is from the conversation participant, not from `Marco`.
 
-When `digest-context.md` includes `### DM Thread Context`, use that section to understand the recent conversation history for waiting-reply DMs. It may include up to 2000 loaded message bubbles per summarized thread, plus raw thread label, URL, and load metadata, so the model can understand complex context before deciding whether and how to mention the DM. Keep the final digest concise; do not paste the full DM history into the report.
+When `browser-dm-context.md` includes thread messages, use that section to understand the recent conversation history for waiting-reply DMs. It may include loaded message bubbles plus raw thread label, URL, and load metadata, so the model can understand complex context before deciding whether and how to mention the DM. Keep the final digest concise; do not paste the full DM history into the report.
 
 Use media and link metadata when present. Public items and DM message context may include `media`, `link`, and `card` lines with image/video URLs, alt text, shared-post links, and external links. Treat these as context for understanding the item, but do not open suspicious links or overstate image contents beyond the available alt/text/URL signals.
 

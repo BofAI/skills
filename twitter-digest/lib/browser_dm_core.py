@@ -1,9 +1,8 @@
 #!/usr/bin/env python3
-"""Collect X/Twitter digest input through a persistent local browser session."""
+"""Internal browser/CDP helpers for collecting visible X Chat/DM context."""
 
 from __future__ import annotations
 
-import argparse
 import base64
 import datetime as dt
 import json
@@ -14,40 +13,9 @@ import socket
 import struct
 import subprocess
 import time
-import urllib.parse
 import urllib.request
 from pathlib import Path
 from typing import Any
-
-
-PUBLIC_STAGNANT_ROUND_LIMIT = 4
-PUBLIC_SLOW_SCROLL_ROUNDS = 3
-PUBLIC_INITIAL_SCROLL_WAIT_SEC = 2
-PUBLIC_LATER_SCROLL_WAIT_SEC = 1
-DEFAULT_BROWSER_PUBLIC_ITEMS = 100
-
-
-def parse_args() -> argparse.Namespace:
-    parser = argparse.ArgumentParser(description=__doc__)
-    default_state_dir = Path(__file__).resolve().parents[1] / ".state"
-    parser.add_argument("--handle", help="Your X handle, with or without @. If omitted, the script tries to detect it from the logged-in page.")
-    parser.add_argument("--keywords", default="", help="Comma-separated keywords or queries for hotspot search.")
-    parser.add_argument("--out", default=str(default_state_dir / "run"), help="Output directory.")
-    parser.add_argument("--profile-dir", default=str(default_state_dir / "chrome-profile"))
-    parser.add_argument("--scrolls", type=int, default=40, help="Maximum scroll rounds per public page.")
-    parser.add_argument("--max-public-items", type=int, default=DEFAULT_BROWSER_PUBLIC_ITEMS, help="Maximum public post items kept per run.")
-    parser.add_argument("--public-window-hours", type=int, default=24, help="Stop loading older public timeline items once posts beyond this window are detected.")
-    parser.add_argument("--login-timeout-sec", type=int, default=300)
-    parser.add_argument("--include-dms", action="store_true", help="Also visit X messages and capture visible conversation text.")
-    parser.add_argument("--dm-threads", type=int, default=5, help="Maximum recent DM threads to open when --include-dms is set.")
-    parser.add_argument("--dm-scrolls", type=int, default=200, help="Maximum upward scroll rounds per opened DM thread.")
-    parser.add_argument("--dm-max-messages", type=int, default=2000, help="Maximum message bubbles kept per opened DM thread.")
-    parser.add_argument("--dm-window-hours", type=int, default=0, help="Stop loading older DM history once messages beyond this window are detected. 0 means load the full thread available in the browser.")
-    parser.add_argument("--headless", action="store_true", help="Run without a visible browser window. This is the default after first login.")
-    parser.add_argument("--headed", action="store_true", help="Force a visible browser window for debugging or manual login.")
-    parser.add_argument("--non-interactive", action="store_true", help="Do not open a visible browser for DM passcode recovery; record a data gap instead.")
-    parser.add_argument("--keep-browser-open", action="store_true")
-    return parser.parse_args()
 
 
 def find_chrome() -> str:
@@ -176,26 +144,6 @@ def domain_matches_x(domain: str) -> bool:
     return domain == "x.com" or domain.endswith(".x.com") or domain == "twitter.com" or domain.endswith(".twitter.com")
 
 
-def build_pages(handle: str | None, keywords: str, include_dms: bool) -> list[dict[str, str]]:
-    pages = [{"kind": "home", "url": "https://x.com/home"}]
-    if handle:
-        clean = handle.lstrip("@")
-        query = urllib.parse.quote(f"@{clean}")
-        pages.append({"kind": "own_profile", "url": f"https://x.com/{clean}"})
-        pages.append({"kind": "mentions_search", "url": f"https://x.com/search?q={query}&src=typed_query&f=live"})
-        pages.append({"kind": "mentions_notifications", "url": "https://x.com/notifications/mentions"})
-    for index, keyword in enumerate([k.strip() for k in keywords.split(",") if k.strip()], start=1):
-        pages.append(
-            {
-                "kind": f"keyword_{index}",
-                "url": f"https://x.com/search?q={urllib.parse.quote(keyword)}&src=typed_query&f=live",
-            }
-        )
-    if include_dms:
-        pages.append({"kind": "messages", "url": "https://x.com/messages"})
-    return pages
-
-
 def collect_page(
     port: int,
     page: dict[str, str],
@@ -204,8 +152,6 @@ def collect_page(
     dm_scrolls: int = 200,
     dm_max_messages: int = 2000,
     dm_window_hours: int = 0,
-    max_public_items: int = DEFAULT_BROWSER_PUBLIC_ITEMS,
-    public_window_hours: int = 24,
 ) -> dict[str, Any]:
     ws_url = wait_for_cdp_page_ws(port)
     cdp_call(ws_url, "Page.enable")
@@ -220,77 +166,22 @@ def collect_page(
             "collection_error": navigate_result["_cdp_error"],
         }
     time.sleep(5)
-    if page["kind"] == "messages":
+    if page["kind"] != "messages":
+        return {
+            "kind": page["kind"],
+            "url": page["url"],
+            "items": [],
+            "collection_status": "skipped",
+            "collection_error": "browser_dm_core only collects X Messages.",
+        }
+    extra = collect_messages_page(ws_url, dm_threads, dm_scrolls, dm_max_messages, dm_window_hours)
+    if dm_collection_looks_premature(extra):
+        cdp_call(ws_url, "Page.navigate", {"url": page["url"]})
+        time.sleep(8)
         extra = collect_messages_page(ws_url, dm_threads, dm_scrolls, dm_max_messages, dm_window_hours)
         if dm_collection_looks_premature(extra):
-            cdp_call(ws_url, "Page.navigate", {"url": page["url"]})
-            time.sleep(8)
-            extra = collect_messages_page(ws_url, dm_threads, dm_scrolls, dm_max_messages, dm_window_hours)
-            if dm_collection_looks_premature(extra):
-                mark_dm_loading_gap(extra)
-        return {"kind": page["kind"], "url": page["url"], "items": [], **extra}
-    extra = collect_public_items(ws_url, max_scrolls=scrolls, max_items=max_public_items, window_hours=public_window_hours)
-    return {"kind": page["kind"], "url": page["url"], **extra}
-
-
-def collect_public_items(ws_url: str, max_scrolls: int, max_items: int, window_hours: int) -> dict[str, Any]:
-    posts: list[dict[str, Any]] = []
-    scroll_limit = max(1, int(max_scrolls))
-    item_limit = max(1, int(max_items))
-    window = max(1, int(window_hours))
-    stagnant_rounds = 0
-    previous_count = 0
-    window_exceeded = False
-    scrolls_used = 0
-
-    for scroll_index in range(scroll_limit):
-        scrolls_used = scroll_index + 1
-        posts = dedupe_items([*posts, *extract_articles(ws_url)])
-        if len(posts) >= item_limit:
-            break
-        window_exceeded = public_posts_beyond_window(posts, window)
-        if window_exceeded:
-            break
-        if len(posts) <= previous_count:
-            stagnant_rounds += 1
-        else:
-            stagnant_rounds = 0
-        if stagnant_rounds >= PUBLIC_STAGNANT_ROUND_LIMIT:
-            break
-        previous_count = len(posts)
-        cdp_eval(ws_url, "window.scrollBy(0, Math.max(900, window.innerHeight * 0.9));")
-        wait_sec = PUBLIC_INITIAL_SCROLL_WAIT_SEC if scroll_index < PUBLIC_SLOW_SCROLL_ROUNDS else PUBLIC_LATER_SCROLL_WAIT_SEC
-        time.sleep(wait_sec)
-
-    posts = dedupe_items([*posts, *extract_articles(ws_url)])
-    window_exceeded = window_exceeded or public_posts_beyond_window(posts, window)
-    if len(posts) > item_limit:
-        posts = posts[:item_limit]
-    return {
-        "items": posts,
-        "public_scrolls_used": min(scroll_limit, scrolls_used),
-        "public_window_exceeded": window_exceeded,
-        "public_max_items": item_limit,
-        "public_window_hours": window,
-    }
-
-
-def public_posts_beyond_window(posts: list[dict[str, Any]], window_hours: int) -> bool:
-    now = dt.datetime.now(dt.timezone.utc)
-    oldest_age = 0.0
-    for post in posts:
-        timestamp = str(post.get("time") or "")
-        if not timestamp:
-            continue
-        try:
-            parsed = dt.datetime.fromisoformat(timestamp.replace("Z", "+00:00"))
-        except ValueError:
-            continue
-        if parsed.tzinfo is None:
-            parsed = parsed.replace(tzinfo=dt.timezone.utc)
-        age = (now - parsed.astimezone(dt.timezone.utc)).total_seconds() / 3600
-        oldest_age = max(oldest_age, age)
-    return oldest_age > max(1, int(window_hours))
+            mark_dm_loading_gap(extra)
+    return {"kind": page["kind"], "url": page["url"], "items": [], **extra}
 
 
 def collect_messages_page(ws_url: str, dm_threads: int, dm_scrolls: int, dm_max_messages: int, dm_window_hours: int) -> dict[str, Any]:
@@ -940,7 +831,7 @@ def wait_for_dm_passcode_resolution(port: int, timeout_sec: int) -> bool:
     cdp_call(ws_url, "Page.enable")
     cdp_call(ws_url, "Runtime.enable")
     cdp_call(ws_url, "Page.navigate", {"url": "https://x.com/messages"})
-    print("X Chat passcode is required. Complete it in the opened browser window; collection will resume automatically.")
+    print("Complete the X Chat passcode/recovery step in the visible browser window.")
     deadline = time.time() + timeout_sec
     last_notice = 0.0
     while time.time() < deadline:
@@ -948,14 +839,14 @@ def wait_for_dm_passcode_resolution(port: int, timeout_sec: int) -> bool:
         main_text = extract_main_text(ws_url)
         if is_dm_passcode_screen(main_text):
             if time.time() - last_notice > 15:
-                print("Still waiting for X Chat passcode to be completed in the opened browser window.")
+                print("Still waiting for X Chat passcode/recovery to be completed in the browser window.")
                 last_notice = time.time()
             continue
         if dm_messages_page_is_readable(ws_url, main_text):
             print("X Chat messages are readable. Resuming DM collection...")
             return True
         if time.time() - last_notice > 15:
-            print("Passcode screen is not readable yet or messages are still loading. Keep the visible browser open until X Messages shows the inbox.")
+            print("Waiting for X Messages to become readable after the visible challenge is completed.")
             last_notice = time.time()
     return False
 
@@ -967,9 +858,7 @@ def dm_messages_page_is_readable(ws_url: str, text: str) -> bool:
         return True
     normalized = " ".join(text.lower().split())
     empty_markers = ["no messages", "welcome to your inbox"]
-    if any(marker in normalized for marker in empty_markers):
-        return True
-    return False
+    return any(marker in normalized for marker in empty_markers)
 
 
 def extract_dm_thread_targets(ws_url: str) -> list[dict[str, Any]]:
@@ -1185,102 +1074,6 @@ def click_point(ws_url: str, x: float, y: float) -> None:
         cdp_call(ws_url, "Input.dispatchMouseEvent", params)
 
 
-def extract_articles(ws_url: str) -> list[dict[str, Any]]:
-    script = r"""
-(() => {
-  const statusUrl = (href) => {
-    try {
-      const url = new URL(href, location.href);
-      return /\/status\/\d+/.test(url.pathname) ? url.href : null;
-    } catch { return null; }
-  };
-  const clean = (text) => (text || '').replace(/\s+/g, ' ').trim();
-  const normalizeUrl = (value) => {
-    if (!value || value.startsWith('data:') || value.startsWith('blob:')) return '';
-    try {
-      const url = new URL(value, location.href);
-      url.hash = '';
-      return url.href;
-    } catch { return ''; }
-  };
-  const linkInfo = (article, links) => {
-    const out = [];
-    for (const a of Array.from(article.querySelectorAll('a[href]'))) {
-      const url = normalizeUrl(a.getAttribute('href'));
-      if (!url) continue;
-      let parsed;
-      try { parsed = new URL(url); } catch { continue; }
-      if (/\/photo\/\d+/.test(parsed.pathname)) continue;
-      if (/\/analytics$|\/retweets$|\/likes$/.test(parsed.pathname)) continue;
-      const label = clean(a.innerText || a.getAttribute('aria-label') || '');
-      const isStatus = /\/status\/\d+/.test(parsed.pathname);
-      const sameStatus = isStatus && links.map(statusUrl).includes(url);
-      const isProfile = /^\/[^/]+$/.test(parsed.pathname) && (parsed.hostname.endsWith('x.com') || parsed.hostname.endsWith('twitter.com'));
-      if (sameStatus || isProfile) continue;
-      if (!out.some((item) => item.url === url)) out.push({url, label});
-    }
-    return out.slice(0, 12);
-  };
-  const mediaInfo = (article) => {
-    const out = [];
-    for (const img of Array.from(article.querySelectorAll('img[src]'))) {
-      const url = normalizeUrl(img.getAttribute('src'));
-      if (!url) continue;
-      if (/profile_images|emoji|hashflags|abs\.twimg\.com\/responsive-web/i.test(url)) continue;
-      const alt = clean(img.getAttribute('alt') || img.getAttribute('aria-label') || '');
-      if (!out.some((item) => item.url === url)) out.push({type: 'image', url, alt});
-    }
-    for (const video of Array.from(article.querySelectorAll('video'))) {
-      const url = normalizeUrl(video.currentSrc || video.getAttribute('src'));
-      const poster = normalizeUrl(video.getAttribute('poster'));
-      if (url || poster) out.push({type: 'video', url, poster, alt: clean(video.getAttribute('aria-label') || '')});
-    }
-    return out.slice(0, 8);
-  };
-  const cardInfo = (article) => {
-    const cards = [];
-    for (const link of Array.from(article.querySelectorAll('a[href]'))) {
-      const text = clean(link.innerText || link.getAttribute('aria-label') || '');
-      const href = normalizeUrl(link.getAttribute('href'));
-      if (!href || text.length < 8) continue;
-      try {
-        const parsed = new URL(href);
-        const isProfile = /^\/[^/]+$/.test(parsed.pathname) && (parsed.hostname.endsWith('x.com') || parsed.hostname.endsWith('twitter.com'));
-        if (isProfile) continue;
-        if (/\/status\/\d+/.test(parsed.pathname) && text.length < 80) continue;
-      } catch { continue; }
-      if (!cards.some((item) => item.url === href && item.text === text)) cards.push({url: href, text: text.slice(0, 500)});
-    }
-    return cards.slice(0, 5);
-  };
-  return Array.from(document.querySelectorAll('article')).map((article) => {
-    const text = (article.innerText || '').trim();
-    const links = Array.from(article.querySelectorAll('a[href]')).map(a => a.href).filter(Boolean);
-    const status = links.map(statusUrl).find(Boolean) || null;
-    const times = Array.from(article.querySelectorAll('time')).map(t => t.getAttribute('datetime')).filter(Boolean);
-    const authorLinks = links.filter(h => {
-      try {
-        const p = new URL(h).pathname;
-        return /^\/[^/]+$/.test(p) && !p.includes('/i/');
-      } catch { return false; }
-    });
-    return {
-      text,
-      url: status,
-      links,
-      externalLinks: linkInfo(article, links),
-      media: mediaInfo(article),
-      cards: cardInfo(article),
-      time: times[0] || null,
-      authorUrl: authorLinks[0] || null
-    };
-  }).filter(item => item.text);
-})()
-"""
-    value = cdp_eval(ws_url, script)
-    return value if isinstance(value, list) else []
-
-
 def extract_main_text(ws_url: str) -> str:
     script = r"""
 (() => {
@@ -1290,107 +1083,6 @@ def extract_main_text(ws_url: str) -> str:
 """
     value = cdp_eval(ws_url, script)
     return str(value or "")
-
-
-def detect_handle(port: int) -> str | None:
-    try:
-        ws_url = wait_for_cdp_page_ws(port)
-        cdp_call(ws_url, "Page.enable")
-        cdp_call(ws_url, "Runtime.enable")
-        cdp_call(ws_url, "Page.navigate", {"url": "https://x.com/home"})
-        time.sleep(5)
-        script = r"""
-(() => {
-  const account = document.querySelector('[data-testid="SideNav_AccountSwitcher_Button"]');
-  const accountText = account ? account.innerText : '';
-  const accountMatch = accountText.match(/@([A-Za-z0-9_]{1,15})/);
-  if (accountMatch) return accountMatch[1];
-  const profileLink = document.querySelector('[data-testid="AppTabBar_Profile_Link"]');
-  const profileHref = profileLink ? profileLink.getAttribute('href') : '';
-  const profileMatch = profileHref.match(/^\/([A-Za-z0-9_]{1,15})$/);
-  if (profileMatch) return profileMatch[1];
-  const labels = Array.from(document.querySelectorAll('[aria-label]')).map(el => el.getAttribute('aria-label') || '');
-  for (const label of labels) {
-    const match = label.match(/@([A-Za-z0-9_]{1,15})/);
-    if (match && /account|profile|账号|帳號|账户/i.test(label)) return match[1];
-  }
-  return null;
-})()
-"""
-        value = cdp_eval(ws_url, script)
-        return str(value).lstrip("@") if value else None
-    except Exception as exc:
-        print(f"Could not auto-detect X handle: {exc}")
-        return None
-
-
-def dedupe_items(items: list[dict[str, Any]]) -> list[dict[str, Any]]:
-    seen: set[str] = set()
-    out: list[dict[str, Any]] = []
-    for item in items:
-        key = str(item.get("url") or item.get("text") or "")[:500]
-        if not key or key in seen:
-            continue
-        seen.add(key)
-        out.append(item)
-    return out
-
-
-def render_markdown(data: dict[str, Any]) -> str:
-    lines = [
-        "# X 浏览器采集输入",
-        "",
-        f"- 生成时间: `{data['generated_at']}`",
-        f"- 浏览器 profile: `{data['profile_dir']}`",
-        f"- 当前账号: `{data.get('handle') or ''}`",
-        "",
-    ]
-    for page in data["pages"]:
-        lines.extend([f"## {page['kind']}", "", f"Source: {page['url']}", ""])
-        lines.append(f"采集条数: `{len(page.get('items', []))}`")
-        lines.append("")
-        for item in page["items"][:80]:
-            text = " ".join(str(item.get("text") or "").split())
-            url = item.get("url") or ""
-            timestamp = item.get("time") or ""
-            lines.append(f"- `{timestamp}` {url}")
-            lines.append(f"  {text[:1000]}")
-        if page.get("visible_text"):
-            lines.extend(["", "页面可见文本摘录:", "", str(page["visible_text"])[:3000]])
-        if page.get("dm_status"):
-            lines.extend(["", f"DM 状态: `{page['dm_status']}`"])
-            lines.append(
-                "DM 会话统计: "
-                f"今日可见 `{int(page.get('dm_visible_thread_count') or 0)}` / "
-                f"最后我发出 `{int(page.get('dm_replied_thread_count') or 0)}` / "
-                f"等我回复 `{int(page.get('dm_unreplied_thread_count') or 0)}`"
-            )
-            lines.append(f"DM 消息统计: 已打开等我回复会话中捕获消息气泡 `{int(page.get('dm_captured_message_count') or 0)}`")
-            if page.get("dm_note"):
-                lines.append(str(page["dm_note"]))
-        if page.get("collection_error"):
-            lines.extend(["", f"采集错误: `{page['collection_error']}`"])
-        for thread in page.get("dm_threads", [])[:20]:
-            participant = thread.get("participant") or thread.get("label") or thread.get("url")
-            lines.extend(["", f"### DM thread: {participant}", ""])
-            if participant:
-                lines.append(f"会话对象: `{participant}`")
-                lines.append(f"会话状态: `{'最后我发出' if thread.get('replied') else '等我回复'}`")
-                lines.append(f"消息数量: `{int(thread.get('message_count') or 0)}`")
-                lines.append("发信人判断: 使用会话对象/消息气泡判断；引用帖、转发卡片或链接预览里的作者不是 DM 发信人。")
-                lines.append("")
-            lines.append(str(thread.get("text") or "")[:3000])
-        lines.append("")
-    lines.extend(
-        [
-            "## 数据缺口",
-            "",
-            "- 浏览器采集依赖 X 页面结构和已加载的可见内容。",
-            "- 日报默认使用较小滚动次数；需要更全覆盖时再提高 `--scrolls`。",
-            "- DM 属于私密内容。只有用户明确同意本地读取时才使用 `--include-dms`。",
-        ]
-    )
-    return "\n".join(lines) + "\n"
 
 
 def wait_for_cdp(port: int) -> None:
@@ -1559,119 +1251,3 @@ def ensure_private_dir(path: Path) -> None:
         path.chmod(0o700)
     except PermissionError:
         pass
-
-
-def write_digest_output(out_dir: Path, data: dict[str, Any]) -> None:
-    ensure_private_dir(out_dir)
-    (out_dir / "digest-input.json").write_text(json.dumps(data, ensure_ascii=False, indent=2), encoding="utf-8")
-    (out_dir / "digest-input.md").write_text(render_markdown(data), encoding="utf-8")
-
-
-def main() -> None:
-    args = parse_args()
-    profile_dir = Path(args.profile_dir).expanduser().resolve()
-    force_headed = bool(args.headed and not args.headless)
-    proc, port, headless, logged_in = ensure_logged_in(profile_dir, args.login_timeout_sec, force_headed, args.non_interactive)
-    try:
-        out_dir = Path(args.out).expanduser().resolve()
-        if not logged_in:
-            data = {
-                "generated_at": dt.datetime.now().astimezone().isoformat(),
-                "profile_dir": str(profile_dir),
-                "handle": args.handle.lstrip("@") if args.handle else None,
-                "keywords": [k.strip() for k in args.keywords.split(",") if k.strip()],
-                "pages": [
-                    {
-                        "kind": "login",
-                        "url": "https://x.com/home",
-                        "items": [],
-                        "collection_status": "skipped",
-                        "collection_error": "Saved X login unavailable in non-interactive mode.",
-                    }
-                ],
-            }
-            write_digest_output(out_dir, data)
-            print(json.dumps({"out_dir": str(out_dir), "pages": len(data["pages"]), "headless": headless, "login": "unavailable"}, indent=2))
-            return
-        handle = args.handle.lstrip("@") if args.handle else detect_handle(port)
-        if handle:
-            print(f"Using X handle: @{handle}")
-        else:
-            print("Could not auto-detect X handle. Mention search will be skipped unless --handle is provided.")
-        pages = build_pages(handle, args.keywords, args.include_dms)
-        data = {
-            "generated_at": dt.datetime.now().astimezone().isoformat(),
-            "profile_dir": str(profile_dir),
-            "handle": handle,
-            "keywords": [k.strip() for k in args.keywords.split(",") if k.strip()],
-            "pages": [],
-        }
-        for page in pages:
-            print(f"Collecting {page['kind']}: {page['url']}")
-            if page["kind"] == "messages" and headless:
-                stop_browser(proc)
-                proc, port = launch_browser(profile_dir, "https://x.com/messages", headless=True)
-                wait_for_login(port, args.login_timeout_sec, interactive=False)
-            result = collect_page(
-                port,
-                page,
-                args.scrolls,
-                args.dm_threads,
-                args.dm_scrolls,
-                args.dm_max_messages,
-                args.dm_window_hours,
-                args.max_public_items,
-                args.public_window_hours,
-            )
-            if page["kind"] == "messages" and result.get("dm_status") == "blocked_by_x_chat_passcode":
-                if args.non_interactive:
-                    result["dm_note"] = "X Chat passcode is required. Non-interactive mode skipped DM recovery for this run."
-                    data["pages"].append(result)
-                    continue
-                resume_headless_after_passcode = bool(headless)
-                if headless:
-                    print("DM passcode screen detected in headless mode. Reopening X Messages in a visible browser window...")
-                    stop_browser(proc)
-                    proc, port = launch_browser(profile_dir, "https://x.com/messages", headless=False)
-                    headless = False
-                    wait_for_login(port, args.login_timeout_sec, interactive=True)
-                if wait_for_dm_passcode_resolution(port, args.login_timeout_sec):
-                    result = collect_page(
-                        port,
-                        page,
-                        args.scrolls,
-                        args.dm_threads,
-                        args.dm_scrolls,
-                        args.dm_max_messages,
-                        args.dm_window_hours,
-                        args.max_public_items,
-                        args.public_window_hours,
-                    )
-                    if result.get("dm_status") == "blocked_by_x_chat_passcode":
-                        result["dm_note"] = (
-                            "X Chat was still blocked by the passcode screen after the visible-browser recovery step. "
-                            "Complete passcode setup or entry until the inbox is visible, then rerun the digest."
-                        )
-                        result["collection_status"] = "partial"
-                        result["collection_error"] = "X Chat passcode screen remained after recovery."
-                    if resume_headless_after_passcode:
-                        print("X Chat passcode was completed. DM collection finished in the visible browser; returning to headless mode...")
-                        stop_browser(proc)
-                        proc, port = launch_browser(profile_dir, "https://x.com/messages", headless=True)
-                        headless = True
-                        wait_for_login(port, args.login_timeout_sec, interactive=False)
-                else:
-                    result["dm_note"] = (
-                        "Timed out waiting for X Messages to become readable after passcode handling. "
-                        "Keep the visible browser window open, complete passcode setup or entry until the inbox is visible, then rerun the digest."
-                    )
-            data["pages"].append(result)
-        write_digest_output(out_dir, data)
-        print(json.dumps({"out_dir": str(out_dir), "pages": len(data["pages"]), "headless": headless}, indent=2))
-    finally:
-        if not args.keep_browser_open:
-            stop_browser(proc)
-
-
-if __name__ == "__main__":
-    main()

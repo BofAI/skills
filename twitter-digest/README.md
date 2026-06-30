@@ -1,199 +1,144 @@
 # X/Twitter Digest
 
-Skill for generating a Chinese daily digest from a user's own X/Twitter account through API collection when configured, otherwise through a saved local browser session.
+Generate Chinese daily or weekly digests for a user's own X/Twitter account.
 
-## Quick Install
+The current design is MCP-first:
 
-From a fresh checkout:
+- Public/account data is read through the hosted X MCP.
+- X Chat/DM content is read through a local logged-in browser profile.
+- There is no local public-data API collector; the agent summarizes MCP tool results directly.
+
+## Structure
+
+```text
+twitter-digest/
+  SKILL.md                         agent-facing rules
+  references/x-twitter-digest.md   implementation notes and scoring rules
+  scripts/collect_browser_dm.py    CLI collector for visible X Chat/DM
+  scripts/install.py               install into ~/.codex or ~/.claude skills
+  lib/browser_dm_core.py           internal browser/CDP implementation
+  .state/                          local private state, ignored on install
+```
+
+Normal agent flow:
+
+```text
+X MCP tools -> public timeline / mentions / own posts / search
+browser collector -> visible X Chat / DM status and message context
+agent summary -> Chinese daily or weekly report
+```
+
+## Install The Skill
+
+From this repository's `skills/` directory, install for Codex with an explicit skills directory:
 
 ```bash
-git clone git@github.com:BofAI/skills.git
-cd skills/skills
+python3 twitter-digest/scripts/install.py --skills-dir ~/.codex/skills
+```
+
+For Claude Code:
+
+```bash
 python3 twitter-digest/scripts/install.py
 ```
 
-For testing the current PR branch before it is merged:
+The installer checks Python 3.10+ and a supported Chromium browser: Google Chrome, Chromium, Microsoft Edge, or Brave.
+
+## Install X MCP
+
+Install the official X API bridge:
 
 ```bash
-git clone -b twitter-digest-skill git@github.com:BofAI/skills.git
-cd skills/skills
-python3 twitter-digest/scripts/install.py
+npm install -g @xdevplatform/xurl
 ```
 
-To ask Claude Code to install this skill for itself, paste this into Claude Code:
+In the X Developer Portal, configure OAuth2/User authentication for your app:
 
-```text
-请帮我安装这个 Claude Code skill：
+- Callback / Redirect URL: `http://localhost:8080/callback`
+- App permissions: `Read and write and Direct message` if you want the default broad `xurl` scopes
 
-git clone -b twitter-digest-skill git@github.com:BofAI/skills.git /tmp/bofai-skills \
-  && cd /tmp/bofai-skills/skills \
-  && python3 twitter-digest/scripts/install.py
-
-安装后请确认 ~/.claude/skills/twitter-digest 存在。首次运行日报时，如果弹出浏览器，请让我登录 X。
-```
-
-After the PR is merged, use the main branch version:
-
-```text
-请帮我安装这个 Claude Code skill：
-
-git clone git@github.com:BofAI/skills.git /tmp/bofai-skills \
-  && cd /tmp/bofai-skills/skills \
-  && python3 twitter-digest/scripts/install.py
-
-安装后请确认 ~/.claude/skills/twitter-digest 存在。首次运行日报时，如果弹出浏览器，请让我登录 X。
-```
-
-The installer copies the skill to:
-
-```text
-~/.claude/skills/twitter-digest
-```
-
-It also checks for Python 3.10+ and a supported Chromium browser: Google Chrome, Chromium, Microsoft Edge, or Brave.
-
-## First Run
+Register the app locally and authorize an X user:
 
 ```bash
-python3 twitter-digest/scripts/run_daily_digest.py
+xurl auth apps add my-app \
+  --client-id YOUR_CLIENT_ID \
+  --client-secret YOUR_CLIENT_SECRET \
+  --redirect-uri http://localhost:8080/callback
+
+xurl auth oauth2 --app my-app
+xurl auth default my-app
 ```
 
-On first run, a dedicated browser profile opens. Log in to X once in that browser. Later runs reuse the saved profile and default to headless collection.
+Do not paste Client Secret or access tokens into chat. Enter them only in the local terminal.
 
-## Data Collection Sources
+## Configure Codex
 
-There are three collection entry points:
+Add the hosted X MCP to `~/.codex/config.toml`:
+
+```toml
+[mcp_servers.xapi]
+command = "xurl"
+args = ["mcp", "https://api.x.com/mcp"]
+
+[mcp_servers.x-docs]
+url = "https://docs.x.com/mcp"
+```
+
+For multiple X users, pin the MCP server to a username:
+
+```toml
+[mcp_servers.xapi]
+command = "xurl"
+args = ["mcp", "-u", "USERNAME", "https://api.x.com/mcp"]
+```
+
+Restart Codex after changing MCP config.
+
+## Browser DM Setup
+
+DM/X Chat should be verified through the browser collector because API/MCP DM events may not include all encrypted X Chat content.
+
+Run once and log in if prompted:
 
 ```bash
-# Browser-only collector
-python3 twitter-digest/scripts/browser_x_digest.py --include-dms
-
-# API-only collector, requires OAuth2 user-context credentials or --bearer-token
-X_BEARER_TOKEN=... python3 twitter-digest/scripts/api_x_digest.py --handle <handle>
-
-# Recommended upper-level wrapper
-python3 twitter-digest/scripts/run_daily_digest.py
+python3 ~/.codex/skills/twitter-digest/scripts/collect_browser_dm.py
 ```
 
-`run_daily_digest.py` defaults to `--source auto`:
-
-- If `X_BEARER_TOKEN` or `TWITTER_BEARER_TOKEN` is configured, it uses the API collector.
-- Otherwise it falls back to the browser collector.
-
-Force a source:
+The collector opens a visible browser automatically when login or X Chat passcode/recovery is required. Later runs reuse the saved profile and can complete headlessly. For a forced visible browser during debugging:
 
 ```bash
-python3 twitter-digest/scripts/run_daily_digest.py --source browser
-X_BEARER_TOKEN=... python3 twitter-digest/scripts/run_daily_digest.py --source api --handle <handle>
+python3 ~/.codex/skills/twitter-digest/scripts/collect_browser_dm.py --headed
 ```
 
-API mode is for stable public-data collection, including the official home timeline endpoint when the configured token has user-context timeline access. Normal daily runs use API for public data and the browser collector for X Chat / DM content. API DM lookup is marked TODO because XChat / encrypted DMs may not appear in `/2/dm_events`; do not use API DM to conclude there are no private messages. App-only API keys are not enough for user-context data.
+## Usage
 
-## Configure API In Chat
-
-Users should trigger every flow from chat. They do not need to export environment variables manually. Ask the agent to run:
-
-```bash
-python3 twitter-digest/scripts/run_daily_digest.py --configure-api
-```
-
-For a local user-owned X Developer App, the supported API setup path is OAuth2 Authorization Code with PKCE. Ask the agent to run:
-
-```bash
-python3 twitter-digest/scripts/run_daily_digest.py --configure-api
-```
-
-The script uses OAuth2 directly. It asks for the X Developer App `Client ID`, opens the X authorization page, waits for the user to authorize the account, receives the local callback, exchanges it for a user-context access token and refresh token, then saves it.
-
-If the user already has an OAuth2 user access token, use the direct token path:
-
-```bash
-python3 twitter-digest/scripts/run_daily_digest.py --configure-api-token
-```
-
-The script opens a hidden system prompt for the token, then asks for optional handle/user id and saves the config locally.
-
-OAuth1 is no longer exposed as a normal setup path for this skill because it did not reliably return DM data during validation. Use OAuth2 with user-context scopes for API collection; otherwise rely on the browser collector.
-
-The app's callback URL in X Developer Portal must match the redirect URI shown by the script, by default:
+Ask the agent:
 
 ```text
-http://127.0.0.1:8765/callback
+用 twitter-digest 看一下我的 X 日报
 ```
 
-For API DM lookup through OAuth2, include these scopes when configuring the X App / OAuth flow:
+or:
 
 ```text
-dm.read tweet.read users.read offline.access
+生成 X 周报
 ```
 
-Use `dm.write` only if the app will send or delete messages; the digest skill only reads.
+The agent should use X MCP for public/account data and browser collection only for DM/X Chat coverage.
 
-On macOS prompts appear as system dialogs; non-GUI terminals fall back to hidden terminal input. The token is saved to:
+## Outputs
+
+Current-run browser DM outputs are written under:
 
 ```text
-twitter-digest/.state/api_config.json
+twitter-digest/.state/run/
 ```
 
-The file is created with owner-only permissions where supported. Later runs of `run_daily_digest.py --source auto` read this saved config and use API automatically. To clear it:
-
-```bash
-python3 twitter-digest/scripts/configure_api.py --clear
-```
-
-If OAuth returns a refresh token, later daily runs refresh the saved access token automatically before collection.
-
-Chat flow summary:
+Important files:
 
 ```text
-生成 X 日报       -> agent runs scripts/run_daily_digest.py
-输入 X token     -> agent runs scripts/run_daily_digest.py --configure-api-token
-配置 X API       -> agent runs scripts/run_daily_digest.py --configure-api
-清除 X API 配置  -> agent runs scripts/configure_api.py --clear
-调试浏览器       -> agent runs scripts/run_daily_digest.py --source browser --headed
+browser-dm-context.md
+browser-dm-context.json
 ```
 
-## Test DM Collection
-
-```bash
-python3 twitter-digest/scripts/test_dm_collection.py
-```
-
-## Compare API And Browser Collection
-
-Run API and browser collectors once per round, keep every round's raw data, and generate a final comparison report:
-
-```bash
-python3 twitter-digest/scripts/compare_collectors.py --rounds 3 --interval-sec 120
-```
-
-The runner enforces a minimum 120-second delay between rounds. Reports are written under:
-
-```text
-twitter-digest/.state/compare-runs/<timestamp>/
-```
-
-See `twitter-digest/COLLECTOR_COMPARISON_TEST.md` for the full agent test plan.
-
-## Main Outputs
-
-```text
-twitter-digest/.state/run/digest-context.md
-twitter-digest/.state/run/digest-context.json
-twitter-digest/.state/run/digest-input.md
-twitter-digest/.state/run/digest-input.json
-```
-
-Use `digest-context.md` as the normal AI input. `digest-input.*` is raw collector capture for debugging.
-
-## More Details
-
-See:
-
-```text
-twitter-digest/QA_PRODUCT_USAGE_AND_TESTING.md
-twitter-digest/DATA_COLLECTION.md
-twitter-digest/RUNBOOK.md
-twitter-digest/FUNCTION_RULES_FLOW.md
-twitter-digest/COLLECTOR_COMPARISON_TEST.md
-```
+Treat `.state/` as private. It can include browser profile data and DM text.

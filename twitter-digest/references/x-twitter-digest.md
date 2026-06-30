@@ -1,91 +1,92 @@
 # X/Twitter Digest Reference
 
-Use this reference when implementing, auditing, or troubleshooting the X/Twitter digest data collection workflow.
+Use this reference when implementing, auditing, or troubleshooting the X/Twitter digest workflow.
 
 ## Access Model
 
-The data collection layer has three scripts:
+The preferred public-data layer is the hosted X MCP installed in the AI client. The agent calls X MCP tools directly for authenticated user lookup, home timeline, mentions, own posts, recent search, trends/news/articles when relevant, and optional keyword searches. Do not add a local MCP wrapper script for normal public-data collection.
 
-- `scripts/browser_x_digest.py`: local browser collector. It launches a dedicated Chromium profile at `twitter-digest/.state/chrome-profile`, reads X page DOM, and is required for X Chat / DM content.
-- `scripts/api_x_digest.py`: official API collector. It uses saved OAuth2 user-context credentials, `X_BEARER_TOKEN` / `TWITTER_BEARER_TOKEN`, or `--bearer-token` and writes the same `digest-input.*` shape as the browser collector.
-- `scripts/run_daily_digest.py`: upper wrapper. Default `--source auto` uses API when configured, otherwise browser.
+The local scripts are now browser DM infrastructure:
+
+- `scripts/collect_browser_dm.py`: command-line wrapper for visible X Chat/DM collection. It writes `browser-dm-context.md/json`.
+- `lib/browser_dm_core.py`: internal browser/CDP implementation used by `collect_browser_dm.py`.
+
+X MCP setup:
+
+```bash
+npm install -g @xdevplatform/xurl
+xurl auth apps add my-app --client-id YOUR_CLIENT_ID --client-secret YOUR_CLIENT_SECRET
+xurl auth oauth2 --app my-app
+xurl auth default my-app
+```
+
+Codex config:
+
+```toml
+[mcp_servers.xapi]
+command = "xurl"
+args = ["mcp", "https://api.x.com/mcp"]
+
+[mcp_servers.x-docs]
+url = "https://docs.x.com/mcp"
+```
 
 Browser mode:
 
 - The user logs in to X once in the dedicated browser profile.
 - Later runs default to headless collection and reuse the saved browser session.
-- If saved login is unavailable, the script opens a visible browser window for manual login.
+- If saved login is unavailable and interactive mode is allowed, the script opens a visible browser window for manual login.
+- If X Chat asks for passcode setup, passcode entry, or encryption-key recovery and interactive mode is allowed, the script opens or reuses a visible browser window, waits for completion, then retries DM collection.
 - The script reads visible content from X pages.
 
-API mode:
+X MCP mode:
 
-- Intended for stable public-data collection.
-- Requires user-context authorization for user-owned timelines. App-only keys are not enough for home timeline reliability.
-- Reads the official reverse chronological home timeline when the token has user-context timeline access.
-- Normal daily runs use browser collection for DMs. API DM lookup is retained only as TODO/debug because XChat / encrypted messages may not appear in `/2/dm_events`.
-- Records endpoint-level API failures as data gaps instead of silently treating them as empty pages.
-- DM lookup failures, zero-event API responses, and inconclusive API DM results are recorded as `api_dm_todo`; do not summarize them as empty inboxes. Use browser collection for X Chat / encrypted DMs while waiting for X to fix or document reliable API coverage.
-- Saved OAuth tokens are configured by the agent-triggered `run_daily_digest.py --configure-api` flow. OAuth2 PKCE is the supported path for user-owned local X Apps: the user provides the Client ID, authorizes the app in the browser, and the script saves the access token plus refresh token. OAuth2 tokens are refreshed automatically when a refresh token is saved.
+- Intended for stable public/account data collection through AI tool calls.
+- Requires X MCP to be installed and authenticated through `xurl`.
+- The user enters Client ID and Client Secret in the local terminal during `xurl auth apps add`; do not ask the user to paste secrets into chat.
+- App-only keys are not enough for user-context home timeline reliability; use OAuth user-context via `xurl auth oauth2`.
+- Normal daily runs use X MCP for public data and browser collection for DMs. DM/X Chat lookup through API/MCP may be incomplete, so browser DM remains authoritative.
+- MCP tool failures should be reported as data gaps, not silently treated as empty pages.
 
-Chat-triggered API setup:
+Chat-triggered X MCP setup:
 
 ```bash
-python3 twitter-digest/scripts/run_daily_digest.py --configure-api
+npm install -g @xdevplatform/xurl
+xurl auth apps add my-app --client-id YOUR_CLIENT_ID --client-secret YOUR_CLIENT_SECRET
+xurl auth oauth2 --app my-app
+xurl auth default my-app
 ```
 
-The user should only interact with the system prompts and X OAuth browser page. Do not require the user to export env vars or paste tokens into shell history.
+Then add the MCP server to the AI client config and restart the client. The user should only enter credentials in the local terminal and X OAuth browser page.
 
 Typical chat run:
 
-```bash
-python3 twitter-digest/scripts/run_daily_digest.py
-```
-
-Visible DM collection is enabled by default. To skip DMs:
-
-```bash
-python3 twitter-digest/scripts/run_daily_digest.py --no-dms
-```
-
-Optional keyword search is off by default. Use it only when the user explicitly asks:
-
-```bash
-python3 twitter-digest/scripts/run_daily_digest.py --keywords "query one,query two"
-```
+1. Call X MCP tools for public/account facts.
+2. Run `collect_browser_dm.py` only if DM/X Chat coverage is needed.
+3. Merge those facts in the final Chinese summary.
 
 Force a visible browser window for debugging:
 
 ```bash
-python3 twitter-digest/scripts/run_daily_digest.py --headed
+python3 twitter-digest/scripts/collect_browser_dm.py --headed
 ```
 
-For unattended scheduled runs that should not open a visible browser or wait on passcode recovery:
+For unattended scheduled runs that should not open a visible browser:
 
 ```bash
-python3 twitter-digest/scripts/run_daily_digest.py --non-interactive
+python3 twitter-digest/scripts/collect_browser_dm.py --non-interactive
 ```
 
-Force a data source:
+Browser DM collection:
 
 ```bash
-python3 twitter-digest/scripts/run_daily_digest.py --source browser
-X_BEARER_TOKEN=... python3 twitter-digest/scripts/run_daily_digest.py --source api --handle <handle>
+python3 twitter-digest/scripts/collect_browser_dm.py
 ```
 
-Outputs:
+Browser DM outputs:
 
-- `twitter-digest/.state/run/digest-input.json`: raw collector capture.
-- `twitter-digest/.state/run/digest-input.md`: readable raw collector capture.
-- `twitter-digest/.state/run/digest-context.json`: normalized current-run facts.
-- `twitter-digest/.state/run/digest-context.md`: primary final summary input. Read this first.
-
-Collector comparison testing:
-
-```bash
-python3 twitter-digest/scripts/compare_collectors.py --rounds 3 --interval-sec 120
-```
-
-One round means one complete public-data API collection plus one complete browser collection. The comparison runner keeps per-round raw outputs and writes `comparison-report.md/json` under `twitter-digest/.state/compare-runs/<timestamp>/`. It enforces a minimum 120-second delay between rounds to reduce API rate-limit risk. Read `COLLECTOR_COMPARISON_TEST.md` before interpreting these reports. Browser DM remains authoritative; API DM is intentionally not tested.
+- `twitter-digest/.state/run/browser-dm-context.json`: raw machine-readable browser DM context.
+- `twitter-digest/.state/run/browser-dm-context.md`: readable browser DM context. Use this for DM/browser facts, not as a replacement for X MCP public facts.
 
 ## Browser Collection Rules
 
@@ -94,34 +95,23 @@ One round means one complete public-data API collection plus one complete browse
 - If X shows a login page, wait for the user to log in manually.
 - If X shows CAPTCHA or account challenge, stop and ask the user to resolve it in the browser.
 - Do not post, like, follow, accept DM requests, open suspicious links, or reply.
-- Keep scrolling bounded by the digest goal. Public pages default to `--scrolls 40`, browser `--max-public-items 100`, API `--max-public-items 300`, and `--public-window-hours 24`, stopping early when loaded post timestamps are clearly outside the daily window.
-- Read only DM content that is visible in the local logged-in browser. Use `--no-dms` when the user does not want DMs processed.
-- If X Chat shows passcode setup, passcode entry, or encryption-key recovery, automatically reopen X Messages in a visible browser window, wait for the user to complete it, then retry DM collection. In `--non-interactive` mode, skip DM recovery and record a data gap. The script must not choose, enter, or store the passcode.
+- Read only DM content that is visible in the local logged-in browser.
+- If X Chat shows passcode setup, passcode entry, or encryption-key recovery, wait for the user to complete it in the visible browser window, then retry DM collection. In `--non-interactive` mode only, record a data gap and continue. The script must not choose, enter, or store the passcode.
 
 ## Pages Collected
 
-Default browser pages:
+The browser collector opens only:
 
-- `home`: home timeline for hotspot detection.
-- `own_profile`: the authenticated account profile.
-- `mentions_search`: live search for `@handle`.
-- `mentions_notifications`: notifications mentions page.
-- `messages`: X Messages.
-
-Optional pages:
-
-- `keyword_N`: explicit search queries, only when `--keywords` is provided.
+- `messages`: X Messages / X Chat.
 
 ## Run Outputs
 
 Current-run files:
 
-- `twitter-digest/.state/config.json`: account defaults and preferences.
-- `twitter-digest/.state/run/digest-context.md`: the only normal input for AI daily-summary writing.
-- `twitter-digest/.state/run/digest-context.json`: machine-readable current-run facts.
-- `twitter-digest/.state/run/digest-input.*`: raw collector capture for debugging only.
+- `twitter-digest/.state/run/browser-dm-context.md`: readable browser DM context.
+- `twitter-digest/.state/run/browser-dm-context.json`: machine-readable browser DM context.
 
-Privacy rule: do not write long-term memory or daily archives. Raw DM text may exist only in the current run's private `twitter-digest/.state/run/digest-input.*` and `digest-context.*` files for immediate summarization/debugging. Use only `digest-context.md` for normal final summaries.
+Privacy rule: do not write long-term memory, daily archives, API token caches, or public MCP captures. Raw DM text may exist only in the current run's private `browser-dm-context.*` files for immediate summarization/debugging.
 
 Date rule:
 
@@ -129,9 +119,9 @@ Date rule:
 
 ## Hotspot Detection
 
-Cluster home timeline posts by repeated topics, hashtags, URLs, named entities, accounts, and semantic similarity. Optional keyword-search posts may be included only when the user explicitly passes `--keywords`.
+Cluster home timeline posts by repeated topics, hashtags, URLs, named entities, accounts, and semantic similarity. Optional keyword-search posts may be included when the user explicitly asks for those searches.
 
-Public timeline, profile, and mentions collection follows the same bounded-window model as DM collection: load enough context for a 24-hour digest, cap the amount passed to the model, and stop early when timestamps show older content. Treat public item counts as browser-loaded items in this run, not exhaustive X history.
+For MCP-backed runs, public timeline, profile, mentions, and search facts come from X MCP. The browser collector is not the public-data source.
 
 A hotspot needs at least one of:
 
@@ -187,7 +177,7 @@ The collector opens waiting-reply conversations and scrolls upward before extrac
 
 Waiting-reply does not automatically mean important. Count every waiting-reply conversation, but summarize only messages that are actionable, relationship-relevant, risky, money/security-sensitive, or clearly useful. Spam, phishing, generic promotion, low-context links, and repeated junk should be classified as ignore/noise and not copied into the main narrative.
 
-For waiting-reply DMs that should be summarized, `digest-context.md` includes a `### DM Thread Context` section with loaded message history, raw thread label, URL, and load metadata. It can include up to 2000 loaded message bubbles per thread. Use it to understand the conversation, but do not copy full private history into the final digest. Keep final DM summaries short and action-oriented.
+For waiting-reply DMs that should be summarized, `browser-dm-context.md` includes loaded message history, raw thread label, URL, and load metadata. It can include up to 2000 loaded message bubbles per thread. Use it to understand the conversation, but do not copy full private history into the final digest. Keep final DM summaries short and action-oriented.
 
 Media/link context:
 
