@@ -8,7 +8,7 @@ twitter-digest/RUNBOOK.md
 
 ## 1. 功能
 
-`twitter-digest` 用本地浏览器读取用户自己的 X/Twitter 页面，并生成中文日报。
+`twitter-digest` 通过 X API 或本地已登录浏览器读取用户自己的 X/Twitter 数据，并生成中文日报。
 
 默认采集内容：
 
@@ -23,13 +23,13 @@ twitter-digest/RUNBOOK.md
 公开页采集范围：
 
 - timeline、profile、mentions 默认按日报目标加载近 24 小时内容。
-- 每个公开页默认最多滚动 40 次，并最多保留 300 条公开帖子进入 `digest-context`。
+- API public 默认最多保留 300 条公开帖子；浏览器公开页默认最多滚动 40 次，并最多保留 100 条公开帖子进入 `digest-context`。
 - 如果已加载帖子的时间戳显示已经超过 24 小时窗口，会提前停止滚动。
 - 公开帖子数量表示“本次浏览器加载到的帖子”，不是完整 X 历史。
 
 ## 2. 数据保存位置
 
-安装脚本会把旧的 `twitter-briefing`、`twitter-briefing.bak` 或已有 `twitter-digest` 安装迁移到 `~/.claude/skills/.backups/`，并把备份里的 `SKILL.md` 改成 `SKILL.md.disabled`，避免 Claude Code 加载重复旧 skill。
+安装脚本会按当前工具选择 skills 目录：Codex 使用 `~/.codex/skills`，Claude Code 使用 `~/.claude/skills`。旧的 `twitter-briefing`、`twitter-briefing.bak` 或已有 `twitter-digest` 安装会迁移到所选 skills 目录的 `.backups/`，并把备份里的 `SKILL.md` 改成 `SKILL.md.disabled`，避免当前工具加载重复旧 skill。
 
 登录状态保存在：
 
@@ -57,15 +57,16 @@ twitter-digest/.state/run/digest-context.md
 用途：
 
 - `digest-context.md/json`：最终总结主输入，包含本次采集归一化后的 `Final Summary Facts`。
-- `digest-input.md/json`：原始浏览器采集结果，只在需要核对细节或排查抓取问题时使用。
+- `digest-input.md/json`：原始采集结果，只在需要核对细节或排查抓取问题时使用。
 
 不生成长期 `memory.json`，不生成 `daily/` 历史归档。
 `twitter-digest/.state/run/` 会尽量设置为 700 权限，避免把当次 DM 原文放到全局可读的 `/tmp`。
 
 ## 3. 运行规则
 
-- 只使用本地浏览器抓取。
-- 不使用 X 开发者 API。
+- 默认入口 `run_daily_digest.py --source auto`：有 OAuth2 user-context API 配置时优先用 API 抓公开数据；没有 API 配置时用浏览器抓取。
+- DM / X Chat 以本地浏览器抓取为准；API DM 现阶段仅保留为 TODO/调试，不用于判断是否有私信。
+- API 不可用、权限不足、tier 不支持或限流时，记录数据缺口并回退浏览器路径。
 - 不使用 MCP。
 - 不要求用户复制 cookie 或 token。
 - 默认 headless 运行。
@@ -142,12 +143,15 @@ DM 默认读取。
 读取范围：
 
 - 只读 X Messages 通过浏览器加载出来的内容；打开等我回复会话后会自动向上滚动加载更多消息。
+- 默认先向下扫描 X Chat 左侧会话列表，最多 20 轮，尽量覆盖今天的可见会话，而不是只看首屏。
 - 只统计今天可见会话数量、最后我发出的数量、等我回复的数量；列表里更早的历史会话不计入日报会话数。
 - “最后我发出”只看 X Chat 列表最后预览是否是 `You:` / `You sent` / `你:`，不是指会话历史里曾经回复过。
 - 消息数量单独统计，只来自已打开的等我回复会话里的消息气泡，不能和会话数量混用。
 - 默认每个等我回复会话会尽量向上滚到对话顶部，完整捕获浏览器可加载的会话历史。
 - 默认安全上限是向上滚动 200 次，并最多保留 2000 条消息气泡；`--dm-window-hours 0` 表示不按 24 小时窗口截断 DM 历史。
 - 如果没有滚到顶部或命中消息上限，会在 `digest-context` 的数据缺口里记录 `dm_thread_incomplete`，不能假装完整。
+- 如果会话列表没有扫到底，会在 `digest-context` 的数据缺口里记录 `dm_list_incomplete`，日报需要说明可能还有会话未覆盖。
+- 如果 X Messages 显示骨架屏、占位条或右侧 `Start Conversation` 但左侧会话列表仍未真实加载，脚本会自动重载 `/messages`，最多重试 3 次；仍失败时记录 `dm_page_loading_timeout`，不能写成“没有私信”。
 - `digest-context.md` 会为需要总结的等我回复会话输出 `DM Thread Context`，最多带 2000 条已加载消息，并保留 raw label、URL、加载状态等原始信息，方便模型理解复杂上下文。
 - 默认只打开今天等我回复的会话。
 - 发信人以 `participant` / `会话对象` 和消息气泡方向为准，不能把引用帖、转发卡片、链接预览里的作者当作 DM 发信人。
@@ -240,33 +244,3 @@ rm -rf twitter-digest/.state/chrome-profile
 
 **⚠️ 数据缺口**
 ```
-
-## 11. PM 测试路径
-
-1. 拉取分支：
-
-   ```bash
-   git clone git@github.com:BofAI/skills.git
-   cd skills/skills
-   git checkout twitter-digest-skill
-   ```
-
-2. 运行：
-
-   ```bash
-   python3 twitter-digest/scripts/run_daily_digest.py
-   ```
-
-3. 第一次弹浏览器时登录 X。
-
-4. 等脚本完成。
-
-5. 检查输出：
-
-   ```text
-   twitter-digest/.state/run/digest-context.md
-   ```
-
-   生成日报只读 `digest-context.md`。`digest-input.*` 只给开发排查抓取问题。
-
-6. 再运行一次同样命令，确认后续默认 headless，不再弹浏览器窗口。

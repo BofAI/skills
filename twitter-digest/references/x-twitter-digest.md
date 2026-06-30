@@ -1,17 +1,46 @@
-# X/Twitter Browser Digest Reference
+# X/Twitter Digest Reference
 
-Use this reference when implementing, auditing, or troubleshooting the browser-only X/Twitter digest workflow.
+Use this reference when implementing, auditing, or troubleshooting the X/Twitter digest data collection workflow.
 
 ## Access Model
 
-The only supported data access path is direct local browser automation:
+The data collection layer has three scripts:
 
-- `scripts/browser_x_digest.py` launches a dedicated Chromium profile at `twitter-digest/.state/chrome-profile`.
-- The user logs in to X once in that browser.
+- `scripts/browser_x_digest.py`: local browser collector. It launches a dedicated Chromium profile at `twitter-digest/.state/chrome-profile`, reads X page DOM, and is required for X Chat / DM content.
+- `scripts/api_x_digest.py`: official API collector. It uses saved OAuth2 user-context credentials, `X_BEARER_TOKEN` / `TWITTER_BEARER_TOKEN`, or `--bearer-token` and writes the same `digest-input.*` shape as the browser collector.
+- `scripts/run_daily_digest.py`: upper wrapper. Default `--source auto` uses API when configured, otherwise browser.
+
+Browser mode:
+
+- The user logs in to X once in the dedicated browser profile.
 - Later runs default to headless collection and reuse the saved browser session.
-- If the saved login is unavailable, the script automatically opens a visible browser window for manual login.
-- The script reads only visible content from X pages.
-- No other data access path is part of this skill.
+- If saved login is unavailable, the script opens a visible browser window for manual login.
+- The script reads visible content from X pages.
+
+API mode:
+
+- Intended for stable public-data collection.
+- Requires user-context authorization for user-owned timelines. App-only keys are not enough for home timeline reliability.
+- Reads the official reverse chronological home timeline when the token has user-context timeline access.
+- Normal daily runs use browser collection for DMs. API DM lookup is retained only as TODO/debug because XChat / encrypted messages may not appear in `/2/dm_events`.
+- Records endpoint-level API failures as data gaps instead of silently treating them as empty pages.
+- DM lookup failures, zero-event API responses, and inconclusive API DM results are recorded as `api_dm_todo`; do not summarize them as empty inboxes. Use browser collection for X Chat / encrypted DMs while waiting for X to fix or document reliable API coverage.
+- Saved OAuth tokens are configured by the agent-triggered `run_daily_digest.py --configure-api` flow. OAuth2 PKCE is the supported path for user-owned local X Apps: the user provides the Client ID, authorizes the app in the browser, and the script saves the access token plus refresh token. OAuth2 tokens are refreshed automatically when a refresh token is saved.
+
+Chat-triggered API setup:
+
+```bash
+python3 ~/.claude/skills/twitter-digest/scripts/run_daily_digest.py --configure-api
+```
+
+The user should only interact with the system prompts and X OAuth browser page. Do not require the user to export env vars or paste tokens into shell history.
+After configuration, verify saved credentials only with the built-in command:
+
+```bash
+python3 ~/.claude/skills/twitter-digest/scripts/configure_api.py --verify
+```
+
+Do not write ad-hoc `python3 -c` snippets or temporary verification scripts in chat. The built-in verifier calls `/users/me`, backfills `handle` / `user_id`, and does not print the token.
 
 Typical chat run:
 
@@ -43,12 +72,27 @@ For unattended scheduled runs that should not open a visible browser or wait on 
 python3 twitter-digest/scripts/run_daily_digest.py --non-interactive
 ```
 
+Force a data source:
+
+```bash
+python3 twitter-digest/scripts/run_daily_digest.py --source browser
+X_BEARER_TOKEN=... python3 twitter-digest/scripts/run_daily_digest.py --source api --handle <handle>
+```
+
 Outputs:
 
-- `twitter-digest/.state/run/digest-input.json`: raw browser capture.
-- `twitter-digest/.state/run/digest-input.md`: readable raw browser capture.
+- `twitter-digest/.state/run/digest-input.json`: raw collector capture.
+- `twitter-digest/.state/run/digest-input.md`: readable raw collector capture.
 - `twitter-digest/.state/run/digest-context.json`: normalized current-run facts.
 - `twitter-digest/.state/run/digest-context.md`: primary final summary input. Read this first.
+
+Normal summary writing must not use ad-hoc `python3 -c`, shell, or temporary scripts to inspect JSON structure. If the agent needs a low-sensitive count/status view, use:
+
+```bash
+python3 twitter-digest/scripts/inspect_digest.py
+```
+
+This prints counts, load status, and data gaps without printing DM message bodies. Use it instead of writing custom inspection snippets.
 
 ## Browser Collection Rules
 
@@ -57,7 +101,7 @@ Outputs:
 - If X shows a login page, wait for the user to log in manually.
 - If X shows CAPTCHA or account challenge, stop and ask the user to resolve it in the browser.
 - Do not post, like, follow, accept DM requests, open suspicious links, or reply.
-- Keep scrolling bounded by the digest goal. Public pages default to `--scrolls 40`, `--max-public-items 300`, and `--public-window-hours 24`, stopping early when loaded post timestamps are clearly outside the daily window.
+- Keep scrolling bounded by the digest goal. API public collection defaults to `--max-public-items 300`; browser public collection defaults to `--scrolls 40`, `--max-public-items 100`, and `--public-window-hours 24`, stopping early when loaded post timestamps are clearly outside the daily window.
 - Read only DM content that is visible in the local logged-in browser. Use `--no-dms` when the user does not want DMs processed.
 - If X Chat shows passcode setup, passcode entry, or encryption-key recovery, automatically reopen X Messages in a visible browser window, wait for the user to complete it, then retry DM collection. In `--non-interactive` mode, skip DM recovery and record a data gap. The script must not choose, enter, or store the passcode.
 
@@ -82,7 +126,7 @@ Current-run files:
 - `twitter-digest/.state/config.json`: account defaults and preferences.
 - `twitter-digest/.state/run/digest-context.md`: the only normal input for AI daily-summary writing.
 - `twitter-digest/.state/run/digest-context.json`: machine-readable current-run facts.
-- `twitter-digest/.state/run/digest-input.*`: raw browser capture for debugging only.
+- `twitter-digest/.state/run/digest-input.*`: raw collector capture for debugging only.
 
 Privacy rule: do not write long-term memory or daily archives. Raw DM text may exist only in the current run's private `twitter-digest/.state/run/digest-input.*` and `digest-context.*` files for immediate summarization/debugging. Use only `digest-context.md` for normal final summaries.
 

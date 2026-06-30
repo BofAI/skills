@@ -2,19 +2,97 @@
 
 ## 目标
 
-`twitter-digest` 通过本地已登录浏览器读取用户自己的 X/Twitter 页面，生成中文日报。
+`twitter-digest` 读取用户自己的 X/Twitter 数据并生成中文日报。抓数据层支持 API 和本地已登录浏览器两种来源。
 
-它不依赖 X Developer API，不要求用户复制 token/cookie，也不通过 MCP 服务读取 X 数据。
+默认入口是 `scripts/run_daily_digest.py`。如果已经通过对话内 OAuth 授权保存了 user-context token，或环境里配置了 X API token，它优先用 API 抓公开数据；如果没有 API 配置，它自动回退到浏览器抓取。读取 X Chat / DM 内容时仍使用本地浏览器，因为普通 API 配置通常没有私信读取能力。
 
 核心链路：
 
 ```text
-本地专用 Chrome/Chromium profile
--> 打开 x.com 页面
--> 读取页面 DOM
--> 生成 digest-context.md
+run_daily_digest.py
+-> 选择 API 或浏览器 collector
+-> 生成 digest-input.*
+-> 归一化生成 digest-context.md
 -> Agent 只基于 digest-context.md 写中文日报
 ```
+
+## 抓数据脚本分层
+
+当前有三层脚本：
+
+```text
+scripts/browser_x_digest.py
+  通过本地浏览器抓取数据。
+
+scripts/api_x_digest.py
+  通过 X API 抓取数据。
+
+scripts/run_daily_digest.py
+  上层入口。默认 --source auto：
+  - 检测到已保存 OAuth token 或 X_BEARER_TOKEN / TWITTER_BEARER_TOKEN 时走 API。
+  - 没有 API 配置时走浏览器。
+  - 保存了 refresh token 时自动刷新过期 access token。
+```
+
+强制浏览器：
+
+```bash
+python3 twitter-digest/scripts/run_daily_digest.py --source browser
+```
+
+强制 API：
+
+```bash
+X_BEARER_TOKEN=... python3 twitter-digest/scripts/run_daily_digest.py --source api --handle <handle>
+```
+
+API 模式重点用于更稳定地抓公开数据。X Chat / DM 内容仍以浏览器模式为准；如果 API 模式无法读取 DM，会在 `digest-context` 的 Data Gaps 中标注。
+
+## 对话内 API 授权
+
+用户不需要自己 export 环境变量。用户在对话里说“配置 X API”时，Agent 运行：
+
+```bash
+python3 ~/.claude/skills/twitter-digest/scripts/run_daily_digest.py --configure-api
+```
+
+如果当前对话环境没有可交互 TTY，脚本会自动打开一个真实 Terminal 窗口来输入 Client ID / Secret 和等待 OAuth callback。不要把 `configure_api.py --oauth` 放到后台 shell 里跑；如果误从临时 clone 目录运行，脚本也会自动切回已安装的 skill 目录，避免把配置写到 `/tmp`。
+
+推荐路径是 OAuth2 PKCE，适合用户自己申请的本地 X Developer App：
+
+1. 脚本直接进入 OAuth2 配置。
+2. 脚本提示输入 X App 的 Client ID。
+3. 脚本提示输入 X App 的 Client Secret；public PKCE app 可留空。
+4. 脚本打开 X 授权页。
+5. 用户在浏览器里授权 app。
+6. 脚本通过本地 callback 收到授权码。
+7. 脚本换取 user access token 和 refresh token。
+8. token 保存到已安装 skill 的 `.state/api_config.json`，文件权限尽量设为 owner-only。
+9. 后续日报 `--source auto` 自动走 API。
+
+用户只需要准备：
+
+```text
+CLIENT_ID
+CLIENT_SECRET（如 App 要求）
+```
+
+`ACCESS_TOKEN` 和 `REFRESH_TOKEN` 由授权流程生成。
+
+配置成功后，后续日报不再要求用户输入 Client ID、Secret 或重新授权。`run_daily_digest.py` 会读取 `.state/api_config.json`：
+
+- OAuth2：如果保存了 refresh token，access token 快过期时自动 refresh。
+- 如果 token 被撤销、权限变更、tier 不支持或 API 返回 401/403/429，脚本把 endpoint 错误写入 data gap，Agent 再提示用户是否重新配置。
+
+OAuth1 PIN 不再作为正常配置路径：验证中它不能可靠读取 DM，不适合这个日报 skill 的核心目标。
+
+X Developer App 里需要配置 callback URL，默认：
+
+```text
+http://127.0.0.1:8765/callback
+```
+
+如果用户已有 user-context access token，可以单独运行 `python3 ~/.claude/skills/twitter-digest/scripts/run_daily_digest.py --configure-api-token`。不要要求用户手动配置 shell 环境变量；这是调试路径，不是主流程。
 
 ## 安装与依赖检查
 
@@ -22,6 +100,18 @@
 
 ```bash
 python3 twitter-digest/scripts/install.py
+```
+
+安装脚本默认安装到当前工具对应的 skills 目录：
+
+- 在 Codex 里运行：`~/.codex/skills/twitter-digest`
+- 在 Claude Code 里运行：`~/.claude/skills/twitter-digest`
+
+如需显式指定：
+
+```bash
+python3 twitter-digest/scripts/install.py --client codex
+python3 twitter-digest/scripts/install.py --client claude
 ```
 
 安装脚本会检查：
@@ -82,7 +172,8 @@ python3 twitter-digest/scripts/install.py --skip-browser-check
 
 ```text
 --scrolls 40
---max-public-items 300
+--min-public-scrolls 5
+--max-public-items 100
 --public-window-hours 24
 ```
 
@@ -92,7 +183,7 @@ python3 twitter-digest/scripts/install.py --skip-browser-check
 2. 读取已加载的 `article`。
 3. 滚动页面并继续读取。
 4. 去重。
-5. 最多保留 300 条公开帖子。
+5. 最多保留 100 条浏览器公开帖子。API public 默认最多保留 300 条。
 6. 如果已加载帖子的时间戳显示超过 24 小时窗口，提前停止。
 
 每条公开帖子会尽量提取：
@@ -136,6 +227,7 @@ today visible = last_from_me + waiting_reply
 
 ```text
 --dm-scrolls 200
+--dm-list-scrolls 20
 --dm-max-messages 2000
 --dm-window-hours 0
 ```
@@ -144,6 +236,7 @@ today visible = last_from_me + waiting_reply
 
 - 最多向上滚动 200 次。
 - 最多保留 2000 条消息气泡。
+- `--dm-list-scrolls 20` 表示先向下扫描左侧会话列表，尽量覆盖今天会话。
 - `--dm-window-hours 0` 表示不按 24 小时截断 DM 历史。
 - 会尽量滚到对话顶部。
 - 如果没有滚到顶部或命中消息上限，会在 `digest-context` 里记录 `dm_thread_incomplete`。
@@ -214,6 +307,14 @@ twitter-digest/.state/run/digest-context.md
 
 Agent 只基于 `digest-context.md` 生成中文日报。
 
+如果需要检查本次采集计数、DM 状态或数据缺口，不要临时写 `python3 -c` 或 shell 片段遍历 JSON。使用固定检查脚本：
+
+```bash
+python3 twitter-digest/scripts/inspect_digest.py
+```
+
+该脚本只输出计数、加载状态和数据缺口，不输出 DM 正文。
+
 默认结构：
 
 ```markdown
@@ -261,7 +362,6 @@ Agent 只基于 `digest-context.md` 生成中文日报。
 - 帮我起草回复，但不要发送。
 - 这次哪些数据没读到？
 - 给我看 `digest-context`。
-- 只测试 DM 扫描。
 - 跳过 DM 生成日报。
 
 ## 常用命令
@@ -282,21 +382,6 @@ python3 twitter-digest/scripts/run_daily_digest.py --no-dms
 
 ```bash
 python3 twitter-digest/scripts/run_daily_digest.py --headed
-```
-
-DM 专用测试：
-
-```bash
-python3 twitter-digest/scripts/test_dm_collection.py
-```
-
-快速 DM 测试：
-
-```bash
-python3 twitter-digest/scripts/test_dm_collection.py \
-  --dm-threads 1 \
-  --dm-scrolls 20 \
-  --dm-max-messages 200
 ```
 
 清理登录态并重新登录：
