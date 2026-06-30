@@ -12,20 +12,12 @@ cd skills
 python3 twitter-digest/scripts/install.py
 ```
 
-For testing the current PR branch before it is merged:
-
-```bash
-git clone -b twitter-digest-api-collector git@github.com:BofAI/skills.git
-cd skills
-python3 twitter-digest/scripts/install.py
-```
-
 To ask Codex to install this skill for itself, paste this into Codex:
 
 ```text
 请帮我安装这个 Codex skill：
 
-git clone -b twitter-digest-api-collector git@github.com:BofAI/skills.git bofai-skills \
+git clone git@github.com:BofAI/skills.git bofai-skills \
   && cd bofai-skills \
   && python3 twitter-digest/scripts/install.py --client codex
 
@@ -33,18 +25,6 @@ git clone -b twitter-digest-api-collector git@github.com:BofAI/skills.git bofai-
 ```
 
 To ask Claude Code to install this skill for itself, paste this into Claude Code:
-
-```text
-请帮我安装这个 Claude Code skill：
-
-git clone -b twitter-digest-api-collector git@github.com:BofAI/skills.git bofai-skills \
-  && cd bofai-skills \
-  && python3 twitter-digest/scripts/install.py --client claude --allow-claude-commands --allow-claude-state-read
-
-安装后请确认 ~/.claude/skills/twitter-digest 存在。首次运行日报时，如果 Claude Code 弹出 Bash 授权，批准 `python3 ~/.claude/skills/twitter-digest/scripts/run_daily_digest.py`；如果弹出浏览器，请让我登录 X。
-```
-
-After the PR is merged, use the main branch version:
 
 ```text
 请帮我安装这个 Claude Code skill：
@@ -177,28 +157,6 @@ Chat flow summary:
 调试浏览器       -> agent runs python3 ~/.claude/skills/twitter-digest/scripts/run_daily_digest.py --source browser --headed
 ```
 
-## Test DM Collection
-
-```bash
-python3 ~/.claude/skills/twitter-digest/scripts/test_dm_collection.py
-```
-
-## Compare API And Browser Collection
-
-Run API and browser collectors once per round, keep every round's raw data, and generate a final comparison report:
-
-```bash
-python3 ~/.claude/skills/twitter-digest/scripts/compare_collectors.py --rounds 3 --interval-sec 120
-```
-
-The runner enforces a minimum 120-second delay between rounds. Reports are written under:
-
-```text
-twitter-digest/.state/compare-runs/<timestamp>/
-```
-
-See `twitter-digest/COLLECTOR_COMPARISON_TEST.md` for the full agent test plan.
-
 ## Main Outputs
 
 ```text
@@ -229,9 +187,7 @@ Do not use `cat`, `head`, `grep`, `python3 -c`, or temporary scripts to read con
 See:
 
 ```text
-twitter-digest/QA_PRODUCT_GUIDE.md
 twitter-digest/DATA_COLLECTION.md
 twitter-digest/RUNBOOK.md
 twitter-digest/FUNCTION_RULES_FLOW.md
-twitter-digest/COLLECTOR_COMPARISON_TEST.md
 ```

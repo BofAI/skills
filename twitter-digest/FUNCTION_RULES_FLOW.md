@@ -244,33 +244,3 @@ rm -rf twitter-digest/.state/chrome-profile
 
 **⚠️ 数据缺口**
 ```
-
-## 11. PM 测试路径
-
-1. 拉取分支：
-
-   ```bash
-   git clone git@github.com:BofAI/skills.git
-   cd skills
-   git checkout twitter-digest-api-collector
-   ```
-
-2. 运行：
-
-   ```bash
-   python3 twitter-digest/scripts/run_daily_digest.py
-   ```
-
-3. 第一次弹浏览器时登录 X。
-
-4. 等脚本完成。
-
-5. 检查输出：
-
-   ```text
-   twitter-digest/.state/run/digest-context.md
-   ```
-
-   生成日报只读 `digest-context.md`。`digest-input.*` 只给开发排查抓取问题。
-
-6. 再运行一次同样命令，确认后续默认 headless，不再弹浏览器窗口。

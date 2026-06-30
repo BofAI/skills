@@ -362,7 +362,6 @@ python3 twitter-digest/scripts/inspect_digest.py
 - 帮我起草回复，但不要发送。
 - 这次哪些数据没读到？
 - 给我看 `digest-context`。
-- 只测试 DM 扫描。
 - 跳过 DM 生成日报。
 
 ## 常用命令
@@ -383,21 +382,6 @@ python3 twitter-digest/scripts/run_daily_digest.py --no-dms
 
 ```bash
 python3 twitter-digest/scripts/run_daily_digest.py --headed
-```
-
-DM 专用测试：
-
-```bash
-python3 twitter-digest/scripts/test_dm_collection.py
-```
-
-快速 DM 测试：
-
-```bash
-python3 twitter-digest/scripts/test_dm_collection.py \
-  --dm-threads 1 \
-  --dm-scrolls 20 \
-  --dm-max-messages 200
 ```
 
 清理登录态并重新登录：

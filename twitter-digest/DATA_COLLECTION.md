@@ -276,9 +276,3 @@ python3 twitter-digest/scripts/browser_x_digest.py --include-dms
 ```bash
 X_BEARER_TOKEN=... python3 twitter-digest/scripts/api_x_digest.py --handle <handle>
 ```
-
-只测试 DM：
-
-```bash
-python3 twitter-digest/scripts/test_dm_collection.py
-```

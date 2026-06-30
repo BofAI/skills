@@ -83,7 +83,6 @@ All normal flows should be triggered from chat by the agent:
 - 检查本次采集计数 / JSON 结构: run `scripts/inspect_digest.py`.
 - 清除 X API 配置: run `CONFIGURE_API --clear`.
 - 调试浏览器: run `RUN_DAILY_DIGEST --source browser --headed`.
-- 对比 API 和浏览器抓取 / 稳定性测试: run `scripts/compare_collectors.py --rounds 3 --interval-sec 120`. Load `COLLECTOR_COMPARISON_TEST.md` before interpreting the report.
 
 Force a source:
 
@@ -150,8 +149,6 @@ Claude Code or other agents can use the installed skill by running the same brow
 - `<installed-skill>/.state/run/digest-input.json`: raw machine-readable collector capture for debugging only.
 
 No `memory.json` or `daily/` archive is produced. Raw DM text or DM excerpts may exist only in the current run's private `twitter-digest/.state/run/digest-input.*` and `digest-context.*` files for immediate summarization/debugging. The run directory is created with owner-only permissions where supported. Run dates use the user's local timezone.
-
-`scripts/compare_collectors.py` is an explicit testing tool, not the normal daily digest path. It intentionally archives historical comparison rounds under `twitter-digest/.state/compare-runs/<timestamp>/` so agents can compare API and browser completeness over time. Keep those files local and treat them as sensitive.
 
 ## Workflow
 
