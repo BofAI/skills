@@ -16,7 +16,7 @@ twitter-digest/RUNBOOK.md
 - Mentions search：搜索谁 @ 了当前账号
 - Mentions notifications：通知里的 @
 - Own profile：当前账号主页动态
-- DMs：私信页面可见会话
+- DMs：默认关闭；用户开启 DM 开关后，读取私信页面可见会话并合并进日报
 
 默认不采集关键词。只有显式传 `--keywords` 时才做关键词搜索。
 
@@ -65,13 +65,13 @@ twitter-digest/.state/run/digest-context.md
 ## 3. 运行规则
 
 - 默认入口 `run_daily_digest.py --source auto`：有 OAuth2 user-context API 配置时优先用 API 抓公开数据；没有 API 配置时用浏览器抓取。
-- DM / X Chat 以本地浏览器抓取为准；API DM 现阶段仅保留为 TODO/调试，不用于判断是否有私信。
+- DM 默认关闭。开启后，DM / X Chat 以本地浏览器抓取为准并合并进同一份日报；API DM 现阶段仅保留为 TODO/调试，不用于判断是否有私信。
 - API 不可用、权限不足、tier 不支持或限流时，记录数据缺口并回退浏览器路径。
 - 不使用 MCP。
 - 不要求用户复制 cookie 或 token。
 - 默认 headless 运行。
 - 第一次没有登录态时，会自动打开可见浏览器让用户登录。
-- 默认读取 DM，但只读取浏览器页面上可见的内容。
+- 默认不读取 DM；只有用户开启 DM 开关后才读取浏览器页面上可见的内容。开启后后续日报持续读取，直到用户运行 `--no-dms` 关闭。
 - 支持 `--non-interactive`，定时任务遇到 passcode 时跳过 DM 恢复并记录数据缺口，不阻塞等待。
 - 不自动发送消息、回复、点赞、关注、拉黑、打开可疑链接或接受 DM 请求。
 - 只生成摘要和建议回复草稿。
@@ -95,7 +95,7 @@ twitter-digest/.state/run/digest-context.md
 
 6. 脚本自动识别当前 X 账号 handle。
 
-7. 脚本采集 timeline、mentions、own profile、DM。
+7. 脚本采集 timeline、mentions、own profile；如果本地 DM 开关已开启，也采集 DM 并合并进同一份日报。
 
 8. 脚本生成 `twitter-digest/.state/run/*` 当次采集文件。
 
@@ -138,7 +138,21 @@ twitter-digest/.state/run/digest-context.md
 
 ## 7. DM 规则
 
-DM 默认读取。
+DM 默认不读取。用户要求以后日报带私信时，运行：
+
+```bash
+python3 twitter-digest/scripts/run_daily_digest.py --include-dms
+```
+
+`--include-dms` 会把 `include_dms: true` 保存到本地配置，后续日报持续读取 X Messages 并合并到同一份日报。用户要求关闭时运行：
+
+```bash
+python3 twitter-digest/scripts/run_daily_digest.py --no-dms
+```
+
+`--dm-only` 仅保留为低层调试模式，不作为普通用户路径。
+
+DM 采集依赖浏览器自动化访问 X Chat，可能触发 X 的账号风控、登录挑战、passcode 恢复或其他平台限制；不要用于长时间无人值守任务。
 
 读取范围：
 
@@ -185,7 +199,13 @@ DM 默认读取。
 python3 twitter-digest/scripts/run_daily_digest.py
 ```
 
-跳过 DM：
+开启 DM：
+
+```bash
+python3 twitter-digest/scripts/run_daily_digest.py --include-dms
+```
+
+关闭 DM：
 
 ```bash
 python3 twitter-digest/scripts/run_daily_digest.py --no-dms
@@ -234,7 +254,7 @@ rm -rf twitter-digest/.state/chrome-profile
 
 **◆ 谁 @ 了你**
 
-**◆ 私信（DM）**
+**◆ 私信（DM）**（仅 DM 开关开启时）
 
 **◆ 时间线热点**
 

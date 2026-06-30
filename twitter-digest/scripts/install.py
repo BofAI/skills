@@ -281,6 +281,24 @@ def write_claude_settings(target: Path, dry_run: bool, allow_commands: bool, all
         save_claude_settings(settings_path, settings)
 
 
+def print_post_install_notes(target: Path) -> None:
+    run_script = target / "scripts" / "run_daily_digest.py"
+    try:
+        run_cmd = f"python3 ~/{run_script.relative_to(Path.home())}"
+    except ValueError:
+        run_cmd = f"python3 {run_script}"
+    print("", flush=True)
+    print("DM collection is OFF by default.", flush=True)
+    print(f"Enable DM in future daily digests: {run_cmd} --include-dms", flush=True)
+    print(f"Disable DM again: {run_cmd} --no-dms", flush=True)
+    print(
+        "When DM is enabled, X Chat is collected through a browser session and merged into the same daily digest. "
+        "Browser DM automation may trigger X account risk controls, login challenges, or passcode recovery; "
+        "avoid long-running unattended DM collection.",
+        flush=True,
+    )
+
+
 def main() -> None:
     args = parse_args()
     check_runtime(args.skip_browser_check)
@@ -298,6 +316,7 @@ def main() -> None:
             write_claude_settings(target, args.dry_run, args.allow_claude_commands, args.allow_claude_state_read)
     if not args.dry_run:
         print(f"Installed skill path: {display_path(target)}", flush=True)
+        print_post_install_notes(target)
 
 
 if __name__ == "__main__":

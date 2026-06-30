@@ -30,7 +30,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--account-name")
     parser.add_argument("--save-default", action="store_true", help="Save --handle/--account-name as the default account for future chat runs.")
     parser.add_argument("--configure-only", action="store_true", help="Only save default account config; do not collect data.")
-    parser.add_argument("--keywords", default="", help="Optional comma-separated search queries. Default is empty; the daily digest focuses on timeline, mentions, and DMs.")
+    parser.add_argument("--keywords", default="", help="Optional comma-separated search queries. Default is empty; the daily digest focuses on timeline and mentions.")
     parser.add_argument("--out", default=str(DEFAULT_OUT_DIR))
     parser.add_argument("--source", choices=("auto", "browser", "api"), default="auto", help="Data collection source. auto uses API when configured, otherwise browser.")
     parser.add_argument("--configure-api", action="store_true", help="Open a secure prompt to save X API credentials, then exit.")
@@ -38,8 +38,9 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--api-base", default=os.environ.get("X_API_BASE_URL") or "")
     parser.add_argument("--user-id", default=os.environ.get("X_USER_ID") or os.environ.get("TWITTER_USER_ID") or "")
     parser.add_argument("--bearer-token", default=os.environ.get("X_BEARER_TOKEN") or os.environ.get("TWITTER_BEARER_TOKEN") or "")
-    parser.add_argument("--include-dms", action="store_true", help="Include visible DMs. This is already the default; kept for compatibility.")
-    parser.add_argument("--no-dms", action="store_true", help="Skip X Messages collection for this run.")
+    parser.add_argument("--include-dms", action="store_true", help="Enable browser DM collection for this and future daily digest runs.")
+    parser.add_argument("--dm-only", action="store_true", help="Debug mode: only collect visible X Chat/DM content through the browser.")
+    parser.add_argument("--no-dms", action="store_true", help="Disable browser DM collection for this and future daily digest runs.")
     parser.add_argument("--dm-threads", type=int, default=5)
     parser.add_argument("--dm-list-scrolls", type=int, default=20, help="Maximum downward scroll rounds used to scan today's DM conversation list.")
     parser.add_argument("--dm-scrolls", type=int, default=200, help="Maximum upward scroll rounds per opened DM thread.")
@@ -78,6 +79,13 @@ def save_config(handle: str | None, account_name: str | None) -> None:
         config["handle"] = handle.lstrip("@")
     if account_name:
         config["account_name"] = account_name
+    CONFIG_PATH.write_text(json.dumps(config, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
+
+
+def save_dm_preference(include_dms: bool) -> None:
+    CONFIG_PATH.parent.mkdir(parents=True, exist_ok=True)
+    config = load_config()
+    config["include_dms"] = bool(include_dms)
     CONFIG_PATH.write_text(json.dumps(config, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
 
 
@@ -191,6 +199,15 @@ def merge_api_public_with_browser_dm(api_out: Path, browser_out: Path, final_out
     (final_out / "digest-input.json").write_text(json.dumps(api_data, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
 
 
+def mark_dm_only_output(out_dir: Path) -> None:
+    input_path = out_dir / "digest-input.json"
+    if not input_path.exists():
+        return
+    data = json.loads(input_path.read_text(encoding="utf-8"))
+    data["source"] = "browser_dm_only"
+    input_path.write_text(json.dumps(data, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
+
+
 def main() -> None:
     rerun_from_installed_if_needed(__file__)
     args = parse_args()
@@ -223,26 +240,31 @@ def main() -> None:
     api_base = args.api_base or str(api_config.get("api_base") or "https://api.x.com/2")
     user_id = args.user_id or str(api_config.get("user_id") or "")
     handle = (args.handle or api_config.get("handle") or config.get("handle") or "").lstrip("@")
+    if args.include_dms:
+        save_dm_preference(True)
+        config["include_dms"] = True
+    if args.no_dms:
+        save_dm_preference(False)
+        config["include_dms"] = False
     source = args.source if args.source != "auto" else ("api" if api_configured(bearer_token) else "browser")
+    if args.dm_only:
+        source = "browser"
     if args.source == "api" and refresh_error and not explicit_bearer_token:
         raise SystemExit("Saved X OAuth token refresh failed. Re-run --configure-api or pass X_BEARER_TOKEN to use API source.")
-    include_dms = not args.no_dms
-    if args.include_dms:
-        include_dms = True
+    include_dms = bool(args.dm_only or config.get("include_dms"))
     if source == "api":
         cmd = api_command(args, args.out, api_base, user_id, handle)
         child_env = os.environ.copy()
         if bearer_token:
             child_env["X_BEARER_TOKEN"] = bearer_token
     else:
-        cmd = browser_command(args, args.out, handle, include_dms)
+        cmd = browser_command(args, args.out, handle, include_dms, dm_only=args.dm_only)
         child_env = None
-    if source == "api" and include_dms:
-        print("API source selected for public data. Browser collection will be used for X Chat/DM.", flush=True)
     print(f"Collecting X digest data via {source} source.", flush=True)
     try:
         if source == "api":
             if include_dms:
+                print("API source selected for public data. Browser collection will be used for X Chat/DM.", flush=True)
                 with tempfile.TemporaryDirectory(prefix="x-digest-api-") as api_tmp, tempfile.TemporaryDirectory(prefix="x-digest-browser-dm-") as browser_tmp:
                     run_api_command(api_command(args, api_tmp, api_base, user_id, handle), child_env)
                     print("Collecting X Chat/DM via browser source.", flush=True)
@@ -253,12 +275,18 @@ def main() -> None:
                 run_api_command(cmd, child_env)
         else:
             run_browser_command(cmd)
+            if args.dm_only:
+                mark_dm_only_output(Path(args.out))
+                source = "browser_dm_only"
     except subprocess.CalledProcessError as exc:
         summary = summarize_child_error(exc)
         if args.source == "auto" and source == "api":
             print(f"API collection unavailable ({summary}). Falling back to browser collection.", flush=True)
             source = "browser"
-            run_browser_command(browser_command(args, args.out, handle, include_dms))
+            run_browser_command(browser_command(args, args.out, handle, include_dms, dm_only=args.dm_only))
+            if args.dm_only:
+                mark_dm_only_output(Path(args.out))
+                source = "browser_dm_only"
         else:
             print(f"API collection failed: {summary}", file=sys.stderr, flush=True)
             raise SystemExit(exc.returncode) from exc

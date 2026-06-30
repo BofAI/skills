@@ -6,7 +6,7 @@ Use this reference when implementing, auditing, or troubleshooting the X/Twitter
 
 The data collection layer has three scripts:
 
-- `scripts/browser_x_digest.py`: local browser collector. It launches a dedicated Chromium profile at `twitter-digest/.state/chrome-profile`, reads X page DOM, and is required for X Chat / DM content.
+- `scripts/browser_x_digest.py`: local browser collector. It launches a dedicated Chromium profile at `twitter-digest/.state/chrome-profile`, reads X page DOM, and is required for opt-in X Chat / DM content.
 - `scripts/api_x_digest.py`: official API collector. It uses saved OAuth2 user-context credentials, `X_BEARER_TOKEN` / `TWITTER_BEARER_TOKEN`, or `--bearer-token` and writes the same `digest-input.*` shape as the browser collector.
 - `scripts/run_daily_digest.py`: upper wrapper. Default `--source auto` uses API when configured, otherwise browser.
 
@@ -22,9 +22,9 @@ API mode:
 - Intended for stable public-data collection.
 - Requires user-context authorization for user-owned timelines. App-only keys are not enough for home timeline reliability.
 - Reads the official reverse chronological home timeline when the token has user-context timeline access.
-- Normal daily runs use browser collection for DMs. API DM lookup is retained only as TODO/debug because XChat / encrypted messages may not appear in `/2/dm_events`.
+- Normal daily runs collect DMs only when the persistent local `include_dms` switch is enabled. The switch is off by default, enabled by `run_daily_digest.py --include-dms`, and disabled by `run_daily_digest.py --no-dms`. When enabled, public data and browser DM data are merged into one daily digest.
 - Records endpoint-level API failures as data gaps instead of silently treating them as empty pages.
-- DM lookup failures, zero-event API responses, and inconclusive API DM results are recorded as `api_dm_todo`; do not summarize them as empty inboxes. Use browser collection for X Chat / encrypted DMs while waiting for X to fix or document reliable API coverage.
+- API DM lookup is retained only as low-level TODO/debug. DM lookup failures, zero-event API responses, and inconclusive API DM results must not be summarized as empty inboxes. Use `run_daily_digest.py --include-dms` to enable browser DM collection for normal daily reports.
 - Saved OAuth tokens are configured by the agent-triggered `run_daily_digest.py --configure-api` flow. OAuth2 PKCE is the supported path for user-owned local X Apps: the user provides the Client ID, authorizes the app in the browser, and the script saves the access token plus refresh token. OAuth2 tokens are refreshed automatically when a refresh token is saved.
 
 Chat-triggered API setup:
@@ -42,17 +42,25 @@ python3 ~/.claude/skills/twitter-digest/scripts/configure_api.py --verify
 
 Do not write ad-hoc `python3 -c` snippets or temporary verification scripts in chat. The built-in verifier calls `/users/me`, backfills `handle` / `user_id`, and does not print the token.
 
-Typical chat run:
+Typical daily run:
 
 ```bash
 python3 twitter-digest/scripts/run_daily_digest.py
 ```
 
-Visible DM collection is enabled by default. To skip DMs:
+Enable DM in daily reports:
+
+```bash
+python3 twitter-digest/scripts/run_daily_digest.py --include-dms
+```
+
+Disable DM in daily reports:
 
 ```bash
 python3 twitter-digest/scripts/run_daily_digest.py --no-dms
 ```
+
+DM browser automation can trigger X account risk controls, login challenges, passcode recovery, or other platform restrictions. Keep it user-triggered and avoid long-running or unattended DM jobs.
 
 Optional keyword search is off by default. Use it only when the user explicitly asks:
 
@@ -102,18 +110,18 @@ This prints counts, load status, and data gaps without printing DM message bodie
 - If X shows CAPTCHA or account challenge, stop and ask the user to resolve it in the browser.
 - Do not post, like, follow, accept DM requests, open suspicious links, or reply.
 - Keep scrolling bounded by the digest goal. API public collection defaults to `--max-public-items 300`; browser public collection defaults to `--scrolls 40`, `--max-public-items 100`, and `--public-window-hours 24`, stopping early when loaded post timestamps are clearly outside the daily window.
-- Read only DM content that is visible in the local logged-in browser. Use `--no-dms` when the user does not want DMs processed.
+- Read DM content only when the persistent DM switch is enabled. Use `--include-dms` to enable it and `--no-dms` to disable it. When enabled, merge DM into the normal daily digest.
 - If X Chat shows passcode setup, passcode entry, or encryption-key recovery, automatically reopen X Messages in a visible browser window, wait for the user to complete it, then retry DM collection. In `--non-interactive` mode, skip DM recovery and record a data gap. The script must not choose, enter, or store the passcode.
 
 ## Pages Collected
 
-Default browser pages:
+Default browser public pages:
 
 - `home`: home timeline for hotspot detection.
 - `own_profile`: the authenticated account profile.
 - `mentions_search`: live search for `@handle`.
 - `mentions_notifications`: notifications mentions page.
-- `messages`: X Messages.
+- `messages`: X Messages, only when the persistent DM switch is enabled or in low-level `--dm-only` debug mode.
 
 Optional pages:
 
@@ -233,5 +241,5 @@ Reply drafting rules:
 ## 中文每日 Prompt
 
 ```text
-使用 $twitter-digest 通过本地浏览器读取我最近 24 小时的 X/Twitter 动态，生成中文日报。重点总结谁 @ 了我、时间线热点、需要处理的私信或互动、我的账号动态。先给今日总结和行动建议，再给明细。回复只生成草稿，不要自动发送。读不到的数据要明确标注。
+使用 $twitter-digest 读取我最近 24 小时的 X/Twitter 动态，生成中文日报。重点总结谁 @ 了我、时间线热点、需要处理的互动、我的账号动态；如果已开启 DM 开关，也把需要处理的私信作为同一份日报的 DM 章节。先给今日总结和行动建议，再给明细。回复只生成草稿，不要自动发送。读不到的数据要明确标注。
 ```
