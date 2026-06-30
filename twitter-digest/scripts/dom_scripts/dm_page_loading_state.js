@@ -29,8 +29,8 @@
       if (style.display === 'none' || style.visibility === 'hidden' || style.opacity === '0') continue;
       const bg = style.backgroundColor || '';
       const radius = parseFloat(style.borderRadius || '0') || 0;
-      const lightBlock = /rgb\\((23[0-9]|24[0-9]|25[0-5]),\\s*(23[0-9]|24[0-9]|25[0-5]),\\s*(23[0-9]|24[0-9]|25[0-5])\\)/.test(bg)
-        || /rgba\\((23[0-9]|24[0-9]|25[0-5]),\\s*(23[0-9]|24[0-9]|25[0-5]),\\s*(23[0-9]|24[0-9]|25[0-5]),/.test(bg);
+      const lightBlock = /rgb\((23[0-9]|24[0-9]|25[0-5]),\s*(23[0-9]|24[0-9]|25[0-5]),\s*(23[0-9]|24[0-9]|25[0-5])\)/.test(bg)
+        || /rgba\((23[0-9]|24[0-9]|25[0-5]),\s*(23[0-9]|24[0-9]|25[0-5]),\s*(23[0-9]|24[0-9]|25[0-5]),/.test(bg);
       if (!lightBlock && radius < 6) continue;
       out.push({
         x: Math.round(rect.left),
@@ -41,5 +41,5 @@
     }
     return out;
   }
-  function clean(value) { return (value || '').replace(/\\s+/g, ' ').trim(); }
+  function clean(value) { return (value || '').replace(/\s+/g, ' ').trim(); }
 })()
