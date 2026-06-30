@@ -9,7 +9,7 @@ import re
 from pathlib import Path
 from typing import Any
 
-from script_utils import local_timezone_name, now_iso
+from script_utils import format_local_time, local_timezone_name, now_iso
 
 CONTEXT_SLICE_FILES = {
     "timeline": "digest-context-timeline.md",
@@ -204,7 +204,8 @@ def build_digest_facts(data: dict[str, Any], summary: dict[str, Any]) -> dict[st
             facts["public"]["items"].append(
                 {
                     "kind": kind,
-                    "time": item.get("time") or "",
+                    "time": format_local_time(item.get("time")),
+                    "raw_time": item.get("time") or "",
                     "url": item.get("url") or "",
                     "author_url": item.get("authorUrl") or "",
                     "text_excerpt": compact_text(item.get("text"))[:700],
@@ -269,7 +270,8 @@ def normalize_dm_messages(value: Any) -> list[dict[str, Any]]:
         messages.append(
             {
                 "sender": "me" if item.get("sender") == "me" else "other",
-                "time": compact_text(item.get("time")),
+                "time": compact_text(format_local_time(item.get("time"))),
+                "raw_time": compact_text(item.get("time")),
                 "text": text[:1000],
                 "links": normalize_context_assets(item.get("links")),
                 "media": normalize_context_assets(item.get("media")),

@@ -40,6 +40,20 @@ def local_timezone_name() -> str:
     return str(tz) if tz else "local"
 
 
+def format_local_time(value: object) -> str:
+    text = str(value or "").strip()
+    if not text:
+        return ""
+    try:
+        parsed = dt.datetime.fromisoformat(text.replace("Z", "+00:00"))
+    except ValueError:
+        return text
+    if parsed.tzinfo is None:
+        return text
+    local = parsed.astimezone()
+    return local.strftime("%Y-%m-%d %H:%M:%S %Z")
+
+
 def installed_skill_roots() -> list[Path]:
     codex = Path.home() / ".codex" / "skills" / "twitter-digest"
     claude = Path.home() / ".claude" / "skills" / "twitter-digest"
