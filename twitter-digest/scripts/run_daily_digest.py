@@ -211,11 +211,21 @@ def main() -> None:
         return
     config = load_config()
     api_config = refresh_oauth_token_if_needed(load_api_config())
-    bearer_token = args.bearer_token or str(api_config.get("bearer_token") or "")
+    explicit_bearer_token = bool(args.bearer_token)
+    refresh_error = str(api_config.get("refresh_error") or "")
+    if refresh_error and not explicit_bearer_token:
+        print(
+            f"Saved X OAuth token refresh failed: {refresh_error}. Run --configure-api to reauthorize, or pass X_BEARER_TOKEN to override.",
+            flush=True,
+        )
+    saved_bearer_token = "" if refresh_error and not explicit_bearer_token else str(api_config.get("bearer_token") or "")
+    bearer_token = args.bearer_token or saved_bearer_token
     api_base = args.api_base or str(api_config.get("api_base") or "https://api.x.com/2")
     user_id = args.user_id or str(api_config.get("user_id") or "")
     handle = (args.handle or api_config.get("handle") or config.get("handle") or "").lstrip("@")
     source = args.source if args.source != "auto" else ("api" if api_configured(bearer_token) else "browser")
+    if args.source == "api" and refresh_error and not explicit_bearer_token:
+        raise SystemExit("Saved X OAuth token refresh failed. Re-run --configure-api or pass X_BEARER_TOKEN to use API source.")
     include_dms = not args.no_dms
     if args.include_dms:
         include_dms = True

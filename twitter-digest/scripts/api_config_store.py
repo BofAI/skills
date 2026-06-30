@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import base64
 import json
+import os
 import time
 import urllib.parse
 import urllib.request
@@ -48,11 +49,25 @@ def load_api_config() -> dict[str, Any]:
 
 def save_api_config(config: dict[str, Any]) -> None:
     ensure_private_dir(API_CONFIG_PATH.parent)
-    API_CONFIG_PATH.write_text(json.dumps(normalize_api_config(config), ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
+    payload = json.dumps(normalize_api_config(config), ensure_ascii=False, indent=2) + "\n"
+    tmp_path = API_CONFIG_PATH.with_name(f".{API_CONFIG_PATH.name}.{os.getpid()}.tmp")
     try:
-        API_CONFIG_PATH.chmod(0o600)
-    except PermissionError:
-        pass
+        tmp_path.write_text(payload, encoding="utf-8")
+        try:
+            tmp_path.chmod(0o600)
+        except PermissionError:
+            pass
+        os.replace(tmp_path, API_CONFIG_PATH)
+        try:
+            API_CONFIG_PATH.chmod(0o600)
+        except PermissionError:
+            pass
+    finally:
+        if tmp_path.exists():
+            try:
+                tmp_path.unlink()
+            except OSError:
+                pass
 
 
 def clear_api_config() -> None:
@@ -87,8 +102,15 @@ def refresh_oauth_token_if_needed(config: dict[str, Any]) -> dict[str, Any]:
         with urllib.request.urlopen(request, timeout=30) as response:
             token = json.loads(response.read().decode("utf-8"))
     except Exception as exc:
-        print(f"Saved OAuth token could not be refreshed: {exc}. Falling back to current token.", flush=True)
-        return config
+        updated = dict(config)
+        updated["refresh_error"] = str(exc)
+        updated["refresh_error_at"] = str(int(time.time()))
+        print(f"Saved OAuth token could not be refreshed: {exc}. Reauthorization may be required.", flush=True)
+        try:
+            save_api_config(updated)
+        except Exception as save_exc:
+            print(f"Could not persist X OAuth refresh error: {save_exc}", flush=True)
+        return normalize_api_config(updated)
     access_token = str(token.get("access_token") or "")
     if not access_token:
         return config
@@ -101,6 +123,8 @@ def refresh_oauth_token_if_needed(config: dict[str, Any]) -> dict[str, Any]:
     updated["expires_in"] = str(token.get("expires_in") or "")
     updated["issued_at"] = str(now)
     updated["expires_at"] = str(now + int(token.get("expires_in") or 0)) if token.get("expires_in") else ""
+    updated.pop("refresh_error", None)
+    updated.pop("refresh_error_at", None)
     save_api_config(updated)
     print("Refreshed saved X OAuth access token.", flush=True)
     return updated

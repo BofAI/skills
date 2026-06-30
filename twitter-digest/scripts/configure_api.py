@@ -201,7 +201,7 @@ def run_oauth_flow(args: argparse.Namespace, existing: dict[str, str]) -> dict[s
     access_token = str(token.get("access_token") or "")
     if not access_token:
         raise SystemExit(f"OAuth token response did not include access_token: {token}")
-    return {
+    token_config = {
         "bearer_token": access_token,
         "refresh_token": str(token.get("refresh_token") or ""),
         "token_type": str(token.get("token_type") or "bearer"),
@@ -213,6 +213,9 @@ def run_oauth_flow(args: argparse.Namespace, existing: dict[str, str]) -> dict[s
         "redirect_uri": redirect_uri.strip(),
         "scopes": scopes.strip(),
     }
+    if client_secret:
+        token_config["client_secret"] = client_secret.strip()
+    return token_config
 
 
 def summarize_http_error(exc: BaseException) -> str:

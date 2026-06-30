@@ -57,8 +57,17 @@ def parse_args() -> argparse.Namespace:
 
 
 def load_bearer_token() -> str:
+    explicit = os.environ.get("X_BEARER_TOKEN") or os.environ.get("TWITTER_BEARER_TOKEN") or ""
+    if explicit:
+        return str(explicit)
     config = refresh_oauth_token_if_needed(load_api_config())
-    return str(config.get("bearer_token") or os.environ.get("X_BEARER_TOKEN") or os.environ.get("TWITTER_BEARER_TOKEN") or "")
+    if config.get("refresh_error"):
+        print(
+            f"Saved X OAuth token refresh failed: {config.get('refresh_error')}. API comparison will run without saved token unless X_BEARER_TOKEN is provided.",
+            flush=True,
+        )
+        return ""
+    return str(config.get("bearer_token") or "")
 
 
 def api_public_item_limit(args: argparse.Namespace) -> int:
