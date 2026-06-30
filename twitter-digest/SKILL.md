@@ -48,7 +48,7 @@ For chat usage, run the wrapper:
 RUN_DAILY_DIGEST
 ```
 
-`run_daily_digest.py --source auto` uses saved OAuth2 user-context credentials, `X_BEARER_TOKEN`, or `TWITTER_BEARER_TOKEN` for public data when present; otherwise it uses the browser collector. DM/X Chat is controlled by a persistent local switch: disabled by default, enabled by `RUN_DAILY_DIGEST --include-dms`, and disabled again by `RUN_DAILY_DIGEST --no-dms`. When enabled, the daily digest is one combined public+DM report. Treat API DM lookup as TODO / waiting for X to fix XChat-encrypted DM coverage; do not use API DM to decide whether the user has private messages.
+`run_daily_digest.py --source auto` uses saved OAuth2 user-context credentials, `X_BEARER_TOKEN`, or `TWITTER_BEARER_TOKEN` for public data when present; otherwise it uses the browser collector. API and browser are isolated: API source never starts a browser and never collects DMs. DM/X Chat is source-specific: browser source always collects visible X Chat/DM and merges it into the same daily digest; API source never starts a browser and never collects DM. API source has no DM collection; use browser source when DM is required.
 
 If the user asks to configure API access, trigger the OAuth/user-token setup from chat:
 
@@ -77,8 +77,8 @@ CONFIGURE_API --clear
 All normal flows should be triggered from chat by the agent:
 
 - X 日报 / 生成日报: run `RUN_DAILY_DIGEST`.
-- 开启 DM / 以后日报带私信: run `RUN_DAILY_DIGEST --include-dms`.
-- 关闭 DM / 以后日报不带私信: run `RUN_DAILY_DIGEST --no-dms`.
+- 带私信的浏览器日报: run `RUN_DAILY_DIGEST --source browser`.
+- 纯 API 公开数据日报: run `RUN_DAILY_DIGEST --source api`.
 - 用户已有 token / 输入 X token: run `RUN_DAILY_DIGEST --configure-api-token`.
 - 配置 X API / 给 app 授权: run `RUN_DAILY_DIGEST --configure-api`.
 - 验证 X API 配置: run `CONFIGURE_API --verify`.
@@ -93,13 +93,13 @@ RUN_DAILY_DIGEST --source browser
 X_BEARER_TOKEN=... RUN_DAILY_DIGEST --source api --handle <handle>
 ```
 
-The first browser run opens a dedicated browser profile at `twitter-digest/.state/chrome-profile`. The user logs in to X once in that browser. Later browser runs default to headless collection and reuse the saved local browser session. If the saved login is unavailable, the script automatically opens a visible browser window for manual login. The skill has two collector scripts: `scripts/api_x_digest.py` for official API public data, and `scripts/browser_x_digest.py` for browser-visible X Chat / encrypted DM content. API-visible DM events remain TODO-only until X fixes or documents reliable XChat coverage.
+The first browser run opens a dedicated browser profile at `twitter-digest/.state/chrome-profile`. The user logs in to X once in that browser. Later browser runs default to headless collection and reuse the saved local browser session. If the saved login is unavailable, the script automatically opens a visible browser window for manual login. The skill has two collector scripts: `scripts/api_x_digest.py` for official API public data, and `scripts/browser_x_digest.py` for browser-visible X Chat / encrypted DM content. API source does not collect DM.
 
-DM reading is disabled by default. If the user asks to include DMs, run `RUN_DAILY_DIGEST --include-dms`; this saves `include_dms: true` in the local skill config, so later daily runs keep including browser DM content until the user runs `RUN_DAILY_DIGEST --no-dms`. When API source is selected and DM is enabled, public data comes from API and X Chat/DM is collected through the browser, then merged into one daily digest. `RUN_DAILY_DIGEST --dm-only` is retained only as a debug mode for DM collection, not the normal product path. Do not use DM collection for unattended scheduled runs.
+Browser source reads visible X Chat/DM by default and merges it into the same daily digest. API source never starts a browser and never collects DMs. `RUN_DAILY_DIGEST --dm-only` is retained only as a debug mode for DM collection, not the normal product path. Do not use browser DM collection for unattended scheduled runs.
 
 DM collection uses browser automation against X Chat and may trigger X account risk controls, login challenges, passcode recovery, or other platform restrictions. This risk belongs in the documentation; do not add extra runtime warning prompts.
 
-X API DM endpoints are not reliable for current X Chat / encrypted DM content. `/2/dm_events` may expose only older Direct Message event data or return incomplete results, so API DM is not used as evidence that there are no private messages.
+X API DM endpoints are not used by this product path. API source has no DM; browser source is required for visible X Chat / encrypted DM content.
 
 Default scope:
 
@@ -132,7 +132,7 @@ This explicitly adds one Claude Code Bash allow rule for `python3 ~/.claude/skil
 
 The installer checks for Python 3.10+ and a supported Chromium browser before installing. Supported browsers are Google Chrome, Chromium, Microsoft Edge, and Brave. If the browser will be installed later, use `--skip-browser-check`.
 
-The installer prints the DM policy after install: DM collection is off by default; `RUN_DAILY_DIGEST --include-dms` enables browser DM collection for this and future daily digests; `RUN_DAILY_DIGEST --no-dms` disables it again. When enabled, DM is merged into the same X daily digest. Browser DM automation may trigger X account risk controls, login challenges, or passcode recovery, so avoid long-running unattended DM collection.
+The installer prints the source policy after install: API source never starts a browser and never collects DMs; browser source collects visible X Chat/DM and merges DM into the same X daily digest. Browser DM automation may trigger X account risk controls, login challenges, or passcode recovery, so avoid long-running unattended DM collection.
 
 The installer moves old `twitter-briefing`, `twitter-briefing.bak`, or existing `twitter-digest` installs into the selected skills directory's `.backups/` folder and disables their `SKILL.md` files so the current agent does not load duplicate old skills. It preserves `.state` from an existing installed `twitter-digest` copy during reinstall, but does not copy `.state` from the development checkout.
 
@@ -163,16 +163,16 @@ When the user asks for an X daily digest or X 日报, run:
 RUN_DAILY_DIGEST
 ```
 
-If they ask to enable DMs for future daily digests:
+If they ask for a digest that includes DMs, use browser source:
 
 ```bash
-RUN_DAILY_DIGEST --include-dms
+RUN_DAILY_DIGEST --source browser
 ```
 
-If they ask to disable DMs for future daily digests:
+If they ask for API-only public data without browser/DM, use API source:
 
 ```bash
-RUN_DAILY_DIGEST --no-dms
+RUN_DAILY_DIGEST --source api
 ```
 
 If the authenticated handle is not detected or the user corrects it:
@@ -199,7 +199,7 @@ Do not ask the user to copy cookies or configure another service. If the script 
 
 Treat browser sessions, cookies observed internally by the script, DMs, phone numbers, emails, private handles, and screenshots as sensitive. Do not post, reply, like, follow, block, open suspicious links, accept DM requests, or send DMs unless the user explicitly asks after reviewing a draft.
 
-Browser DM collection only runs when the persistent DM switch is enabled. It reads message content visible in the logged-in local browser. If X Chat shows a passcode setup, passcode entry, or end-to-end-encryption recovery screen during headless collection, the script should automatically reopen X Messages in a visible browser window, wait for the user to complete it, then retry DM collection. In `--non-interactive` mode, record the DM data gap and continue without blocking. Do not choose, enter, or store a passcode for the user.
+Browser DM collection runs when source is browser. It reads message content visible in the logged-in local browser. If X Chat shows a passcode setup, passcode entry, or end-to-end-encryption recovery screen during headless collection, the script should automatically reopen X Messages in a visible browser window, wait for the user to complete it, then retry DM collection. In `--non-interactive` mode, record the DM data gap and continue without blocking. Do not choose, enter, or store a passcode for the user.
 
 ### 3. Analyze
 
@@ -234,7 +234,7 @@ For private messages, summarize minimally. Quote only the short phrase needed to
 
 ### 4. Produce The Daily Summary
 
-除非用户另有要求，X 日报最终输出必须用中文，并使用这个结构。DM 开关关闭时，如果 context says `dm_status: not_requested`, write "本次未采集 DM" only if needed, not "没有私信"。DM 开关开启时，把 DM 作为同一份日报的一个章节，不要另起一份 DM 日报。
+除非用户另有要求，X 日报最终输出必须用中文，并使用这个结构。API 来源时如果 context says `dm_status: not_requested`, write "API 来源未采集 DM" only if needed, not "没有私信"。浏览器来源时，把 DM 作为同一份日报的一个章节，不要另起一份 DM 日报。
 
 ```markdown
 ## 🐦 X 日报 - YYYY-MM-DD

@@ -31,7 +31,7 @@ scripts/browser_x_digest.py
 适合：
 
 - 无 API 配置的普通用户。
-- 用户已开启 X Chat / DM 持久开关的场景。
+- 需要读取 X Chat / DM 的浏览器来源场景。
 - API 权限不足时的 fallback。
 
 ### 2. API 抓取脚本
@@ -45,7 +45,7 @@ scripts/api_x_digest.py
 - 使用已保存的 OAuth2 user-context token，或 `X_BEARER_TOKEN` / `TWITTER_BEARER_TOKEN` / `--bearer-token` 传入的 OAuth2 user token。
 - 主路径是 OAuth2 PKCE：用户准备 X App 的 `Client ID`，使用 `python3 ~/.claude/skills/twitter-digest/scripts/run_daily_digest.py --configure-api` 让脚本打开授权页并通过本地 callback 换取 user access token / refresh token。
 - 如果用户已经有 OAuth2 user access token，使用 `python3 ~/.claude/skills/twitter-digest/scripts/run_daily_digest.py --configure-api-token` 由脚本安全保存。
-- OAuth1 不再作为日报 API 配置路径。公开数据主路径使用 OAuth2；完整 DM 只走浏览器，且由 `--include-dms` 持久开关控制。
+- OAuth1 不再作为日报 API 配置路径。公开数据主路径使用 OAuth2；完整 DM 只走浏览器；API 来源不采集 DM。
 - 读取 home timeline：`/2/users/:id/timelines/reverse_chronological`。
 - 读取用户公开发帖。
 - 读取 mentions。
@@ -60,12 +60,12 @@ scripts/api_x_digest.py
 
 限制：
 
-- `run_daily_digest.py` 不使用 API DM 做最终判断；DM / X Chat 由浏览器脚本读取，并由本地 `include_dms` 开关决定是否合并进日报。
-- `api_x_digest.py --include-dms` 保留为 TODO/调试路径：它会尝试 `/2/dm_events`，但结果只作为 API 可见事件参考。
+- `run_daily_digest.py` 不使用 API DM 做最终判断；DM / X Chat 只由浏览器脚本读取；浏览器来源会合并 DM，API 来源不会采集 DM。
+- `api_x_digest.py` 不调用 DM endpoint；API 来源没有 DM。
 - Home timeline endpoint 需要可访问该用户上下文的 token；如果账号权限、套餐或 token 类型不支持，会在 `home` 页面写入具体 `collection_error`。
 - App-only API key / app-only bearer token 不等于用户授权，不能保证读取用户 home timeline 或 DM。
-- DM API 需要 X App / token 有 `dm.read` 相关权限；权限不足、tier 不支持、rate limit、返回 0 条或无法确认是否需要回复时，会写入 `api_dm_todo` 和 data gap。
-- API DM 不等同于网页 X Chat。XChat / 加密私信可能不会出现在 `/2/dm_events`。现阶段 API DM 标记为 TODO，等待 X 修复或明确文档；日报中的 DM 以浏览器采集为准。
+- 不需要为 API 日报配置 `dm.read`；DM 只通过浏览器来源采集。
+- API 来源不采集 DM。XChat / 加密私信只以浏览器采集为准。
 - API 权限不足、额度不足或 endpoint 不可用时，会把错误写入对应页面的 `collection_error`。
 
 ### 3. 上层入口脚本
@@ -97,8 +97,8 @@ scripts/run_daily_digest.py
 底层只保留两个抓取脚本：
 
 ```text
-scripts/api_x_digest.py      -> 官方 API 抓取：home timeline、mentions、profile；API DM 仅作为 TODO/调试
-scripts/browser_x_digest.py  -> 浏览器抓取：公开网页；DM 开关开启时读取 X Chat / 加密 DM
+scripts/api_x_digest.py      -> 官方 API 抓取：home timeline、mentions、profile；不采集 DM
+scripts/browser_x_digest.py  -> 浏览器抓取：公开网页 + X Chat / 加密 DM
 ```
 
 普通日报：
@@ -106,16 +106,16 @@ scripts/browser_x_digest.py  -> 浏览器抓取：公开网页；DM 开关开启
 ```text
 用户：生成 X 日报
 Agent：运行 scripts/run_daily_digest.py
-脚本：自动选择 API 或浏览器，只采集公开数据，生成 digest-context.md
+脚本：自动选择 API 或浏览器；API 只采集公开数据，浏览器采集公开数据 + DM，生成 digest-context.md
 Agent：读取 digest-context.md 写中文日报
 ```
 
-开启 DM 后的日报：
+浏览器日报（含 DM）：
 
 ```text
-用户：以后日报带私信
-Agent：运行 scripts/run_daily_digest.py --include-dms
-脚本：保存 include_dms=true，并采集公开数据 + 浏览器 DM
+用户：生成带私信的日报
+Agent：运行 scripts/run_daily_digest.py --source browser
+脚本：采集公开数据 + 浏览器 DM
 Agent：读取 digest-context.md 写合并中文日报
 ```
 
@@ -218,15 +218,11 @@ DM page 尽量包含：
 - `dm_captured_message_count`
 - `dm_threads`
 
-API DM TODO / 调试规则：
+API 与 DM 规则：
 
-- 正常日报不使用 API DM 做最终判断；DM 开关开启时，用浏览器补 DM 并合并进日报。
-- 只有直接运行 `api_x_digest.py --include-dms` 做调试时，才调用 `/2/dm_events`。
-- 按 `dm_conversation_id` 分组。
-- 只把最后一条不是用户发出的会话正文放进 `dm_threads`，用于判断是否需要回复。
-- 最后一条是用户发出的会话只计数，不展开正文。
-- 如果 `/2/dm_events` 返回权限、tier、认证或限流错误，写入 `api_dm_todo` data gap，不把失败当作“无私信”。
-- 如果 `/2/dm_events` 返回 0 条，或 API 返回的事件不能确认是否需要回复，也写入 `api_dm_todo` TODO List；完整 DM 以 `run_daily_digest.py --include-dms` 开启后的浏览器 DM 页为准。
+- API 来源不调用 `/dm_events`，不读取 DM，也不启动浏览器。
+- 浏览器来源读取 X Messages，并把 DM 合并进同一份日报。
+- API 来源的日报不能写“没有私信”，只能说明“API 来源未采集 DM”。
 
 ## 稳定性策略
 
@@ -283,7 +279,7 @@ python3 twitter-digest/scripts/browser_x_digest.py
 开启后续日报 DM：
 
 ```bash
-python3 twitter-digest/scripts/run_daily_digest.py --include-dms
+python3 twitter-digest/scripts/run_daily_digest.py --source browser
 ```
 
 只跑 API 抓取：

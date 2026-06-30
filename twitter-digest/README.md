@@ -47,7 +47,7 @@ It also checks for Python 3.10+ and a supported Chromium browser: Google Chrome,
 Reinstalling preserves the existing installed `.state` directory, including saved API and browser-session settings. The installer still excludes `.state` from the development checkout.
 After installation, configure and run the installed copy. If a script is accidentally started from a temporary clone while an installed copy exists, it automatically re-runs the installed copy so state is saved under `~/.claude/skills/twitter-digest/.state` or `~/.codex/skills/twitter-digest/.state`.
 
-DM collection is off by default. To include DMs in this and future daily digests, run `python3 ~/.claude/skills/twitter-digest/scripts/run_daily_digest.py --include-dms`; to disable it again, run `python3 ~/.claude/skills/twitter-digest/scripts/run_daily_digest.py --no-dms`. When DM is enabled, X Chat is collected through the browser and merged into the same daily digest. Browser DM automation may trigger X account risk controls, login challenges, or passcode recovery; avoid long-running unattended DM collection.
+API and browser sources are isolated: API runs never start a browser and never collect DMs. Browser runs collect visible X Chat/DM and merge DM into the same daily digest. Browser DM automation may trigger X account risk controls, login challenges, or passcode recovery; avoid long-running unattended DM collection.
 
 Use one stable installed command form for normal runs. This prevents repeated Claude Code Bash permission prompts across different projects:
 
@@ -96,18 +96,18 @@ python3 ~/.claude/skills/twitter-digest/scripts/run_daily_digest.py --source bro
 X_BEARER_TOKEN=... python3 ~/.claude/skills/twitter-digest/scripts/run_daily_digest.py --source api --handle <handle>
 ```
 
-API mode is for stable public-data collection, including the official home timeline endpoint when the configured token has user-context timeline access. DM is controlled by a persistent local switch and is off by default. When enabled, daily runs produce one combined public+DM report: API public data is merged with browser-collected X Chat/DM. API DM lookup is not used for the product path because XChat / encrypted DMs may not appear in `/2/dm_events`; do not use API DM to conclude there are no private messages. App-only API keys are not enough for user-context data.
+API mode is for stable public-data collection, including the official home timeline endpoint when the configured token has user-context timeline access. API mode never starts a browser and never collects DMs. API source has no DM collection. XChat / encrypted DMs are only handled by browser source. App-only API keys are not enough for user-context data.
 
-To enable DMs for this and future daily digests:
+To generate a browser digest with DM included:
 
 ```bash
-python3 ~/.claude/skills/twitter-digest/scripts/run_daily_digest.py --include-dms
+python3 ~/.claude/skills/twitter-digest/scripts/run_daily_digest.py --source browser
 ```
 
-To disable DMs again:
+To generate an API-only public digest with no browser and no DM:
 
 ```bash
-python3 ~/.claude/skills/twitter-digest/scripts/run_daily_digest.py --no-dms
+python3 ~/.claude/skills/twitter-digest/scripts/run_daily_digest.py --source api
 ```
 
 DM browser automation may trigger X account risk controls, login challenges, or passcode recovery, so do not use it for long-running or unattended jobs. This risk is documented here and is not repeated as a runtime warning prompt.
@@ -150,7 +150,7 @@ For API public collection, include these scopes when configuring the X App / OAu
 tweet.read users.read offline.access
 ```
 
-DM is not collected through the API product path. X API DM endpoints may expose only older Direct Message event data and do not reliably expose current X Chat / encrypted messages.
+DM is not collected through the API product path. Use browser source when visible X Chat / encrypted DM content is required.
 
 On macOS prompts appear as system dialogs; non-GUI terminals fall back to hidden terminal input. The token is saved to:
 
@@ -170,8 +170,8 @@ Chat flow summary:
 
 ```text
 生成 X 日报       -> agent runs python3 ~/.claude/skills/twitter-digest/scripts/run_daily_digest.py
-以后日报带私信   -> agent runs python3 ~/.claude/skills/twitter-digest/scripts/run_daily_digest.py --include-dms
-以后日报不带私信 -> agent runs python3 ~/.claude/skills/twitter-digest/scripts/run_daily_digest.py --no-dms
+浏览器日报带私信 -> agent runs python3 ~/.claude/skills/twitter-digest/scripts/run_daily_digest.py --source browser
+API 日报不带私信 -> agent runs python3 ~/.claude/skills/twitter-digest/scripts/run_daily_digest.py --source api
 输入 X token     -> agent runs python3 ~/.claude/skills/twitter-digest/scripts/run_daily_digest.py --configure-api-token
 配置 X API       -> agent runs python3 ~/.claude/skills/twitter-digest/scripts/run_daily_digest.py --configure-api
 清除 X API 配置  -> agent runs python3 ~/.claude/skills/twitter-digest/scripts/configure_api.py --clear

@@ -288,11 +288,12 @@ def print_post_install_notes(target: Path) -> None:
     except ValueError:
         run_cmd = f"python3 {run_script}"
     print("", flush=True)
-    print("DM collection is OFF by default.", flush=True)
-    print(f"Enable DM in future daily digests: {run_cmd} --include-dms", flush=True)
-    print(f"Disable DM again: {run_cmd} --no-dms", flush=True)
+    print("Collection source policy:", flush=True)
+    print(f"API-only digest: {run_cmd} --source api", flush=True)
+    print(f"Browser digest with DM: {run_cmd} --source browser", flush=True)
     print(
-        "When DM is enabled, X Chat is collected through a browser session and merged into the same daily digest. "
+        "API source and browser source are isolated: API runs never start a browser and never collect DMs. "
+        "Browser source collects X Chat through a browser session and merges DM into the same daily digest. "
         "Browser DM automation may trigger X account risk controls, login challenges, or passcode recovery; "
         "avoid long-running unattended DM collection.",
         flush=True,

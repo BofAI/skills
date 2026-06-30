@@ -22,9 +22,9 @@ API mode:
 - Intended for stable public-data collection.
 - Requires user-context authorization for user-owned timelines. App-only keys are not enough for home timeline reliability.
 - Reads the official reverse chronological home timeline when the token has user-context timeline access.
-- Normal daily runs collect DMs only when the persistent local `include_dms` switch is enabled. The switch is off by default, enabled by `run_daily_digest.py --include-dms`, and disabled by `run_daily_digest.py --no-dms`. When enabled, public data and browser DM data are merged into one daily digest.
+- Browser-source daily runs collect visible X Chat/DM and merge it into one daily digest. API-source runs never start a browser and never collect DM.
 - Records endpoint-level API failures as data gaps instead of silently treating them as empty pages.
-- API DM lookup is retained only as low-level TODO/debug. DM lookup failures, zero-event API responses, and inconclusive API DM results must not be summarized as empty inboxes. Use `run_daily_digest.py --include-dms` to enable browser DM collection for normal daily reports.
+- API source does not collect DM. Use `run_daily_digest.py --source browser` when DM collection is required.
 - Saved OAuth tokens are configured by the agent-triggered `run_daily_digest.py --configure-api` flow. OAuth2 PKCE is the supported path for user-owned local X Apps: the user provides the Client ID, authorizes the app in the browser, and the script saves the access token plus refresh token. OAuth2 tokens are refreshed automatically when a refresh token is saved.
 
 Chat-triggered API setup:
@@ -48,16 +48,16 @@ Typical daily run:
 python3 twitter-digest/scripts/run_daily_digest.py
 ```
 
-Enable DM in daily reports:
+Browser digest with DM:
 
 ```bash
-python3 twitter-digest/scripts/run_daily_digest.py --include-dms
+python3 twitter-digest/scripts/run_daily_digest.py --source browser
 ```
 
-Disable DM in daily reports:
+API-only digest without browser/DM:
 
 ```bash
-python3 twitter-digest/scripts/run_daily_digest.py --no-dms
+python3 twitter-digest/scripts/run_daily_digest.py --source api
 ```
 
 DM browser automation can trigger X account risk controls, login challenges, passcode recovery, or other platform restrictions. Keep it user-triggered and avoid long-running or unattended DM jobs.
@@ -110,7 +110,7 @@ This prints counts, load status, and data gaps without printing DM message bodie
 - If X shows CAPTCHA or account challenge, stop and ask the user to resolve it in the browser.
 - Do not post, like, follow, accept DM requests, open suspicious links, or reply.
 - Keep scrolling bounded by the digest goal. API public collection defaults to `--max-public-items 300`; browser public collection defaults to `--scrolls 40`, `--max-public-items 100`, and `--public-window-hours 24`, stopping early when loaded post timestamps are clearly outside the daily window.
-- Read DM content only when the persistent DM switch is enabled. Use `--include-dms` to enable it and `--no-dms` to disable it. When enabled, merge DM into the normal daily digest.
+- Read DM content only in browser source. API source must not start a browser and must not collect DM.
 - If X Chat shows passcode setup, passcode entry, or encryption-key recovery, automatically reopen X Messages in a visible browser window, wait for the user to complete it, then retry DM collection. In `--non-interactive` mode, skip DM recovery and record a data gap. The script must not choose, enter, or store the passcode.
 
 ## Pages Collected
@@ -121,7 +121,7 @@ Default browser public pages:
 - `own_profile`: the authenticated account profile.
 - `mentions_search`: live search for `@handle`.
 - `mentions_notifications`: notifications mentions page.
-- `messages`: X Messages, only when the persistent DM switch is enabled or in low-level `--dm-only` debug mode.
+- `messages`: X Messages, only in browser source or low-level `--dm-only` debug mode.
 
 Optional pages:
 
@@ -241,5 +241,5 @@ Reply drafting rules:
 ## 中文每日 Prompt
 
 ```text
-使用 $twitter-digest 读取我最近 24 小时的 X/Twitter 动态，生成中文日报。重点总结谁 @ 了我、时间线热点、需要处理的互动、我的账号动态；如果已开启 DM 开关，也把需要处理的私信作为同一份日报的 DM 章节。先给今日总结和行动建议，再给明细。回复只生成草稿，不要自动发送。读不到的数据要明确标注。
+使用 $twitter-digest 读取我最近 24 小时的 X/Twitter 动态，生成中文日报。重点总结谁 @ 了我、时间线热点、需要处理的互动、我的账号动态；如果使用浏览器来源，也把需要处理的私信作为同一份日报的 DM 章节；如果使用 API 来源，不采集 DM。先给今日总结和行动建议，再给明细。回复只生成草稿，不要自动发送。读不到的数据要明确标注。
 ```
