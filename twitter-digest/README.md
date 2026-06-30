@@ -94,6 +94,42 @@ args = ["mcp", "-u", "USERNAME", "https://api.x.com/mcp"]
 
 Restart Codex after changing MCP config.
 
+## Configure Claude Code
+
+Claude Code should expose the same hosted X MCP server to the agent. Use the
+Claude Code MCP config surface for your environment and configure an MCP server
+named `xapi` with:
+
+```json
+{
+  "command": "xurl",
+  "args": ["mcp", "https://api.x.com/mcp"]
+}
+```
+
+For multiple X users, pin the server to the authorized username:
+
+```json
+{
+  "command": "xurl",
+  "args": ["mcp", "-u", "USERNAME", "https://api.x.com/mcp"]
+}
+```
+
+Also add the X docs MCP if your client supports URL-based MCP servers:
+
+```json
+{
+  "url": "https://docs.x.com/mcp"
+}
+```
+
+Restart Claude Code after changing MCP config.
+
+Do not configure old cookie-based Twitter MCP servers for this skill. Public
+X/account data should come from hosted X MCP (`xapi`), and DM/X Chat should come
+from the browser collector.
+
 ## Browser DM Setup
 
 DM/X Chat should be verified through the browser collector because API/MCP DM events may not include all encrypted X Chat content.
@@ -142,3 +178,79 @@ browser-dm-context.json
 ```
 
 Treat `.state/` as private. It can include browser profile data and DM text.
+
+## Clean Install QA
+
+Use this flow to verify a fresh install:
+
+```bash
+rm -rf ~/.codex/skills/twitter-digest
+rm -rf ~/.claude/skills/twitter-digest
+rm -rf ~/.xurl
+```
+
+Remove any old cookie-based Twitter MCP config such as `agent-twitter-client-mcp`
+or `TWITTER_COOKIES` from the AI client config.
+
+Install the skill:
+
+```bash
+python3 twitter-digest/scripts/install.py --skills-dir ~/.codex/skills
+# or, for Claude Code:
+python3 twitter-digest/scripts/install.py
+```
+
+Verify the installed files are minimal:
+
+```bash
+find ~/.codex/skills/twitter-digest -maxdepth 3 -type f | sort
+```
+
+Expected source files:
+
+```text
+.gitignore
+README.md
+SKILL.md
+agents/openai.yaml
+lib/browser_dm_core.py
+references/x-twitter-digest.md
+scripts/collect_browser_dm.py
+scripts/install.py
+```
+
+Configure X MCP from scratch:
+
+```bash
+xurl auth apps add test \
+  --client-id YOUR_CLIENT_ID \
+  --client-secret YOUR_CLIENT_SECRET \
+  --redirect-uri http://localhost:8080/callback
+
+xurl auth oauth2 --app test
+xurl auth default test USERNAME
+```
+
+Then add the `xapi` MCP server to the AI client config and restart the client.
+
+Validate public data through MCP by calling tools such as:
+
+- `get_users_me`
+- `get_users_mentions`
+- `get_users_timeline`
+- `get_users_posts`
+
+Validate browser DM collection:
+
+```bash
+python3 ~/.codex/skills/twitter-digest/scripts/collect_browser_dm.py --out /tmp/twitter-digest-dm-qa
+```
+
+Expected behavior:
+
+- If the dedicated browser profile is not logged in, Chrome opens and waits for login.
+- If X Chat asks for passcode setup, passcode entry, or encryption-key recovery, the collector waits in the visible browser and retries after completion.
+- `--non-interactive` is the only mode that should avoid opening a browser and record a data gap instead.
+
+Finally, ask the agent to generate a daily digest. The report should use X MCP
+for public data and the browser collector for DM/X Chat coverage.

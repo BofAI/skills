@@ -62,6 +62,7 @@ Use `Read and write and Direct message` permissions if the user wants the broad 
 
 - For X 日报 / 周报, call X MCP tools directly for public/account data.
 - Run the browser collector only when DM/X Chat coverage is needed.
+- Do not use cookie-based Twitter MCP servers such as `agent-twitter-client-mcp` for this skill.
 - If browser collection is used, use the installed command path:
   - Codex: `python3 ~/.codex/skills/twitter-digest/scripts/collect_browser_dm.py`
   - Claude Code: `python3 ~/.claude/skills/twitter-digest/scripts/collect_browser_dm.py`

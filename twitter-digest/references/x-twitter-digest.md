@@ -45,6 +45,7 @@ X MCP mode:
 - Requires X MCP to be installed and authenticated through `xurl`.
 - The user enters Client ID and Client Secret in the local terminal during `xurl auth apps add`; do not ask the user to paste secrets into chat.
 - App-only keys are not enough for user-context home timeline reliability; use OAuth user-context via `xurl auth oauth2`.
+- Do not use cookie-based Twitter MCP servers such as `agent-twitter-client-mcp`; they are outside this skill's supported collection path.
 - Normal daily runs use X MCP for public data and browser collection for DMs. DM/X Chat lookup through API/MCP may be incomplete, so browser DM remains authoritative.
 - MCP tool failures should be reported as data gaps, not silently treated as empty pages.
 
