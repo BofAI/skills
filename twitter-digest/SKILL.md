@@ -105,7 +105,7 @@ Default scope:
 
 Public timeline/profile/mentions pages use the same daily-window loading model as DMs: by default the collector scrolls each public page up to 40 rounds, keeps up to 300 public items, waits for DOM growth after each scroll, and only allows early stop after at least 5 scroll rounds when loaded post timestamps show content beyond the 24-hour digest window (`--scrolls 40`, `--min-public-scrolls 5`, `--max-public-items 300`, `--public-window-hours 24`).
 
-Read only the installed `digest-context.md` with the file Read tool when writing the Chinese digest. Its `Final Summary Facts` section is the content source for the final summary. Use `digest-input.md` only when debugging collection issues, not during normal summarization. Do not add content from older runs. Do not write ad-hoc `python3 -c`, shell, or temporary scripts to inspect JSON structure during normal summarization. If counts or non-content structure must be checked, run the built-in `scripts/inspect_digest.py`, which does not print DM bodies.
+Read the installed `digest-context.md` with the file Read tool when writing the Chinese digest. Its `Final Summary Facts` section is the content source for the final summary. If more focused context is needed, use the file Read tool on the split current-run files: `digest-context-timeline.md` for home/profile/timeline items, `digest-context-mentions.md` for @ mentions, and `digest-context-dm.md` for visible DM conversations. Use `digest-input.md` only when debugging collection issues, not during normal summarization. Do not add content from older runs. Do not write ad-hoc `python3 -c`, shell, `cat`, `head`, `tail`, `grep`, or temporary scripts to inspect context structure during normal summarization. If counts or non-content structure must be checked, run the built-in `scripts/inspect_digest.py`, which does not print DM bodies.
 
 ## Install
 
@@ -136,8 +136,11 @@ Claude Code or other agents can use the installed skill by running the same brow
 `scripts/run_daily_digest.py` does not write long-term memory. Each run writes only current-run files:
 
 - `twitter-digest/.state/config.json`: account defaults and preferences.
-- `<installed-skill>/.state/run/digest-context.md`: the only normal input for AI daily-summary writing.
+- `<installed-skill>/.state/run/digest-context.md`: the normal top-level input for AI daily-summary writing.
 - `<installed-skill>/.state/run/digest-context.json`: machine-readable version of the same normalized facts.
+- `<installed-skill>/.state/run/digest-context-timeline.md`: focused current-run timeline/profile context for file Read.
+- `<installed-skill>/.state/run/digest-context-mentions.md`: focused current-run @ mention context for file Read.
+- `<installed-skill>/.state/run/digest-context-dm.md`: focused current-run DM context for file Read.
 - `<installed-skill>/.state/run/digest-input.md`: raw collector capture for debugging only.
 - `<installed-skill>/.state/run/digest-input.json`: raw machine-readable collector capture for debugging only.
 

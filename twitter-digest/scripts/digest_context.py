@@ -11,6 +11,13 @@ from typing import Any
 
 from script_utils import local_timezone_name, now_iso
 
+CONTEXT_SLICE_FILES = {
+    "timeline": "digest-context-timeline.md",
+    "mentions": "digest-context-mentions.md",
+    "dm": "digest-context-dm.md",
+}
+
+
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--input", required=True, help="Path to digest-input.json.")
@@ -33,9 +40,11 @@ def build_current_context_from_file(input_path: Path, out_dir: Path, markdown_pa
         markdown_path.write_text(render_digest_input(data), encoding="utf-8")
 
     facts = build_digest_facts(data, summary)
-    context_json = {"summary": summary, "facts": facts, "memory": "disabled"}
+    context_json = {"summary": summary, "facts": facts, "memory": "disabled", "slices": CONTEXT_SLICE_FILES}
     (out_dir / "digest-context.md").write_text(render_digest_context(summary, facts), encoding="utf-8")
     (out_dir / "digest-context.json").write_text(json.dumps(context_json, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
+    for slice_name, file_name in CONTEXT_SLICE_FILES.items():
+        (out_dir / file_name).write_text(render_context_slice(summary, facts, slice_name), encoding="utf-8")
     return context_json
 
 
@@ -397,22 +406,43 @@ def render_digest_context(summary: dict[str, Any], facts: dict[str, Any]) -> str
     return "\n".join(lines) + "\n"
 
 
-def render_digest_facts(facts: dict[str, Any]) -> str:
-    dms = facts.get("dms") or {}
-    dm_counts = dms.get("counts") or {}
+def render_context_slice(summary: dict[str, Any], facts: dict[str, Any], slice_name: str) -> str:
+    titles = {
+        "timeline": "X Timeline Context",
+        "mentions": "X Mentions Context",
+        "dm": "X DM Context",
+    }
     lines = [
-        "# X Digest Facts",
+        f"# {titles.get(slice_name, 'X Digest Context Slice')}",
         "",
-        "Use this section as the only content input for the final Chinese X daily digest. Use raw capture only to verify details.",
+        "This is a focused current-run slice for AI reading. Use it with `digest-context.md`; do not use shell grep/cat to inspect it.",
         "",
         "## Run",
         "",
-        f"- date: `{(facts.get('run') or {}).get('date')}`",
-        f"- generated_at: `{(facts.get('run') or {}).get('generated_at')}`",
-        f"- source: `{(facts.get('run') or {}).get('source') or 'browser'}`",
-        f"- timezone: `{(facts.get('run') or {}).get('timezone')}`",
-        f"- account: `@{(facts.get('account') or {}).get('handle') or ''}`",
+        f"- date: `{summary.get('date')}`",
+        f"- handle: `@{summary.get('handle') or ''}`",
+        f"- source: `{summary.get('source') or 'browser'}`",
+        f"- context policy: {summary.get('context_policy')}",
         "",
+    ]
+    if slice_name == "dm":
+        lines.extend(render_dm_facts_section(facts).splitlines())
+    else:
+        lines.extend(render_public_slice_section(facts, slice_name).splitlines())
+    lines.extend(["", "## Data Gaps", ""])
+    gaps = [gap for gap in facts.get("data_gaps") or [] if data_gap_matches_slice(gap, slice_name)]
+    if gaps:
+        for gap in gaps:
+            lines.append(f"- `{gap.get('source')}` `{gap.get('status')}`: {gap.get('detail')}")
+    else:
+        lines.append("- None")
+    return "\n".join(lines) + "\n"
+
+
+def render_dm_facts_section(facts: dict[str, Any]) -> str:
+    dms = facts.get("dms") or {}
+    dm_counts = dms.get("counts") or {}
+    lines = [
         "## DM Facts",
         "",
         f"- status: `{dms.get('status')}`",
@@ -454,12 +484,6 @@ def render_digest_facts(facts: dict[str, Any]) -> str:
     if not dms.get("threads"):
         lines.append("| none | - | 0 | no | no_opened_unreplied_threads | |")
 
-    lines.extend(["", "## TODO List", ""])
-    for todo in facts.get("todo_items") or []:
-        lines.append(f"- `{todo.get('source')}` `{todo.get('status')}`: {todo.get('detail')}")
-    if not facts.get("todo_items"):
-        lines.append("- None")
-
     context_threads = [
         thread
         for thread in dms.get("threads") or []
@@ -469,9 +493,9 @@ def render_digest_facts(facts: dict[str, Any]) -> str:
         lines.extend(
             [
                 "",
-                "### DM Thread Context",
+                "## DM Thread Context",
                 "",
-                "Use this recent loaded history to understand what the waiting-reply DM is about before drafting the daily digest. Sender is based on message bubble direction; quoted-post authors are not DM senders.",
+                "Use this recent loaded history to understand waiting-reply DMs. Sender is based on message bubble direction; quoted-post authors are not DM senders.",
             ]
         )
         for index, thread in enumerate(context_threads, start=1):
@@ -481,7 +505,7 @@ def render_digest_facts(facts: dict[str, Any]) -> str:
             lines.extend(
                 [
                     "",
-                    f"#### DM {index}: {thread.get('participant') or '[unknown]'}",
+                    f"### DM {index}: {thread.get('participant') or '[unknown]'}",
                     "",
                     f"- reply_state: `{thread.get('reply_state')}`",
                     f"- raw_label: `{md_inline(thread.get('label') or '')}`",
@@ -494,6 +518,84 @@ def render_digest_facts(facts: dict[str, Any]) -> str:
                     "```",
                 ]
             )
+    return "\n".join(lines)
+
+
+def render_public_slice_section(facts: dict[str, Any], slice_name: str) -> str:
+    public = facts.get("public") or {}
+    counts = public.get("counts") or {}
+    items = [item for item in public.get("items") or [] if public_item_matches_slice(item, slice_name)]
+    lines = ["## Public Counts", "", "| page | total |", "|---|---:|"]
+    any_counts = False
+    for kind, page_counts in counts.items():
+        if public_kind_matches_slice(str(kind), slice_name):
+            any_counts = True
+            lines.append(f"| {md_cell(kind)} | {page_counts.get('total', 0)} |")
+    if not any_counts:
+        lines.append("| none | 0 |")
+    lines.extend(["", "## Public Items", ""])
+    for item in items[:300]:
+        lines.append(f"- `{item.get('kind')}` `{item.get('time')}` {item.get('url') or '[no url]'} - {item.get('text_excerpt')}")
+        for asset in item.get("media") or []:
+            alt = f" alt={asset.get('alt')}" if asset.get("alt") else ""
+            poster = f" poster={asset.get('poster')}" if asset.get("poster") else ""
+            lines.append(f"  - media: {asset.get('type') or 'media'} {asset.get('url')}{poster}{alt}".rstrip())
+        for link in item.get("external_links") or []:
+            label = f" {link.get('label')}" if link.get("label") else ""
+            lines.append(f"  - link: {link.get('url')}{label}")
+        for card in item.get("cards") or []:
+            text = f" {card.get('text')}" if card.get("text") else ""
+            lines.append(f"  - card: {card.get('url')}{text}")
+    if not items:
+        lines.append("- None")
+    return "\n".join(lines)
+
+
+def public_item_matches_slice(item: dict[str, Any], slice_name: str) -> bool:
+    return public_kind_matches_slice(str(item.get("kind") or ""), slice_name)
+
+
+def public_kind_matches_slice(kind: str, slice_name: str) -> bool:
+    kind = kind.lower()
+    if slice_name == "mentions":
+        return "mention" in kind
+    if slice_name == "timeline":
+        return kind != "messages" and "mention" not in kind
+    return False
+
+
+def data_gap_matches_slice(gap: dict[str, Any], slice_name: str) -> bool:
+    source = str(gap.get("source") or "").lower()
+    if slice_name == "dm":
+        return source == "messages"
+    if slice_name == "mentions":
+        return "mention" in source
+    if slice_name == "timeline":
+        return source != "messages" and "mention" not in source
+    return False
+
+
+def render_digest_facts(facts: dict[str, Any]) -> str:
+    lines = [
+        "# X Digest Facts",
+        "",
+        "Use this section as the only content input for the final Chinese X daily digest. Use raw capture only to verify details.",
+        "",
+        "## Run",
+        "",
+        f"- date: `{(facts.get('run') or {}).get('date')}`",
+        f"- generated_at: `{(facts.get('run') or {}).get('generated_at')}`",
+        f"- source: `{(facts.get('run') or {}).get('source') or 'browser'}`",
+        f"- timezone: `{(facts.get('run') or {}).get('timezone')}`",
+        f"- account: `@{(facts.get('account') or {}).get('handle') or ''}`",
+    ]
+    lines.extend(["", *render_dm_facts_section(facts).splitlines()])
+
+    lines.extend(["", "## TODO List", ""])
+    for todo in facts.get("todo_items") or []:
+        lines.append(f"- `{todo.get('source')}` `{todo.get('status')}`: {todo.get('detail')}")
+    if not facts.get("todo_items"):
+        lines.append("- None")
 
     lines.extend(["", "## Public Counts", "", "| page | total |", "|---|---:|"])
     for kind, counts in ((facts.get("public") or {}).get("counts") or {}).items():

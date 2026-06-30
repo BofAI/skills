@@ -204,19 +204,25 @@ See `twitter-digest/COLLECTOR_COMPARISON_TEST.md` for the full agent test plan.
 ```text
 twitter-digest/.state/run/digest-context.md
 twitter-digest/.state/run/digest-context.json
+twitter-digest/.state/run/digest-context-timeline.md
+twitter-digest/.state/run/digest-context-mentions.md
+twitter-digest/.state/run/digest-context-dm.md
 twitter-digest/.state/run/digest-input.md
 twitter-digest/.state/run/digest-input.json
 ```
 
-Use `digest-context.md` as the normal AI input. `digest-input.*` is raw collector capture for debugging.
+Use `digest-context.md` as the normal AI input. Use the split context files when the agent needs only one section: timeline/profile, mentions, or DM. `digest-input.*` is raw collector capture for debugging.
 
 During analysis/summary writing, the agent should use its file Read tool to read:
 
 ```text
 ~/.claude/skills/twitter-digest/.state/run/digest-context.md
+~/.claude/skills/twitter-digest/.state/run/digest-context-timeline.md
+~/.claude/skills/twitter-digest/.state/run/digest-context-mentions.md
+~/.claude/skills/twitter-digest/.state/run/digest-context-dm.md
 ```
 
-Do not use `cat`, `head`, `grep`, `python3 -c`, or temporary scripts to read the context file during normal summary generation; those shell reads create extra Claude Code permission prompts.
+Do not use `cat`, `head`, `grep`, `python3 -c`, or temporary scripts to read context files during normal summary generation; those shell reads create extra Claude Code permission prompts.
 
 ## More Details
 

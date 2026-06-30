@@ -114,6 +114,9 @@ python3 ~/.claude/skills/twitter-digest/scripts/run_daily_digest.py
 ```text
 ~/.claude/skills/twitter-digest/.state/run/digest-context.md
 ~/.claude/skills/twitter-digest/.state/run/digest-context.json
+~/.claude/skills/twitter-digest/.state/run/digest-context-timeline.md
+~/.claude/skills/twitter-digest/.state/run/digest-context-mentions.md
+~/.claude/skills/twitter-digest/.state/run/digest-context-dm.md
 ~/.claude/skills/twitter-digest/.state/run/digest-input.md
 ~/.claude/skills/twitter-digest/.state/run/digest-input.json
 ```
@@ -124,7 +127,7 @@ Agent 写日报时只读：
 ~/.claude/skills/twitter-digest/.state/run/digest-context.md
 ```
 
-不要用 `cat/head/grep/python -c` 读取这些文件，避免 Claude Code 额外弹 Bash 权限。
+如果只需要某一类内容，Agent 可以用 Read 工具读取拆分文件：`digest-context-timeline.md`、`digest-context-mentions.md`、`digest-context-dm.md`。不要用 `cat/head/grep/python -c` 读取这些文件，避免 Claude Code 额外弹 Bash 权限。
 
 ## 5. 日常运行规则
 

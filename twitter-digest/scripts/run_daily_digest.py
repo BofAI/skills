@@ -271,6 +271,11 @@ def main() -> None:
     result = {
         "ai_input_markdown": str(out_dir / "digest-context.md"),
         "ai_input_json": str(out_dir / "digest-context.json"),
+        "ai_input_slices": {
+            "timeline": str(out_dir / "digest-context-timeline.md"),
+            "mentions": str(out_dir / "digest-context-mentions.md"),
+            "dm": str(out_dir / "digest-context-dm.md"),
+        },
         "debug_raw_markdown": str(out_dir / "digest-input.md"),
         "debug_raw_json": str(out_dir / "digest-input.json"),
         "memory": "disabled",
