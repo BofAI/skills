@@ -43,8 +43,8 @@ scripts/api_x_digest.py
 职责：
 
 - 使用已保存的 OAuth2 user-context token，或 `X_BEARER_TOKEN` / `TWITTER_BEARER_TOKEN` / `--bearer-token` 传入的 OAuth2 user token。
-- 主路径是 OAuth2 PKCE：用户准备 X App 的 `Client ID`，使用 `scripts/run_daily_digest.py --configure-api` 让脚本打开授权页并通过本地 callback 换取 user access token / refresh token。
-- 如果用户已经有 OAuth2 user access token，使用 `scripts/run_daily_digest.py --configure-api-token` 由脚本安全保存。
+- 主路径是 OAuth2 PKCE：用户准备 X App 的 `Client ID`，使用 `python3 ~/.claude/skills/twitter-digest/scripts/run_daily_digest.py --configure-api` 让脚本打开授权页并通过本地 callback 换取 user access token / refresh token。
+- 如果用户已经有 OAuth2 user access token，使用 `python3 ~/.claude/skills/twitter-digest/scripts/run_daily_digest.py --configure-api-token` 由脚本安全保存。
 - OAuth1 不再作为日报 API 配置路径，因为它不能可靠读取 DM；需要完整 DM 时走 OAuth2，API DM 拿不到时走浏览器脚本。
 - 读取 home timeline：`/2/users/:id/timelines/reverse_chronological`。
 - 读取用户公开发帖。
@@ -114,24 +114,24 @@ Agent：读取 digest-context.md 写中文日报
 
 ```text
 用户：输入 X token / 我已经有 token
-Agent：运行 scripts/run_daily_digest.py --configure-api-token
+Agent：运行 `python3 ~/.claude/skills/twitter-digest/scripts/run_daily_digest.py --configure-api-token`
 脚本：弹出隐藏输入框
 用户：粘贴 user access token
 脚本：保存 token 到 .state/api_config.json
-后续：run_daily_digest.py --source auto 自动走 API
+后续：`python3 ~/.claude/skills/twitter-digest/scripts/run_daily_digest.py --source auto` 自动走 API
 ```
 
 配置 API，OAuth2 授权：
 
 ```text
 用户：配置 X API
-Agent：运行 scripts/run_daily_digest.py --configure-api
+Agent：运行 `python3 ~/.claude/skills/twitter-digest/scripts/run_daily_digest.py --configure-api`
 脚本：直接进入 OAuth2 配置
 用户：输入 Client ID 和可选 Client Secret
 脚本：打开 X 授权页
 用户：在浏览器里授权 app
 脚本：通过本地 callback 换取 access token / refresh token 并保存
-后续：run_daily_digest.py --source auto 自动走 API
+后续：`python3 ~/.claude/skills/twitter-digest/scripts/run_daily_digest.py --source auto` 自动走 API
 ```
 
 后续运行：
@@ -151,15 +151,15 @@ Agent：读取 digest-context.md 写中文日报
 脚本：把 API endpoint 错误写入 data gap
 Agent：告知用户需要重新配置/授权
 用户：在对话里说“重新配置 X API”
-Agent：再次运行 scripts/run_daily_digest.py --configure-api
+Agent：再次运行 `python3 ~/.claude/skills/twitter-digest/scripts/run_daily_digest.py --configure-api`
 ```
 
 清除 API：
 
 ```text
 用户：清除 X API 配置
-Agent：运行 scripts/configure_api.py --clear
-后续：run_daily_digest.py --source auto 自动回到浏览器抓取
+Agent：运行 `python3 ~/.claude/skills/twitter-digest/scripts/configure_api.py --clear`
+后续：`python3 ~/.claude/skills/twitter-digest/scripts/run_daily_digest.py --source auto` 自动回到浏览器抓取
 ```
 
 ## 标准输出结构

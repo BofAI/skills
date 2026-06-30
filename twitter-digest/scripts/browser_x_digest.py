@@ -37,6 +37,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--public-window-hours", type=int, default=24, help="Stop loading older public timeline items once posts beyond this window are detected.")
     parser.add_argument("--login-timeout-sec", type=int, default=300)
     parser.add_argument("--include-dms", action="store_true", help="Also visit X messages and capture visible conversation text.")
+    parser.add_argument("--dm-only", action="store_true", help="Collect only X messages. Used when API already collected public data.")
     parser.add_argument("--dm-threads", type=int, default=5, help="Maximum recent DM threads to open when --include-dms is set.")
     parser.add_argument("--dm-list-scrolls", type=int, default=20, help="Maximum downward scroll rounds used to scan today's DM conversation list.")
     parser.add_argument("--dm-scrolls", type=int, default=200, help="Maximum upward scroll rounds per opened DM thread.")
@@ -49,7 +50,9 @@ def parse_args() -> argparse.Namespace:
     return parser.parse_args()
 
 
-def build_pages(handle: str | None, keywords: str, include_dms: bool) -> list[dict[str, str]]:
+def build_pages(handle: str | None, keywords: str, include_dms: bool, dm_only: bool = False) -> list[dict[str, str]]:
+    if dm_only:
+        return [{"kind": "messages", "url": "https://x.com/messages"}] if include_dms else []
     pages = [{"kind": "home", "url": "https://x.com/home"}]
     if handle:
         clean = handle.lstrip("@")
@@ -156,6 +159,8 @@ def error_page(page: dict[str, str], exc: BaseException) -> dict[str, Any]:
 
 def main() -> None:
     args = parse_args()
+    if args.dm_only:
+        args.include_dms = True
     profile_dir = Path(args.profile_dir).expanduser().resolve()
     force_headed = bool(args.headed and not args.headless)
     proc, port, headless, logged_in = ensure_logged_in(profile_dir, args.login_timeout_sec, force_headed, args.non_interactive)
@@ -185,7 +190,7 @@ def main() -> None:
             print(f"Using X handle: @{handle}")
         else:
             print("Could not auto-detect X handle. Mention search will be skipped unless --handle is provided.")
-        pages = build_pages(handle, args.keywords, args.include_dms)
+        pages = build_pages(handle, args.keywords, args.include_dms, args.dm_only)
         data = {
             "generated_at": dt.datetime.now().astimezone().isoformat(),
             "profile_dir": str(profile_dir),

@@ -18,6 +18,11 @@ Use a stable installed command form for normal chat-triggered runs. This keeps C
 
 In command examples below, `RUN_DAILY_DIGEST` means the matching installed command above for the current agent. Do not rely on `python3 twitter-digest/scripts/run_daily_digest.py` after installation unless you are intentionally working inside a source checkout.
 
+For API maintenance commands, `CONFIGURE_API` means the matching installed configure command:
+
+- Claude Code: `python3 ~/.claude/skills/twitter-digest/scripts/configure_api.py`
+- Codex: `python3 ~/.codex/skills/twitter-digest/scripts/configure_api.py`
+
 For summary writing, read the installed current-run context with the agent's file Read tool, not Bash. The normal context path is:
 
 - Claude Code: `~/.claude/skills/twitter-digest/.state/run/digest-context.md`
@@ -57,7 +62,7 @@ This is an agent-triggered flow. It supports OAuth2 user authorization:
 - Existing token path: if the user says they already have an OAuth2 user access token, run `RUN_DAILY_DIGEST --configure-api-token`.
 - If the agent is not inside an interactive Terminal, do not background `configure_api.py` yourself. Use `run_daily_digest.py --configure-api`; it opens a real Terminal window for secure input and OAuth callback handling. `configure_api.py --oauth` also self-opens Terminal when invoked non-interactively, but the wrapper is the primary path.
 - OAuth1 PIN is not a supported normal setup path for this skill because it did not reliably return DM data during validation. Do not guide users to Consumer Key / Consumer Secret / PIN unless they are explicitly debugging legacy API behavior.
-- Do not write ad-hoc inline Python or shell snippets to verify tokens. Use the built-in verifier: `python3 twitter-digest/scripts/configure_api.py --verify`. It calls `/users/me`, backfills `handle` / `user_id`, and does not print the token.
+- Do not write ad-hoc inline Python or shell snippets to verify tokens. Use the built-in verifier: `CONFIGURE_API --verify`. It calls `/users/me`, backfills `handle` / `user_id`, and does not print the token.
 
 If a refresh token is saved, later daily runs refresh the access token automatically. Do not ask the user to export environment variables manually. App-only API keys are not enough for user-context home timeline access.
 
@@ -66,7 +71,7 @@ After API setup succeeds once, future daily digest runs should not ask the user 
 If the user asks to clear API access, run:
 
 ```bash
-python3 twitter-digest/scripts/configure_api.py --clear
+CONFIGURE_API --clear
 ```
 
 All normal flows should be triggered from chat by the agent:
@@ -74,9 +79,9 @@ All normal flows should be triggered from chat by the agent:
 - X 日报 / 生成日报: run `RUN_DAILY_DIGEST`.
 - 用户已有 token / 输入 X token: run `RUN_DAILY_DIGEST --configure-api-token`.
 - 配置 X API / 给 app 授权: run `RUN_DAILY_DIGEST --configure-api`.
-- 验证 X API 配置: run `scripts/configure_api.py --verify`.
+- 验证 X API 配置: run `CONFIGURE_API --verify`.
 - 检查本次采集计数 / JSON 结构: run `scripts/inspect_digest.py`.
-- 清除 X API 配置: run `scripts/configure_api.py --clear`.
+- 清除 X API 配置: run `CONFIGURE_API --clear`.
 - 调试浏览器: run `RUN_DAILY_DIGEST --source browser --headed`.
 - 对比 API 和浏览器抓取 / 稳定性测试: run `scripts/compare_collectors.py --rounds 3 --interval-sec 120`. Load `COLLECTOR_COMPARISON_TEST.md` before interpreting the report.
 
@@ -103,7 +108,7 @@ Default scope:
 - Today's visible DM conversations, with only conversations whose latest preview is not from the user opened for content.
 - Optional keyword searches only when the user explicitly passes `--keywords`.
 
-Public timeline/profile/mentions pages use the same daily-window loading model as DMs: by default the collector scrolls each public page up to 40 rounds, keeps up to 300 public items, waits for DOM growth after each scroll, and only allows early stop after at least 5 scroll rounds when loaded post timestamps show content beyond the 24-hour digest window (`--scrolls 40`, `--min-public-scrolls 5`, `--max-public-items 300`, `--public-window-hours 24`).
+Public timeline/profile/mentions pages use the same daily-window loading model as DMs. API public collection keeps up to 300 items; browser public collection scrolls each public page up to 40 rounds, keeps up to 100 public items, waits for DOM growth after each scroll, and only allows early stop after at least 5 scroll rounds when loaded post timestamps show content beyond the 24-hour digest window (`--scrolls 40`, `--min-public-scrolls 5`, `--max-public-items 100`, `--public-window-hours 24`).
 
 Read the installed `digest-context.md` with the file Read tool when writing the Chinese digest. Its `Final Summary Facts` section is the content source for the final summary. If more focused context is needed, use the file Read tool on the split current-run files: `digest-context-timeline.md` for home/profile/timeline items, `digest-context-mentions.md` for @ mentions, and `digest-context-dm.md` for visible DM conversations. Use `digest-input.md` only when debugging collection issues, not during normal summarization. Do not add content from older runs. Do not write ad-hoc `python3 -c`, shell, `cat`, `head`, `tail`, `grep`, or temporary scripts to inspect context structure during normal summarization. If counts or non-content structure must be checked, run the built-in `scripts/inspect_digest.py`, which does not print DM bodies.
 

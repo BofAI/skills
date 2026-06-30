@@ -46,7 +46,7 @@ round-XX/
 
 API 路径：
 
-- 已通过 `python3 twitter-digest/scripts/run_daily_digest.py --configure-api` 完成 OAuth2 user-context 授权，或环境里有 `X_BEARER_TOKEN` / `TWITTER_BEARER_TOKEN`。
+- 已通过 `python3 ~/.claude/skills/twitter-digest/scripts/run_daily_digest.py --configure-api` 完成 OAuth2 user-context 授权，或环境里有 `X_BEARER_TOKEN` / `TWITTER_BEARER_TOKEN`。
 - token 必须是用户上下文 token。App-only token 不能可靠读取 home timeline 或用户数据。
 
 浏览器路径：

@@ -30,14 +30,14 @@ API mode:
 Chat-triggered API setup:
 
 ```bash
-python3 twitter-digest/scripts/run_daily_digest.py --configure-api
+python3 ~/.claude/skills/twitter-digest/scripts/run_daily_digest.py --configure-api
 ```
 
 The user should only interact with the system prompts and X OAuth browser page. Do not require the user to export env vars or paste tokens into shell history.
 After configuration, verify saved credentials only with the built-in command:
 
 ```bash
-python3 twitter-digest/scripts/configure_api.py --verify
+python3 ~/.claude/skills/twitter-digest/scripts/configure_api.py --verify
 ```
 
 Do not write ad-hoc `python3 -c` snippets or temporary verification scripts in chat. The built-in verifier calls `/users/me`, backfills `handle` / `user_id`, and does not print the token.
@@ -109,7 +109,7 @@ One round means one complete public-data API collection plus one complete browse
 - If X shows a login page, wait for the user to log in manually.
 - If X shows CAPTCHA or account challenge, stop and ask the user to resolve it in the browser.
 - Do not post, like, follow, accept DM requests, open suspicious links, or reply.
-- Keep scrolling bounded by the digest goal. Public pages default to `--scrolls 40`, `--max-public-items 300`, and `--public-window-hours 24`, stopping early when loaded post timestamps are clearly outside the daily window.
+- Keep scrolling bounded by the digest goal. API public collection defaults to `--max-public-items 300`; browser public collection defaults to `--scrolls 40`, `--max-public-items 100`, and `--public-window-hours 24`, stopping early when loaded post timestamps are clearly outside the daily window.
 - Read only DM content that is visible in the local logged-in browser. Use `--no-dms` when the user does not want DMs processed.
 - If X Chat shows passcode setup, passcode entry, or encryption-key recovery, automatically reopen X Messages in a visible browser window, wait for the user to complete it, then retry DM collection. In `--non-interactive` mode, skip DM recovery and record a data gap. The script must not choose, enter, or store the passcode.
 

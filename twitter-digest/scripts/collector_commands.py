@@ -94,13 +94,13 @@ def browser_collector_command(
         "--out",
         str(out_dir),
         "--max-public-items",
-        "1" if dm_only else str(max_public_items),
+        str(max_public_items),
         "--public-window-hours",
         str(public_window_hours),
         "--min-public-scrolls",
-        "0" if dm_only else str(min_public_scrolls),
+        str(min_public_scrolls),
         "--scrolls",
-        "0" if dm_only else str(scrolls),
+        str(scrolls),
         "--dm-threads",
         str(dm_threads),
         "--dm-list-scrolls",
@@ -116,6 +116,8 @@ def browser_collector_command(
         cmd.extend(["--handle", handle.lstrip("@")])
     if include_dms:
         cmd.append("--include-dms")
+    if dm_only:
+        cmd.append("--dm-only")
     if headed:
         cmd.append("--headed")
     if headless:
