@@ -155,7 +155,7 @@ python3 twitter-digest/scripts/install.py --skip-browser-check
 - `own_profile`：自己的主页，用于看自己最近发帖/互动。
 - `mentions_search`：搜索 `@当前账号`。
 - `mentions_notifications`：通知里的 @ 提及。
-默认不采集 `messages`。如果用户要求日报带私信，运行浏览器来源：
+API 来源不采集 `messages`；浏览器来源会采集 `messages` 并合并到日报。如果用户要求日报带私信，运行浏览器来源：
 
 ```bash
 python3 twitter-digest/scripts/run_daily_digest.py --source browser

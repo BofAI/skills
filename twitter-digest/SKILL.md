@@ -211,7 +211,7 @@ Group mentions by reason to care:
 - Opportunity: partnership, hiring, customer lead, investor/media attention, community praise.
 - Noise: spam, generic tags, low-context reposts.
 
-When DM collection is enabled, classify DMs as:
+When browser-source DM collection runs, classify DMs as:
 
 - `urgent`: time-sensitive, business-critical, safety/security, money, reputation, or deadline.
 - `important`: meaningful relationship, opportunity, unresolved issue, or action needed.
