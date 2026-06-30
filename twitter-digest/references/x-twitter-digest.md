@@ -43,7 +43,7 @@ X MCP mode:
 
 - Intended for stable public/account data collection through AI tool calls.
 - Requires X MCP to be installed and authenticated through `xurl`.
-- The user enters Client ID and Client Secret in the local terminal during `xurl auth apps add`; do not ask the user to paste secrets into chat.
+- The user enters Client ID and Client Secret in the local terminal during `xurl auth apps add`; do not ask the user to paste secrets into chat. If the agent can open a visible local terminal window, it should do that and let the user type credentials there instead of only printing setup commands.
 - App-only keys are not enough for user-context home timeline reliability; use OAuth user-context via `xurl auth oauth2`.
 - Do not use cookie-based Twitter MCP servers such as `agent-twitter-client-mcp`; they are outside this skill's supported collection path.
 - Normal daily runs use X MCP for public data and browser collection for DMs. DM/X Chat lookup through API/MCP may be incomplete, so browser DM remains authoritative.
@@ -59,6 +59,14 @@ xurl auth default my-app
 ```
 
 Then add the MCP server to the AI client config and restart the client. The user should only enter credentials in the local terminal and X OAuth browser page.
+
+Agent-assisted desktop setup:
+
+1. Open a visible terminal window for `xurl auth apps add`.
+2. Let the user type Client ID and Client Secret locally; hide Secret input when possible.
+3. Run `xurl auth oauth2 --app APP_NAME` so the browser OAuth page opens.
+4. Verify `xurl auth status` and set the default app/user.
+5. Write `xapi` MCP config and tell the user to restart the AI client.
 
 Typical chat run:
 

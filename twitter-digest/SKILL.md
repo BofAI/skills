@@ -51,6 +51,14 @@ http://localhost:8080/callback
 
 Use `Read and write and Direct message` permissions if the user wants the broad default `xurl` scopes. Client ID and Client Secret are entered in the local terminal only.
 
+When the user asks the agent to install or configure X MCP, the agent should
+open a real local terminal window for Client ID / Client Secret entry whenever
+the environment supports it. Do not merely print commands and ask the user to
+run them if the agent can launch Terminal.app or an equivalent visible terminal.
+After the user completes terminal input and OAuth, verify with `xurl auth status`
+and then write or update the AI client's `xapi` MCP config. If no visible
+terminal can be opened, fall back to concise manual instructions.
+
 ## Skill Structure
 
 - `X MCP`: primary source for home timeline, mentions, own posts, user lookup, recent search, trends/news/articles when relevant, and optional keyword searches.

@@ -71,6 +71,26 @@ xurl auth default my-app
 
 Do not paste Client Secret or access tokens into chat. Enter them only in the local terminal.
 
+### Agent-Assisted Setup
+
+When an agent is helping with setup on a desktop machine, it should open a real
+terminal window for sensitive input instead of asking the user to paste secrets
+into chat or manually copy commands. On macOS, the agent can open Terminal.app
+with a command equivalent to:
+
+```bash
+osascript <<'APPLESCRIPT'
+tell application "Terminal"
+  activate
+  do script "printf 'X Client ID: '; IFS= read -r CLIENT_ID; printf 'X Client Secret: '; stty -echo; IFS= read -r CLIENT_SECRET; stty echo; printf '\\n'; xurl auth apps add test --client-id \"$CLIENT_ID\" --client-secret \"$CLIENT_SECRET\" --redirect-uri http://localhost:8080/callback; echo; xurl auth oauth2 --app test; echo; xurl auth status; echo 'X MCP authorization finished. You can close this terminal after the agent verifies it.'"
+end tell
+APPLESCRIPT
+```
+
+After the terminal OAuth flow succeeds, the agent should verify `xurl auth
+status`, set the default app/user if needed, update the AI client MCP config,
+and restart or ask the user to restart the client so `xapi` is loaded.
+
 ## Configure Codex
 
 Add the hosted X MCP to `~/.codex/config.toml`:
