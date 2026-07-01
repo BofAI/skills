@@ -153,6 +153,12 @@ python3 twitter-digest/scripts/install.py --skip-browser-check
 3. 如果登录态有效，不弹浏览器。
 4. 如果登录失效，再打开可见浏览器让用户重新登录。
 
+浏览器日报必须识别当前登录账号的 handle。脚本会先从 X 的账号切换器、Profile 导航和账号相关 DOM 自动识别；如果 headless 识别不到，会打开可见浏览器重试。仍识别不到时直接停止，不生成日报。此时让用户确认可见浏览器里登录的是正确账号，或显式运行：
+
+```bash
+python3 twitter-digest/scripts/run_daily_digest.py --handle <handle>
+```
+
 不会读取用户常用浏览器 profile，也不会要求用户复制 cookie/token。
 
 ## 默认采集范围

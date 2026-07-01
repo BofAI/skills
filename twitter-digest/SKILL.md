@@ -192,6 +192,8 @@ If the authenticated handle is not detected or the user corrects it:
 RUN_DAILY_DIGEST --handle <handle> --account-name "<显示名>" --save-default
 ```
 
+Browser-source daily digests must identify the authenticated handle before collecting public pages. If automatic handle detection fails, the collector opens a visible browser window and retries. If the handle still cannot be identified, the run must stop and the agent must not generate a daily digest from partial browser data; ask the user to rerun with `--handle <handle>` or confirm the correct account in the visible X window.
+
 For debugging or manual inspection:
 
 ```bash

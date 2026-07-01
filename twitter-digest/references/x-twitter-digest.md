@@ -100,6 +100,7 @@ This prints counts, load status, and data gaps without printing DM message bodie
 - Do not ask the user to copy cookies or tokens.
 - If X shows a login page, wait for the user to log in manually.
 - If X shows CAPTCHA or account challenge, stop and ask the user to resolve it in the browser.
+- Browser daily digest collection must identify the authenticated handle before collecting `own_profile`, `mentions_search`, and `mentions_notifications`. If headless detection fails, retry in a visible browser. If detection still fails, stop the run; do not let the agent summarize partial browser data as a daily digest.
 - Do not post, like, follow, accept DM requests, open suspicious links, or reply.
 - Keep scrolling bounded by the digest goal. API public collection defaults to `--max-public-items 300`; browser public collection defaults to `--scrolls 40`, `--max-public-items 100`, and `--public-window-hours 24`, stopping early when loaded post timestamps are clearly outside the daily window.
 - Read only DM content that is visible in the local logged-in browser. Use `--no-dms` when the user does not want DMs processed.

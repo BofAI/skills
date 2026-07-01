@@ -93,15 +93,17 @@ twitter-digest/.state/run/digest-context.md
 
 5. 脚本检测登录成功。
 
-6. 脚本自动识别当前 X 账号 handle。
+6. 脚本自动识别当前 X 账号 handle；如果 headless 识别失败，会打开可见浏览器重试。
 
-7. 脚本采集 timeline、mentions、own profile、DM。
+7. 如果仍无法识别 handle，脚本直接停止并要求用户带 `--handle <用户名>` 重跑，不能生成缺 `@你` 和自己动态的日报。
 
-8. 脚本生成 `twitter-digest/.state/run/*` 当次采集文件。
+8. 识别成功后，脚本采集 timeline、mentions、own profile、DM。
 
-9. Agent 只读取 `twitter-digest/.state/run/digest-context.md` 生成中文日报。
+9. 脚本生成 `twitter-digest/.state/run/*` 当次采集文件。
 
-10. `digest-input.*` 只在排查抓取问题时使用。
+10. Agent 只读取 `twitter-digest/.state/run/digest-context.md` 生成中文日报。
+
+11. `digest-input.*` 只在排查抓取问题时使用。
 
 ## 5. 后续运行流程
 
