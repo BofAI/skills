@@ -7,8 +7,8 @@ INSTALL_SPEC="${PACKAGE}@${VERSION}"
 APP_NAME="${X_MCP_APP_NAME:-xmcp}"
 REDIRECT_URI="${X_MCP_REDIRECT_URI:-http://localhost:8080/callback}"
 SERVER_NAME="${X_MCP_SERVER_NAME:-xapi}"
-REGISTER_CODEX="${X_MCP_REGISTER_CODEX:-1}"
-REGISTER_CLAUDE="${X_MCP_REGISTER_CLAUDE:-auto}"
+REGISTER_CODEX="${X_MCP_REGISTER_CODEX:-0}"
+REGISTER_CLAUDE="${X_MCP_REGISTER_CLAUDE:-0}"
 CODEX_CONFIG="${CODEX_CONFIG:-$HOME/.codex/config.toml}"
 OPEN_TERMINAL="${X_MCP_OPEN_TERMINAL:-auto}"
 XURL_COMMAND="${X_MCP_XURL_COMMAND:-}"
@@ -115,7 +115,7 @@ tell application "Terminal"
   do script "$(applescript_quote "$command_text")"
 end tell
 OSA
-  info "Opened Terminal for X MCP OAuth2 setup. Continue there."
+  info "Opened Terminal for xurl OAuth2 setup. Continue there."
   exit 0
 }
 
@@ -285,9 +285,9 @@ else
 fi
 
 info "Done"
-printf '\nX MCP command for MCP clients:\n'
+printf '\nOptional hosted X MCP bridge command:\n'
 printf '  %s --app %s mcp https://api.x.com/mcp\n' "$XURL_COMMAND" "$APP_NAME"
-printf '\nCodex config example:\n'
+printf '\nOptional Codex MCP config example:\n'
 printf '[mcp_servers.%s]\n' "$SERVER_NAME"
 printf 'command = "%s"\n' "$XURL_COMMAND"
 printf 'args = ["--app", "%s", "mcp", "https://api.x.com/mcp"]\n' "$APP_NAME"
