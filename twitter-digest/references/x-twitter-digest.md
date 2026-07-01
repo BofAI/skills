@@ -8,7 +8,7 @@ The data collection layer has three scripts:
 
 - `scripts/browser_x_digest.py`: local browser collector. It launches a dedicated Chromium profile at `twitter-digest/.state/chrome-profile`, reads X page DOM, and is required for X Chat / DM content.
 - `scripts/api_x_digest.py`: official API collector. It uses saved OAuth2 user-context credentials, `X_BEARER_TOKEN` / `TWITTER_BEARER_TOKEN`, or `--bearer-token` and writes the same `digest-input.*` shape as the browser collector.
-- `scripts/run_daily_digest.py`: upper wrapper. Default source is browser. API is used only when the user explicitly asks for API setup/use or the agent runs `--source api` / `--source auto`.
+- `scripts/run_daily_digest.py`: upper wrapper. Default source is auto: API when credentials are configured, otherwise browser. Use `--source browser` when the user explicitly wants browser collection.
 
 Browser mode:
 

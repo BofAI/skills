@@ -31,7 +31,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--configure-only", action="store_true", help="Only save default account config; do not collect data.")
     parser.add_argument("--keywords", default="", help="Optional comma-separated search queries. Default is empty; the daily digest focuses on timeline, mentions, and DMs.")
     parser.add_argument("--out", default=str(DEFAULT_OUT_DIR))
-    parser.add_argument("--source", choices=("browser", "api", "auto"), default="browser", help="Data collection source. Default browser. Use api or auto only after explicitly configuring X API.")
+    parser.add_argument("--source", choices=("auto", "browser", "api"), default="auto", help="Data collection source. Default auto: API when configured, otherwise browser. Use browser to force local browser collection.")
     parser.add_argument("--configure-api", action="store_true", help="Open a secure prompt to save X API credentials, then exit.")
     parser.add_argument("--configure-api-token", action="store_true", help="Open a secure prompt to paste an existing X user access token, then exit.")
     parser.add_argument("--api-base", default=os.environ.get("X_API_BASE_URL") or "")

@@ -32,7 +32,7 @@ scripts/browser_x_digest.py
 
 - 无 API 配置的普通用户。
 - 需要读取 X Chat / DM 内容的场景。
-- 普通日报的默认来源；即使本地已有 API 配置，未显式选择 API 时也继续使用浏览器。
+- 没有 API 配置时的默认来源，或用户显式选择浏览器模式时使用。
 
 ### 2. API 抓取脚本
 
@@ -78,10 +78,11 @@ scripts/run_daily_digest.py
 
 - 统一入口。
 - 提供 `--configure-api`，由 Agent 在对话里触发 OAuth 配置。
-- 默认使用浏览器抓取。
-- 只有用户主动要求配置/使用 X API，或命令显式传入 `--source api` / `--source auto`，才走 API 抓取。
-- API source 已显式选择时不启动浏览器，不自动回退浏览器；API 不可用时失败或写入 data gap。
-- 普通 `run_daily_digest.py` 即使检测到环境变量 token 或 `.state/api_config.json`，也继续使用浏览器。
+- 默认 `--source auto`。
+- 如果检测到环境变量 token，或 `.state/api_config.json` 里保存的 OAuth2 user-context 配置，走 API 抓取。
+- 如果没有 API token，走浏览器抓取。
+- 用户主动要求浏览器或命令显式传入 `--source browser` 时，强制浏览器抓取。
+- API source 已选择时不启动浏览器，不自动回退浏览器；API 不可用时失败或写入 data gap。
 - 如果 OAuth2 access token 快过期且保存了 refresh token，自动刷新后再抓取。
 - 抓取完成后调用 `digest_context.py` 生成 `digest-context.*`。
 
@@ -90,14 +91,14 @@ scripts/run_daily_digest.py
 ```text
 --source api      -> 强制 API，只采公开数据，不启动浏览器
 --source browser  -> 强制浏览器，采公开网页和可见 X Chat / DM
---source auto     -> 显式选择自动模式；有 X_BEARER_TOKEN/TWITTER_BEARER_TOKEN 或已保存 OAuth2 user token 用 API，否则浏览器；API 已配置时不回退浏览器
+--source auto     -> 默认自动模式；有 X_BEARER_TOKEN/TWITTER_BEARER_TOKEN 或已保存 OAuth2 user token 用 API，否则浏览器；API 已配置时不回退浏览器
 ```
 
 隔离规则：
 
 - API 来源只运行 `api_x_digest.py`，不启动浏览器、不读取浏览器 profile、不用浏览器补采 API 缺口。
 - 浏览器来源只运行 `browser_x_digest.py`，不读取 API token、不合并 API collector 输出。
-- 默认浏览器来源和 `--source auto` 每次都只选择一个来源，不合并 API 和浏览器两边的数据。
+- 默认 `--source auto` 每次只选择一个来源，不合并 API 和浏览器两边的数据。
 - API 输出里的“需要浏览器确认 DM”只能作为 data gap 提示，不表示本次已经读取了浏览器 DM。
 
 ## 对话触发流程
@@ -126,7 +127,7 @@ Agent：运行 `python3 ~/.claude/skills/twitter-digest/scripts/run_daily_digest
 脚本：弹出隐藏输入框
 用户：粘贴 user access token
 脚本：保存 token 到 .state/api_config.json
-后续普通日报仍运行 `python3 ~/.claude/skills/twitter-digest/scripts/run_daily_digest.py` 并默认走浏览器；要用 API 时显式运行 `--source api` 或 `--source auto`
+后续普通日报仍运行 `python3 ~/.claude/skills/twitter-digest/scripts/run_daily_digest.py`，并自动走 API；要临时使用浏览器时显式运行 `--source browser`
 ```
 
 配置 API，OAuth2 授权：
@@ -139,7 +140,7 @@ Agent：运行 `python3 ~/.claude/skills/twitter-digest/scripts/run_daily_digest
 脚本：打开 X 授权页
 用户：在浏览器里授权 app
 脚本：通过本地 callback 换取 access token / refresh token 并保存
-后续普通日报仍运行 `python3 ~/.claude/skills/twitter-digest/scripts/run_daily_digest.py` 并默认走浏览器；要用 API 时显式运行 `--source api` 或 `--source auto`
+后续普通日报仍运行 `python3 ~/.claude/skills/twitter-digest/scripts/run_daily_digest.py`，并自动走 API；要临时使用浏览器时显式运行 `--source browser`
 ```
 
 后续运行：
@@ -147,8 +148,8 @@ Agent：运行 `python3 ~/.claude/skills/twitter-digest/scripts/run_daily_digest
 ```text
 用户：生成 X 日报
 Agent：运行 scripts/run_daily_digest.py
-脚本：默认使用浏览器采集并生成 digest-context.md
-脚本：只有显式 `--source api` / `--source auto` 时才读取 `.state/api_config.json` 使用 API
+脚本：默认 auto；有 API 配置则使用 API，否则使用浏览器，生成 digest-context.md
+脚本：只有显式 `--source browser` 时才在有 API 配置的情况下强制浏览器
 Agent：读取 digest-context.md 写中文日报
 ```
 
@@ -166,7 +167,7 @@ Agent：再次运行 `python3 ~/.claude/skills/twitter-digest/scripts/run_daily_
 ```text
 用户：清除 X API 配置
 Agent：运行 `python3 ~/.claude/skills/twitter-digest/scripts/configure_api.py --clear`
-后续：`python3 ~/.claude/skills/twitter-digest/scripts/run_daily_digest.py` 默认使用浏览器抓取
+后续：`python3 ~/.claude/skills/twitter-digest/scripts/run_daily_digest.py` 因没有 API 配置而使用浏览器抓取
 ```
 
 ## 标准输出结构

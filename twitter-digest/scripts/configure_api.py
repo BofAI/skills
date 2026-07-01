@@ -346,7 +346,7 @@ def main() -> None:
                 "handle": saved.get("handle") or config["handle"],
                 "user_id": saved.get("user_id") or config["user_id"],
                 "verification": verification,
-                "next_step": "Normal scripts/run_daily_digest.py runs still use browser. Use --source api or --source auto to use the saved API token.",
+                "next_step": "Normal scripts/run_daily_digest.py runs now use the saved API token. Use --source browser only when you explicitly want browser collection.",
             },
             ensure_ascii=False,
             indent=2,
