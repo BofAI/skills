@@ -105,10 +105,8 @@ open_in_terminal_and_exit() {
   fi
   local path
   path="$(script_path)"
-  local cwd
-  cwd="$(pwd)"
   local command_text
-  command_text="cd $(shell_quote "$cwd") && X_MCP_TERMINAL_CHILD=1 /bin/bash $(shell_quote "$path"); printf '\\nPress Enter to close this window...'; IFS= read -r _"
+  command_text="cd ~ && X_MCP_TERMINAL_CHILD=1 /bin/bash $(shell_quote "$path"); printf '\\nPress Enter to close this window...'; IFS= read -r _"
   osascript >/dev/null <<OSA
 tell application "Terminal"
   activate
@@ -205,16 +203,16 @@ register_claude() {
   claude mcp add "$server_name" -- "$xurl_command" --app "$app_name" mcp https://api.x.com/mcp
 }
 
-if should_open_terminal; then
-  open_in_terminal_and_exit
-fi
-
 if ! command_exists node; then
   fail "Node.js is required before installing xurl. Install Node.js, then rerun this script."
 fi
 
 if ! command_exists npm; then
   fail "npm is required before installing xurl. Install npm, then rerun this script."
+fi
+
+if should_open_terminal; then
+  open_in_terminal_and_exit
 fi
 
 info "Installing ${INSTALL_SPEC}"
