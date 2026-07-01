@@ -11,12 +11,6 @@ REGISTER_CODEX="${X_MCP_REGISTER_CODEX:-1}"
 REGISTER_CLAUDE="${X_MCP_REGISTER_CLAUDE:-auto}"
 CODEX_CONFIG="${CODEX_CONFIG:-$HOME/.codex/config.toml}"
 OPEN_TERMINAL="${X_MCP_OPEN_TERMINAL:-auto}"
-INSTALL_SKILL="${X_MCP_INSTALL_SKILL:-0}"
-SKILL_CLIENT="${X_MCP_SKILL_CLIENT:-auto}"
-SKILL_INSTALL_MODE="${X_MCP_SKILL_INSTALL_MODE:-copy}"
-SKIP_BROWSER_CHECK="${X_MCP_SKIP_BROWSER_CHECK:-0}"
-ALLOW_CLAUDE_COMMANDS="${X_MCP_ALLOW_CLAUDE_COMMANDS:-0}"
-ALLOW_CLAUDE_STATE_READ="${X_MCP_ALLOW_CLAUDE_STATE_READ:-0}"
 
 info() {
   printf '==> %s\n' "$1"
@@ -184,33 +178,6 @@ register_claude() {
   claude mcp add "$server_name" -- xurl --app "$app_name" mcp https://api.x.com/mcp
 }
 
-install_twitter_skill() {
-  local path
-  path="$(script_path)"
-  local root
-  root="$(cd "$(dirname "$path")/.." >/dev/null 2>&1 && pwd)"
-  local install_py="$root/scripts/install.py"
-  local cmd=(python3 "$install_py" --client "$SKILL_CLIENT")
-
-  if [ "$SKILL_INSTALL_MODE" = "symlink" ]; then
-    cmd+=(--symlink)
-  else
-    cmd+=(--copy)
-  fi
-  if [ "$SKIP_BROWSER_CHECK" = "1" ] || [ "$SKIP_BROWSER_CHECK" = "true" ]; then
-    cmd+=(--skip-browser-check)
-  fi
-  if [ "$ALLOW_CLAUDE_COMMANDS" = "1" ] || [ "$ALLOW_CLAUDE_COMMANDS" = "true" ]; then
-    cmd+=(--allow-claude-commands)
-  fi
-  if [ "$ALLOW_CLAUDE_STATE_READ" = "1" ] || [ "$ALLOW_CLAUDE_STATE_READ" = "true" ]; then
-    cmd+=(--allow-claude-state-read)
-  fi
-
-  info "Installing twitter-digest skill"
-  "${cmd[@]}"
-}
-
 if should_open_terminal; then
   open_in_terminal_and_exit
 fi
@@ -286,18 +253,10 @@ else
   info "Skipped Claude Code MCP registration."
 fi
 
-if [ "$INSTALL_SKILL" = "1" ] || [ "$INSTALL_SKILL" = "true" ]; then
-  install_twitter_skill
-else
-  info "Skipped twitter-digest skill install. Set X_MCP_INSTALL_SKILL=1 to install it."
-fi
-
 info "Done"
 printf '\nX MCP command for MCP clients:\n'
-printf '  xurl mcp https://api.x.com/mcp\n'
+printf '  xurl --app %s mcp https://api.x.com/mcp\n' "$APP_NAME"
 printf '\nCodex config example:\n'
-printf '[mcp_servers.xapi]\n'
+printf '[mcp_servers.%s]\n' "$SERVER_NAME"
 printf 'command = "xurl"\n'
 printf 'args = ["--app", "%s", "mcp", "https://api.x.com/mcp"]\n' "$APP_NAME"
-printf '\nOptional one-command skill install:\n'
-printf '  X_MCP_INSTALL_SKILL=1 /bin/bash twitter-digest/scripts/install_xmcp.sh\n'

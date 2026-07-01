@@ -1,6 +1,6 @@
 ---
 name: twitter-digest
-description: Use when the user wants Claude Code or another agent to analyze their own X/Twitter mentions, home timeline, visible direct messages, reply opportunities, and daily social-media summaries through X MCP, API, or local logged-in browser collection.
+description: Use when the user wants Claude Code or another agent to analyze their own X/Twitter mentions, home timeline, visible direct messages, reply opportunities, and daily social-media summaries through available X MCP tools, API, or local logged-in browser collection. Do not use for installing or registering X MCP; use twitter-mcp for that.
 ---
 
 # X/Twitter Digest
@@ -47,23 +47,7 @@ When X MCP tools are available in the current agent session, use them directly a
 
 Do not run `run_daily_digest.py` just to use MCP. MCP is an agent tool source, not a local file-producing collector. If an MCP endpoint returns an auth/tier error, include it as a data gap. If the current X MCP tool list does not include DM/X Chat tools, say DM was not collected through MCP and do not claim there are no private messages.
 
-If X MCP is installed but Codex or Claude Code cannot see tools, the user likely needs MCP registration plus a new agent session. The installer helper is:
-
-```bash
-twitter-digest/scripts/install_xmcp.sh
-```
-
-It installs `@xdevplatform/xurl`, runs OAuth2 authorization, and registers the MCP server as `xapi` for Codex and, when available, Claude Code.
-
-When launched by a Codex or Claude Code agent on macOS, the installer opens a real Terminal window for OAuth2 Client ID / Secret input and browser authorization. Do not ask the user to paste OAuth credentials into chat.
-
-By default, `install_xmcp.sh` installs only X MCP. If the user wants one command to also install this skill, set:
-
-```bash
-X_MCP_INSTALL_SKILL=1 twitter-digest/scripts/install_xmcp.sh
-```
-
-Optional controls are `X_MCP_SKILL_CLIENT=auto|codex|claude`, `X_MCP_SKILL_INSTALL_MODE=copy|symlink`, and `X_MCP_SKIP_BROWSER_CHECK=1`.
+If X MCP is installed but Codex or Claude Code cannot see tools, the user likely needs MCP registration plus a new agent session. Use the separate `twitter-mcp` skill for X MCP installation, authorization, registration, and troubleshooting. Do not install or register MCP from this skill.
 
 ### Script Sources
 

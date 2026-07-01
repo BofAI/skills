@@ -74,27 +74,13 @@ X MCP registered as xapi -> agent calls MCP tools directly -> agent writes the C
 
 The MCP path does not use a local collector script and does not write `digest-context.*`. The agent should call tools such as `get_users_me`, `get_users_timeline`, `get_users_mentions`, and `get_users_posts` directly. If X MCP does not expose DM/X Chat tools, report DM as not collected through MCP rather than claiming there are no private messages.
 
-To install and register X MCP for Codex / Claude Code:
+To install and register X MCP for Codex / Claude Code, use the separate `twitter-mcp` skill:
 
 ```bash
-twitter-digest/scripts/install_xmcp.sh
+/bin/bash twitter-mcp/scripts/install_xmcp.sh
 ```
 
 When launched by a Codex or Claude Code agent on macOS, the installer opens a real Terminal window for OAuth2 Client ID / Secret input and browser authorization. Secrets should be entered there, not pasted into chat.
-
-By default this only installs and registers X MCP. To also install the `twitter-digest` skill in the same flow:
-
-```bash
-X_MCP_INSTALL_SKILL=1 twitter-digest/scripts/install_xmcp.sh
-```
-
-Useful install options:
-
-```bash
-X_MCP_SKILL_CLIENT=codex          # auto | codex | claude
-X_MCP_SKILL_INSTALL_MODE=symlink  # copy | symlink
-X_MCP_SKIP_BROWSER_CHECK=1        # skip browser runtime check for skill install
-```
 
 There are three collection entry points:
 

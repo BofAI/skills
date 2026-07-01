@@ -1,0 +1,4 @@
+interface:
+  display_name: "X/Twitter MCP"
+  short_description: "Install and register the official X MCP server"
+  default_prompt: "Use $twitter-mcp to install and register X MCP for Codex or Claude Code."
