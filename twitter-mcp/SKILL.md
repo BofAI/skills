@@ -51,13 +51,13 @@ From the repository `skills/` directory:
 For a one-line Codex install from this beta tag:
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/BofAI/skills/v1.5.11-beta.8/twitter-mcp/install.sh | X_MCP_REGISTER_CODEX=1 X_MCP_REGISTER_CLAUDE=0 sh
+curl -fsSL https://raw.githubusercontent.com/BofAI/skills/v1.5.11-beta.9/twitter-mcp/install.sh | X_MCP_REGISTER_CODEX=1 X_MCP_REGISTER_CLAUDE=0 sh
 ```
 
 For a one-line Claude Code install from this beta tag:
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/BofAI/skills/v1.5.11-beta.8/twitter-mcp/install.sh | X_MCP_REGISTER_CODEX=0 X_MCP_REGISTER_CLAUDE=1 sh
+curl -fsSL https://raw.githubusercontent.com/BofAI/skills/v1.5.11-beta.9/twitter-mcp/install.sh | X_MCP_REGISTER_CODEX=0 X_MCP_REGISTER_CLAUDE=1 sh
 ```
 
 The installer:
@@ -66,7 +66,7 @@ The installer:
 - Requires Node.js and npm.
 - Installs `@xdevplatform/xurl` globally with npm.
 - Opens the X OAuth2 authorization flow.
-- Registers an MCP server named `xapi` for Codex by editing `~/.codex/config.toml`.
+- Registers an MCP server named `xapi` for Codex by editing `~/.codex/config.toml` with the absolute `xurl` command path.
 - Registers the same MCP server for Claude Code when the `claude` CLI is available.
 
 When launched by Codex or Claude Code on macOS, the installer opens a real Terminal window for OAuth2 Client ID / Secret input and browser authorization. Do not ask the user to paste OAuth credentials into chat.
@@ -103,7 +103,7 @@ Codex config shape:
 
 ```toml
 [mcp_servers.xapi]
-command = "xurl"
+command = "/absolute/path/to/xurl"
 args = ["--app", "xmcp", "mcp", "https://api.x.com/mcp"]
 ```
 
@@ -119,7 +119,7 @@ After installation:
 
 1. Start a new Codex or Claude Code session.
 2. Check whether X MCP tools are visible under the `xapi` server.
-3. If tools are missing, verify `xurl` is on `PATH`, the MCP config contains `xapi`, and the OAuth app name matches the configured `--app` value.
+3. If tools are missing, verify the MCP config contains `xapi`, `command` points to an executable `xurl` path, and the OAuth app name matches the configured `--app` value.
 
 If an X MCP endpoint returns an auth, subscription, tier, or scope error, report the exact failing capability as a setup or account limitation. Do not infer that the requested X data does not exist.
 

@@ -11,6 +11,7 @@ REGISTER_CODEX="${X_MCP_REGISTER_CODEX:-1}"
 REGISTER_CLAUDE="${X_MCP_REGISTER_CLAUDE:-auto}"
 CODEX_CONFIG="${CODEX_CONFIG:-$HOME/.codex/config.toml}"
 OPEN_TERMINAL="${X_MCP_OPEN_TERMINAL:-auto}"
+XURL_COMMAND="${X_MCP_XURL_COMMAND:-}"
 
 info() {
   printf '==> %s\n' "$1"
@@ -38,6 +39,19 @@ applescript_quote() {
 toml_quote() {
   local value="$1"
   printf '"%s"' "$(printf '%s' "$value" | sed 's/\\/\\\\/g; s/"/\\"/g')"
+}
+
+resolve_command_path() {
+  local command_name="$1"
+  local resolved=""
+  resolved="$(command -v "$command_name" 2>/dev/null || true)"
+  if [ -z "$resolved" ]; then
+    return 1
+  fi
+  case "$resolved" in
+    /*) printf '%s' "$resolved" ;;
+    *) printf '%s/%s' "$(cd -P "$(dirname "$resolved")" >/dev/null 2>&1 && pwd)" "$(basename "$resolved")" ;;
+  esac
 }
 
 script_path() {
@@ -137,19 +151,31 @@ register_codex() {
   local config_path="$1"
   local server_name="$2"
   local app_name="$3"
+  local xurl_command="$4"
   local marker="[mcp_servers.${server_name}]"
+  local subtable_prefix="[mcp_servers.${server_name}."
+  local tmp_config=""
 
   mkdir -p "$(dirname "$config_path")"
   touch "$config_path"
+  tmp_config="${config_path}.tmp.$$"
 
-  if grep -Fqx "$marker" "$config_path"; then
-    info "Codex MCP server '${server_name}' already exists in ${config_path}; leaving it unchanged."
-    return
-  fi
+  awk -v marker="$marker" -v subtable_prefix="$subtable_prefix" '
+    /^\[/ {
+      if ($0 == marker || index($0, subtable_prefix) == 1) {
+        skip = 1
+        next
+      }
+      skip = 0
+    }
+    skip { next }
+    { print }
+  ' "$config_path" > "$tmp_config"
+  mv "$tmp_config" "$config_path"
 
   {
     printf '\n[mcp_servers.%s]\n' "$server_name"
-    printf 'command = "xurl"\n'
+    printf 'command = %s\n' "$(toml_quote "$xurl_command")"
     printf 'args = [%s, %s, %s, %s]\n' \
       "$(toml_quote '--app')" \
       "$(toml_quote "$app_name")" \
@@ -157,12 +183,13 @@ register_codex() {
       "$(toml_quote 'https://api.x.com/mcp')"
   } >> "$config_path"
 
-  info "Registered Codex MCP server '${server_name}' in ${config_path}"
+  info "Registered Codex MCP server '${server_name}' in ${config_path} with ${xurl_command}"
 }
 
 register_claude() {
   local server_name="$1"
   local app_name="$2"
+  local xurl_command="$3"
 
   if ! command_exists claude; then
     info "Claude Code CLI not found; skipped Claude MCP registration."
@@ -175,7 +202,7 @@ register_claude() {
   fi
 
   info "Registering Claude Code MCP server '${server_name}'"
-  claude mcp add "$server_name" -- xurl --app "$app_name" mcp https://api.x.com/mcp
+  claude mcp add "$server_name" -- "$xurl_command" --app "$app_name" mcp https://api.x.com/mcp
 }
 
 if should_open_terminal; then
@@ -193,11 +220,15 @@ fi
 info "Installing ${INSTALL_SPEC}"
 npm install -g "${INSTALL_SPEC}"
 
-if ! command_exists xurl; then
+if [ -z "$XURL_COMMAND" ]; then
+  XURL_COMMAND="$(resolve_command_path xurl || true)"
+fi
+
+if [ -z "$XURL_COMMAND" ] || [ ! -x "$XURL_COMMAND" ]; then
   fail "xurl was installed by npm, but the xurl command is not on PATH."
 fi
 
-info "Installed $(xurl --version 2>/dev/null || printf 'xurl')"
+info "Installed $("$XURL_COMMAND" --version 2>/dev/null || printf 'xurl') at ${XURL_COMMAND}"
 
 CLIENT_ID="${X_MCP_CLIENT_ID:-${X_OAUTH_CLIENT_ID:-}}"
 CLIENT_SECRET="${X_MCP_CLIENT_SECRET:-${X_OAUTH_CLIENT_SECRET:-}}"
@@ -223,29 +254,29 @@ if [ -t 0 ]; then
 fi
 
 info "Registering xurl OAuth app '${APP_NAME}'"
-app_cmd=(xurl auth apps add "$APP_NAME" --client-id "$CLIENT_ID" --redirect-uri "$REDIRECT_URI")
+app_cmd=("$XURL_COMMAND" auth apps add "$APP_NAME" --client-id "$CLIENT_ID" --redirect-uri "$REDIRECT_URI")
 if [ -n "$CLIENT_SECRET" ]; then
   app_cmd+=(--client-secret "$CLIENT_SECRET")
 fi
 "${app_cmd[@]}"
 
 info "Opening X OAuth authorization flow"
-xurl auth oauth2 --app "$APP_NAME"
+"$XURL_COMMAND" auth oauth2 --app "$APP_NAME"
 
 info "Setting '${APP_NAME}' as the default xurl auth app"
-xurl auth default "$APP_NAME"
+"$XURL_COMMAND" auth default "$APP_NAME"
 
 if [ "$REGISTER_CODEX" = "1" ] || [ "$REGISTER_CODEX" = "true" ]; then
-  register_codex "$CODEX_CONFIG" "$SERVER_NAME" "$APP_NAME"
+  register_codex "$CODEX_CONFIG" "$SERVER_NAME" "$APP_NAME" "$XURL_COMMAND"
 else
   info "Skipped Codex MCP registration."
 fi
 
 if [ "$REGISTER_CLAUDE" = "1" ] || [ "$REGISTER_CLAUDE" = "true" ]; then
-  register_claude "$SERVER_NAME" "$APP_NAME"
+  register_claude "$SERVER_NAME" "$APP_NAME" "$XURL_COMMAND"
 elif [ "$REGISTER_CLAUDE" = "auto" ]; then
   if command_exists claude; then
-    register_claude "$SERVER_NAME" "$APP_NAME"
+    register_claude "$SERVER_NAME" "$APP_NAME" "$XURL_COMMAND"
   else
     info "Claude Code CLI not found; skipped Claude MCP registration."
   fi
@@ -255,8 +286,8 @@ fi
 
 info "Done"
 printf '\nX MCP command for MCP clients:\n'
-printf '  xurl --app %s mcp https://api.x.com/mcp\n' "$APP_NAME"
+printf '  %s --app %s mcp https://api.x.com/mcp\n' "$XURL_COMMAND" "$APP_NAME"
 printf '\nCodex config example:\n'
 printf '[mcp_servers.%s]\n' "$SERVER_NAME"
-printf 'command = "xurl"\n'
+printf 'command = "%s"\n' "$XURL_COMMAND"
 printf 'args = ["--app", "%s", "mcp", "https://api.x.com/mcp"]\n' "$APP_NAME"
