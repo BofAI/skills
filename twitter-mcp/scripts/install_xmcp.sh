@@ -94,7 +94,7 @@ open_in_terminal_and_exit() {
   local cwd
   cwd="$(pwd)"
   local command_text
-  command_text="cd $(shell_quote "$cwd") && X_MCP_TERMINAL_CHILD=1 /bin/bash $(shell_quote "$path"); printf '\\n'; read -r -n 1 -s -p 'Press any key to close this window...'"
+  command_text="cd $(shell_quote "$cwd") && X_MCP_TERMINAL_CHILD=1 /bin/bash $(shell_quote "$path"); printf '\\nPress Enter to close this window...'; IFS= read -r _"
   osascript >/dev/null <<OSA
 tell application "Terminal"
   activate

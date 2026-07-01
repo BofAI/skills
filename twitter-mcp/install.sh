@@ -1,7 +1,7 @@
 #!/bin/sh
 set -eu
 
-TAG="${X_MCP_INSTALL_TAG:-v1.5.11-beta.5}"
+TAG="${X_MCP_INSTALL_TAG:-v1.5.11-beta.6}"
 BASE_URL="${X_MCP_INSTALL_BASE_URL:-https://raw.githubusercontent.com/BofAI/skills/${TAG}/twitter-mcp}"
 REGISTER_CODEX="${X_MCP_REGISTER_CODEX:-1}"
 REGISTER_CLAUDE="${X_MCP_REGISTER_CLAUDE:-auto}"
