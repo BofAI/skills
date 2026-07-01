@@ -19,16 +19,16 @@ From the repository `skills/` directory:
 /bin/bash twitter-mcp/scripts/install_xmcp.sh
 ```
 
-For a one-line Codex install from this branch:
+For a one-line Codex install from this beta tag:
 
 ```bash
-TMPDIR="$(mktemp -d)" && git clone --depth 1 --branch v1.5.11-beta.2 https://github.com/BofAI/skills.git "$TMPDIR/skills" && X_MCP_REGISTER_CODEX=1 X_MCP_REGISTER_CLAUDE=0 /bin/bash "$TMPDIR/skills/twitter-mcp/scripts/install_xmcp.sh"
+curl -fsSL https://raw.githubusercontent.com/BofAI/skills/v1.5.11-beta.3/twitter-mcp/install.sh | X_MCP_REGISTER_CODEX=1 X_MCP_REGISTER_CLAUDE=0 sh
 ```
 
-For a one-line Claude Code install from this branch:
+For a one-line Claude Code install from this beta tag:
 
 ```bash
-TMPDIR="$(mktemp -d)" && git clone --depth 1 --branch v1.5.11-beta.2 https://github.com/BofAI/skills.git "$TMPDIR/skills" && X_MCP_REGISTER_CODEX=0 X_MCP_REGISTER_CLAUDE=1 /bin/bash "$TMPDIR/skills/twitter-mcp/scripts/install_xmcp.sh"
+curl -fsSL https://raw.githubusercontent.com/BofAI/skills/v1.5.11-beta.3/twitter-mcp/install.sh | X_MCP_REGISTER_CODEX=0 X_MCP_REGISTER_CLAUDE=1 sh
 ```
 
 The installer:
