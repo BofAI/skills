@@ -29,22 +29,21 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--account-name")
     parser.add_argument("--save-default", action="store_true", help="Save --handle/--account-name as the default account for future chat runs.")
     parser.add_argument("--configure-only", action="store_true", help="Only save default account config; do not collect data.")
-    parser.add_argument("--keywords", default="", help="Optional comma-separated search queries. Default is empty; the daily digest focuses on timeline and mentions.")
+    parser.add_argument("--keywords", default="", help="Optional comma-separated search queries. Default is empty; the daily digest focuses on timeline, mentions, and DMs.")
     parser.add_argument("--out", default=str(DEFAULT_OUT_DIR))
-    parser.add_argument("--source", choices=("auto", "browser", "api"), default="auto", help="Data collection source. auto uses API when configured, otherwise browser.")
+    parser.add_argument("--source", choices=("auto", "browser", "api"), default="auto", help="Data collection source. Default auto: API when configured, otherwise browser. Use browser to force local browser collection.")
     parser.add_argument("--configure-api", action="store_true", help="Open a secure prompt to save X API credentials, then exit.")
     parser.add_argument("--configure-api-token", action="store_true", help="Open a secure prompt to paste an existing X user access token, then exit.")
     parser.add_argument("--api-base", default=os.environ.get("X_API_BASE_URL") or "")
     parser.add_argument("--user-id", default=os.environ.get("X_USER_ID") or os.environ.get("TWITTER_USER_ID") or "")
     parser.add_argument("--bearer-token", default=os.environ.get("X_BEARER_TOKEN") or os.environ.get("TWITTER_BEARER_TOKEN") or "")
-    parser.add_argument("--include-dms", action="store_true", help=argparse.SUPPRESS)
-    parser.add_argument("--dm-only", action="store_true", help="Debug mode: only collect visible X Chat/DM content through the browser.")
-    parser.add_argument("--no-dms", action="store_true", help=argparse.SUPPRESS)
+    parser.add_argument("--include-dms", action="store_true", help="Include visible DMs. This is already the default; kept for compatibility.")
+    parser.add_argument("--no-dms", action="store_true", help="Skip X Messages collection for this run.")
     parser.add_argument("--dm-threads", type=int, default=5)
     parser.add_argument("--dm-list-scrolls", type=int, default=20, help="Maximum downward scroll rounds used to scan today's DM conversation list.")
     parser.add_argument("--dm-scrolls", type=int, default=200, help="Maximum upward scroll rounds per opened DM thread.")
     parser.add_argument("--dm-max-messages", type=int, default=2000, help="Maximum message bubbles kept per opened DM thread.")
-    parser.add_argument("--dm-max-events", type=int, default=300, help=argparse.SUPPRESS)
+    parser.add_argument("--dm-max-events", type=int, default=300, help="Maximum Direct Message API events kept per run.")
     parser.add_argument("--dm-window-hours", type=int, default=0, help="Stop loading older DM history once messages beyond this window are detected. 0 means load full available thread history.")
     parser.add_argument("--scrolls", type=int, default=40, help="Maximum scroll rounds per public page.")
     parser.add_argument("--min-public-scrolls", type=int, default=5, help="Minimum public-page scroll rounds before early stop rules can end collection.")
@@ -99,6 +98,10 @@ def open_config_in_terminal(extra_args: list[str]) -> bool:
 
 def api_configured(bearer_token: str) -> bool:
     return bool(bearer_token)
+
+
+def has_saved_api_credentials(config: dict) -> bool:
+    return any(str(config.get(key) or "") for key in ("bearer_token", "refresh_token", "client_id"))
 
 
 def summarize_child_error(error: subprocess.CalledProcessError) -> str:
@@ -163,15 +166,6 @@ def run_browser_command(cmd: list[str]) -> None:
     subprocess.run(cmd, check=True)
 
 
-def mark_dm_only_output(out_dir: Path) -> None:
-    input_path = out_dir / "digest-input.json"
-    if not input_path.exists():
-        return
-    data = json.loads(input_path.read_text(encoding="utf-8"))
-    data["source"] = "browser_dm_only"
-    input_path.write_text(json.dumps(data, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
-
-
 def main() -> None:
     rerun_from_installed_if_needed(__file__)
     args = parse_args()
@@ -191,7 +185,9 @@ def main() -> None:
         print(json.dumps({"config": str(CONFIG_PATH), "saved": bool(args.save_default)}, ensure_ascii=False, indent=2))
         return
     config = load_config()
-    api_config = refresh_oauth_token_if_needed(load_api_config())
+    raw_api_config = load_api_config()
+    saved_api_configured = has_saved_api_credentials(raw_api_config)
+    api_config = refresh_oauth_token_if_needed(raw_api_config)
     explicit_bearer_token = bool(args.bearer_token)
     refresh_error = str(api_config.get("refresh_error") or "")
     if refresh_error and not explicit_bearer_token:
@@ -204,41 +200,35 @@ def main() -> None:
     api_base = args.api_base or str(api_config.get("api_base") or "https://api.x.com/2")
     user_id = args.user_id or str(api_config.get("user_id") or "")
     handle = (args.handle or api_config.get("handle") or config.get("handle") or "").lstrip("@")
-    source = args.source if args.source != "auto" else ("api" if api_configured(bearer_token) else "browser")
-    if args.dm_only:
-        source = "browser"
-    if args.source == "api" and refresh_error and not explicit_bearer_token:
-        raise SystemExit("Saved X OAuth token refresh failed. Re-run --configure-api or pass X_BEARER_TOKEN to use API source.")
-    include_dms = source == "browser"
+    source = args.source
+    if source == "auto":
+        source = "api" if (explicit_bearer_token or saved_api_configured or api_configured(bearer_token)) else "browser"
+    if source == "api" and refresh_error and not explicit_bearer_token:
+        raise SystemExit("Saved X OAuth token refresh failed. Re-run --configure-api or pass X_BEARER_TOKEN to use API source. Browser collection will not be opened while API is configured.")
+    include_dms = not args.no_dms
+    if args.include_dms:
+        include_dms = True
     if source == "api":
         cmd = api_command(args, args.out, api_base, user_id, handle)
         child_env = os.environ.copy()
         if bearer_token:
             child_env["X_BEARER_TOKEN"] = bearer_token
     else:
-        cmd = browser_command(args, args.out, handle, include_dms, dm_only=args.dm_only)
+        cmd = browser_command(args, args.out, handle, include_dms)
         child_env = None
+    if source == "api" and include_dms:
+        print("API source selected. Browser DM collection is not run for API source; use --source browser when DMs are required.", flush=True)
     print(f"Collecting X digest data via {source} source.", flush=True)
     try:
         if source == "api":
             run_api_command(cmd, child_env)
         else:
             run_browser_command(cmd)
-            if args.dm_only:
-                mark_dm_only_output(Path(args.out))
-                source = "browser_dm_only"
     except subprocess.CalledProcessError as exc:
         summary = summarize_child_error(exc)
-        if args.source == "auto" and source == "api":
-            print(f"API collection unavailable ({summary}). Falling back to browser collection.", flush=True)
-            source = "browser"
-            run_browser_command(browser_command(args, args.out, handle, include_dms, dm_only=args.dm_only))
-            if args.dm_only:
-                mark_dm_only_output(Path(args.out))
-                source = "browser_dm_only"
-        else:
-            print(f"API collection failed: {summary}", file=sys.stderr, flush=True)
-            raise SystemExit(exc.returncode) from exc
+        source_label = "API" if source == "api" else source.capitalize()
+        print(f"{source_label} collection failed: {summary}", file=sys.stderr, flush=True)
+        raise SystemExit(exc.returncode) from exc
     out_dir = Path(args.out)
     build_current_context_from_file(
         input_path=out_dir / "digest-input.json",

@@ -6,9 +6,9 @@ Use this reference when implementing, auditing, or troubleshooting the X/Twitter
 
 The data collection layer has three scripts:
 
-- `scripts/browser_x_digest.py`: local browser collector. It launches a dedicated Chromium profile at `twitter-digest/.state/chrome-profile`, reads X page DOM, and is required for opt-in X Chat / DM content.
+- `scripts/browser_x_digest.py`: local browser collector. It launches a dedicated Chromium profile at `twitter-digest/.state/chrome-profile`, reads X page DOM, and is required for X Chat / DM content.
 - `scripts/api_x_digest.py`: official API collector. It uses saved OAuth2 user-context credentials, `X_BEARER_TOKEN` / `TWITTER_BEARER_TOKEN`, or `--bearer-token` and writes the same `digest-input.*` shape as the browser collector.
-- `scripts/run_daily_digest.py`: upper wrapper. Default `--source auto` uses API when configured, otherwise browser.
+- `scripts/run_daily_digest.py`: upper wrapper. Default source is auto: API when credentials are configured, otherwise browser. Use `--source browser` when the user explicitly wants browser collection.
 
 Browser mode:
 
@@ -22,10 +22,10 @@ API mode:
 - Intended for stable public-data collection.
 - Requires user-context authorization for user-owned timelines. App-only keys are not enough for home timeline reliability.
 - Reads the official reverse chronological home timeline when the token has user-context timeline access.
-- Browser-source daily runs collect visible X Chat/DM and merge it into one daily digest. API-source runs never start a browser and never collect DM.
+- Normal daily runs use browser collection for DMs. API DM lookup is retained only as TODO/debug because XChat / encrypted messages may not appear in `/2/dm_events`.
 - Records endpoint-level API failures as data gaps instead of silently treating them as empty pages.
-- API source does not collect DM. Use `run_daily_digest.py --source browser` when DM collection is required.
-- Saved OAuth tokens are configured by the agent-triggered `run_daily_digest.py --configure-api` flow. OAuth2 PKCE is the supported path for user-owned local X Apps: the user provides the Client ID, authorizes the app in the browser, and the script saves the access token plus refresh token. OAuth2 tokens are refreshed automatically when a refresh token is saved.
+- DM lookup failures, zero-event API responses, and inconclusive API DM results are recorded as `api_dm_todo`; do not summarize them as empty inboxes. Use browser collection for X Chat / encrypted DMs while waiting for X to fix or document reliable API coverage.
+- Saved OAuth tokens are configured only by the agent-triggered `run_daily_digest.py --configure-api` flow, after the user explicitly asks to configure X API. OAuth2 PKCE is the supported path for user-owned local X Apps: the user provides the Client ID, authorizes the app in the browser, and the script saves the access token plus refresh token. OAuth2 tokens are refreshed automatically when a refresh token is saved.
 
 Chat-triggered API setup:
 
@@ -42,25 +42,17 @@ python3 ~/.claude/skills/twitter-digest/scripts/configure_api.py --verify
 
 Do not write ad-hoc `python3 -c` snippets or temporary verification scripts in chat. The built-in verifier calls `/users/me`, backfills `handle` / `user_id`, and does not print the token.
 
-Typical daily run:
+Typical chat run:
 
 ```bash
 python3 twitter-digest/scripts/run_daily_digest.py
 ```
 
-Browser digest with DM:
+Visible DM collection is enabled by default. To skip DMs:
 
 ```bash
-python3 twitter-digest/scripts/run_daily_digest.py --source browser
+python3 twitter-digest/scripts/run_daily_digest.py --no-dms
 ```
-
-API-only digest without browser/DM:
-
-```bash
-python3 twitter-digest/scripts/run_daily_digest.py --source api
-```
-
-DM browser automation can trigger X account risk controls, login challenges, passcode recovery, or other platform restrictions. Keep it user-triggered and avoid long-running or unattended DM jobs.
 
 Optional keyword search is off by default. Use it only when the user explicitly asks:
 
@@ -108,20 +100,21 @@ This prints counts, load status, and data gaps without printing DM message bodie
 - Do not ask the user to copy cookies or tokens.
 - If X shows a login page, wait for the user to log in manually.
 - If X shows CAPTCHA or account challenge, stop and ask the user to resolve it in the browser.
+- Browser daily digest collection must identify the authenticated handle before collecting `own_profile`, `mentions_search`, and `mentions_notifications`. If headless detection fails, retry in a visible browser. If detection still fails, stop the run; do not let the agent summarize partial browser data as a daily digest.
 - Do not post, like, follow, accept DM requests, open suspicious links, or reply.
 - Keep scrolling bounded by the digest goal. API public collection defaults to `--max-public-items 300`; browser public collection defaults to `--scrolls 40`, `--max-public-items 100`, and `--public-window-hours 24`, stopping early when loaded post timestamps are clearly outside the daily window.
-- Read DM content only in browser source. API source must not start a browser and must not collect DM.
+- Read only DM content that is visible in the local logged-in browser. Use `--no-dms` when the user does not want DMs processed.
 - If X Chat shows passcode setup, passcode entry, or encryption-key recovery, automatically reopen X Messages in a visible browser window, wait for the user to complete it, then retry DM collection. In `--non-interactive` mode, skip DM recovery and record a data gap. The script must not choose, enter, or store the passcode.
 
 ## Pages Collected
 
-Default browser public pages:
+Default browser pages:
 
 - `home`: home timeline for hotspot detection.
 - `own_profile`: the authenticated account profile.
 - `mentions_search`: live search for `@handle`.
 - `mentions_notifications`: notifications mentions page.
-- `messages`: X Messages, only in browser source or low-level `--dm-only` debug mode.
+- `messages`: X Messages.
 
 Optional pages:
 
@@ -141,12 +134,25 @@ Privacy rule: do not write long-term memory or daily archives. Raw DM text may e
 Date rule:
 
 - Run dates use the user's local timezone, not UTC.
+- Public timeline/profile/mentions facts use a strict `[now - 24 hours, now]` window in the user's current local timezone.
+- Public items with missing or unparseable timestamps are excluded from final-summary facts and must be reported as `time-unverified` data gaps.
 
 ## Hotspot Detection
 
 Cluster home timeline posts by repeated topics, hashtags, URLs, named entities, accounts, and semantic similarity. Optional keyword-search posts may be included only when the user explicitly passes `--keywords`.
 
-Public timeline, profile, and mentions collection follows the same bounded-window model as DM collection: load enough context for a 24-hour digest, cap the amount passed to the model, and stop early when timestamps show older content. Treat public item counts as browser-loaded items in this run, not exhaustive X history.
+Public timeline, profile, and mentions collection follows the same bounded-window model as DM collection: load enough context for a 24-hour digest, cap the amount passed to the model, and stop early when timestamps show older content. Treat public item counts as browser-loaded items in this run, not exhaustive X history. The generated digest context applies a second strict local-time 24-hour filter before writing final-summary public facts; do not reintroduce older raw-capture items while summarizing.
+
+Mention handling is strict:
+
+- Direct mention/notification collection and handle search (`@handle` / equivalent search page or API recent search) are complementary. Use both sources when available before concluding there are no current mentions or no reply opportunities.
+- If one mention source is missing, failed, unavailable, or only returned stale data, report the source status as a data gap and do not turn stale mentions into action items.
+- Mentions older than the local 24-hour window must not appear in action items, reply drafts, or the `谁 @ 了你` section.
+- Before labeling a mention as needing reply, verify from current-run data whether the authenticated account already replied after the mention timestamp.
+- Already-replied mentions should be omitted from action items or marked as already handled.
+- If `digest-context.md` includes `reply_state=already_replied` or `action_state=handled`, the mention is not a pending reply. Do not include it in `✅ 该处理` as a reply task.
+- If `digest-context.md` includes `reply_state=reply_unverified`, report `回复状态未确认`; do not claim the user definitely needs to reply.
+- If reply status cannot be verified, label the mention as `回复状态未确认` instead of claiming the user still needs to reply.
 
 A hotspot needs at least one of:
 
@@ -241,5 +247,5 @@ Reply drafting rules:
 ## 中文每日 Prompt
 
 ```text
-使用 $twitter-digest 读取我最近 24 小时的 X/Twitter 动态，生成中文日报。重点总结谁 @ 了我、时间线热点、需要处理的互动、我的账号动态；如果使用浏览器来源，也把需要处理的私信作为同一份日报的 DM 章节；如果使用 API 来源，不采集 DM。先给今日总结和行动建议，再给明细。回复只生成草稿，不要自动发送。读不到的数据要明确标注。
+使用 $twitter-digest 通过本地浏览器读取我最近 24 小时的 X/Twitter 动态，生成中文日报。重点总结谁 @ 了我、时间线热点、需要处理的私信或互动、我的账号动态。先给今日总结和行动建议，再给明细。回复只生成草稿，不要自动发送。读不到的数据要明确标注。
 ```

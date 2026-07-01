@@ -1,6 +1,6 @@
 # X/Twitter Digest
 
-Skill for generating a Chinese daily digest from a user's own X/Twitter account through API collection when configured, otherwise through a saved local browser session.
+Skill for generating a Chinese daily digest from a user's own X/Twitter account. It defaults to API collection after X API is configured, otherwise it uses a saved local browser session.
 
 ## Quick Install
 
@@ -14,6 +14,14 @@ python3 twitter-digest/scripts/install.py
 
 To ask Codex to install this skill for itself, paste this into Codex:
 
+```bash
+curl -fsSL https://raw.githubusercontent.com/BofAI/skills/v1.5.11/twitter-digest/install.sh | env TWITTER_DIGEST_INSTALL_CLIENT=codex sh
+```
+
+When this one-line installer is launched from Codex, Claude Code, or another non-interactive agent on macOS, it opens a real Terminal window and re-runs the full installation there. This avoids agent permission/inspect prompts during `git clone`, Python checks, browser checks, and installer writes. Set `TWITTER_DIGEST_OPEN_TERMINAL=0` only when intentionally running in an already interactive Terminal or CI.
+
+Or use the natural-language prompt:
+
 ```text
 请帮我安装这个 Codex skill：
 
@@ -25,6 +33,12 @@ git clone git@github.com:BofAI/skills.git bofai-skills \
 ```
 
 To ask Claude Code to install this skill for itself, paste this into Claude Code:
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/BofAI/skills/v1.5.11/twitter-digest/install.sh | env TWITTER_DIGEST_INSTALL_CLIENT=claude TWITTER_DIGEST_ALLOW_CLAUDE_COMMANDS=1 TWITTER_DIGEST_ALLOW_CLAUDE_STATE_READ=1 sh
+```
+
+Or use the natural-language prompt:
 
 ```text
 请帮我安装这个 Claude Code skill：
@@ -46,8 +60,6 @@ Claude Code: ~/.claude/skills/twitter-digest
 It also checks for Python 3.10+ and a supported Chromium browser: Google Chrome, Chromium, Microsoft Edge, or Brave.
 Reinstalling preserves the existing installed `.state` directory, including saved API and browser-session settings. The installer still excludes `.state` from the development checkout.
 After installation, configure and run the installed copy. If a script is accidentally started from a temporary clone while an installed copy exists, it automatically re-runs the installed copy so state is saved under `~/.claude/skills/twitter-digest/.state` or `~/.codex/skills/twitter-digest/.state`.
-
-API and browser sources are isolated: API runs never start a browser and never collect DMs. Browser runs collect visible X Chat/DM and merge DM into the same daily digest. Browser DM automation may trigger X account risk controls, login challenges, or passcode recovery; avoid long-running unattended DM collection.
 
 Use one stable installed command form for normal runs. This prevents repeated Claude Code Bash permission prompts across different projects:
 
@@ -71,11 +83,8 @@ On first run, a dedicated browser profile opens. Log in to X once in that browse
 There are three collection entry points:
 
 ```bash
-# Browser-only public collector
-python3 twitter-digest/scripts/browser_x_digest.py
-
-# Browser-only DM collector, for debugging only
-python3 twitter-digest/scripts/browser_x_digest.py --dm-only
+# Browser-only collector
+python3 twitter-digest/scripts/browser_x_digest.py --include-dms
 
 # API-only collector, requires OAuth2 user-context credentials or --bearer-token
 X_BEARER_TOKEN=... python3 twitter-digest/scripts/api_x_digest.py --handle <handle>
@@ -86,8 +95,16 @@ python3 ~/.claude/skills/twitter-digest/scripts/run_daily_digest.py
 
 `run_daily_digest.py` defaults to `--source auto`:
 
-- If `X_BEARER_TOKEN` or `TWITTER_BEARER_TOKEN` is configured, it uses the API collector.
-- Otherwise it falls back to the browser collector.
+- A normal daily run uses API when saved API credentials or `X_BEARER_TOKEN` / `TWITTER_BEARER_TOKEN` exist.
+- If no API credentials exist, it uses the browser collector.
+- Use `--source browser` only when the user explicitly wants browser collection.
+
+Source isolation:
+
+- API mode only runs `api_x_digest.py`; it never opens a browser or reads the browser profile.
+- Browser mode only runs `browser_x_digest.py`; it does not use API tokens or API collector output.
+- Default `--source auto` picks one source for the run and does not merge API and browser data.
+- API DM data gaps are notes only; they do not mean browser DM data was collected.
 
 Force a source:
 
@@ -96,21 +113,7 @@ python3 ~/.claude/skills/twitter-digest/scripts/run_daily_digest.py --source bro
 X_BEARER_TOKEN=... python3 ~/.claude/skills/twitter-digest/scripts/run_daily_digest.py --source api --handle <handle>
 ```
 
-API mode is for stable public-data collection, including the official home timeline endpoint when the configured token has user-context timeline access. API mode never starts a browser and never collects DMs. API source has no DM collection. XChat / encrypted DMs are only handled by browser source. App-only API keys are not enough for user-context data.
-
-To generate a browser digest with DM included:
-
-```bash
-python3 ~/.claude/skills/twitter-digest/scripts/run_daily_digest.py --source browser
-```
-
-To generate an API-only public digest with no browser and no DM:
-
-```bash
-python3 ~/.claude/skills/twitter-digest/scripts/run_daily_digest.py --source api
-```
-
-DM browser automation may trigger X account risk controls, login challenges, or passcode recovery, so do not use it for long-running or unattended jobs. This risk is documented here and is not repeated as a runtime warning prompt.
+API mode is for stable public-data collection, including the official home timeline endpoint when the configured token has user-context timeline access. API mode never starts a browser, never reads the browser profile, and never collects X Chat / DM content from the browser. Use browser mode when visible X Chat / DM is required. API DM lookup is marked TODO because XChat / encrypted DMs may not appear in `/2/dm_events`; do not use API DM to conclude there are no private messages. App-only API keys are not enough for user-context data.
 
 ## Configure API In Chat
 
@@ -144,13 +147,13 @@ The app's callback URL in X Developer Portal must match the redirect URI shown b
 http://127.0.0.1:8765/callback
 ```
 
-For API public collection, include these scopes when configuring the X App / OAuth flow:
+For API DM lookup through OAuth2, include these scopes when configuring the X App / OAuth flow:
 
 ```text
-tweet.read users.read offline.access
+dm.read tweet.read users.read offline.access
 ```
 
-DM is not collected through the API product path. Use browser source when visible X Chat / encrypted DM content is required.
+Use `dm.write` only if the app will send or delete messages; the digest skill only reads.
 
 On macOS prompts appear as system dialogs; non-GUI terminals fall back to hidden terminal input. The token is saved to:
 
@@ -158,20 +161,18 @@ On macOS prompts appear as system dialogs; non-GUI terminals fall back to hidden
 twitter-digest/.state/api_config.json
 ```
 
-The file is created with owner-only permissions where supported. Later runs of `run_daily_digest.py --source auto` read this saved config and use API automatically. To clear it:
+The file is created with owner-only permissions where supported. Later normal runs read this saved config and use API without opening the browser. Use `run_daily_digest.py --source browser` only when the user explicitly wants browser collection. To clear API config:
 
 ```bash
 python3 ~/.claude/skills/twitter-digest/scripts/configure_api.py --clear
 ```
 
-If OAuth returns a refresh token, later daily runs refresh the saved access token automatically before collection.
+If OAuth returns a refresh token, later API-source runs refresh the saved access token automatically before collection.
 
 Chat flow summary:
 
 ```text
 生成 X 日报       -> agent runs python3 ~/.claude/skills/twitter-digest/scripts/run_daily_digest.py
-浏览器日报带私信 -> agent runs python3 ~/.claude/skills/twitter-digest/scripts/run_daily_digest.py --source browser
-API 日报不带私信 -> agent runs python3 ~/.claude/skills/twitter-digest/scripts/run_daily_digest.py --source api
 输入 X token     -> agent runs python3 ~/.claude/skills/twitter-digest/scripts/run_daily_digest.py --configure-api-token
 配置 X API       -> agent runs python3 ~/.claude/skills/twitter-digest/scripts/run_daily_digest.py --configure-api
 清除 X API 配置  -> agent runs python3 ~/.claude/skills/twitter-digest/scripts/configure_api.py --clear

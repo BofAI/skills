@@ -26,7 +26,7 @@ from script_utils import display_path, open_script_in_terminal, rerun_from_insta
 AUTHORIZE_URL = "https://x.com/i/oauth2/authorize"
 TOKEN_URL = "https://api.x.com/2/oauth2/token"
 DEFAULT_REDIRECT_URI = "http://127.0.0.1:8765/callback"
-DEFAULT_SCOPES = "tweet.read users.read offline.access"
+DEFAULT_SCOPES = "dm.read tweet.read users.read offline.access"
 
 
 def parse_args() -> argparse.Namespace:
@@ -346,7 +346,7 @@ def main() -> None:
                 "handle": saved.get("handle") or config["handle"],
                 "user_id": saved.get("user_id") or config["user_id"],
                 "verification": verification,
-                "next_step": "Run scripts/run_daily_digest.py; --source auto will use the saved API token.",
+                "next_step": "Normal scripts/run_daily_digest.py runs now use the saved API token. Use --source browser only when you explicitly want browser collection.",
             },
             ensure_ascii=False,
             indent=2,

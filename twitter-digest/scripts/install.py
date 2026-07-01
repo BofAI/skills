@@ -281,25 +281,6 @@ def write_claude_settings(target: Path, dry_run: bool, allow_commands: bool, all
         save_claude_settings(settings_path, settings)
 
 
-def print_post_install_notes(target: Path) -> None:
-    run_script = target / "scripts" / "run_daily_digest.py"
-    try:
-        run_cmd = f"python3 ~/{run_script.relative_to(Path.home())}"
-    except ValueError:
-        run_cmd = f"python3 {run_script}"
-    print("", flush=True)
-    print("Collection source policy:", flush=True)
-    print(f"API-only digest: {run_cmd} --source api", flush=True)
-    print(f"Browser digest with DM: {run_cmd} --source browser", flush=True)
-    print(
-        "API source and browser source are isolated: API runs never start a browser and never collect DMs. "
-        "Browser source collects X Chat through a browser session and merges DM into the same daily digest. "
-        "Browser DM automation may trigger X account risk controls, login challenges, or passcode recovery; "
-        "avoid long-running unattended DM collection.",
-        flush=True,
-    )
-
-
 def main() -> None:
     args = parse_args()
     check_runtime(args.skip_browser_check)
@@ -317,7 +298,6 @@ def main() -> None:
             write_claude_settings(target, args.dry_run, args.allow_claude_commands, args.allow_claude_state_read)
     if not args.dry_run:
         print(f"Installed skill path: {display_path(target)}", flush=True)
-        print_post_install_notes(target)
 
 
 if __name__ == "__main__":

@@ -1,0 +1,4 @@
+interface:
+  display_name: "X/Twitter xurl"
+  short_description: "Install xurl and generate X digests"
+  default_prompt: "Use $twitter-mcp to generate my X daily digest from the local xurl CLI."

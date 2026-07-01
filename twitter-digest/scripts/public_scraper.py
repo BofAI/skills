@@ -26,7 +26,8 @@ PUBLIC_GROWTH_READY_SETTLE_SEC = 0.4
 PUBLIC_GROWTH_POLL_SEC = 0.5
 PUBLIC_GROWTH_STABLE_TICKS = 3
 PUBLIC_SCROLL_JS = "window.scrollBy(0, Math.max(900, window.innerHeight * 0.9));"
-HANDLE_DETECT_SETTLE_SEC = 5
+HANDLE_DETECT_TIMEOUT_SEC = 20
+HANDLE_DETECT_POLL_SEC = 1
 
 
 def wait_for_public_page_ready(ws_url: str, timeout_sec: int = 20) -> None:
@@ -132,11 +133,17 @@ def detect_handle(port: int) -> str | None:
         ws_url = wait_for_cdp_page_ws(port)
         cdp_call(ws_url, "Page.enable")
         cdp_call(ws_url, "Runtime.enable")
-        cdp_call(ws_url, "Page.navigate", {"url": "https://x.com/home"})
-        time.sleep(HANDLE_DETECT_SETTLE_SEC)
         script = load_dom_script("detect_handle.js")
-        value = cdp_eval(ws_url, script)
-        return str(value).lstrip("@") if value else None
+        for url in ("https://x.com/home", "https://x.com/notifications"):
+            cdp_call(ws_url, "Page.navigate", {"url": url})
+            deadline = time.time() + HANDLE_DETECT_TIMEOUT_SEC
+            while time.time() < deadline:
+                value = cdp_eval(ws_url, script)
+                handle = str(value or "").lstrip("@").strip()
+                if handle:
+                    return handle
+                time.sleep(HANDLE_DETECT_POLL_SEC)
+        return None
     except Exception as exc:
         print(f"Could not auto-detect X handle: {exc}")
         return None

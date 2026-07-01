@@ -68,6 +68,13 @@
     const text = (article.innerText || '').trim();
     const links = Array.from(article.querySelectorAll('a[href]')).map(a => a.href).filter(Boolean);
     const status = links.map(statusUrl).find(Boolean) || null;
+    let tweetId = null;
+    if (status) {
+      try {
+        const match = new URL(status).pathname.match(/\/status\/(\d+)/);
+        tweetId = match ? match[1] : null;
+      } catch {}
+    }
     const times = Array.from(article.querySelectorAll('time')).map(t => t.getAttribute('datetime')).filter(Boolean);
     const authorLinks = links.filter(h => {
       try {
@@ -75,7 +82,14 @@
         return /^\/[^/]+$/.test(p) && !p.includes('/i/');
       } catch { return false; }
     });
+    let authorUsername = null;
+    if (authorLinks[0]) {
+      try {
+        authorUsername = new URL(authorLinks[0]).pathname.split('/').filter(Boolean)[0] || null;
+      } catch {}
+    }
     return {
+      id: tweetId,
       text,
       url: status,
       links,
@@ -83,7 +97,8 @@
       media: mediaInfo(article),
       cards: cardInfo(article),
       time: times[0] || null,
-      authorUrl: authorLinks[0] || null
+      authorUrl: authorLinks[0] || null,
+      authorUsername
     };
   }).filter(item => item.text);
 })()

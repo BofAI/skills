@@ -37,8 +37,8 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--public-window-hours", type=int, default=24, help="Stop loading older public timeline items once posts beyond this window are detected.")
     parser.add_argument("--login-timeout-sec", type=int, default=300)
     parser.add_argument("--include-dms", action="store_true", help="Also visit X messages and capture visible conversation text.")
-    parser.add_argument("--dm-only", action="store_true", help="Debug mode: collect only X messages.")
-    parser.add_argument("--dm-threads", type=int, default=5, help="Maximum recent DM threads to open when DM collection is enabled.")
+    parser.add_argument("--dm-only", action="store_true", help="Collect only X messages. Used when API already collected public data.")
+    parser.add_argument("--dm-threads", type=int, default=5, help="Maximum recent DM threads to open when --include-dms is set.")
     parser.add_argument("--dm-list-scrolls", type=int, default=20, help="Maximum downward scroll rounds used to scan today's DM conversation list.")
     parser.add_argument("--dm-scrolls", type=int, default=200, help="Maximum upward scroll rounds per opened DM thread.")
     parser.add_argument("--dm-max-messages", type=int, default=2000, help="Maximum message bubbles kept per opened DM thread.")
@@ -157,6 +157,46 @@ def error_page(page: dict[str, str], exc: BaseException) -> dict[str, Any]:
     }
 
 
+def resolve_required_handle(
+    args: argparse.Namespace,
+    profile_dir: Path,
+    proc: Any,
+    port: int,
+    headless: bool,
+) -> tuple[str, Any, int, bool]:
+    explicit = args.handle.lstrip("@").strip() if args.handle else ""
+    if explicit:
+        return explicit, proc, port, headless
+
+    handle = detect_handle(port)
+    if handle:
+        return handle, proc, port, headless
+
+    if args.non_interactive:
+        raise SystemExit(
+            "Could not auto-detect the authenticated X handle from the saved browser session. "
+            "Rerun interactively so the browser can be inspected, or pass --handle <your_handle>. "
+            "The digest was stopped because mentions and own-profile collection require the authenticated account."
+        )
+
+    if headless and not args.headed:
+        print("Could not auto-detect X handle in headless mode. Opening a visible browser window to verify the logged-in account...", flush=True)
+        stop_browser(proc)
+        proc, port = launch_browser(profile_dir, "https://x.com/home", headless=False)
+        headless = False
+        wait_for_login(port, args.login_timeout_sec, interactive=True)
+        handle = detect_handle(port)
+        if handle:
+            return handle, proc, port, headless
+
+    raise SystemExit(
+        "Could not auto-detect the authenticated X handle from the browser UI. "
+        "Open the visible X window, confirm the correct account is logged in and the left account/profile area is visible, "
+        "then rerun the digest or pass --handle <your_handle>. "
+        "The digest was stopped because @mentions and own-profile collection would be incomplete without this."
+    )
+
+
 def main() -> None:
     args = parse_args()
     if args.dm_only:
@@ -185,11 +225,11 @@ def main() -> None:
             write_digest_output(out_dir, data)
             print(json.dumps({"out_dir": str(out_dir), "pages": len(data["pages"]), "headless": headless, "login": "unavailable"}, indent=2))
             return
-        handle = args.handle.lstrip("@") if args.handle else detect_handle(port)
-        if handle:
-            print(f"Using X handle: @{handle}")
+        if args.dm_only:
+            handle = args.handle.lstrip("@") if args.handle else None
         else:
-            print("Could not auto-detect X handle. Mention search will be skipped unless --handle is provided.")
+            handle, proc, port, headless = resolve_required_handle(args, profile_dir, proc, port, headless)
+            print(f"Using X handle: @{handle}")
         pages = build_pages(handle, args.keywords, args.include_dms, args.dm_only)
         data = {
             "generated_at": dt.datetime.now().astimezone().isoformat(),

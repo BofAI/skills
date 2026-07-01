@@ -30,8 +30,8 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--api-base", default=os.environ.get("X_API_BASE_URL") or API_BASE)
     parser.add_argument("--keywords", default="", help="Comma-separated keywords or queries for optional search.")
     parser.add_argument("--out", default=str(default_state_dir / "run"))
-    parser.add_argument("--include-dms", action="store_true", help=argparse.SUPPRESS)
-    parser.add_argument("--dm-max-events", type=int, default=300, help=argparse.SUPPRESS)
+    parser.add_argument("--include-dms", action="store_true", help="Try DM endpoints when API access supports them.")
+    parser.add_argument("--dm-max-events", type=int, default=300, help="Maximum Direct Message events kept from the API.")
     parser.add_argument("--max-public-items", type=int, default=300)
     parser.add_argument("--public-window-hours", type=int, default=24)
     parser.add_argument("--scrolls", type=int, default=0, help=argparse.SUPPRESS)
@@ -98,6 +98,17 @@ def tweet_params(max_results: int, hours: int) -> dict[str, Any]:
         "expansions": "author_id,attachments.media_keys,referenced_tweets.id,referenced_tweets.id.author_id",
         "media.fields": "url,preview_image_url,alt_text,type",
         "user.fields": "username,name",
+    }
+
+
+def dm_params(max_results: int, hours: int) -> dict[str, Any]:
+    return {
+        "max_results": max(10, min(100, max_results)),
+        "dm_event.fields": "id,text,event_type,created_at,dm_conversation_id,sender_id,participant_ids,attachments,referenced_tweets",
+        "expansions": "sender_id,participant_ids,attachments.media_keys,referenced_tweets.id",
+        "user.fields": "username,name",
+        "media.fields": "url,preview_image_url,alt_text,type",
+        "post.fields": "created_at,author_id,text,entities",
     }
 
 
@@ -195,6 +206,9 @@ def normalize_tweets(raw: list[dict[str, Any]], includes: dict[str, Any], source
         out.append(
             {
                 "api_source": source_kind,
+                "id": tweet_id,
+                "conversation_id": str(tweet.get("conversation_id") or ""),
+                "author_username": username,
                 "text": text,
                 "metrics": metrics,
                 "url": url,
@@ -204,6 +218,11 @@ def normalize_tweets(raw: list[dict[str, Any]], includes: dict[str, Any], source
                 "cards": cards,
                 "time": tweet.get("created_at"),
                 "authorUrl": f"https://x.com/{username}" if username else "",
+                "referenced_tweets": [
+                    {"id": str(ref.get("id") or ""), "type": str(ref.get("type") or "")}
+                    for ref in (tweet.get("referenced_tweets") or [])
+                    if isinstance(ref, dict)
+                ],
             }
         )
     return out
@@ -216,6 +235,117 @@ def parse_time(value: Any) -> dt.datetime | None:
         return dt.datetime.fromisoformat(str(value).replace("Z", "+00:00"))
     except ValueError:
         return None
+
+
+def normalize_dm_asset_links(event: dict[str, Any]) -> list[dict[str, str]]:
+    entities = event.get("entities") if isinstance(event.get("entities"), dict) else {}
+    links = []
+    for link in entities.get("urls") or []:
+        if not isinstance(link, dict):
+            continue
+        url = str(link.get("expanded_url") or link.get("url") or "")
+        if url:
+            links.append({"url": url, "label": str(link.get("title") or link.get("display_url") or "")})
+    return links
+
+
+def normalize_dm_events(raw: list[dict[str, Any]], includes: dict[str, Any], current_user_id: str, max_threads: int = 50) -> dict[str, Any]:
+    users = index_by(includes.get("users", []), "id")
+    media = index_by(includes.get("media", []), "media_key")
+    tweets = index_by(includes.get("tweets", []), "id")
+    conversations: dict[str, list[dict[str, Any]]] = {}
+    for event in raw:
+        if not isinstance(event, dict):
+            continue
+        if str(event.get("event_type") or "").lower() not in {"message_create", "messagecreate", ""}:
+            continue
+        conversation_id = str(event.get("dm_conversation_id") or event.get("conversation_id") or event.get("id") or "")
+        if not conversation_id:
+            continue
+        conversations.setdefault(conversation_id, []).append(event)
+
+    thread_rows: list[dict[str, Any]] = []
+    for conversation_id, events in conversations.items():
+        events.sort(key=lambda item: str(item.get("created_at") or ""))
+        latest = events[-1] if events else {}
+        participant_ids: set[str] = set()
+        for event in events:
+            sender_id = str(event.get("sender_id") or "")
+            if sender_id:
+                participant_ids.add(sender_id)
+            for participant_id in event.get("participant_ids") or []:
+                participant_ids.add(str(participant_id))
+        other_ids = [pid for pid in participant_ids if pid and pid != current_user_id]
+        participant_names = []
+        for pid in other_ids:
+            user = users.get(pid) or {}
+            username = str(user.get("username") or "")
+            name = str(user.get("name") or "")
+            participant_names.append(f"@{username}" if username else name or pid)
+        participant = ", ".join(participant_names) or conversation_id
+        replied = str(latest.get("sender_id") or "") == current_user_id
+        messages = []
+        for event in events:
+            sender = "me" if str(event.get("sender_id") or "") == current_user_id else "other"
+            text = str(event.get("text") or "")
+            media_items = []
+            attachments = event.get("attachments") if isinstance(event.get("attachments"), dict) else {}
+            for key in attachments.get("media_keys") or []:
+                item = media.get(str(key))
+                if not item:
+                    continue
+                url = item.get("url") or item.get("preview_image_url") or ""
+                if url:
+                    media_items.append({"type": str(item.get("type") or "media"), "url": str(url), "alt": str(item.get("alt_text") or "")})
+            links = normalize_dm_asset_links(event)
+            cards = []
+            for ref in event.get("referenced_tweets") or []:
+                if not isinstance(ref, dict):
+                    continue
+                tweet = tweets.get(str(ref.get("id"))) or {}
+                cards.append({"url": f"https://x.com/i/web/status/{ref.get('id')}", "text": str(tweet.get("text") or "")[:500]})
+            messages.append({"sender": sender, "time": str(event.get("created_at") or ""), "text": text, "links": links + cards, "media": media_items})
+        thread_text = "\n".join(f"{message['sender']} {message.get('time') or ''}: {message.get('text') or ''}" for message in messages)
+        thread_rows.append(
+            {
+                "participant": participant,
+                "label": participant,
+                "url": f"https://x.com/messages/{conversation_id}",
+                "replied": replied,
+                "message_count": len(messages),
+                "text": thread_text,
+                "messages": messages,
+                "dm_load_complete": True,
+                "dm_scrolls_used": 0,
+                "dm_window_exceeded": False,
+                "dm_hit_message_cap": False,
+                "latest_time": str(latest.get("created_at") or ""),
+            }
+        )
+
+    thread_rows.sort(key=lambda row: str(row.get("latest_time") or ""), reverse=True)
+    visible_threads = thread_rows[:max_threads]
+    waiting_threads = [thread for thread in visible_threads if not thread.get("replied")]
+    replied_threads = [thread for thread in visible_threads if thread.get("replied")]
+    return {
+        "threads": waiting_threads,
+        "visible_count": len(visible_threads),
+        "replied_count": len(replied_threads),
+        "unreplied_count": len(waiting_threads),
+        "captured_messages": sum(int(thread.get("message_count") or 0) for thread in waiting_threads),
+    }
+
+
+def filter_events_by_window(raw: list[dict[str, Any]], hours: int) -> list[dict[str, Any]]:
+    cutoff = dt.datetime.now(dt.timezone.utc) - dt.timedelta(hours=max(1, hours))
+    filtered = []
+    for event in raw:
+        if not isinstance(event, dict):
+            continue
+        event_time = parse_time(event.get("created_at"))
+        if event_time and event_time >= cutoff:
+            filtered.append(event)
+    return filtered
 
 
 def page(kind: str, url: str, items: list[dict[str, Any]], note: str = "", error: str = "") -> dict[str, Any]:
@@ -295,6 +425,56 @@ def collect_api(args: argparse.Namespace) -> dict[str, Any]:
             page_token_name="next_token",
         )
         pages.append(page(f"keyword_{index}", f"{args.api_base}/tweets/search/recent?q={urllib.parse.quote(keyword)}", normalize_tweets(raw, includes, f"keyword_{index}"), error="; ".join(errors)))
+
+    if args.include_dms:
+        dm_raw, dm_includes, dm_errors = collect_paginated(
+            args,
+            "/dm_events",
+            dm_params(max(10, int(args.dm_max_events)), hours),
+            max(1, int(args.dm_max_events)),
+        )
+        dm_window_raw = filter_events_by_window(dm_raw, hours)
+        dm_summary = normalize_dm_events(dm_window_raw, dm_includes, user_id, max_threads=50)
+        if dm_errors:
+            dm_status = "api_dm_todo"
+            dm_note = "TODO: X API DM lookup failed. Do not treat this as an empty inbox; use browser DM collection if DM coverage is required."
+            dm_todo_detail = "API DM request failed; check OAuth2 dm.read scope, Project/API access, rate limits, or use browser DM collection."
+        elif dm_summary["visible_count"] == 0:
+            dm_status = "api_dm_todo"
+            dm_note = "TODO: X API returned 0 DM events in the digest window. XChat/encrypted messages may not be exposed through DM Events API; use browser DM collection if DM coverage is required."
+            dm_todo_detail = "API DM returned 0 events; verify with browser X Chat before saying there are no DMs."
+        elif dm_summary["unreplied_count"] == 0:
+            dm_status = "api_dm_todo"
+            dm_note = "TODO: X API returned DM events but no waiting-reply conversation. Browser X Chat should be checked before concluding no DM action is needed."
+            dm_todo_detail = "API DM has events but no waiting-reply thread; browser DM collection remains authoritative for XChat/encrypted conversations."
+        else:
+            dm_status = "captured_unreplied_threads"
+            dm_note = "X API DM lookup captured recent waiting-reply conversations. API events are limited by X API retention, permissions, and rate limits."
+            dm_todo_detail = ""
+        messages_page = {
+            "kind": "messages",
+            "url": f"{args.api_base}/dm_events",
+            "items": [],
+            "dm_status": dm_status,
+            "dm_note": dm_note,
+            "dm_threads": dm_summary["threads"],
+            "dm_visible_thread_count": dm_summary["visible_count"],
+            "dm_replied_thread_count": dm_summary["replied_count"],
+            "dm_unreplied_thread_count": dm_summary["unreplied_count"],
+            "dm_captured_message_count": dm_summary["captured_messages"],
+        }
+        if dm_todo_detail:
+            messages_page["todo_items"] = [
+                {
+                    "source": "messages",
+                    "status": dm_status,
+                    "detail": dm_todo_detail,
+                }
+            ]
+        if dm_errors:
+            messages_page["collection_status"] = "error"
+            messages_page["collection_error"] = "; ".join(dm_errors)
+        pages.append(messages_page)
 
     return {
         "generated_at": dt.datetime.now().astimezone().isoformat(),

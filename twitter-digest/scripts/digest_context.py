@@ -4,6 +4,7 @@
 from __future__ import annotations
 
 import argparse
+import datetime as dt
 import json
 import re
 from pathlib import Path
@@ -82,6 +83,11 @@ def summarize_current_run(data: dict[str, Any]) -> dict[str, Any]:
 
 
 def build_digest_facts(data: dict[str, Any], summary: dict[str, Any]) -> dict[str, Any]:
+    now = dt.datetime.now().astimezone()
+    cutoff = now - dt.timedelta(hours=24)
+    public_items: list[dict[str, Any]] = []
+    loaded_public_kinds: set[str] = set()
+    kept_public_counts: dict[str, int] = {}
     facts: dict[str, Any] = {
         "schema_version": 1,
         "run": {
@@ -89,6 +95,9 @@ def build_digest_facts(data: dict[str, Any], summary: dict[str, Any]) -> dict[st
             "date": summary.get("date"),
             "source": summary.get("source"),
             "timezone": local_timezone_name(),
+            "window_start": cutoff.isoformat(),
+            "window_end": now.isoformat(),
+            "window_hours": 24,
         },
         "account": {
             "handle": summary.get("handle") or clean_handle(data.get("handle")),
@@ -104,9 +113,11 @@ def build_digest_facts(data: dict[str, Any], summary: dict[str, Any]) -> dict[st
                 "Only threads whose latest preview is not from the user are opened for content.",
                 "Do not treat embedded post authors as DM senders.",
                 "Count low-value waiting-reply DMs but do not expand spam, phishing, generic promotions, or repeated junk.",
+                "Public timeline/profile/mention items must be inside the local-time 24-hour window.",
+                "Do not present already-handled mentions as needing reply; if reply status is unclear, label it as unverified.",
             ],
         },
-        "public": {"counts": summary.get("post_counts") or {}, "items": []},
+        "public": {"counts": {}, "loaded_counts": summary.get("post_counts") or {}, "items": []},
         "dms": {
             "status": summary.get("dm_status"),
             "counts": summary.get("dm_counts") or {},
@@ -120,6 +131,8 @@ def build_digest_facts(data: dict[str, Any], summary: dict[str, Any]) -> dict[st
         if not isinstance(page, dict):
             continue
         kind = str(page.get("kind") or "unknown")
+        if kind != "messages":
+            loaded_public_kinds.add(kind)
         if page.get("collection_error"):
             facts["data_gaps"].append(
                 {
@@ -201,21 +214,25 @@ def build_digest_facts(data: dict[str, Any], summary: dict[str, Any]) -> dict[st
         for item in page.get("items") or []:
             if not isinstance(item, dict):
                 continue
-            facts["public"]["items"].append(
-                {
-                    "kind": kind,
-                    "time": format_local_time(item.get("time")),
-                    "raw_time": item.get("time") or "",
-                    "url": item.get("url") or "",
-                    "author_url": item.get("authorUrl") or "",
-                    "text_excerpt": compact_text(item.get("text"))[:700],
-                    "external_links": normalize_context_assets(item.get("externalLinks")),
-                    "media": normalize_context_assets(item.get("media")),
-                    "cards": normalize_context_assets(item.get("cards")),
-                }
-            )
-    if (summary.get("dm_status") or "") == "not_requested":
-        facts["dms"]["note"] = "DM was not collected in this run because the API source was used. Browser source includes DM; API source never starts a browser and never collects DM."
+            item_time = parse_item_time(item.get("time"))
+            if item_time is None:
+                facts["data_gaps"].append(
+                    {
+                        "source": kind,
+                        "status": "time-unverified",
+                        "detail": f"Excluded public item without parseable timestamp: {compact_text(item.get('url') or item.get('text'))[:180]}",
+                    }
+                )
+                continue
+            local_item_time = item_time.astimezone()
+            if local_item_time < cutoff or local_item_time > now:
+                continue
+            public_counts = facts["public"]["counts"].setdefault(kind, {"total": 0})
+            public_counts["total"] = int(public_counts.get("total") or 0) + 1
+            kept_public_counts[kind] = kept_public_counts.get(kind, 0) + 1
+            public_items.append(normalize_public_item(kind, item))
+    facts["public"]["items"] = annotate_public_reply_states(public_items, str((facts.get("account") or {}).get("handle") or ""))
+    add_public_source_gaps(facts, loaded_public_kinds, kept_public_counts, summary)
     if (summary.get("dm_status") or "") in {"blocked_by_x_chat_passcode", "visible_threads_unopened", "no_visible_threads", "dm_page_loading_timeout", "api_dm_unavailable", "api_dm_error", "api_dm_todo"}:
         facts["data_gaps"].append(
             {
@@ -233,6 +250,126 @@ def build_digest_facts(data: dict[str, Any], summary: dict[str, Any]) -> dict[st
             }
         )
     return facts
+
+
+def add_public_source_gaps(
+    facts: dict[str, Any],
+    loaded_public_kinds: set[str],
+    kept_public_counts: dict[str, int],
+    summary: dict[str, Any],
+) -> None:
+    post_counts = summary.get("post_counts") if isinstance(summary.get("post_counts"), dict) else {}
+    required_mentions = ["mentions_search", "mentions_notifications"]
+    for kind in required_mentions:
+        if kind not in loaded_public_kinds:
+            facts["data_gaps"].append(
+                {
+                    "source": kind,
+                    "status": "missing_required_mention_source",
+                    "detail": f"{kind} was not present in this run; do not conclude mention state from the other source alone.",
+                }
+            )
+            continue
+        loaded_total = int((post_counts.get(kind) or {}).get("total") or 0) if isinstance(post_counts.get(kind), dict) else 0
+        kept_total = int(kept_public_counts.get(kind, 0))
+        if loaded_total > 0 and kept_total == 0:
+            facts["data_gaps"].append(
+                {
+                    "source": kind,
+                    "status": "no_in_window_items",
+                    "detail": f"{kind} loaded {loaded_total} item(s), but none survived the local 24-hour filter.",
+                }
+            )
+
+
+def normalize_public_item(kind: str, item: dict[str, Any]) -> dict[str, Any]:
+    author_username = clean_handle(item.get("author_username") or item.get("authorUsername") or author_from_url(item.get("authorUrl")))
+    references = item.get("referenced_tweets") if isinstance(item.get("referenced_tweets"), list) else []
+    return {
+        "kind": kind,
+        "id": compact_text(item.get("id")),
+        "conversation_id": compact_text(item.get("conversation_id")),
+        "author_username": author_username,
+        "time": format_local_time(item.get("time")),
+        "raw_time": item.get("time") or "",
+        "url": item.get("url") or "",
+        "author_url": item.get("authorUrl") or "",
+        "text_excerpt": compact_text(item.get("text"))[:700],
+        "referenced_tweets": [
+            {"id": compact_text(ref.get("id")), "type": compact_text(ref.get("type"))}
+            for ref in references
+            if isinstance(ref, dict)
+        ],
+        "external_links": normalize_context_assets(item.get("externalLinks")),
+        "media": normalize_context_assets(item.get("media")),
+        "cards": normalize_context_assets(item.get("cards")),
+    }
+
+
+def annotate_public_reply_states(items: list[dict[str, Any]], handle: str) -> list[dict[str, Any]]:
+    clean_self = clean_handle(handle).lower()
+    own_items = [item for item in items if is_own_public_item(item, clean_self)]
+    for item in items:
+        if "mention" not in str(item.get("kind") or "").lower():
+            continue
+        evidence = find_reply_evidence(item, own_items)
+        if evidence:
+            item["reply_state"] = "already_replied"
+            item["action_state"] = "handled"
+            item["reply_evidence"] = evidence
+        else:
+            item["reply_state"] = "reply_unverified"
+            item["action_state"] = "review_without_claiming_needs_reply"
+    return items
+
+
+def is_own_public_item(item: dict[str, Any], clean_self: str) -> bool:
+    kind = str(item.get("kind") or "").lower()
+    author = clean_handle(item.get("author_username")).lower()
+    return kind == "own_profile" or (bool(clean_self) and author == clean_self)
+
+
+def find_reply_evidence(mention: dict[str, Any], own_items: list[dict[str, Any]]) -> str:
+    mention_time = parse_item_time(mention.get("raw_time"))
+    mention_id = compact_text(mention.get("id"))
+    conversation_id = compact_text(mention.get("conversation_id"))
+    mention_author = clean_handle(mention.get("author_username")).lower()
+    for own in own_items:
+        own_time = parse_item_time(own.get("raw_time"))
+        if mention_time and own_time and own_time <= mention_time:
+            continue
+        if mention_id and referenced_ids(own) and mention_id in referenced_ids(own):
+            return f"own reply references mention tweet {mention_id}"
+        own_conversation_id = compact_text(own.get("conversation_id"))
+        if conversation_id and own_conversation_id and own_conversation_id == conversation_id and compact_text(own.get("id")) != mention_id:
+            return f"own post appears later in same conversation {conversation_id}"
+        if mention_author and f"@{mention_author}" in str(own.get("text_excerpt") or "").lower():
+            return f"own post mentions @{mention_author} after the mention"
+    return ""
+
+
+def referenced_ids(item: dict[str, Any]) -> set[str]:
+    refs = item.get("referenced_tweets") if isinstance(item.get("referenced_tweets"), list) else []
+    return {compact_text(ref.get("id")) for ref in refs if isinstance(ref, dict) and ref.get("id")}
+
+
+def author_from_url(value: Any) -> str:
+    text = str(value or "").strip()
+    match = re.search(r"https?://(?:www\.)?(?:x|twitter)\.com/([^/?#]+)", text)
+    return match.group(1) if match else ""
+
+
+def parse_item_time(value: Any) -> dt.datetime | None:
+    text = str(value or "").strip()
+    if not text:
+        return None
+    try:
+        parsed = dt.datetime.fromisoformat(text.replace("Z", "+00:00"))
+    except ValueError:
+        return None
+    if parsed.tzinfo is None:
+        parsed = parsed.replace(tzinfo=dt.datetime.now().astimezone().tzinfo)
+    return parsed
 
 
 def assess_dm_thread(thread: dict[str, Any]) -> dict[str, Any]:
@@ -539,7 +676,10 @@ def render_public_slice_section(facts: dict[str, Any], slice_name: str) -> str:
         lines.append("| none | 0 |")
     lines.extend(["", "## Public Items", ""])
     for item in items[:300]:
-        lines.append(f"- `{item.get('kind')}` `{item.get('time')}` {item.get('url') or '[no url]'} - {item.get('text_excerpt')}")
+        reply_state = f" reply_state=`{item.get('reply_state')}` action_state=`{item.get('action_state')}`" if item.get("reply_state") else ""
+        evidence = f" reply_evidence={item.get('reply_evidence')}" if item.get("reply_evidence") else ""
+        author = f" @{item.get('author_username')}" if item.get("author_username") else ""
+        lines.append(f"- `{item.get('kind')}` `{item.get('time')}`{author}{reply_state}{evidence} {item.get('url') or '[no url]'} - {item.get('text_excerpt')}")
         for asset in item.get("media") or []:
             alt = f" alt={asset.get('alt')}" if asset.get("alt") else ""
             poster = f" poster={asset.get('poster')}" if asset.get("poster") else ""
@@ -591,6 +731,9 @@ def render_digest_facts(facts: dict[str, Any]) -> str:
         f"- generated_at: `{(facts.get('run') or {}).get('generated_at')}`",
         f"- source: `{(facts.get('run') or {}).get('source') or 'browser'}`",
         f"- timezone: `{(facts.get('run') or {}).get('timezone')}`",
+        f"- window_start: `{(facts.get('run') or {}).get('window_start')}`",
+        f"- window_end: `{(facts.get('run') or {}).get('window_end')}`",
+        f"- window_hours: `{(facts.get('run') or {}).get('window_hours')}`",
         f"- account: `@{(facts.get('account') or {}).get('handle') or ''}`",
     ]
     lines.extend(["", *render_dm_facts_section(facts).splitlines()])
@@ -607,7 +750,10 @@ def render_digest_facts(facts: dict[str, Any]) -> str:
 
     lines.extend(["", "## Public Items", ""])
     for item in ((facts.get("public") or {}).get("items") or [])[:300]:
-        lines.append(f"- `{item.get('kind')}` `{item.get('time')}` {item.get('url') or '[no url]'} - {item.get('text_excerpt')}")
+        reply_state = f" reply_state=`{item.get('reply_state')}` action_state=`{item.get('action_state')}`" if item.get("reply_state") else ""
+        evidence = f" reply_evidence={item.get('reply_evidence')}" if item.get("reply_evidence") else ""
+        author = f" @{item.get('author_username')}" if item.get("author_username") else ""
+        lines.append(f"- `{item.get('kind')}` `{item.get('time')}`{author}{reply_state}{evidence} {item.get('url') or '[no url]'} - {item.get('text_excerpt')}")
         for asset in item.get("media") or []:
             alt = f" alt={asset.get('alt')}" if asset.get("alt") else ""
             poster = f" poster={asset.get('poster')}" if asset.get("poster") else ""

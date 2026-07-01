@@ -1,13 +1,13 @@
 ---
 name: twitter-digest
-description: Use when the user wants Claude Code or another agent to analyze their own X/Twitter mentions, home timeline, visible direct messages, reply opportunities, and daily social-media summaries through API or local logged-in browser collection.
+description: Use when the user asks to generate an X/Twitter daily digest or says phrases such as "生成X日报", "生成 x 日报", "X日报", "推特日报", "Twitter digest", or wants an agent to analyze their own X/Twitter mentions, home timeline, visible direct messages, reply opportunities, and daily social-media summaries through API or local logged-in browser collection.
 ---
 
 # X/Twitter Digest
 
 ## Overview
 
-Use this skill to produce a concise Chinese daily digest from the user's own X/Twitter account. The recommended entry point is `scripts/run_daily_digest.py`, which selects API collection when API credentials are configured and otherwise falls back to local browser collection with a persistent dedicated Chromium profile.
+Use this skill to produce a concise Chinese daily digest from the user's own X/Twitter account. Use `scripts/run_daily_digest.py`, which defaults to `--source auto`: API collection when API credentials are configured, otherwise local browser collection with a persistent dedicated Chromium profile. Installing this skill does not configure X API and must not open an API configuration Terminal. After the user explicitly configures X API once, normal `RUN_DAILY_DIGEST` runs use API by default. Use `RUN_DAILY_DIGEST --source browser` when the user explicitly wants browser collection. Once API source is selected by default or explicitly, API failures should fail or report data gaps until the user fixes or clears the API configuration.
 
 After installation, configuration and daily runs should use the installed skill copy, not a temporary clone/source checkout. Installed locations are `~/.claude/skills/twitter-digest` for Claude Code and `~/.codex/skills/twitter-digest` for Codex. If `run_daily_digest.py` or `configure_api.py` is accidentally run from a source checkout while an installed copy exists, the script automatically re-runs the installed copy so `.state` is written to the installed skill directory.
 
@@ -39,7 +39,7 @@ There are three collection scripts:
 ```bash
 python3 twitter-digest/scripts/browser_x_digest.py   # browser collector
 python3 twitter-digest/scripts/api_x_digest.py       # API collector
-python3 twitter-digest/scripts/run_daily_digest.py   # upper wrapper, --source auto
+python3 twitter-digest/scripts/run_daily_digest.py   # upper wrapper, default auto source
 ```
 
 For chat usage, run the wrapper:
@@ -48,7 +48,14 @@ For chat usage, run the wrapper:
 RUN_DAILY_DIGEST
 ```
 
-`run_daily_digest.py --source auto` uses saved OAuth2 user-context credentials, `X_BEARER_TOKEN`, or `TWITTER_BEARER_TOKEN` for public data when present; otherwise it uses the browser collector. API and browser are isolated: API source never starts a browser and never collects DMs. DM/X Chat is source-specific: browser source always collects visible X Chat/DM and merges it into the same daily digest; API source never starts a browser and never collects DM. API source has no DM collection; use browser source when DM is required.
+`run_daily_digest.py` defaults to `--source auto`. Auto uses saved OAuth2 user-context credentials, `X_BEARER_TOKEN`, or `TWITTER_BEARER_TOKEN` for public data when present; otherwise it uses the browser collector. When API credentials are present, normal `RUN_DAILY_DIGEST` uses API and must not fall back to browser on API errors. Treat API DM lookup as TODO / waiting for X to fix XChat-encrypted DM coverage; do not use API DM to decide whether the user has private messages.
+
+Source isolation is strict:
+
+- API source runs only `api_x_digest.py`. It never starts a browser, never opens X pages, never reads the browser profile, and never supplements missing API data with browser data.
+- Browser source runs only `browser_x_digest.py`. It uses the dedicated browser profile and does not use saved API tokens or API collector output.
+- Default source is auto. It picks exactly one source for the run: API when API credentials exist, otherwise browser. It does not merge both sources.
+- If API output says DM needs browser confirmation, treat that as a data gap note only. It does not mean browser data was collected.
 
 If the user asks to configure API access, trigger the OAuth/user-token setup from chat:
 
@@ -58,15 +65,15 @@ RUN_DAILY_DIGEST --configure-api
 
 This is an agent-triggered flow. It supports OAuth2 user authorization:
 
-- OAuth2 path: if the user has an X Developer App OAuth2 `Client ID` / `Client Secret` and local callback URL, run `RUN_DAILY_DIGEST --configure-api`. It goes directly into OAuth2 setup. Request `tweet.read users.read offline.access`.
+- OAuth2 path: if the user has an X Developer App OAuth2 `Client ID` / `Client Secret` and local callback URL, run `RUN_DAILY_DIGEST --configure-api`. It goes directly into OAuth2 setup. Request `dm.read tweet.read users.read offline.access`.
 - Existing token path: if the user says they already have an OAuth2 user access token, run `RUN_DAILY_DIGEST --configure-api-token`.
 - If the agent is not inside an interactive Terminal, do not background `configure_api.py` yourself. Use `run_daily_digest.py --configure-api`; it opens a real Terminal window for secure input and OAuth callback handling. `configure_api.py --oauth` also self-opens Terminal when invoked non-interactively, but the wrapper is the primary path.
 - OAuth1 PIN is not a supported normal setup path for this skill because it did not reliably return DM data during validation. Do not guide users to Consumer Key / Consumer Secret / PIN unless they are explicitly debugging legacy API behavior.
 - Do not write ad-hoc inline Python or shell snippets to verify tokens. Use the built-in verifier: `CONFIGURE_API --verify`. It calls `/users/me`, backfills `handle` / `user_id`, and does not print the token.
 
-If a refresh token is saved, later daily runs refresh the access token automatically. Do not ask the user to export environment variables manually. App-only API keys are not enough for user-context home timeline access.
+If a refresh token is saved, API-source runs refresh the access token automatically. Do not ask the user to export environment variables manually. App-only API keys are not enough for user-context home timeline access.
 
-After API setup succeeds once, future daily digest runs should not ask the user for credentials again. Run `RUN_DAILY_DIGEST`; it reads `.state/api_config.json` automatically. OAuth2 credentials are refreshed automatically when a refresh token is saved. Only rerun `--configure-api` when the saved credentials are missing, revoked, expired without refresh, or the user explicitly asks to change accounts/apps.
+After API setup succeeds once, future daily digest runs should not ask the user for credentials again. Normal `RUN_DAILY_DIGEST` reads `.state/api_config.json` automatically and uses API by default. OAuth2 credentials are refreshed automatically when a refresh token is saved. Only rerun `--configure-api` when the saved credentials are missing, revoked, expired without refresh, or the user explicitly asks to change accounts/apps. Use `RUN_DAILY_DIGEST --source browser` only when the user explicitly wants browser collection.
 
 If the user asks to clear API access, run:
 
@@ -76,9 +83,7 @@ CONFIGURE_API --clear
 
 All normal flows should be triggered from chat by the agent:
 
-- X 日报 / 生成日报: run `RUN_DAILY_DIGEST`.
-- 带私信的浏览器日报: run `RUN_DAILY_DIGEST --source browser`.
-- 纯 API 公开数据日报: run `RUN_DAILY_DIGEST --source api`.
+- X 日报 / 生成日报: run `RUN_DAILY_DIGEST`; this uses API if configured, otherwise browser.
 - 用户已有 token / 输入 X token: run `RUN_DAILY_DIGEST --configure-api-token`.
 - 配置 X API / 给 app 授权: run `RUN_DAILY_DIGEST --configure-api`.
 - 验证 X API 配置: run `CONFIGURE_API --verify`.
@@ -86,31 +91,43 @@ All normal flows should be triggered from chat by the agent:
 - 清除 X API 配置: run `CONFIGURE_API --clear`.
 - 调试浏览器: run `RUN_DAILY_DIGEST --source browser --headed`.
 
-Force a source:
+Force a script source:
 
 ```bash
 RUN_DAILY_DIGEST --source browser
 X_BEARER_TOKEN=... RUN_DAILY_DIGEST --source api --handle <handle>
 ```
 
-The first browser run opens a dedicated browser profile at `twitter-digest/.state/chrome-profile`. The user logs in to X once in that browser. Later browser runs default to headless collection and reuse the saved local browser session. If the saved login is unavailable, the script automatically opens a visible browser window for manual login. The skill has two collector scripts: `scripts/api_x_digest.py` for official API public data, and `scripts/browser_x_digest.py` for browser-visible X Chat / encrypted DM content. API source does not collect DM.
+Browser-source runs use a dedicated browser profile at `twitter-digest/.state/chrome-profile`. The user logs in to X once in that browser. Later browser runs default to headless collection and reuse the saved local browser session. If the saved login is unavailable during a browser-source run, the script automatically opens a visible browser window for manual login. API-source runs do not touch this profile and are used automatically after API credentials are configured unless the user explicitly selects `--source browser`. The skill has two collector scripts: `scripts/api_x_digest.py` for official API public data, and `scripts/browser_x_digest.py` for browser-visible X Chat / encrypted DM content. API-visible DM events remain TODO-only until X fixes or documents reliable XChat coverage.
 
-Browser source reads visible X Chat/DM by default and merges it into the same daily digest. API source never starts a browser and never collects DMs. `RUN_DAILY_DIGEST --dm-only` is retained only as a debug mode for DM collection, not the normal product path. Do not use browser DM collection for unattended scheduled runs.
+DM reading is enabled by default only for browser-source runs and only reads visible local browser content. API-source runs do not start a browser, even when `--include-dms` is passed. To skip DMs for a browser run:
 
-DM collection uses browser automation against X Chat and may trigger X account risk controls, login challenges, passcode recovery, or other platform restrictions. This risk belongs in the documentation; do not add extra runtime warning prompts.
-
-X API DM endpoints are not used by this product path. API source has no DM; browser source is required for visible X Chat / encrypted DM content.
+```bash
+RUN_DAILY_DIGEST --no-dms
+```
 
 Default scope:
 
 - Mentions of the authenticated handle.
 - Home timeline hotspots.
 - Own profile activity.
+- Browser source only: today's visible DM conversations, with only conversations whose latest preview is not from the user opened for content.
 - Optional keyword searches only when the user explicitly passes `--keywords`.
 
-Public timeline/profile/mentions pages use the same daily-window loading model as DMs. API public collection keeps up to 300 items; browser public collection scrolls each public page up to 40 rounds, keeps up to 100 public items, waits for DOM growth after each scroll, and only allows early stop after at least 5 scroll rounds when loaded post timestamps show content beyond the 24-hour digest window (`--scrolls 40`, `--min-public-scrolls 5`, `--max-public-items 100`, `--public-window-hours 24`).
+Public timeline/profile/mentions pages use the same daily-window loading model as DMs. API public collection keeps up to 300 items; browser public collection scrolls each public page up to 40 rounds, keeps up to 100 public items, waits for DOM growth after each scroll, and only allows early stop after at least 5 scroll rounds when loaded post timestamps show content beyond the 24-hour digest window (`--scrolls 40`, `--min-public-scrolls 5`, `--max-public-items 100`, `--public-window-hours 24`). The generated digest context applies a second strict filter: public timeline/profile/mention items must be inside `[now - 24 hours, now]` in the user's current local timezone. Items with missing or unparseable timestamps are excluded from final-summary facts and reported as `time-unverified` data gaps.
+
+Mention handling is strict:
+
+- Both mention sources must be considered when available: direct mention/notification collection and handle search (`@handle` / equivalent search page or API recent search). Do not conclude "no current mentions" from only one source unless the other source was attempted and failed or is unavailable.
+- Do not include mentions older than the local 24-hour window in `该处理`, `谁 @ 了你`, or reply drafts.
+- Do not present an already-replied mention as needing reply. Use own-profile/API own posts, browser-visible reply context, or context metadata when available to decide whether the authenticated account already replied after the mention timestamp.
+- When `digest-context.md` marks a mention with `reply_state=already_replied` or `action_state=handled`, it must not appear as a pending reply opportunity. It may be omitted or summarized as already handled.
+- When `digest-context.md` marks `reply_state=reply_unverified`, do not say the user "needs to reply"; write `回复状态未确认` and suggest review only if the content is important.
+- If reply status cannot be verified from the current run's data, label the item as `回复状态未确认` instead of claiming the user still needs to reply.
 
 Read the installed `digest-context.md` with the file Read tool when writing the Chinese digest. Its `Final Summary Facts` section is the content source for the final summary. If more focused context is needed, use the file Read tool on the split current-run files: `digest-context-timeline.md` for home/profile/timeline items, `digest-context-mentions.md` for @ mentions, and `digest-context-dm.md` for visible DM conversations. Use `digest-input.md` only when debugging collection issues, not during normal summarization. Do not add content from older runs. Do not write ad-hoc `python3 -c`, shell, `cat`, `head`, `tail`, `grep`, or temporary scripts to inspect context structure during normal summarization. If counts or non-content structure must be checked, run the built-in `scripts/inspect_digest.py`, which does not print DM bodies.
+
+If `digest-context.md` or `digest-context-mentions.md` shows missing mention sources, collection errors for `mentions_search` / `mentions_notifications`, or only stale mention data, report that as a data gap. Do not turn stale mentions into action items.
 
 ## Install
 
@@ -119,6 +136,8 @@ From the repository `skills/` directory:
 ```bash
 python3 twitter-digest/scripts/install.py
 ```
+
+For one-line installs through `twitter-digest/install.sh`, Codex, Claude Code, and other non-interactive macOS agents open a real Terminal window and re-run the full installation there. This keeps `git clone`, Python/browser prerequisite checks, and skill-directory writes out of the agent permission sandbox. To force direct in-process installation from an already interactive terminal or CI, set `TWITTER_DIGEST_OPEN_TERMINAL=0`.
 
 Default install targets the current agent client: Codex installs to `~/.codex/skills/twitter-digest`, Claude Code installs to `~/.claude/skills/twitter-digest`. Use `--client codex`, `--client claude`, or `--skills-dir` to override. Local development can use `--symlink`.
 
@@ -131,8 +150,6 @@ python3 twitter-digest/scripts/install.py --client claude --allow-claude-command
 This explicitly adds one Claude Code Bash allow rule for `python3 ~/.claude/skills/twitter-digest/scripts/run_daily_digest.py:*` and adds `~/.claude/skills/twitter-digest/.state` to Claude Code `additionalDirectories` so the Read tool can read `digest-context.md` without a separate file-access prompt. It does not bypass permissions globally and does not grant arbitrary Bash access.
 
 The installer checks for Python 3.10+ and a supported Chromium browser before installing. Supported browsers are Google Chrome, Chromium, Microsoft Edge, and Brave. If the browser will be installed later, use `--skip-browser-check`.
-
-The installer prints the source policy after install: API source never starts a browser and never collects DMs; browser source collects visible X Chat/DM and merges DM into the same X daily digest. Browser DM automation may trigger X account risk controls, login challenges, or passcode recovery, so avoid long-running unattended DM collection.
 
 The installer moves old `twitter-briefing`, `twitter-briefing.bak`, or existing `twitter-digest` installs into the selected skills directory's `.backups/` folder and disables their `SKILL.md` files so the current agent does not load duplicate old skills. It preserves `.state` from an existing installed `twitter-digest` copy during reinstall, but does not copy `.state` from the development checkout.
 
@@ -163,16 +180,10 @@ When the user asks for an X daily digest or X 日报, run:
 RUN_DAILY_DIGEST
 ```
 
-If they ask for a digest that includes DMs, use browser source:
+If they ask to skip DMs:
 
 ```bash
-RUN_DAILY_DIGEST --source browser
-```
-
-If they ask for API-only public data without browser/DM, use API source:
-
-```bash
-RUN_DAILY_DIGEST --source api
+RUN_DAILY_DIGEST --no-dms
 ```
 
 If the authenticated handle is not detected or the user corrects it:
@@ -180,6 +191,8 @@ If the authenticated handle is not detected or the user corrects it:
 ```bash
 RUN_DAILY_DIGEST --handle <handle> --account-name "<显示名>" --save-default
 ```
+
+Browser-source daily digests must identify the authenticated handle before collecting public pages. If automatic handle detection fails, the collector opens a visible browser window and retries. If the handle still cannot be identified, the run must stop and the agent must not generate a daily digest from partial browser data; ask the user to rerun with `--handle <handle>` or confirm the correct account in the visible X window.
 
 For debugging or manual inspection:
 
@@ -199,7 +212,7 @@ Do not ask the user to copy cookies or configure another service. If the script 
 
 Treat browser sessions, cookies observed internally by the script, DMs, phone numbers, emails, private handles, and screenshots as sensitive. Do not post, reply, like, follow, block, open suspicious links, accept DM requests, or send DMs unless the user explicitly asks after reviewing a draft.
 
-Browser DM collection runs when source is browser. It reads message content visible in the logged-in local browser. If X Chat shows a passcode setup, passcode entry, or end-to-end-encryption recovery screen during headless collection, the script should automatically reopen X Messages in a visible browser window, wait for the user to complete it, then retry DM collection. In `--non-interactive` mode, record the DM data gap and continue without blocking. Do not choose, enter, or store a passcode for the user.
+Browser DM collection only reads message content visible in the logged-in local browser. If X Chat shows a passcode setup, passcode entry, or end-to-end-encryption recovery screen during headless collection, the script should automatically reopen X Messages in a visible browser window, wait for the user to complete it, then retry DM collection. In `--non-interactive` mode, record the DM data gap and continue without blocking. Do not choose, enter, or store a passcode for the user.
 
 ### 3. Analyze
 
@@ -211,7 +224,9 @@ Group mentions by reason to care:
 - Opportunity: partnership, hiring, customer lead, investor/media attention, community praise.
 - Noise: spam, generic tags, low-context reposts.
 
-When browser-source DM collection runs, classify DMs as:
+Before putting a mention into `✅ 该处理` or `🔴 值得回 / 需要处理`, confirm it is within the local 24-hour window and not already replied to. If it is already replied to, either omit it from action items or mark it as already handled. If the current run cannot verify reply status, mark `回复状态未确认` and avoid phrasing it as definitely needing a reply. For mentions, treat `reply_state` / `action_state` in `digest-context.md` as authoritative over the text of the mention.
+
+Classify DMs as:
 
 - `urgent`: time-sensitive, business-critical, safety/security, money, reputation, or deadline.
 - `important`: meaningful relationship, opportunity, unresolved issue, or action needed.
@@ -234,7 +249,7 @@ For private messages, summarize minimally. Quote only the short phrase needed to
 
 ### 4. Produce The Daily Summary
 
-除非用户另有要求，X 日报最终输出必须用中文，并使用这个结构。API 来源时如果 context says `dm_status: not_requested`, write "API 来源未采集 DM" only if needed, not "没有私信"。浏览器来源时，把 DM 作为同一份日报的一个章节，不要另起一份 DM 日报。
+除非用户另有要求，最终输出必须用中文，并使用这个结构：
 
 ```markdown
 ## 🐦 X 日报 - YYYY-MM-DD
@@ -250,11 +265,13 @@ For private messages, summarize minimally. Quote only the short phrase needed to
 - 🔴 值得回 / 需要处理
 - 🟡 一般互动
 - ⚪ 噪音折叠统计
+- 只包含本地 24 小时窗口内的 mentions；已回复过的 mentions 不再作为待回复提醒
 
 **◆ 私信（DM）**
 - 会话统计：今日可见会话 N 个，最后我发出 N 个，等我回复 N 个
 - 消息统计：已打开等我回复会话中捕获消息 N 条
 - 仅挑重点总结等我回复的私信；垃圾、钓鱼、低质营销只计数并归为忽略
+- 🔴 重要 / 🟡 一般 / ⚪ 忽略
 
 **◆ 时间线热点**
 1. 热点：一句话解释 + 代表观点 + 和用户的关系
@@ -266,7 +283,7 @@ For private messages, summarize minimally. Quote only the short phrase needed to
 - 只给草稿，不自动发送。
 
 **⚠️ 数据缺口**
-- 哪些公开页面没读到、是否只扫描了前 N 条；如果未采集 DM，写“本次未采集 DM”。
+- 哪些页面没读到、DM 是否不可见、是否只扫描了前 N 条。
 ```
 
 保持简洁、有判断、可执行。价值在总结和行动建议，不是把页面内容全文搬运。
