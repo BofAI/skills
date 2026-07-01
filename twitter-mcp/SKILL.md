@@ -19,9 +19,9 @@ When X MCP tools are available, collect data directly through MCP:
 
 - Resolve the authenticated account with `get_users_me` or the closest available current-user tool.
 - Collect home timeline / followed-account activity with `get_users_timeline` or the closest available timeline tool.
-- Collect direct mentions with `get_users_mentions`.
-- Collect the user's own recent posts with `get_users_posts`.
-- Use search tools such as `search_posts_all` only for explicit keywords, extra mention searches, or user-requested topics.
+- Collect direct mentions with `get_users_mentions` when available. If no mentions tool is exposed, use available search tools with mention queries for the authenticated handle, such as `@handle`, `to:handle`, or equivalent X search syntax.
+- Collect the user's own recent posts with `get_users_posts` when available. If no own-posts tool is exposed, use available search tools with `from:handle` for the authenticated handle.
+- Use search tools such as `search_posts_all` for explicit keywords, extra mention searches, user-requested topics, and fallbacks when dedicated mentions or own-post tools are not exposed.
 - Use trends or news tools only when available and relevant.
 - Collect DM/X Chat data only if the current X MCP tool list exposes a DM/chat capability. If it does not, clearly report that DMs were not collected through MCP; do not claim there are no private messages.
 
@@ -51,13 +51,13 @@ From the repository `skills/` directory:
 For a one-line Codex install from this beta tag:
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/BofAI/skills/v1.5.11-beta.9/twitter-mcp/install.sh | X_MCP_REGISTER_CODEX=1 X_MCP_REGISTER_CLAUDE=0 sh
+curl -fsSL https://raw.githubusercontent.com/BofAI/skills/v1.5.11-beta.10/twitter-mcp/install.sh | X_MCP_REGISTER_CODEX=1 X_MCP_REGISTER_CLAUDE=0 sh
 ```
 
 For a one-line Claude Code install from this beta tag:
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/BofAI/skills/v1.5.11-beta.9/twitter-mcp/install.sh | X_MCP_REGISTER_CODEX=0 X_MCP_REGISTER_CLAUDE=1 sh
+curl -fsSL https://raw.githubusercontent.com/BofAI/skills/v1.5.11-beta.10/twitter-mcp/install.sh | X_MCP_REGISTER_CODEX=0 X_MCP_REGISTER_CLAUDE=1 sh
 ```
 
 The installer:
