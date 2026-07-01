@@ -17,6 +17,14 @@ If the user asks to generate an X/Twitter daily digest, says `生成X日报`, `X
 
 For daily digest requests, run `xurl` commands directly from the agent shell and use their outputs as the digest source. Do not create or run wrapper/helper scripts for digest collection.
 
+Before collecting X data, determine the user's current local timezone and the exact 24-hour window:
+
+```bash
+date '+%Y-%m-%d %H:%M:%S %Z %z'
+```
+
+Use that local time as `now`, compute `cutoff = now - 24 hours`, and include only X items whose timestamp is within `[cutoff, now]` in the user's local timezone. Convert UTC `created_at` timestamps from X into the user's local timezone before filtering or grouping. Do not use calendar-day-only filtering unless the user explicitly asks for "today" by date instead of "past 24 hours".
+
 ```bash
 xurl whoami
 xurl timeline -n 100
@@ -35,6 +43,9 @@ xurl search "to:<handle>" -n 100
 Rules for collection:
 
 - If `xurl whoami` does not reveal a handle, ask the user for the handle or skip handle-dependent commands and report the gap.
+- Keep only posts, mentions, searches, and timeline items from the last 24 hours in the user's current local timezone.
+- If an item has no parseable timestamp, do not use it for time-bound facts; report it under data gaps as time-unverified.
+- When using `xurl search`, search date operators may be used only as a coarse prefilter; still post-filter each returned item to the exact 24-hour window.
 - If a specific `xurl` command fails, report that command under data gaps and continue with successful command outputs.
 - Do not run the DM command during normal daily digest collection. Current DM/API coverage is not reliable for this workflow and should not appear in the daily digest.
 - If the user explicitly asks for private messages, explain that this skill does not collect them by default because the current API path is unavailable or unreliable; do not claim there are no private messages.
@@ -47,7 +58,7 @@ Write the final response in Chinese by default for `X日报` requests. Use this 
 - 需要处理: direct asks, risks, and reply opportunities from public timeline, mentions, and searches.
 - 时间线热点: grouped by topic with why it matters.
 - 我的账号动态: notable own posts or engagement.
-- 数据缺口: failed `xurl` commands, auth/tier errors, or rate limits.
+- 数据缺口: failed `xurl` commands, auth/tier errors, rate limits, or items excluded because timestamps were missing/unparseable.
 - 建议动作: concise reply/follow-up suggestions. Do not post or send anything without explicit approval.
 
 ## Install And Register
@@ -61,13 +72,13 @@ From the repository `skills/` directory:
 For a one-line Codex install from this beta tag:
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/BofAI/skills/v1.5.11-beta.18/twitter-mcp/install.sh | X_MCP_REGISTER_CODEX=1 X_MCP_REGISTER_CLAUDE=0 sh
+curl -fsSL https://raw.githubusercontent.com/BofAI/skills/v1.5.11-beta.19/twitter-mcp/install.sh | env X_MCP_REGISTER_CODEX=1 X_MCP_REGISTER_CLAUDE=0 sh
 ```
 
 For a one-line Claude Code install from this beta tag:
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/BofAI/skills/v1.5.11-beta.18/twitter-mcp/install.sh | X_MCP_REGISTER_CODEX=0 X_MCP_REGISTER_CLAUDE=1 sh
+curl -fsSL https://raw.githubusercontent.com/BofAI/skills/v1.5.11-beta.19/twitter-mcp/install.sh | env X_MCP_REGISTER_CODEX=0 X_MCP_REGISTER_CLAUDE=1 sh
 ```
 
 The installer:
