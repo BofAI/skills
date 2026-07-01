@@ -203,16 +203,16 @@ register_claude() {
   claude mcp add "$server_name" -- "$xurl_command" --app "$app_name" mcp https://api.x.com/mcp
 }
 
+if should_open_terminal; then
+  open_in_terminal_and_exit
+fi
+
 if ! command_exists node; then
-  fail "Node.js is required before installing xurl. Install Node.js, then rerun this script."
+  fail "Node.js is required before installing xurl. Install Node.js 18 or newer, then rerun this script."
 fi
 
 if ! command_exists npm; then
   fail "npm is required before installing xurl. Install npm, then rerun this script."
-fi
-
-if should_open_terminal; then
-  open_in_terminal_and_exit
 fi
 
 info "Installing ${INSTALL_SPEC}"

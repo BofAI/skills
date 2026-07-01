@@ -74,24 +74,24 @@ From the repository `skills/` directory:
 For a one-line Codex install from this beta tag:
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/BofAI/skills/v1.5.11-beta.21/twitter-mcp/install.sh | env X_MCP_REGISTER_CODEX=1 X_MCP_REGISTER_CLAUDE=0 sh
+curl -fsSL https://raw.githubusercontent.com/BofAI/skills/v1.5.11-beta.22/twitter-mcp/install.sh | env X_MCP_REGISTER_CODEX=1 X_MCP_REGISTER_CLAUDE=0 sh
 ```
 
 For a one-line Claude Code install from this beta tag:
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/BofAI/skills/v1.5.11-beta.21/twitter-mcp/install.sh | env X_MCP_REGISTER_CODEX=0 X_MCP_REGISTER_CLAUDE=1 sh
+curl -fsSL https://raw.githubusercontent.com/BofAI/skills/v1.5.11-beta.22/twitter-mcp/install.sh | env X_MCP_REGISTER_CODEX=0 X_MCP_REGISTER_CLAUDE=1 sh
 ```
 
 The installer:
 
 - Installs this `twitter-mcp` skill into the selected local skills directory.
-- Requires Node.js and npm.
+- Requires Node.js 18+ and npm. Node.js 20 LTS+ is recommended.
 - Installs `@xdevplatform/xurl` globally with npm.
 - Opens the X OAuth2 authorization flow.
 - Does not register the hosted X MCP bridge by default. To also register MCP, set `X_MCP_REGISTER_CODEX_MCP=1` or `X_MCP_REGISTER_CLAUDE_MCP=1`.
 
-When launched by Codex or Claude Code on macOS, the installer opens a real Terminal window for OAuth2 Client ID / Secret input and browser authorization. Do not ask the user to paste OAuth credentials into chat.
+When launched by Codex, Claude Code, or another non-interactive agent on macOS, the one-line installer immediately opens a real Terminal window and re-runs the full installation there. Node/npm checks, `xurl` installation, OAuth2 Client ID / Secret input, and browser authorization all happen in Terminal, not inside the agent permission sandbox. Do not ask the user to paste OAuth credentials into chat.
 
 ## Configuration
 
