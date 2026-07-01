@@ -132,6 +132,8 @@ From the repository `skills/` directory:
 python3 twitter-digest/scripts/install.py
 ```
 
+For one-line installs through `twitter-digest/install.sh`, Codex, Claude Code, and other non-interactive macOS agents open a real Terminal window and re-run the full installation there. This keeps `git clone`, Python/browser prerequisite checks, and skill-directory writes out of the agent permission sandbox. To force direct in-process installation from an already interactive terminal or CI, set `TWITTER_DIGEST_OPEN_TERMINAL=0`.
+
 Default install targets the current agent client: Codex installs to `~/.codex/skills/twitter-digest`, Claude Code installs to `~/.claude/skills/twitter-digest`. Use `--client codex`, `--client claude`, or `--skills-dir` to override. Local development can use `--symlink`.
 
 For Claude Code, the skill cannot silently grant itself Bash permission or file access outside the project. On first use, approve the visible `run_daily_digest.py` command and choose "don't ask again" if appropriate. For a global opt-in during install, run:
