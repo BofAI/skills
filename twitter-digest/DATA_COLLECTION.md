@@ -87,8 +87,8 @@ scripts/run_daily_digest.py
 选择逻辑：
 
 ```text
---source api      -> 强制 API
---source browser  -> 强制浏览器
+--source api      -> 强制 API，只采公开数据，不启动浏览器
+--source browser  -> 强制浏览器，采公开网页和可见 X Chat / DM
 --source auto     -> 有 X_BEARER_TOKEN/TWITTER_BEARER_TOKEN 或已保存 OAuth2 user token 用 API，否则浏览器；API 不可用时回退浏览器
 ```
 
@@ -98,7 +98,7 @@ scripts/run_daily_digest.py
 
 ```text
 scripts/api_x_digest.py      -> 官方 API 抓取：home timeline、mentions、profile；API DM 仅作为 TODO/调试
-scripts/browser_x_digest.py  -> 浏览器抓取：X Chat / 加密 DM / API 拿不到的网页内容
+scripts/browser_x_digest.py  -> 浏览器抓取：公开网页 + X Chat / 加密 DM
 ```
 
 普通日报：
@@ -217,7 +217,7 @@ API DM TODO / 调试规则：
 - 只把最后一条不是用户发出的会话正文放进 `dm_threads`，用于判断是否需要回复。
 - 最后一条是用户发出的会话只计数，不展开正文。
 - 如果 `/2/dm_events` 返回权限、tier、认证或限流错误，写入 `api_dm_todo` data gap，不把失败当作“无私信”。
-- 如果 `/2/dm_events` 返回 0 条，或 API 返回的事件不能确认是否需要回复，也写入 `api_dm_todo` TODO List；完整 DM 以 `scripts/browser_x_digest.py` 或 `run_daily_digest.py` 的浏览器 DM 页为准。
+- API 来源不启动浏览器，也不补采浏览器 DM；如果需要完整 DM，必须显式使用 `--source browser`。
 
 ## 稳定性策略
 

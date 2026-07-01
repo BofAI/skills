@@ -8,7 +8,6 @@ import json
 import os
 import subprocess
 import sys
-import tempfile
 from pathlib import Path
 
 from api_config_store import API_CONFIG_PATH, load_api_config, refresh_oauth_token_if_needed
@@ -163,34 +162,6 @@ def run_browser_command(cmd: list[str]) -> None:
     subprocess.run(cmd, check=True)
 
 
-def merge_api_public_with_browser_dm(api_out: Path, browser_out: Path, final_out: Path) -> None:
-    api_data = json.loads((api_out / "digest-input.json").read_text(encoding="utf-8"))
-    browser_data = json.loads((browser_out / "digest-input.json").read_text(encoding="utf-8"))
-    browser_messages = [page for page in browser_data.get("pages", []) if isinstance(page, dict) and page.get("kind") == "messages"]
-    if not browser_messages:
-        browser_messages = [
-            {
-                "kind": "messages",
-                "url": "https://x.com/messages",
-                "items": [],
-                "dm_status": "no_visible_threads",
-                "dm_note": "Browser DM collection completed but did not produce a messages page.",
-                "dm_threads": [],
-                "dm_visible_thread_count": 0,
-                "dm_replied_thread_count": 0,
-                "dm_unreplied_thread_count": 0,
-                "dm_captured_message_count": 0,
-            }
-        ]
-    merged_pages = [page for page in api_data.get("pages", []) if not (isinstance(page, dict) and page.get("kind") == "messages")]
-    merged_pages.extend(browser_messages)
-    api_data["pages"] = merged_pages
-    api_data["source"] = "api+browser_dm"
-    api_data["dm_source"] = "browser"
-    final_out.mkdir(parents=True, exist_ok=True)
-    (final_out / "digest-input.json").write_text(json.dumps(api_data, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
-
-
 def main() -> None:
     rerun_from_installed_if_needed(__file__)
     args = parse_args()
@@ -238,19 +209,11 @@ def main() -> None:
         cmd = browser_command(args, args.out, handle, include_dms)
         child_env = None
     if source == "api" and include_dms:
-        print("API source selected for public data. Browser collection will be used for X Chat/DM.", flush=True)
+        print("API source selected. Browser DM collection is not run for API source; use --source browser when DMs are required.", flush=True)
     print(f"Collecting X digest data via {source} source.", flush=True)
     try:
         if source == "api":
-            if include_dms:
-                with tempfile.TemporaryDirectory(prefix="x-digest-api-") as api_tmp, tempfile.TemporaryDirectory(prefix="x-digest-browser-dm-") as browser_tmp:
-                    run_api_command(api_command(args, api_tmp, api_base, user_id, handle), child_env)
-                    print("Collecting X Chat/DM via browser source.", flush=True)
-                    run_browser_command(browser_command(args, browser_tmp, handle, include_dms=True, dm_only=True))
-                    merge_api_public_with_browser_dm(Path(api_tmp), Path(browser_tmp), Path(args.out))
-                    source = "api+browser_dm"
-            else:
-                run_api_command(cmd, child_env)
+            run_api_command(cmd, child_env)
         else:
             run_browser_command(cmd)
     except subprocess.CalledProcessError as exc:

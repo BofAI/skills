@@ -66,6 +66,36 @@ On first run, a dedicated browser profile opens. Log in to X once in that browse
 
 ## Data Collection Sources
 
+Preferred path when available:
+
+```text
+X MCP registered as xapi -> agent calls MCP tools directly -> agent writes the Chinese digest
+```
+
+The MCP path does not use a local collector script and does not write `digest-context.*`. The agent should call tools such as `get_users_me`, `get_users_timeline`, `get_users_mentions`, and `get_users_posts` directly. If X MCP does not expose DM/X Chat tools, report DM as not collected through MCP rather than claiming there are no private messages.
+
+To install and register X MCP for Codex / Claude Code:
+
+```bash
+twitter-digest/scripts/install_xmcp.sh
+```
+
+When launched by a Codex or Claude Code agent on macOS, the installer opens a real Terminal window for OAuth2 Client ID / Secret input and browser authorization. Secrets should be entered there, not pasted into chat.
+
+By default this only installs and registers X MCP. To also install the `twitter-digest` skill in the same flow:
+
+```bash
+X_MCP_INSTALL_SKILL=1 twitter-digest/scripts/install_xmcp.sh
+```
+
+Useful install options:
+
+```bash
+X_MCP_SKILL_CLIENT=codex          # auto | codex | claude
+X_MCP_SKILL_INSTALL_MODE=symlink  # copy | symlink
+X_MCP_SKIP_BROWSER_CHECK=1        # skip browser runtime check for skill install
+```
+
 There are three collection entry points:
 
 ```bash
@@ -91,7 +121,7 @@ python3 ~/.claude/skills/twitter-digest/scripts/run_daily_digest.py --source bro
 X_BEARER_TOKEN=... python3 ~/.claude/skills/twitter-digest/scripts/run_daily_digest.py --source api --handle <handle>
 ```
 
-API mode is for stable public-data collection, including the official home timeline endpoint when the configured token has user-context timeline access. Normal daily runs use API for public data and the browser collector for X Chat / DM content. API DM lookup is marked TODO because XChat / encrypted DMs may not appear in `/2/dm_events`; do not use API DM to conclude there are no private messages. App-only API keys are not enough for user-context data.
+API mode is for stable public-data collection, including the official home timeline endpoint when the configured token has user-context timeline access. API mode never starts a browser and never collects X Chat / DM content. Use browser mode when visible X Chat / DM is required. API DM lookup is marked TODO because XChat / encrypted DMs may not appear in `/2/dm_events`; do not use API DM to conclude there are no private messages. App-only API keys are not enough for user-context data.
 
 ## Configure API In Chat
 

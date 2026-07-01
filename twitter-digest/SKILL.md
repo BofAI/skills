@@ -1,13 +1,13 @@
 ---
 name: twitter-digest
-description: Use when the user wants Claude Code or another agent to analyze their own X/Twitter mentions, home timeline, visible direct messages, reply opportunities, and daily social-media summaries through API or local logged-in browser collection.
+description: Use when the user wants Claude Code or another agent to analyze their own X/Twitter mentions, home timeline, visible direct messages, reply opportunities, and daily social-media summaries through X MCP, API, or local logged-in browser collection.
 ---
 
 # X/Twitter Digest
 
 ## Overview
 
-Use this skill to produce a concise Chinese daily digest from the user's own X/Twitter account. The recommended entry point is `scripts/run_daily_digest.py`, which selects API collection when API credentials are configured and otherwise falls back to local browser collection with a persistent dedicated Chromium profile.
+Use this skill to produce a concise Chinese daily digest from the user's own X/Twitter account. The preferred path is X MCP when the agent exposes an `xapi` / X MCP server. In that case, call MCP tools directly and write the digest from those tool results; do not run a local MCP collector script. If X MCP is not available, use `scripts/run_daily_digest.py`, which selects API collection when API credentials are configured and otherwise falls back to local browser collection with a persistent dedicated Chromium profile.
 
 After installation, configuration and daily runs should use the installed skill copy, not a temporary clone/source checkout. Installed locations are `~/.claude/skills/twitter-digest` for Claude Code and `~/.codex/skills/twitter-digest` for Codex. If `run_daily_digest.py` or `configure_api.py` is accidentally run from a source checkout while an installed copy exists, the script automatically re-runs the installed copy so `.state` is written to the installed skill directory.
 
@@ -34,6 +34,39 @@ Load `references/x-twitter-digest.md` when you need implementation details, brow
 
 ## Data Collection
 
+### X MCP Source
+
+When X MCP tools are available in the current agent session, use them directly as the collection source:
+
+- `get_users_me`: resolve the authenticated account.
+- `get_users_timeline`: collect home timeline / followed-account activity.
+- `get_users_mentions`: collect direct @ mentions.
+- `get_users_posts`: collect the user's own recent posts.
+- `search_posts_all`: optional keyword or mention search when supported by the current auth mode.
+- `get_trends_by_woeid` / news tools: optional hotspot context when available.
+
+Do not run `run_daily_digest.py` just to use MCP. MCP is an agent tool source, not a local file-producing collector. If an MCP endpoint returns an auth/tier error, include it as a data gap. If the current X MCP tool list does not include DM/X Chat tools, say DM was not collected through MCP and do not claim there are no private messages.
+
+If X MCP is installed but Codex or Claude Code cannot see tools, the user likely needs MCP registration plus a new agent session. The installer helper is:
+
+```bash
+twitter-digest/scripts/install_xmcp.sh
+```
+
+It installs `@xdevplatform/xurl`, runs OAuth2 authorization, and registers the MCP server as `xapi` for Codex and, when available, Claude Code.
+
+When launched by a Codex or Claude Code agent on macOS, the installer opens a real Terminal window for OAuth2 Client ID / Secret input and browser authorization. Do not ask the user to paste OAuth credentials into chat.
+
+By default, `install_xmcp.sh` installs only X MCP. If the user wants one command to also install this skill, set:
+
+```bash
+X_MCP_INSTALL_SKILL=1 twitter-digest/scripts/install_xmcp.sh
+```
+
+Optional controls are `X_MCP_SKILL_CLIENT=auto|codex|claude`, `X_MCP_SKILL_INSTALL_MODE=copy|symlink`, and `X_MCP_SKIP_BROWSER_CHECK=1`.
+
+### Script Sources
+
 There are three collection scripts:
 
 ```bash
@@ -48,7 +81,7 @@ For chat usage, run the wrapper:
 RUN_DAILY_DIGEST
 ```
 
-`run_daily_digest.py --source auto` uses saved OAuth2 user-context credentials, `X_BEARER_TOKEN`, or `TWITTER_BEARER_TOKEN` for public data when present; otherwise it uses the browser collector. During the current X API limitation, normal daily runs use API for public data and browser collection for all DM/X Chat content. Treat API DM lookup as TODO / waiting for X to fix XChat-encrypted DM coverage; do not use API DM to decide whether the user has private messages.
+`run_daily_digest.py --source auto` uses saved OAuth2 user-context credentials, `X_BEARER_TOKEN`, or `TWITTER_BEARER_TOKEN` for public data when present; otherwise it uses the browser collector. The script sources are isolated: API source never starts a browser and browser source owns visible X Chat / DM collection. Treat API DM lookup as TODO / waiting for X to fix XChat-encrypted DM coverage; do not use API DM to decide whether the user has private messages.
 
 If the user asks to configure API access, trigger the OAuth/user-token setup from chat:
 
@@ -84,7 +117,7 @@ All normal flows should be triggered from chat by the agent:
 - 清除 X API 配置: run `CONFIGURE_API --clear`.
 - 调试浏览器: run `RUN_DAILY_DIGEST --source browser --headed`.
 
-Force a source:
+Force a script source:
 
 ```bash
 RUN_DAILY_DIGEST --source browser
@@ -93,7 +126,7 @@ X_BEARER_TOKEN=... RUN_DAILY_DIGEST --source api --handle <handle>
 
 The first run opens a dedicated browser profile at `twitter-digest/.state/chrome-profile`. The user logs in to X once in that browser. Later runs default to headless collection and reuse the saved local browser session. If the saved login is unavailable, the script automatically opens a visible browser window for manual login. The skill has two collector scripts: `scripts/api_x_digest.py` for official API public data, and `scripts/browser_x_digest.py` for browser-visible X Chat / encrypted DM content. API-visible DM events remain TODO-only until X fixes or documents reliable XChat coverage.
 
-DM reading is enabled by default and only reads visible local browser content. To skip DMs for a run:
+DM reading is enabled by default only for browser-source runs and only reads visible local browser content. API-source runs do not start a browser, even when `--include-dms` is passed. To skip DMs for a browser run:
 
 ```bash
 RUN_DAILY_DIGEST --no-dms
