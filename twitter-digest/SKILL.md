@@ -1,6 +1,6 @@
 ---
 name: twitter-digest
-description: Use when the user wants Claude Code or another agent to analyze their own X/Twitter mentions, home timeline, visible direct messages, reply opportunities, and daily social-media summaries through API or local logged-in browser collection.
+description: Use when the user asks to generate an X/Twitter daily digest or says phrases such as "生成X日报", "生成 x 日报", "X日报", "推特日报", "Twitter digest", or wants an agent to analyze their own X/Twitter mentions, home timeline, visible direct messages, reply opportunities, and daily social-media summaries through API or local logged-in browser collection.
 ---
 
 # X/Twitter Digest
