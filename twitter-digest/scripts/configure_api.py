@@ -26,7 +26,7 @@ from script_utils import display_path, open_script_in_terminal, rerun_from_insta
 AUTHORIZE_URL = "https://x.com/i/oauth2/authorize"
 TOKEN_URL = "https://api.x.com/2/oauth2/token"
 DEFAULT_REDIRECT_URI = "http://127.0.0.1:8765/callback"
-DEFAULT_SCOPES = "dm.read tweet.read users.read offline.access"
+DEFAULT_SCOPES = "tweet.read users.read offline.access"
 
 
 def parse_args() -> argparse.Namespace:

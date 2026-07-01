@@ -4,7 +4,7 @@
 
 `twitter-digest` 读取用户自己的 X/Twitter 数据并生成中文日报。抓数据层支持 API 和本地已登录浏览器两种来源。
 
-默认入口是 `scripts/run_daily_digest.py`。如果已经通过对话内 OAuth 授权保存了 user-context token，或环境里配置了 X API token，它优先用 API 抓公开数据；如果没有 API 配置，它自动回退到浏览器抓取。读取 X Chat / DM 内容时仍使用本地浏览器，因为普通 API 配置通常没有私信读取能力。
+默认入口是 `scripts/run_daily_digest.py`。如果已经通过对话内 OAuth 授权保存了 user-context token，或环境里配置了 X API token，它优先用 API 抓公开数据；如果没有 API 配置，它自动回退到浏览器抓取公开数据。API 和浏览器完全分开：走 API 时不会启动浏览器，也不会读取 DM。X Chat / DM 只属于浏览器来源：走浏览器时默认采集并合并 DM；走 API 时不启动浏览器、不采集 DM。
 
 核心链路：
 
@@ -46,7 +46,7 @@ python3 twitter-digest/scripts/run_daily_digest.py --source browser
 X_BEARER_TOKEN=... python3 twitter-digest/scripts/run_daily_digest.py --source api --handle <handle>
 ```
 
-API 模式重点用于更稳定地抓公开数据。X Chat / DM 内容仍以浏览器模式为准；如果 API 模式无法读取 DM，会在 `digest-context` 的 Data Gaps 中标注。
+API 模式重点用于更稳定地抓公开数据。API 模式不会启动浏览器，也不会读取 X Chat / DM；DM 只存在于浏览器模式。API 来源没有 DM 采集能力；XChat / 加密私信只走浏览器来源。
 
 ## 对话内 API 授权
 
@@ -155,7 +155,17 @@ python3 twitter-digest/scripts/install.py --skip-browser-check
 - `own_profile`：自己的主页，用于看自己最近发帖/互动。
 - `mentions_search`：搜索 `@当前账号`。
 - `mentions_notifications`：通知里的 @ 提及。
-- `messages`：X Chat / DM。
+API 来源不采集 `messages`；浏览器来源会采集 `messages` 并合并到日报。如果用户要求日报带私信，运行浏览器来源：
+
+```bash
+python3 twitter-digest/scripts/run_daily_digest.py --source browser
+```
+
+如果用户要求不启动浏览器、不采集私信，运行 API 来源：
+
+```bash
+python3 twitter-digest/scripts/run_daily_digest.py --source api
+```
 
 默认不采集关键词。只有显式传 `--keywords` 时才增加关键词搜索页。
 
@@ -200,7 +210,9 @@ python3 twitter-digest/scripts/install.py --skip-browser-check
 
 ## DM 采集逻辑
 
-DM 默认读取。
+DM 不由开关控制。浏览器来源默认读取 X Messages 并把 DM 合并进同一份日报；API 来源不启动浏览器、不读取 DM。`--dm-only` 仅保留为低层调试模式。
+
+DM 采集依赖浏览器自动化访问 X Chat，可能触发 X 的账号风控、登录挑战、passcode 恢复或其他平台限制。不要把 DM 采集做成长时间无人值守任务。
 
 先读取 X Chat 左侧会话列表，并统计今天可见会话：
 
@@ -315,7 +327,7 @@ python3 twitter-digest/scripts/inspect_digest.py
 
 该脚本只输出计数、加载状态和数据缺口，不输出 DM 正文。
 
-默认结构：
+普通 X 日报默认结构：
 
 ```markdown
 ## X 日报 - YYYY-MM-DD
@@ -325,8 +337,6 @@ python3 twitter-digest/scripts/inspect_digest.py
 **该处理**
 
 **谁 @ 了你**
-
-**私信（DM）**
 
 **时间线热点**
 
@@ -341,7 +351,8 @@ python3 twitter-digest/scripts/inspect_digest.py
 
 - 先判断今天有没有需要处理的风险、机会或回复。
 - @ 提及按重要性分组。
-- DM 只重点总结 `waiting_reply`。
+- API 来源时，最多在数据缺口里写“API 来源未采集 DM”，不能写“没有私信”。
+- 浏览器来源时，在同一份日报里写 **私信（DM）** 章节，只重点总结 `waiting_reply`。
 - `last_from_me` 不当作待处理。
 - 垃圾、钓鱼、低质营销只计数，不展开。
 - 私信内容只做必要摘要，不贴完整隐私历史。
@@ -354,6 +365,8 @@ python3 twitter-digest/scripts/inspect_digest.py
 
 - 生成今日 X 日报。
 - 今天谁 @ 我了？
+- 生成浏览器日报，带私信。
+- 生成 API 日报，不启动浏览器也不带私信。
 - 哪些 DM 等我回复？
 - 有没有重要私信？
 - 哪些私信是垃圾/钓鱼？
@@ -362,20 +375,25 @@ python3 twitter-digest/scripts/inspect_digest.py
 - 帮我起草回复，但不要发送。
 - 这次哪些数据没读到？
 - 给我看 `digest-context`。
-- 跳过 DM 生成日报。
 
 ## 常用命令
 
-完整日报：
+普通 X 日报：
 
 ```bash
 python3 twitter-digest/scripts/run_daily_digest.py
 ```
 
-跳过 DM：
+浏览器日报（含 DM）：
 
 ```bash
-python3 twitter-digest/scripts/run_daily_digest.py --no-dms
+python3 twitter-digest/scripts/run_daily_digest.py --source browser
+```
+
+API 日报（无浏览器、无 DM）：
+
+```bash
+python3 twitter-digest/scripts/run_daily_digest.py --source api
 ```
 
 强制显示浏览器：

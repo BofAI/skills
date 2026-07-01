@@ -66,7 +66,7 @@ def render_markdown(data: dict[str, Any]) -> str:
             "",
             "- 浏览器采集依赖 X 页面结构和已加载的可见内容。",
             "- 日报默认使用较小滚动次数；需要更全覆盖时再提高 `--scrolls`。",
-            "- DM 属于私密内容。只有用户明确同意本地读取时才使用 `--include-dms`。",
+            "- DM 属于私密内容。浏览器来源会读取并合并 DM；API 来源不启动浏览器、不读取 DM。",
         ]
     )
     return "\n".join(lines) + "\n"

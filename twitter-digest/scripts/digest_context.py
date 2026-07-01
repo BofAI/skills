@@ -214,6 +214,8 @@ def build_digest_facts(data: dict[str, Any], summary: dict[str, Any]) -> dict[st
                     "cards": normalize_context_assets(item.get("cards")),
                 }
             )
+    if (summary.get("dm_status") or "") == "not_requested":
+        facts["dms"]["note"] = "DM was not collected in this run because the API source was used. Browser source includes DM; API source never starts a browser and never collects DM."
     if (summary.get("dm_status") or "") in {"blocked_by_x_chat_passcode", "visible_threads_unopened", "no_visible_threads", "dm_page_loading_timeout", "api_dm_unavailable", "api_dm_error", "api_dm_todo"}:
         facts["data_gaps"].append(
             {
