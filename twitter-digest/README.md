@@ -15,7 +15,7 @@ python3 twitter-digest/scripts/install.py
 To ask Codex to install this skill for itself, paste this into Codex:
 
 ```bash
-TMPDIR="$(mktemp -d)" && git clone --depth 1 --branch v1.5.11-beta.3 https://github.com/BofAI/skills.git "$TMPDIR/skills" && python3 "$TMPDIR/skills/twitter-digest/scripts/install.py" --client codex
+TMPDIR="$(mktemp -d)" && git clone --depth 1 --branch v1.5.11-beta.4 https://github.com/BofAI/skills.git "$TMPDIR/skills" && python3 "$TMPDIR/skills/twitter-digest/scripts/install.py" --client codex
 ```
 
 Or use the natural-language prompt:
@@ -33,7 +33,7 @@ git clone git@github.com:BofAI/skills.git bofai-skills \
 To ask Claude Code to install this skill for itself, paste this into Claude Code:
 
 ```bash
-TMPDIR="$(mktemp -d)" && git clone --depth 1 --branch v1.5.11-beta.3 https://github.com/BofAI/skills.git "$TMPDIR/skills" && python3 "$TMPDIR/skills/twitter-digest/scripts/install.py" --client claude --allow-claude-commands --allow-claude-state-read
+TMPDIR="$(mktemp -d)" && git clone --depth 1 --branch v1.5.11-beta.4 https://github.com/BofAI/skills.git "$TMPDIR/skills" && python3 "$TMPDIR/skills/twitter-digest/scripts/install.py" --client claude --allow-claude-commands --allow-claude-state-read
 ```
 
 Or use the natural-language prompt:
@@ -97,6 +97,13 @@ python3 ~/.claude/skills/twitter-digest/scripts/run_daily_digest.py
 - If saved API credentials exist, it uses the API collector and does not fall back to browser on API errors.
 - If no API credentials exist, it uses the browser collector.
 
+Source isolation:
+
+- API mode only runs `api_x_digest.py`; it never opens a browser or reads the browser profile.
+- Browser mode only runs `browser_x_digest.py`; it does not use API tokens or API collector output.
+- `--source auto` picks one source for the run and does not merge API and browser data.
+- API DM data gaps are notes only; they do not mean browser DM data was collected.
+
 Force a source:
 
 ```bash
@@ -104,7 +111,7 @@ python3 ~/.claude/skills/twitter-digest/scripts/run_daily_digest.py --source bro
 X_BEARER_TOKEN=... python3 ~/.claude/skills/twitter-digest/scripts/run_daily_digest.py --source api --handle <handle>
 ```
 
-API mode is for stable public-data collection, including the official home timeline endpoint when the configured token has user-context timeline access. API mode never starts a browser and never collects X Chat / DM content. Use browser mode when visible X Chat / DM is required. API DM lookup is marked TODO because XChat / encrypted DMs may not appear in `/2/dm_events`; do not use API DM to conclude there are no private messages. App-only API keys are not enough for user-context data.
+API mode is for stable public-data collection, including the official home timeline endpoint when the configured token has user-context timeline access. API mode never starts a browser, never reads the browser profile, and never collects X Chat / DM content from the browser. Use browser mode when visible X Chat / DM is required. API DM lookup is marked TODO because XChat / encrypted DMs may not appear in `/2/dm_events`; do not use API DM to conclude there are no private messages. App-only API keys are not enough for user-context data.
 
 ## Configure API In Chat
 

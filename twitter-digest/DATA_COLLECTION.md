@@ -93,6 +93,13 @@ scripts/run_daily_digest.py
 --source auto     -> 有 X_BEARER_TOKEN/TWITTER_BEARER_TOKEN 或已保存 OAuth2 user token 用 API，否则浏览器；API 已配置时不回退浏览器
 ```
 
+隔离规则：
+
+- API 来源只运行 `api_x_digest.py`，不启动浏览器、不读取浏览器 profile、不用浏览器补采 API 缺口。
+- 浏览器来源只运行 `browser_x_digest.py`，不读取 API token、不合并 API collector 输出。
+- `--source auto` 每次只选择一个来源，不合并 API 和浏览器两边的数据。
+- API 输出里的“需要浏览器确认 DM”只能作为 data gap 提示，不表示本次已经读取了浏览器 DM。
+
 ## 对话触发流程
 
 底层只保留两个抓取脚本：

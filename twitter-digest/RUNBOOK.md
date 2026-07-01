@@ -49,6 +49,13 @@ X_BEARER_TOKEN=... python3 twitter-digest/scripts/run_daily_digest.py --source a
 
 API 模式重点用于更稳定地抓公开数据。API 模式不会打开浏览器。X Chat / DM 内容仍以浏览器模式为准；如果 API 模式无法读取 DM，会在 `digest-context` 的 Data Gaps 中标注。
 
+来源隔离规则：
+
+- API 模式只运行 `api_x_digest.py`，不启动浏览器、不读取浏览器 profile、不用浏览器补采 API 缺口。
+- 浏览器模式只运行 `browser_x_digest.py`，不读取 API token、不合并 API collector 输出。
+- `--source auto` 每次只选择一个来源，不合并 API 和浏览器两边的数据。
+- API 模式输出的 DM 浏览器确认提示只是 data gap，不代表浏览器数据已被采集。
+
 ## 对话内 API 授权
 
 用户不需要自己 export 环境变量。用户在对话里说“配置 X API”时，Agent 运行：

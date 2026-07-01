@@ -1,7 +1,7 @@
 #!/bin/sh
 set -eu
 
-TAG="${X_MCP_INSTALL_TAG:-v1.5.11-beta.3}"
+TAG="${X_MCP_INSTALL_TAG:-v1.5.11-beta.4}"
 BASE_URL="${X_MCP_INSTALL_BASE_URL:-https://raw.githubusercontent.com/BofAI/skills/${TAG}/twitter-mcp}"
 
 if command -v mktemp >/dev/null 2>&1; then
