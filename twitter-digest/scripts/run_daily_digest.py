@@ -31,7 +31,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--configure-only", action="store_true", help="Only save default account config; do not collect data.")
     parser.add_argument("--keywords", default="", help="Optional comma-separated search queries. Default is empty; the daily digest focuses on timeline, mentions, and DMs.")
     parser.add_argument("--out", default=str(DEFAULT_OUT_DIR))
-    parser.add_argument("--source", choices=("auto", "browser", "api"), default="auto", help="Data collection source. auto uses API when configured, otherwise browser.")
+    parser.add_argument("--source", choices=("browser", "api", "auto"), default="browser", help="Data collection source. Default browser. Use api or auto only after explicitly configuring X API.")
     parser.add_argument("--configure-api", action="store_true", help="Open a secure prompt to save X API credentials, then exit.")
     parser.add_argument("--configure-api-token", action="store_true", help="Open a secure prompt to paste an existing X user access token, then exit.")
     parser.add_argument("--api-base", default=os.environ.get("X_API_BASE_URL") or "")
@@ -200,7 +200,9 @@ def main() -> None:
     api_base = args.api_base or str(api_config.get("api_base") or "https://api.x.com/2")
     user_id = args.user_id or str(api_config.get("user_id") or "")
     handle = (args.handle or api_config.get("handle") or config.get("handle") or "").lstrip("@")
-    source = args.source if args.source != "auto" else ("api" if (explicit_bearer_token or saved_api_configured or api_configured(bearer_token)) else "browser")
+    source = args.source
+    if source == "auto":
+        source = "api" if (explicit_bearer_token or saved_api_configured or api_configured(bearer_token)) else "browser"
     if source == "api" and refresh_error and not explicit_bearer_token:
         raise SystemExit("Saved X OAuth token refresh failed. Re-run --configure-api or pass X_BEARER_TOKEN to use API source. Browser collection will not be opened while API is configured.")
     include_dms = not args.no_dms

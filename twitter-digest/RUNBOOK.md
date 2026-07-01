@@ -4,7 +4,7 @@
 
 `twitter-digest` 读取用户自己的 X/Twitter 数据并生成中文日报。抓数据层支持 API 和本地已登录浏览器两种来源。
 
-默认入口是 `scripts/run_daily_digest.py`。如果已经通过对话内 OAuth 授权保存了 user-context token，或环境里配置了 X API token，它只用 API 抓公开数据，不打开浏览器；如果没有 API 配置，它使用浏览器抓取。读取 X Chat / DM 内容必须显式使用浏览器模式。
+默认入口是 `scripts/run_daily_digest.py`，普通日报默认使用本地浏览器抓取。即使已经通过对话内 OAuth 授权保存了 user-context token，或环境里配置了 X API token，普通日报也不会自动切到 API。只有用户主动要求配置/使用 X API，或命令显式传入 `--source api` / `--source auto` 时，才使用 API；API 模式只抓公开数据，不打开浏览器。
 
 核心链路：
 
@@ -28,11 +28,11 @@ scripts/api_x_digest.py
   通过 X API 抓取数据。
 
 scripts/run_daily_digest.py
-  上层入口。默认 --source auto：
-  - 检测到已保存 OAuth token 或 X_BEARER_TOKEN / TWITTER_BEARER_TOKEN 时走 API。
-  - API 已配置时不回退浏览器；API 失败就报错或写 data gap。
-  - 没有 API 配置时走浏览器。
-  - 保存了 refresh token 时自动刷新过期 access token。
+  上层入口。默认使用浏览器：
+  - 普通日报不因已保存 OAuth token 或 X_BEARER_TOKEN / TWITTER_BEARER_TOKEN 自动切到 API。
+  - 只有用户主动要求 API 或命令显式 `--source api` / `--source auto` 时才使用 API。
+  - API source 已显式选择时不回退浏览器；API 失败就报错或写 data gap。
+  - 显式使用 API 且保存了 refresh token 时自动刷新过期 access token。
 ```
 
 强制浏览器：
@@ -53,7 +53,7 @@ API 模式重点用于更稳定地抓公开数据。API 模式不会打开浏览
 
 - API 模式只运行 `api_x_digest.py`，不启动浏览器、不读取浏览器 profile、不用浏览器补采 API 缺口。
 - 浏览器模式只运行 `browser_x_digest.py`，不读取 API token、不合并 API collector 输出。
-- `--source auto` 每次只选择一个来源，不合并 API 和浏览器两边的数据。
+- 默认浏览器来源和 `--source auto` 每次都只选择一个来源，不合并 API 和浏览器两边的数据。
 - API 模式输出的 DM 浏览器确认提示只是 data gap，不代表浏览器数据已被采集。
 
 ## 对话内 API 授权
@@ -76,7 +76,7 @@ python3 ~/.claude/skills/twitter-digest/scripts/run_daily_digest.py --configure-
 6. 脚本通过本地 callback 收到授权码。
 7. 脚本换取 user access token 和 refresh token。
 8. token 保存到已安装 skill 的 `.state/api_config.json`，文件权限尽量设为 owner-only。
-9. 后续日报 `--source auto` 自动走 API。
+9. 后续普通日报仍默认走浏览器；要使用 API 时显式运行 `--source api` 或 `--source auto`。
 
 用户只需要准备：
 
@@ -87,7 +87,7 @@ CLIENT_SECRET（如 App 要求）
 
 `ACCESS_TOKEN` 和 `REFRESH_TOKEN` 由授权流程生成。
 
-配置成功后，后续日报不再要求用户输入 Client ID、Secret 或重新授权。`run_daily_digest.py` 会读取 `.state/api_config.json`：
+配置成功后，后续显式 API 日报不再要求用户输入 Client ID、Secret 或重新授权。普通 `run_daily_digest.py` 仍默认走浏览器；只有 `--source api` 或 `--source auto` 会读取 `.state/api_config.json`：
 
 - OAuth2：如果保存了 refresh token，access token 快过期时自动 refresh。
 - 如果 token 被撤销、权限变更、tier 不支持或 API 返回 401/403/429，脚本把 endpoint 错误写入 data gap，Agent 再提示用户是否重新配置。

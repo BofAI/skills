@@ -1,6 +1,6 @@
 # X/Twitter Digest
 
-Skill for generating a Chinese daily digest from a user's own X/Twitter account through API collection when configured, otherwise through a saved local browser session.
+Skill for generating a Chinese daily digest from a user's own X/Twitter account through a saved local browser session by default, with optional X API collection only when explicitly configured and selected.
 
 ## Quick Install
 
@@ -15,7 +15,7 @@ python3 twitter-digest/scripts/install.py
 To ask Codex to install this skill for itself, paste this into Codex:
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/BofAI/skills/v1.5.11-beta.25/twitter-digest/install.sh | env TWITTER_DIGEST_INSTALL_CLIENT=codex sh
+curl -fsSL https://raw.githubusercontent.com/BofAI/skills/v1.5.11-beta.26/twitter-digest/install.sh | env TWITTER_DIGEST_INSTALL_CLIENT=codex sh
 ```
 
 When this one-line installer is launched from Codex, Claude Code, or another non-interactive agent on macOS, it opens a real Terminal window and re-runs the full installation there. This avoids agent permission/inspect prompts during `git clone`, Python checks, browser checks, and installer writes. Set `TWITTER_DIGEST_OPEN_TERMINAL=0` only when intentionally running in an already interactive Terminal or CI.
@@ -35,7 +35,7 @@ git clone git@github.com:BofAI/skills.git bofai-skills \
 To ask Claude Code to install this skill for itself, paste this into Claude Code:
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/BofAI/skills/v1.5.11-beta.25/twitter-digest/install.sh | env TWITTER_DIGEST_INSTALL_CLIENT=claude TWITTER_DIGEST_ALLOW_CLAUDE_COMMANDS=1 TWITTER_DIGEST_ALLOW_CLAUDE_STATE_READ=1 sh
+curl -fsSL https://raw.githubusercontent.com/BofAI/skills/v1.5.11-beta.26/twitter-digest/install.sh | env TWITTER_DIGEST_INSTALL_CLIENT=claude TWITTER_DIGEST_ALLOW_CLAUDE_COMMANDS=1 TWITTER_DIGEST_ALLOW_CLAUDE_STATE_READ=1 sh
 ```
 
 Or use the natural-language prompt:
@@ -93,17 +93,17 @@ X_BEARER_TOKEN=... python3 twitter-digest/scripts/api_x_digest.py --handle <hand
 python3 ~/.claude/skills/twitter-digest/scripts/run_daily_digest.py
 ```
 
-`run_daily_digest.py` defaults to `--source auto`:
+`run_daily_digest.py` defaults to browser source:
 
-- If `X_BEARER_TOKEN` or `TWITTER_BEARER_TOKEN` is configured, it uses the API collector.
-- If saved API credentials exist, it uses the API collector and does not fall back to browser on API errors.
-- If no API credentials exist, it uses the browser collector.
+- A normal daily run uses the browser collector, even if saved API credentials exist.
+- It uses API only when the user explicitly runs `--source api` or `--source auto`.
+- `--source auto` uses API when saved API credentials or `X_BEARER_TOKEN` / `TWITTER_BEARER_TOKEN` exist; otherwise it uses browser.
 
 Source isolation:
 
 - API mode only runs `api_x_digest.py`; it never opens a browser or reads the browser profile.
 - Browser mode only runs `browser_x_digest.py`; it does not use API tokens or API collector output.
-- `--source auto` picks one source for the run and does not merge API and browser data.
+- Default browser source and `--source auto` each pick one source for the run and do not merge API and browser data.
 - API DM data gaps are notes only; they do not mean browser DM data was collected.
 
 Force a source:
@@ -161,13 +161,13 @@ On macOS prompts appear as system dialogs; non-GUI terminals fall back to hidden
 twitter-digest/.state/api_config.json
 ```
 
-The file is created with owner-only permissions where supported. Later runs of `run_daily_digest.py --source auto` read this saved config and use API automatically without opening the browser. To clear it:
+The file is created with owner-only permissions where supported. Later normal runs still use browser by default. Runs using `run_daily_digest.py --source api` or `run_daily_digest.py --source auto` read this saved config and use API without opening the browser. To clear it:
 
 ```bash
 python3 ~/.claude/skills/twitter-digest/scripts/configure_api.py --clear
 ```
 
-If OAuth returns a refresh token, later daily runs refresh the saved access token automatically before collection.
+If OAuth returns a refresh token, later explicit API-source runs refresh the saved access token automatically before collection.
 
 Chat flow summary:
 

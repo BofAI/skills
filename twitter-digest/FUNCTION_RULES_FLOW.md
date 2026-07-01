@@ -8,7 +8,7 @@ twitter-digest/RUNBOOK.md
 
 ## 1. 功能
 
-`twitter-digest` 通过 X API 或本地已登录浏览器读取用户自己的 X/Twitter 数据，并生成中文日报。
+`twitter-digest` 默认通过本地已登录浏览器读取用户自己的 X/Twitter 数据，并生成中文日报。只有用户主动要求配置/使用 X API，或命令显式传入 `--source api` / `--source auto` 时，才使用 X API。
 
 默认采集内容：
 
@@ -64,7 +64,8 @@ twitter-digest/.state/run/digest-context.md
 
 ## 3. 运行规则
 
-- 默认入口 `run_daily_digest.py --source auto`：有 OAuth2 user-context API 配置时只用 API 抓公开数据，不打开浏览器；没有 API 配置时用浏览器抓取。
+- 默认入口 `run_daily_digest.py`：使用浏览器抓取。即使已保存 OAuth2 user-context API 配置或环境里有 `X_BEARER_TOKEN` / `TWITTER_BEARER_TOKEN`，普通日报也不会自动切到 API。
+- 只有用户主动要求 API 或命令显式 `--source api` / `--source auto` 时才使用 API；API 模式只抓公开数据，不打开浏览器。
 - DM / X Chat 以本地浏览器抓取为准；API DM 现阶段仅保留为 TODO/调试，不用于判断是否有私信。
 - API 不可用、权限不足、tier 不支持或限流时，记录数据缺口或失败，不回退浏览器路径。
 - 不要求用户复制 cookie 或 token。

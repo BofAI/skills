@@ -8,7 +8,7 @@ The data collection layer has three scripts:
 
 - `scripts/browser_x_digest.py`: local browser collector. It launches a dedicated Chromium profile at `twitter-digest/.state/chrome-profile`, reads X page DOM, and is required for X Chat / DM content.
 - `scripts/api_x_digest.py`: official API collector. It uses saved OAuth2 user-context credentials, `X_BEARER_TOKEN` / `TWITTER_BEARER_TOKEN`, or `--bearer-token` and writes the same `digest-input.*` shape as the browser collector.
-- `scripts/run_daily_digest.py`: upper wrapper. Default `--source auto` uses API when configured, otherwise browser.
+- `scripts/run_daily_digest.py`: upper wrapper. Default source is browser. API is used only when the user explicitly asks for API setup/use or the agent runs `--source api` / `--source auto`.
 
 Browser mode:
 
@@ -25,7 +25,7 @@ API mode:
 - Normal daily runs use browser collection for DMs. API DM lookup is retained only as TODO/debug because XChat / encrypted messages may not appear in `/2/dm_events`.
 - Records endpoint-level API failures as data gaps instead of silently treating them as empty pages.
 - DM lookup failures, zero-event API responses, and inconclusive API DM results are recorded as `api_dm_todo`; do not summarize them as empty inboxes. Use browser collection for X Chat / encrypted DMs while waiting for X to fix or document reliable API coverage.
-- Saved OAuth tokens are configured by the agent-triggered `run_daily_digest.py --configure-api` flow. OAuth2 PKCE is the supported path for user-owned local X Apps: the user provides the Client ID, authorizes the app in the browser, and the script saves the access token plus refresh token. OAuth2 tokens are refreshed automatically when a refresh token is saved.
+- Saved OAuth tokens are configured only by the agent-triggered `run_daily_digest.py --configure-api` flow, after the user explicitly asks to configure X API. OAuth2 PKCE is the supported path for user-owned local X Apps: the user provides the Client ID, authorizes the app in the browser, and the script saves the access token plus refresh token. OAuth2 tokens are refreshed automatically when a refresh token is saved.
 
 Chat-triggered API setup:
 
