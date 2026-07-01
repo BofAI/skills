@@ -11,31 +11,36 @@ Use this skill to install and authorize `@xdevplatform/xurl`, and to generate X/
 
 The hosted X MCP bridge can still be registered as `xapi` when explicitly requested, but daily digest generation should not depend on MCP tools being visible. `xurl` CLI exposes direct digest-relevant commands such as `whoami`, `timeline`, `mentions`, `posts`, `dms`, and `search`.
 
-If the user asks to generate an X/Twitter daily digest, says `生成X日报`, `X日报`, `推特日报`, or asks for a Twitter digest, run the installed `scripts/xurl_daily_digest.py` helper and write the digest from its generated context. Do not create a generic report template. Do not run `twitter-digest` scripts or local browser/API collectors from this skill.
+If the user asks to generate an X/Twitter daily digest, says `生成X日报`, `X日报`, `推特日报`, or asks for a Twitter digest, use this skill to guide direct `xurl` CLI collection. Do not create a generic report template. Do not run digest helper scripts, `twitter-digest` scripts, or local browser/API collectors from this skill.
 
 ## xurl Digest Workflow
 
-For daily digest requests, run:
+For daily digest requests, run `xurl` commands directly from the agent shell and use their outputs as the digest source. Do not create or run wrapper/helper scripts for digest collection.
 
 ```bash
-python3 ~/.codex/skills/twitter-mcp/scripts/xurl_daily_digest.py --max-results 100
+xurl whoami
+xurl timeline -n 100
+xurl mentions -n 100
 ```
 
-Use the matching installed path for the current client:
+Detect the authenticated handle from `xurl whoami`. Then run:
 
-- Codex: `~/.codex/skills/twitter-mcp/scripts/xurl_daily_digest.py`
-- Claude Code: `~/.claude/skills/twitter-mcp/scripts/xurl_daily_digest.py`
+```bash
+xurl posts <handle> -n 100
+xurl search "from:<handle>" -n 100
+xurl search "@<handle>" -n 100
+xurl search "to:<handle>" -n 100
+xurl dms -n 100
+```
 
-The helper collects:
+Rules for collection:
 
-- `xurl whoami`
-- `xurl timeline -n 100`
-- `xurl mentions -n 100`
-- `xurl posts <handle> -n 100` when the handle can be detected or is provided with `--handle`
-- `xurl search "from:<handle>"`, `xurl search "@<handle>"`, and `xurl search "to:<handle>"`
-- `xurl dms -n 100` unless `--no-include-dms` is passed
-
-After it runs, read `twitter-mcp/.state/xurl-run/digest-context.md` and write the digest from that context only. If a specific `xurl` command fails, report that command under data gaps and continue with the successful command outputs. If `xurl` is missing or unauthenticated, help the user install or authorize it with this skill.
+- If `xurl whoami` does not reveal a handle, ask the user for the handle or skip handle-dependent commands and report the gap.
+- If a specific `xurl` command fails, report that command under data gaps and continue with successful command outputs.
+- If `xurl dms` fails because the app lacks scopes, tier access, or DM API access, report it as a data gap. Do not claim there are no DMs.
+- Treat `xurl dms` output as private. Do not quote sensitive DM content unless needed for the user's requested action.
+- Do not post, reply, like, repost, bookmark, follow, or send DMs without explicit approval after showing a draft/action summary.
+- If `xurl` is missing or unauthenticated, help the user install or authorize it with this skill before generating the digest.
 
 Write the final response in Chinese by default for `X日报` requests. Use this structure:
 
@@ -57,13 +62,13 @@ From the repository `skills/` directory:
 For a one-line Codex install from this beta tag:
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/BofAI/skills/v1.5.11-beta.11/twitter-mcp/install.sh | X_MCP_REGISTER_CODEX=1 X_MCP_REGISTER_CLAUDE=0 sh
+curl -fsSL https://raw.githubusercontent.com/BofAI/skills/v1.5.11-beta.12/twitter-mcp/install.sh | X_MCP_REGISTER_CODEX=1 X_MCP_REGISTER_CLAUDE=0 sh
 ```
 
 For a one-line Claude Code install from this beta tag:
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/BofAI/skills/v1.5.11-beta.11/twitter-mcp/install.sh | X_MCP_REGISTER_CODEX=0 X_MCP_REGISTER_CLAUDE=1 sh
+curl -fsSL https://raw.githubusercontent.com/BofAI/skills/v1.5.11-beta.12/twitter-mcp/install.sh | X_MCP_REGISTER_CODEX=0 X_MCP_REGISTER_CLAUDE=1 sh
 ```
 
 The installer:
@@ -125,7 +130,7 @@ claude mcp add xapi -- xurl --app xmcp mcp https://api.x.com/mcp
 After installation:
 
 1. Run `xurl whoami` to verify the local CLI is authorized.
-2. Run `python3 ~/.codex/skills/twitter-mcp/scripts/xurl_daily_digest.py --max-results 10` to verify digest collection.
+2. Run `xurl timeline -n 10` and `xurl mentions -n 10` to verify digest collection.
 3. If optional MCP registration was enabled, start a new Codex or Claude Code session and check whether X MCP tools are visible under the `xapi` server.
 
 If an X MCP endpoint returns an auth, subscription, tier, or scope error, report the exact failing capability as a setup or account limitation. Do not infer that the requested X data does not exist.

@@ -15,7 +15,7 @@ python3 twitter-digest/scripts/install.py
 To ask Codex to install this skill for itself, paste this into Codex:
 
 ```bash
-TMPDIR="$(mktemp -d)" && git clone --depth 1 --branch v1.5.11-beta.11 https://github.com/BofAI/skills.git "$TMPDIR/skills" && python3 "$TMPDIR/skills/twitter-digest/scripts/install.py" --client codex
+TMPDIR="$(mktemp -d)" && git clone --depth 1 --branch v1.5.11-beta.12 https://github.com/BofAI/skills.git "$TMPDIR/skills" && python3 "$TMPDIR/skills/twitter-digest/scripts/install.py" --client codex
 ```
 
 Or use the natural-language prompt:
@@ -33,7 +33,7 @@ git clone git@github.com:BofAI/skills.git bofai-skills \
 To ask Claude Code to install this skill for itself, paste this into Claude Code:
 
 ```bash
-TMPDIR="$(mktemp -d)" && git clone --depth 1 --branch v1.5.11-beta.11 https://github.com/BofAI/skills.git "$TMPDIR/skills" && python3 "$TMPDIR/skills/twitter-digest/scripts/install.py" --client claude --allow-claude-commands --allow-claude-state-read
+TMPDIR="$(mktemp -d)" && git clone --depth 1 --branch v1.5.11-beta.12 https://github.com/BofAI/skills.git "$TMPDIR/skills" && python3 "$TMPDIR/skills/twitter-digest/scripts/install.py" --client claude --allow-claude-commands --allow-claude-state-read
 ```
 
 Or use the natural-language prompt:

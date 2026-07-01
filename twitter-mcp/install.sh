@@ -1,7 +1,7 @@
 #!/bin/sh
 set -eu
 
-TAG="${X_MCP_INSTALL_TAG:-v1.5.11-beta.11}"
+TAG="${X_MCP_INSTALL_TAG:-v1.5.11-beta.12}"
 BASE_URL="${X_MCP_INSTALL_BASE_URL:-https://raw.githubusercontent.com/BofAI/skills/${TAG}/twitter-mcp}"
 REGISTER_CODEX="${X_MCP_REGISTER_CODEX:-1}"
 REGISTER_CLAUDE="${X_MCP_REGISTER_CLAUDE:-auto}"
@@ -84,8 +84,7 @@ install_skill_copy() {
   download_file "${BASE_URL%/}/install.sh" "$staging/install.sh"
   download_file "${BASE_URL%/}/agents/openai.yaml" "$staging/agents/openai.yaml"
   download_file "${BASE_URL%/}/scripts/install_xmcp.sh" "$staging/scripts/install_xmcp.sh"
-  download_file "${BASE_URL%/}/scripts/xurl_daily_digest.py" "$staging/scripts/xurl_daily_digest.py"
-  chmod 700 "$staging/install.sh" "$staging/scripts/install_xmcp.sh" "$staging/scripts/xurl_daily_digest.py"
+  chmod 700 "$staging/install.sh" "$staging/scripts/install_xmcp.sh"
   mkdir -p "$skills_dir"
   backup_existing_skill "$target" "$skills_dir"
   mv "$staging" "$target"

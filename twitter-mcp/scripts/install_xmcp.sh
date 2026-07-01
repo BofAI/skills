@@ -210,11 +210,11 @@ if should_open_terminal; then
 fi
 
 if ! command_exists node; then
-  fail "Node.js is required before installing X MCP. Install Node.js, then rerun this script."
+  fail "Node.js is required before installing xurl. Install Node.js, then rerun this script."
 fi
 
 if ! command_exists npm; then
-  fail "npm is required before installing X MCP. Install npm, then rerun this script."
+  fail "npm is required before installing xurl. Install npm, then rerun this script."
 fi
 
 info "Installing ${INSTALL_SPEC}"
