@@ -66,22 +66,6 @@ On first run, a dedicated browser profile opens. Log in to X once in that browse
 
 ## Data Collection Sources
 
-Preferred path when available:
-
-```text
-X MCP registered as xapi -> agent calls MCP tools directly -> agent writes the Chinese digest
-```
-
-The MCP path does not use a local collector script and does not write `digest-context.*`. The agent should call tools such as `get_users_me`, `get_users_timeline`, `get_users_mentions`, and `get_users_posts` directly. If X MCP does not expose DM/X Chat tools, report DM as not collected through MCP rather than claiming there are no private messages.
-
-To install and register X MCP for Codex / Claude Code, use the separate `twitter-mcp` skill:
-
-```bash
-/bin/bash twitter-mcp/scripts/install_xmcp.sh
-```
-
-When launched by a Codex or Claude Code agent on macOS, the installer opens a real Terminal window for OAuth2 Client ID / Secret input and browser authorization. Secrets should be entered there, not pasted into chat.
-
 There are three collection entry points:
 
 ```bash

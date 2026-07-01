@@ -1,13 +1,13 @@
 ---
 name: twitter-digest
-description: Use when the user wants Claude Code or another agent to analyze their own X/Twitter mentions, home timeline, visible direct messages, reply opportunities, and daily social-media summaries through available X MCP tools, API, or local logged-in browser collection. Do not use for installing or registering X MCP; use twitter-mcp for that.
+description: Use when the user wants Claude Code or another agent to analyze their own X/Twitter mentions, home timeline, visible direct messages, reply opportunities, and daily social-media summaries through API or local logged-in browser collection.
 ---
 
 # X/Twitter Digest
 
 ## Overview
 
-Use this skill to produce a concise Chinese daily digest from the user's own X/Twitter account. The preferred path is X MCP when the agent exposes an `xapi` / X MCP server. In that case, call MCP tools directly and write the digest from those tool results; do not run a local MCP collector script. If X MCP is not available, use `scripts/run_daily_digest.py`, which selects API collection when API credentials are configured and otherwise falls back to local browser collection with a persistent dedicated Chromium profile.
+Use this skill to produce a concise Chinese daily digest from the user's own X/Twitter account. Use `scripts/run_daily_digest.py`, which selects API collection when API credentials are configured and otherwise falls back to local browser collection with a persistent dedicated Chromium profile.
 
 After installation, configuration and daily runs should use the installed skill copy, not a temporary clone/source checkout. Installed locations are `~/.claude/skills/twitter-digest` for Claude Code and `~/.codex/skills/twitter-digest` for Codex. If `run_daily_digest.py` or `configure_api.py` is accidentally run from a source checkout while an installed copy exists, the script automatically re-runs the installed copy so `.state` is written to the installed skill directory.
 
@@ -33,23 +33,6 @@ Do not use `cat`, `head`, `tail`, `grep`, `sed`, `python3 -c`, or temporary scri
 Load `references/x-twitter-digest.md` when you need implementation details, browser workflow rules, current-run context behavior, or the scoring rubric.
 
 ## Data Collection
-
-### X MCP Source
-
-When X MCP tools are available in the current agent session, use them directly as the collection source:
-
-- `get_users_me`: resolve the authenticated account.
-- `get_users_timeline`: collect home timeline / followed-account activity.
-- `get_users_mentions`: collect direct @ mentions.
-- `get_users_posts`: collect the user's own recent posts.
-- `search_posts_all`: optional keyword or mention search when supported by the current auth mode.
-- `get_trends_by_woeid` / news tools: optional hotspot context when available.
-
-Do not run `run_daily_digest.py` just to use MCP. MCP is an agent tool source, not a local file-producing collector. If an MCP endpoint returns an auth/tier error, include it as a data gap. If the current X MCP tool list does not include DM/X Chat tools, say DM was not collected through MCP and do not claim there are no private messages.
-
-If X MCP is installed but Codex or Claude Code cannot see tools, the user likely needs MCP registration plus a new agent session. Use the separate `twitter-mcp` skill for X MCP installation, authorization, registration, and troubleshooting. Do not install or register MCP from this skill.
-
-### Script Sources
 
 There are three collection scripts:
 
