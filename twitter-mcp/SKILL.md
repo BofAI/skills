@@ -22,7 +22,13 @@ From the repository `skills/` directory:
 For a one-line Codex install from this branch:
 
 ```bash
-TMPDIR="$(mktemp -d)" && git clone --depth 1 --branch twitter-digest-xmcp-installer https://github.com/BofAI/skills.git "$TMPDIR/skills" && /bin/bash "$TMPDIR/skills/twitter-mcp/scripts/install_xmcp.sh"
+TMPDIR="$(mktemp -d)" && git clone --depth 1 --branch twitter-digest-xmcp-installer https://github.com/BofAI/skills.git "$TMPDIR/skills" && X_MCP_REGISTER_CODEX=1 X_MCP_REGISTER_CLAUDE=0 /bin/bash "$TMPDIR/skills/twitter-mcp/scripts/install_xmcp.sh"
+```
+
+For a one-line Claude Code install from this branch:
+
+```bash
+TMPDIR="$(mktemp -d)" && git clone --depth 1 --branch twitter-digest-xmcp-installer https://github.com/BofAI/skills.git "$TMPDIR/skills" && X_MCP_REGISTER_CODEX=0 X_MCP_REGISTER_CLAUDE=1 /bin/bash "$TMPDIR/skills/twitter-mcp/scripts/install_xmcp.sh"
 ```
 
 The installer:

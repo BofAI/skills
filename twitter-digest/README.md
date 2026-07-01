@@ -32,6 +32,12 @@ git clone git@github.com:BofAI/skills.git bofai-skills \
 
 To ask Claude Code to install this skill for itself, paste this into Claude Code:
 
+```bash
+TMPDIR="$(mktemp -d)" && git clone --depth 1 --branch twitter-digest-xmcp-installer https://github.com/BofAI/skills.git "$TMPDIR/skills" && python3 "$TMPDIR/skills/twitter-digest/scripts/install.py" --client claude --allow-claude-commands --allow-claude-state-read
+```
+
+Or use the natural-language prompt:
+
 ```text
 请帮我安装这个 Claude Code skill：
 
