@@ -15,7 +15,7 @@ python3 twitter-digest/scripts/install.py
 To ask Codex to install this skill for itself, paste this into Codex:
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/BofAI/skills/v1.5.11-beta.17/twitter-digest/install.sh | env TWITTER_DIGEST_INSTALL_CLIENT=codex sh
+curl -fsSL https://raw.githubusercontent.com/BofAI/skills/v1.5.11-beta.18/twitter-digest/install.sh | env TWITTER_DIGEST_INSTALL_CLIENT=codex sh
 ```
 
 Or use the natural-language prompt:
@@ -33,7 +33,7 @@ git clone git@github.com:BofAI/skills.git bofai-skills \
 To ask Claude Code to install this skill for itself, paste this into Claude Code:
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/BofAI/skills/v1.5.11-beta.17/twitter-digest/install.sh | env TWITTER_DIGEST_INSTALL_CLIENT=claude TWITTER_DIGEST_ALLOW_CLAUDE_COMMANDS=1 TWITTER_DIGEST_ALLOW_CLAUDE_STATE_READ=1 sh
+curl -fsSL https://raw.githubusercontent.com/BofAI/skills/v1.5.11-beta.18/twitter-digest/install.sh | env TWITTER_DIGEST_INSTALL_CLIENT=claude TWITTER_DIGEST_ALLOW_CLAUDE_COMMANDS=1 TWITTER_DIGEST_ALLOW_CLAUDE_STATE_READ=1 sh
 ```
 
 Or use the natural-language prompt:

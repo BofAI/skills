@@ -12,7 +12,6 @@ REGISTER_CLAUDE="${X_MCP_REGISTER_CLAUDE:-0}"
 CODEX_CONFIG="${CODEX_CONFIG:-$HOME/.codex/config.toml}"
 OPEN_TERMINAL="${X_MCP_OPEN_TERMINAL:-auto}"
 XURL_COMMAND="${X_MCP_XURL_COMMAND:-}"
-INSTALL_NODE="${X_MCP_INSTALL_NODE:-auto}"
 
 info() {
   printf '==> %s\n' "$1"
@@ -25,22 +24,6 @@ fail() {
 
 command_exists() {
   command -v "$1" >/dev/null 2>&1
-}
-
-find_brew() {
-  local brew_path=""
-  brew_path="$(command -v brew 2>/dev/null || true)"
-  if [ -n "$brew_path" ]; then
-    printf '%s' "$brew_path"
-    return 0
-  fi
-  for candidate in /opt/homebrew/bin/brew /usr/local/bin/brew; do
-    if [ -x "$candidate" ]; then
-      printf '%s' "$candidate"
-      return 0
-    fi
-  done
-  return 1
 }
 
 shell_quote() {
@@ -162,37 +145,6 @@ prompt_secret() {
   printf '%s' "$value"
 }
 
-ensure_node_runtime() {
-  if command_exists node && command_exists npm; then
-    return 0
-  fi
-
-  case "$INSTALL_NODE" in
-    0|false|no)
-      fail "Node.js and npm are required before installing xurl. Install Node.js, then rerun this script."
-      ;;
-    auto|1|true|yes) ;;
-    *)
-      fail "X_MCP_INSTALL_NODE must be auto, 1, true, yes, 0, false, or no."
-      ;;
-  esac
-
-  local brew_path=""
-  brew_path="$(find_brew || true)"
-  if [ -n "$brew_path" ]; then
-    info "Node.js/npm not found. Installing Node.js with Homebrew."
-    "$brew_path" install node
-    export PATH="${brew_path%/*}:$PATH"
-  fi
-
-  if command_exists node && command_exists npm; then
-    info "Node.js is available: $(node --version 2>/dev/null || printf 'node')"
-    return 0
-  fi
-
-  fail "Node.js and npm are required before installing xurl. Install Node.js from https://nodejs.org/ or run 'brew install node', then rerun this script."
-}
-
 register_codex() {
   local config_path="$1"
   local server_name="$2"
@@ -251,7 +203,13 @@ register_claude() {
   claude mcp add "$server_name" -- "$xurl_command" --app "$app_name" mcp https://api.x.com/mcp
 }
 
-ensure_node_runtime
+if ! command_exists node; then
+  fail "Node.js is required before installing xurl. Install Node.js, then rerun this script."
+fi
+
+if ! command_exists npm; then
+  fail "npm is required before installing xurl. Install npm, then rerun this script."
+fi
 
 if should_open_terminal; then
   open_in_terminal_and_exit

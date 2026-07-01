@@ -61,19 +61,19 @@ From the repository `skills/` directory:
 For a one-line Codex install from this beta tag:
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/BofAI/skills/v1.5.11-beta.17/twitter-mcp/install.sh | X_MCP_REGISTER_CODEX=1 X_MCP_REGISTER_CLAUDE=0 sh
+curl -fsSL https://raw.githubusercontent.com/BofAI/skills/v1.5.11-beta.18/twitter-mcp/install.sh | X_MCP_REGISTER_CODEX=1 X_MCP_REGISTER_CLAUDE=0 sh
 ```
 
 For a one-line Claude Code install from this beta tag:
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/BofAI/skills/v1.5.11-beta.17/twitter-mcp/install.sh | X_MCP_REGISTER_CODEX=0 X_MCP_REGISTER_CLAUDE=1 sh
+curl -fsSL https://raw.githubusercontent.com/BofAI/skills/v1.5.11-beta.18/twitter-mcp/install.sh | X_MCP_REGISTER_CODEX=0 X_MCP_REGISTER_CLAUDE=1 sh
 ```
 
 The installer:
 
 - Installs this `twitter-mcp` skill into the selected local skills directory.
-- Requires Node.js and npm; when they are missing and Homebrew is available, the installer installs Node.js automatically with `brew install node`.
+- Requires Node.js and npm.
 - Installs `@xdevplatform/xurl` globally with npm.
 - Opens the X OAuth2 authorization flow.
 - Does not register the hosted X MCP bridge by default. To also register MCP, set `X_MCP_REGISTER_CODEX_MCP=1` or `X_MCP_REGISTER_CLAUDE_MCP=1`.
