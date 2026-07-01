@@ -23,7 +23,7 @@ Before collecting X data, determine the user's current local timezone and the ex
 date '+%Y-%m-%d %H:%M:%S %Z %z'
 ```
 
-Use that local time as `now`, compute `cutoff = now - 24 hours`, and include only X items whose timestamp is within `[cutoff, now]` in the user's local timezone. Convert UTC `created_at` timestamps from X into the user's local timezone before filtering or grouping. Do not use calendar-day-only filtering unless the user explicitly asks for "today" by date instead of "past 24 hours".
+Use that local time as `now`, compute `cutoff = now - 24 hours`, and include only X items whose timestamp is within `[cutoff, now]` in the user's local timezone. Convert UTC `created_at` timestamps from X into the user's local timezone before filtering or grouping. Do not use calendar-day-only filtering unless the user explicitly asks for "today" by date instead of "past 24 hours". Do not rely on `xurl` result ordering, labels such as "recent", or search date operators as proof that an item is inside the window; every item used in the digest must pass this timestamp check.
 
 ```bash
 xurl whoami
@@ -43,9 +43,11 @@ xurl search "to:<handle>" -n 100
 Rules for collection:
 
 - If `xurl whoami` does not reveal a handle, ask the user for the handle or skip handle-dependent commands and report the gap.
-- Keep only posts, mentions, searches, and timeline items from the last 24 hours in the user's current local timezone.
+- Keep only posts, mentions, searches, and timeline items from the last 24 hours in the user's current local timezone. This rule is strict for `xurl mentions`: mentions older than `cutoff` must be discarded before analysis and must not appear in `需要处理`.
 - If an item has no parseable timestamp, do not use it for time-bound facts; report it under data gaps as time-unverified.
 - When using `xurl search`, search date operators may be used only as a coarse prefilter; still post-filter each returned item to the exact 24-hour window.
+- Before adding any mention or direct ask to `需要处理` as "needs reply", verify whether the authenticated account has already replied after that mention's timestamp. Use `xurl posts <handle>` and `xurl search "from:<handle> to:<author>" -n 100` or equivalent `xurl` output to check for replies in the same conversation/thread or to the same author. If a reply from the authenticated account already exists after the mention timestamp, mark it as already handled or omit it from `需要处理`; do not ask the user to reply again.
+- If the reply status cannot be verified from available `xurl` output, label it as `回复状态未确认` instead of claiming the user still needs to reply.
 - If a specific `xurl` command fails, report that command under data gaps and continue with successful command outputs.
 - Do not run the DM command during normal daily digest collection. Current DM/API coverage is not reliable for this workflow and should not appear in the daily digest.
 - If the user explicitly asks for private messages, explain that this skill does not collect them by default because the current API path is unavailable or unreliable; do not claim there are no private messages.
@@ -55,7 +57,7 @@ Rules for collection:
 Write the final response in Chinese by default for `X日报` requests. Use this structure:
 
 - 今日概览: 3-6 bullets with the highest-signal changes.
-- 需要处理: direct asks, risks, and reply opportunities from public timeline, mentions, and searches.
+- 需要处理: unresolved direct asks, risks, and reply opportunities from public timeline, mentions, and searches. Exclude out-of-window mentions and already replied-to mentions.
 - 时间线热点: grouped by topic with why it matters.
 - 我的账号动态: notable own posts or engagement.
 - 数据缺口: failed `xurl` commands, auth/tier errors, rate limits, or items excluded because timestamps were missing/unparseable.
@@ -72,13 +74,13 @@ From the repository `skills/` directory:
 For a one-line Codex install from this beta tag:
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/BofAI/skills/v1.5.11-beta.19/twitter-mcp/install.sh | env X_MCP_REGISTER_CODEX=1 X_MCP_REGISTER_CLAUDE=0 sh
+curl -fsSL https://raw.githubusercontent.com/BofAI/skills/v1.5.11-beta.20/twitter-mcp/install.sh | env X_MCP_REGISTER_CODEX=1 X_MCP_REGISTER_CLAUDE=0 sh
 ```
 
 For a one-line Claude Code install from this beta tag:
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/BofAI/skills/v1.5.11-beta.19/twitter-mcp/install.sh | env X_MCP_REGISTER_CODEX=0 X_MCP_REGISTER_CLAUDE=1 sh
+curl -fsSL https://raw.githubusercontent.com/BofAI/skills/v1.5.11-beta.20/twitter-mcp/install.sh | env X_MCP_REGISTER_CODEX=0 X_MCP_REGISTER_CLAUDE=1 sh
 ```
 
 The installer:
