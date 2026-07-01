@@ -9,7 +9,7 @@ description: Use when the user wants to install or authorize xurl for X/Twitter,
 
 Use this skill to install and authorize `@xdevplatform/xurl`, and to generate X/Twitter daily digests from the local `xurl` CLI. The primary digest data source is `xurl` CLI output, not the hosted X MCP tool list. This skill does not use local API collectors, local browser collectors, or `twitter-digest` scripts.
 
-The hosted X MCP bridge can still be registered as `xapi` when explicitly requested, but daily digest generation should not depend on MCP tools being visible. `xurl` CLI exposes direct digest-relevant commands such as `whoami`, `timeline`, `mentions`, `posts`, `dms`, and `search`.
+The hosted X MCP bridge can still be registered as `xapi` when explicitly requested, but daily digest generation should not depend on MCP tools being visible. `xurl` CLI exposes direct digest-relevant commands such as `whoami`, `timeline`, `mentions`, `posts`, and `search`.
 
 If the user asks to generate an X/Twitter daily digest, says `生成X日报`, `X日报`, `推特日报`, or asks for a Twitter digest, use this skill to guide direct `xurl` CLI collection. Do not create a generic report template. Do not run digest helper scripts, `twitter-digest` scripts, or local browser/API collectors from this skill.
 
@@ -30,25 +30,24 @@ xurl posts <handle> -n 100
 xurl search "from:<handle>" -n 100
 xurl search "@<handle>" -n 100
 xurl search "to:<handle>" -n 100
-xurl dms -n 100
 ```
 
 Rules for collection:
 
 - If `xurl whoami` does not reveal a handle, ask the user for the handle or skip handle-dependent commands and report the gap.
 - If a specific `xurl` command fails, report that command under data gaps and continue with successful command outputs.
-- If `xurl dms` fails because the app lacks scopes, tier access, or DM API access, report it as a data gap. Do not claim there are no DMs.
-- Treat `xurl dms` output as private. Do not quote sensitive DM content unless needed for the user's requested action.
+- Do not run the DM command during normal daily digest collection. Current DM/API coverage is not reliable for this workflow and should not appear in the daily digest.
+- If the user explicitly asks for private messages, explain that this skill does not collect them by default because the current API path is unavailable or unreliable; do not claim there are no private messages.
 - Do not post, reply, like, repost, bookmark, follow, or send DMs without explicit approval after showing a draft/action summary.
 - If `xurl` is missing or unauthenticated, help the user install or authorize it with this skill before generating the digest.
 
 Write the final response in Chinese by default for `X日报` requests. Use this structure:
 
 - 今日概览: 3-6 bullets with the highest-signal changes.
-- 需要处理: direct asks, risks, reply opportunities, urgent DMs if collected.
+- 需要处理: direct asks, risks, and reply opportunities from public timeline, mentions, and searches.
 - 时间线热点: grouped by topic with why it matters.
 - 我的账号动态: notable own posts or engagement.
-- 数据缺口: failed `xurl` commands, auth/tier errors, unavailable DMs, or rate limits.
+- 数据缺口: failed `xurl` commands, auth/tier errors, or rate limits.
 - 建议动作: concise reply/follow-up suggestions. Do not post or send anything without explicit approval.
 
 ## Install And Register
@@ -62,13 +61,13 @@ From the repository `skills/` directory:
 For a one-line Codex install from this beta tag:
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/BofAI/skills/v1.5.11-beta.12/twitter-mcp/install.sh | X_MCP_REGISTER_CODEX=1 X_MCP_REGISTER_CLAUDE=0 sh
+curl -fsSL https://raw.githubusercontent.com/BofAI/skills/v1.5.11-beta.13/twitter-mcp/install.sh | X_MCP_REGISTER_CODEX=1 X_MCP_REGISTER_CLAUDE=0 sh
 ```
 
 For a one-line Claude Code install from this beta tag:
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/BofAI/skills/v1.5.11-beta.12/twitter-mcp/install.sh | X_MCP_REGISTER_CODEX=0 X_MCP_REGISTER_CLAUDE=1 sh
+curl -fsSL https://raw.githubusercontent.com/BofAI/skills/v1.5.11-beta.13/twitter-mcp/install.sh | X_MCP_REGISTER_CODEX=0 X_MCP_REGISTER_CLAUDE=1 sh
 ```
 
 The installer:
