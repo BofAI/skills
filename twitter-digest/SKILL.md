@@ -118,6 +118,7 @@ Public timeline/profile/mentions pages use the same daily-window loading model a
 
 Mention handling is strict:
 
+- Both mention sources must be considered when available: direct mention/notification collection and handle search (`@handle` / equivalent search page or API recent search). Do not conclude "no current mentions" from only one source unless the other source was attempted and failed or is unavailable.
 - Do not include mentions older than the local 24-hour window in `该处理`, `谁 @ 了你`, or reply drafts.
 - Do not present an already-replied mention as needing reply. Use own-profile/API own posts, browser-visible reply context, or context metadata when available to decide whether the authenticated account already replied after the mention timestamp.
 - When `digest-context.md` marks a mention with `reply_state=already_replied` or `action_state=handled`, it must not appear as a pending reply opportunity. It may be omitted or summarized as already handled.
@@ -125,6 +126,8 @@ Mention handling is strict:
 - If reply status cannot be verified from the current run's data, label the item as `回复状态未确认` instead of claiming the user still needs to reply.
 
 Read the installed `digest-context.md` with the file Read tool when writing the Chinese digest. Its `Final Summary Facts` section is the content source for the final summary. If more focused context is needed, use the file Read tool on the split current-run files: `digest-context-timeline.md` for home/profile/timeline items, `digest-context-mentions.md` for @ mentions, and `digest-context-dm.md` for visible DM conversations. Use `digest-input.md` only when debugging collection issues, not during normal summarization. Do not add content from older runs. Do not write ad-hoc `python3 -c`, shell, `cat`, `head`, `tail`, `grep`, or temporary scripts to inspect context structure during normal summarization. If counts or non-content structure must be checked, run the built-in `scripts/inspect_digest.py`, which does not print DM bodies.
+
+If `digest-context.md` or `digest-context-mentions.md` shows missing mention sources, collection errors for `mentions_search` / `mentions_notifications`, or only stale mention data, report that as a data gap. Do not turn stale mentions into action items.
 
 ## Install
 

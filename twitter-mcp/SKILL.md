@@ -40,10 +40,14 @@ xurl search "@<handle>" -n 100
 xurl search "to:<handle>" -n 100
 ```
 
+These commands are mandatory for daily digest collection. Do not write a final digest if any of them has not been attempted. If you notice during drafting that `from:<handle>`, `@<handle>`, or `to:<handle>` search was skipped, stop drafting, run the missing command(s), then rebuild the digest from the combined outputs.
+
 Rules for collection:
 
 - If `xurl whoami` does not reveal a handle, ask the user for the handle or skip handle-dependent commands and report the gap.
 - Keep only posts, mentions, searches, and timeline items from the last 24 hours in the user's current local timezone. This rule is strict for `xurl mentions`: mentions older than `cutoff` must be discarded before analysis and must not appear in `需要处理`.
+- `xurl mentions` is not enough to conclude current mention state. If `xurl mentions` returns only old items or no in-window items, the `@<handle>` and `to:<handle>` searches are still required before saying there are no current mentions or no reply tasks.
+- Do not put "未跑关键词搜索" in the final data gaps for mandatory `from:/@/to:` searches. Missing mandatory searches are a collection error to fix by running the commands before the final answer. Only report a mandatory search as a data gap if it was attempted and failed with an error, auth limit, tier limit, or rate limit.
 - If an item has no parseable timestamp, do not use it for time-bound facts; report it under data gaps as time-unverified.
 - When using `xurl search`, search date operators may be used only as a coarse prefilter; still post-filter each returned item to the exact 24-hour window.
 - Before adding any mention or direct ask to `需要处理` as "needs reply", verify whether the authenticated account has already replied after that mention's timestamp. Use `xurl posts <handle>` and `xurl search "from:<handle> to:<author>" -n 100` or equivalent `xurl` output to check for replies in the same conversation/thread or to the same author. If a reply from the authenticated account already exists after the mention timestamp, mark it as already handled or omit it from `需要处理`; do not ask the user to reply again.
@@ -75,13 +79,13 @@ From the repository `skills/` directory:
 For a one-line Codex install from this beta tag:
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/BofAI/skills/v1.5.11-beta.24/twitter-mcp/install.sh | env X_MCP_REGISTER_CODEX=1 X_MCP_REGISTER_CLAUDE=0 sh
+curl -fsSL https://raw.githubusercontent.com/BofAI/skills/v1.5.11-beta.25/twitter-mcp/install.sh | env X_MCP_REGISTER_CODEX=1 X_MCP_REGISTER_CLAUDE=0 sh
 ```
 
 For a one-line Claude Code install from this beta tag:
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/BofAI/skills/v1.5.11-beta.24/twitter-mcp/install.sh | env X_MCP_REGISTER_CODEX=0 X_MCP_REGISTER_CLAUDE=1 sh
+curl -fsSL https://raw.githubusercontent.com/BofAI/skills/v1.5.11-beta.25/twitter-mcp/install.sh | env X_MCP_REGISTER_CODEX=0 X_MCP_REGISTER_CLAUDE=1 sh
 ```
 
 The installer:

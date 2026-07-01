@@ -144,6 +144,8 @@ Public timeline, profile, and mentions collection follows the same bounded-windo
 
 Mention handling is strict:
 
+- Direct mention/notification collection and handle search (`@handle` / equivalent search page or API recent search) are complementary. Use both sources when available before concluding there are no current mentions or no reply opportunities.
+- If one mention source is missing, failed, unavailable, or only returned stale data, report the source status as a data gap and do not turn stale mentions into action items.
 - Mentions older than the local 24-hour window must not appear in action items, reply drafts, or the `谁 @ 了你` section.
 - Before labeling a mention as needing reply, verify from current-run data whether the authenticated account already replied after the mention timestamp.
 - Already-replied mentions should be omitted from action items or marked as already handled.

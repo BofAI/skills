@@ -86,6 +86,8 @@ def build_digest_facts(data: dict[str, Any], summary: dict[str, Any]) -> dict[st
     now = dt.datetime.now().astimezone()
     cutoff = now - dt.timedelta(hours=24)
     public_items: list[dict[str, Any]] = []
+    loaded_public_kinds: set[str] = set()
+    kept_public_counts: dict[str, int] = {}
     facts: dict[str, Any] = {
         "schema_version": 1,
         "run": {
@@ -129,6 +131,8 @@ def build_digest_facts(data: dict[str, Any], summary: dict[str, Any]) -> dict[st
         if not isinstance(page, dict):
             continue
         kind = str(page.get("kind") or "unknown")
+        if kind != "messages":
+            loaded_public_kinds.add(kind)
         if page.get("collection_error"):
             facts["data_gaps"].append(
                 {
@@ -225,8 +229,10 @@ def build_digest_facts(data: dict[str, Any], summary: dict[str, Any]) -> dict[st
                 continue
             public_counts = facts["public"]["counts"].setdefault(kind, {"total": 0})
             public_counts["total"] = int(public_counts.get("total") or 0) + 1
+            kept_public_counts[kind] = kept_public_counts.get(kind, 0) + 1
             public_items.append(normalize_public_item(kind, item))
     facts["public"]["items"] = annotate_public_reply_states(public_items, str((facts.get("account") or {}).get("handle") or ""))
+    add_public_source_gaps(facts, loaded_public_kinds, kept_public_counts, summary)
     if (summary.get("dm_status") or "") in {"blocked_by_x_chat_passcode", "visible_threads_unopened", "no_visible_threads", "dm_page_loading_timeout", "api_dm_unavailable", "api_dm_error", "api_dm_todo"}:
         facts["data_gaps"].append(
             {
@@ -244,6 +250,36 @@ def build_digest_facts(data: dict[str, Any], summary: dict[str, Any]) -> dict[st
             }
         )
     return facts
+
+
+def add_public_source_gaps(
+    facts: dict[str, Any],
+    loaded_public_kinds: set[str],
+    kept_public_counts: dict[str, int],
+    summary: dict[str, Any],
+) -> None:
+    post_counts = summary.get("post_counts") if isinstance(summary.get("post_counts"), dict) else {}
+    required_mentions = ["mentions_search", "mentions_notifications"]
+    for kind in required_mentions:
+        if kind not in loaded_public_kinds:
+            facts["data_gaps"].append(
+                {
+                    "source": kind,
+                    "status": "missing_required_mention_source",
+                    "detail": f"{kind} was not present in this run; do not conclude mention state from the other source alone.",
+                }
+            )
+            continue
+        loaded_total = int((post_counts.get(kind) or {}).get("total") or 0) if isinstance(post_counts.get(kind), dict) else 0
+        kept_total = int(kept_public_counts.get(kind, 0))
+        if loaded_total > 0 and kept_total == 0:
+            facts["data_gaps"].append(
+                {
+                    "source": kind,
+                    "status": "no_in_window_items",
+                    "detail": f"{kind} loaded {loaded_total} item(s), but none survived the local 24-hour filter.",
+                }
+            )
 
 
 def normalize_public_item(kind: str, item: dict[str, Any]) -> dict[str, Any]:
