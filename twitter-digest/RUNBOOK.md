@@ -4,7 +4,7 @@
 
 `twitter-digest` 读取用户自己的 X/Twitter 数据并生成中文日报。抓数据层支持 API 和本地已登录浏览器两种来源。
 
-默认入口是 `scripts/run_daily_digest.py`。如果已经通过对话内 OAuth 授权保存了 user-context token，或环境里配置了 X API token，它优先用 API 抓公开数据；如果没有 API 配置，它自动回退到浏览器抓取。读取 X Chat / DM 内容时仍使用本地浏览器，因为普通 API 配置通常没有私信读取能力。
+默认入口是 `scripts/run_daily_digest.py`。如果已经通过对话内 OAuth 授权保存了 user-context token，或环境里配置了 X API token，它只用 API 抓公开数据，不打开浏览器；如果没有 API 配置，它使用浏览器抓取。读取 X Chat / DM 内容必须显式使用浏览器模式。
 
 核心链路：
 
@@ -30,6 +30,7 @@ scripts/api_x_digest.py
 scripts/run_daily_digest.py
   上层入口。默认 --source auto：
   - 检测到已保存 OAuth token 或 X_BEARER_TOKEN / TWITTER_BEARER_TOKEN 时走 API。
+  - API 已配置时不回退浏览器；API 失败就报错或写 data gap。
   - 没有 API 配置时走浏览器。
   - 保存了 refresh token 时自动刷新过期 access token。
 ```
@@ -46,7 +47,7 @@ python3 twitter-digest/scripts/run_daily_digest.py --source browser
 X_BEARER_TOKEN=... python3 twitter-digest/scripts/run_daily_digest.py --source api --handle <handle>
 ```
 
-API 模式重点用于更稳定地抓公开数据。X Chat / DM 内容仍以浏览器模式为准；如果 API 模式无法读取 DM，会在 `digest-context` 的 Data Gaps 中标注。
+API 模式重点用于更稳定地抓公开数据。API 模式不会打开浏览器。X Chat / DM 内容仍以浏览器模式为准；如果 API 模式无法读取 DM，会在 `digest-context` 的 Data Gaps 中标注。
 
 ## 对话内 API 授权
 

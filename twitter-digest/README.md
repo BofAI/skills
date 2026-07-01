@@ -82,7 +82,8 @@ python3 ~/.claude/skills/twitter-digest/scripts/run_daily_digest.py
 `run_daily_digest.py` defaults to `--source auto`:
 
 - If `X_BEARER_TOKEN` or `TWITTER_BEARER_TOKEN` is configured, it uses the API collector.
-- Otherwise it falls back to the browser collector.
+- If saved API credentials exist, it uses the API collector and does not fall back to browser on API errors.
+- If no API credentials exist, it uses the browser collector.
 
 Force a source:
 
@@ -139,7 +140,7 @@ On macOS prompts appear as system dialogs; non-GUI terminals fall back to hidden
 twitter-digest/.state/api_config.json
 ```
 
-The file is created with owner-only permissions where supported. Later runs of `run_daily_digest.py --source auto` read this saved config and use API automatically. To clear it:
+The file is created with owner-only permissions where supported. Later runs of `run_daily_digest.py --source auto` read this saved config and use API automatically without opening the browser. To clear it:
 
 ```bash
 python3 ~/.claude/skills/twitter-digest/scripts/configure_api.py --clear

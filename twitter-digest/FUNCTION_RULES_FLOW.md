@@ -64,9 +64,9 @@ twitter-digest/.state/run/digest-context.md
 
 ## 3. 运行规则
 
-- 默认入口 `run_daily_digest.py --source auto`：有 OAuth2 user-context API 配置时优先用 API 抓公开数据；没有 API 配置时用浏览器抓取。
+- 默认入口 `run_daily_digest.py --source auto`：有 OAuth2 user-context API 配置时只用 API 抓公开数据，不打开浏览器；没有 API 配置时用浏览器抓取。
 - DM / X Chat 以本地浏览器抓取为准；API DM 现阶段仅保留为 TODO/调试，不用于判断是否有私信。
-- API 不可用、权限不足、tier 不支持或限流时，记录数据缺口并回退浏览器路径。
+- API 不可用、权限不足、tier 不支持或限流时，记录数据缺口或失败，不回退浏览器路径。
 - 不要求用户复制 cookie 或 token。
 - 默认 headless 运行。
 - 第一次没有登录态时，会自动打开可见浏览器让用户登录。

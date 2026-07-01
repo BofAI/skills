@@ -32,7 +32,7 @@ scripts/browser_x_digest.py
 
 - 无 API 配置的普通用户。
 - 需要读取 X Chat / DM 内容的场景。
-- API 权限不足时的 fallback。
+- 用户显式选择浏览器模式，或完全没有 API 配置时的默认来源。
 
 ### 2. API 抓取脚本
 
@@ -79,7 +79,8 @@ scripts/run_daily_digest.py
 - 统一入口。
 - 提供 `--configure-api`，由 Agent 在对话里触发 OAuth 配置。
 - 默认 `--source auto`。
-- 如果检测到环境变量 token，或 `.state/api_config.json` 里保存的 OAuth2 user-context bearer token，走 API 抓取。
+- 如果检测到环境变量 token，或 `.state/api_config.json` 里保存的 OAuth2 user-context 配置，走 API 抓取。
+- API 已配置时不启动浏览器，不自动回退浏览器；API 不可用时失败或写入 data gap。
 - 如果没有 API token，走浏览器抓取。
 - 如果 OAuth2 access token 快过期且保存了 refresh token，自动刷新后再抓取。
 - 抓取完成后调用 `digest_context.py` 生成 `digest-context.*`。
@@ -89,7 +90,7 @@ scripts/run_daily_digest.py
 ```text
 --source api      -> 强制 API，只采公开数据，不启动浏览器
 --source browser  -> 强制浏览器，采公开网页和可见 X Chat / DM
---source auto     -> 有 X_BEARER_TOKEN/TWITTER_BEARER_TOKEN 或已保存 OAuth2 user token 用 API，否则浏览器；API 不可用时回退浏览器
+--source auto     -> 有 X_BEARER_TOKEN/TWITTER_BEARER_TOKEN 或已保存 OAuth2 user token 用 API，否则浏览器；API 已配置时不回退浏览器
 ```
 
 ## 对话触发流程
@@ -159,7 +160,7 @@ Agent：再次运行 `python3 ~/.claude/skills/twitter-digest/scripts/run_daily_
 ```text
 用户：清除 X API 配置
 Agent：运行 `python3 ~/.claude/skills/twitter-digest/scripts/configure_api.py --clear`
-后续：`python3 ~/.claude/skills/twitter-digest/scripts/run_daily_digest.py --source auto` 自动回到浏览器抓取
+后续：`python3 ~/.claude/skills/twitter-digest/scripts/run_daily_digest.py --source auto` 因没有 API 配置而使用浏览器抓取
 ```
 
 ## 标准输出结构
@@ -236,7 +237,7 @@ API DM TODO / 调试规则：
 - 每个页面独立采集，某个 endpoint 失败不会阻塞其他页面。
 - API 错误写入页面级 `collection_error`。
 - Home timeline 会先尝试官方 timeline endpoint，只有 endpoint 返回权限/额度/可用性错误时才进入 data gap。
-- 没有 API token 时不报错，由上层自动 fallback 到浏览器。
+- 没有 API token 时不报错；上层仅在完全没有 API 配置时使用浏览器。
 
 ### 上层摘要
 

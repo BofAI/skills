@@ -7,7 +7,7 @@ description: Use when the user wants Claude Code or another agent to analyze the
 
 ## Overview
 
-Use this skill to produce a concise Chinese daily digest from the user's own X/Twitter account. Use `scripts/run_daily_digest.py`, which selects API collection when API credentials are configured and otherwise falls back to local browser collection with a persistent dedicated Chromium profile.
+Use this skill to produce a concise Chinese daily digest from the user's own X/Twitter account. Use `scripts/run_daily_digest.py`, which selects API collection when API credentials are configured and otherwise uses local browser collection with a persistent dedicated Chromium profile. Once API credentials are configured, `--source auto` must not open the browser; API failures should fail or report data gaps until the user fixes or clears the API configuration.
 
 After installation, configuration and daily runs should use the installed skill copy, not a temporary clone/source checkout. Installed locations are `~/.claude/skills/twitter-digest` for Claude Code and `~/.codex/skills/twitter-digest` for Codex. If `run_daily_digest.py` or `configure_api.py` is accidentally run from a source checkout while an installed copy exists, the script automatically re-runs the installed copy so `.state` is written to the installed skill directory.
 
@@ -48,7 +48,7 @@ For chat usage, run the wrapper:
 RUN_DAILY_DIGEST
 ```
 
-`run_daily_digest.py --source auto` uses saved OAuth2 user-context credentials, `X_BEARER_TOKEN`, or `TWITTER_BEARER_TOKEN` for public data when present; otherwise it uses the browser collector. The script sources are isolated: API source never starts a browser and browser source owns visible X Chat / DM collection. Treat API DM lookup as TODO / waiting for X to fix XChat-encrypted DM coverage; do not use API DM to decide whether the user has private messages.
+`run_daily_digest.py --source auto` uses saved OAuth2 user-context credentials, `X_BEARER_TOKEN`, or `TWITTER_BEARER_TOKEN` for public data when present; otherwise it uses the browser collector. When API credentials are present, `auto` does not fall back to browser on API errors. The script sources are isolated: API source never starts a browser and browser source owns visible X Chat / DM collection. Treat API DM lookup as TODO / waiting for X to fix XChat-encrypted DM coverage; do not use API DM to decide whether the user has private messages.
 
 If the user asks to configure API access, trigger the OAuth/user-token setup from chat:
 
