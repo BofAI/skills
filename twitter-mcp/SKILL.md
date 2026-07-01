@@ -19,6 +19,12 @@ From the repository `skills/` directory:
 /bin/bash twitter-mcp/scripts/install_xmcp.sh
 ```
 
+For a one-line Codex install from this branch:
+
+```bash
+TMPDIR="$(mktemp -d)" && git clone --depth 1 --branch twitter-digest-xmcp-installer https://github.com/BofAI/skills.git "$TMPDIR/skills" && /bin/bash "$TMPDIR/skills/twitter-mcp/scripts/install_xmcp.sh"
+```
+
 The installer:
 
 - Requires Node.js and npm.

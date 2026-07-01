@@ -14,6 +14,12 @@ python3 twitter-digest/scripts/install.py
 
 To ask Codex to install this skill for itself, paste this into Codex:
 
+```bash
+TMPDIR="$(mktemp -d)" && git clone --depth 1 --branch twitter-digest-xmcp-installer https://github.com/BofAI/skills.git "$TMPDIR/skills" && python3 "$TMPDIR/skills/twitter-digest/scripts/install.py" --client codex
+```
+
+Or use the natural-language prompt:
+
 ```text
 请帮我安装这个 Codex skill：
 
