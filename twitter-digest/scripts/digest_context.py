@@ -85,6 +85,7 @@ def summarize_current_run(data: dict[str, Any]) -> dict[str, Any]:
 def build_digest_facts(data: dict[str, Any], summary: dict[str, Any]) -> dict[str, Any]:
     now = dt.datetime.now().astimezone()
     cutoff = now - dt.timedelta(hours=24)
+    public_items: list[dict[str, Any]] = []
     facts: dict[str, Any] = {
         "schema_version": 1,
         "run": {
@@ -224,19 +225,8 @@ def build_digest_facts(data: dict[str, Any], summary: dict[str, Any]) -> dict[st
                 continue
             public_counts = facts["public"]["counts"].setdefault(kind, {"total": 0})
             public_counts["total"] = int(public_counts.get("total") or 0) + 1
-            facts["public"]["items"].append(
-                {
-                    "kind": kind,
-                    "time": format_local_time(item.get("time")),
-                    "raw_time": item.get("time") or "",
-                    "url": item.get("url") or "",
-                    "author_url": item.get("authorUrl") or "",
-                    "text_excerpt": compact_text(item.get("text"))[:700],
-                    "external_links": normalize_context_assets(item.get("externalLinks")),
-                    "media": normalize_context_assets(item.get("media")),
-                    "cards": normalize_context_assets(item.get("cards")),
-                }
-            )
+            public_items.append(normalize_public_item(kind, item))
+    facts["public"]["items"] = annotate_public_reply_states(public_items, str((facts.get("account") or {}).get("handle") or ""))
     if (summary.get("dm_status") or "") in {"blocked_by_x_chat_passcode", "visible_threads_unopened", "no_visible_threads", "dm_page_loading_timeout", "api_dm_unavailable", "api_dm_error", "api_dm_todo"}:
         facts["data_gaps"].append(
             {
@@ -254,6 +244,83 @@ def build_digest_facts(data: dict[str, Any], summary: dict[str, Any]) -> dict[st
             }
         )
     return facts
+
+
+def normalize_public_item(kind: str, item: dict[str, Any]) -> dict[str, Any]:
+    author_username = clean_handle(item.get("author_username") or item.get("authorUsername") or author_from_url(item.get("authorUrl")))
+    references = item.get("referenced_tweets") if isinstance(item.get("referenced_tweets"), list) else []
+    return {
+        "kind": kind,
+        "id": compact_text(item.get("id")),
+        "conversation_id": compact_text(item.get("conversation_id")),
+        "author_username": author_username,
+        "time": format_local_time(item.get("time")),
+        "raw_time": item.get("time") or "",
+        "url": item.get("url") or "",
+        "author_url": item.get("authorUrl") or "",
+        "text_excerpt": compact_text(item.get("text"))[:700],
+        "referenced_tweets": [
+            {"id": compact_text(ref.get("id")), "type": compact_text(ref.get("type"))}
+            for ref in references
+            if isinstance(ref, dict)
+        ],
+        "external_links": normalize_context_assets(item.get("externalLinks")),
+        "media": normalize_context_assets(item.get("media")),
+        "cards": normalize_context_assets(item.get("cards")),
+    }
+
+
+def annotate_public_reply_states(items: list[dict[str, Any]], handle: str) -> list[dict[str, Any]]:
+    clean_self = clean_handle(handle).lower()
+    own_items = [item for item in items if is_own_public_item(item, clean_self)]
+    for item in items:
+        if "mention" not in str(item.get("kind") or "").lower():
+            continue
+        evidence = find_reply_evidence(item, own_items)
+        if evidence:
+            item["reply_state"] = "already_replied"
+            item["action_state"] = "handled"
+            item["reply_evidence"] = evidence
+        else:
+            item["reply_state"] = "reply_unverified"
+            item["action_state"] = "review_without_claiming_needs_reply"
+    return items
+
+
+def is_own_public_item(item: dict[str, Any], clean_self: str) -> bool:
+    kind = str(item.get("kind") or "").lower()
+    author = clean_handle(item.get("author_username")).lower()
+    return kind == "own_profile" or (bool(clean_self) and author == clean_self)
+
+
+def find_reply_evidence(mention: dict[str, Any], own_items: list[dict[str, Any]]) -> str:
+    mention_time = parse_item_time(mention.get("raw_time"))
+    mention_id = compact_text(mention.get("id"))
+    conversation_id = compact_text(mention.get("conversation_id"))
+    mention_author = clean_handle(mention.get("author_username")).lower()
+    for own in own_items:
+        own_time = parse_item_time(own.get("raw_time"))
+        if mention_time and own_time and own_time <= mention_time:
+            continue
+        if mention_id and referenced_ids(own) and mention_id in referenced_ids(own):
+            return f"own reply references mention tweet {mention_id}"
+        own_conversation_id = compact_text(own.get("conversation_id"))
+        if conversation_id and own_conversation_id and own_conversation_id == conversation_id and compact_text(own.get("id")) != mention_id:
+            return f"own post appears later in same conversation {conversation_id}"
+        if mention_author and f"@{mention_author}" in str(own.get("text_excerpt") or "").lower():
+            return f"own post mentions @{mention_author} after the mention"
+    return ""
+
+
+def referenced_ids(item: dict[str, Any]) -> set[str]:
+    refs = item.get("referenced_tweets") if isinstance(item.get("referenced_tweets"), list) else []
+    return {compact_text(ref.get("id")) for ref in refs if isinstance(ref, dict) and ref.get("id")}
+
+
+def author_from_url(value: Any) -> str:
+    text = str(value or "").strip()
+    match = re.search(r"https?://(?:www\.)?(?:x|twitter)\.com/([^/?#]+)", text)
+    return match.group(1) if match else ""
 
 
 def parse_item_time(value: Any) -> dt.datetime | None:
@@ -573,7 +640,10 @@ def render_public_slice_section(facts: dict[str, Any], slice_name: str) -> str:
         lines.append("| none | 0 |")
     lines.extend(["", "## Public Items", ""])
     for item in items[:300]:
-        lines.append(f"- `{item.get('kind')}` `{item.get('time')}` {item.get('url') or '[no url]'} - {item.get('text_excerpt')}")
+        reply_state = f" reply_state=`{item.get('reply_state')}` action_state=`{item.get('action_state')}`" if item.get("reply_state") else ""
+        evidence = f" reply_evidence={item.get('reply_evidence')}" if item.get("reply_evidence") else ""
+        author = f" @{item.get('author_username')}" if item.get("author_username") else ""
+        lines.append(f"- `{item.get('kind')}` `{item.get('time')}`{author}{reply_state}{evidence} {item.get('url') or '[no url]'} - {item.get('text_excerpt')}")
         for asset in item.get("media") or []:
             alt = f" alt={asset.get('alt')}" if asset.get("alt") else ""
             poster = f" poster={asset.get('poster')}" if asset.get("poster") else ""
@@ -644,7 +714,10 @@ def render_digest_facts(facts: dict[str, Any]) -> str:
 
     lines.extend(["", "## Public Items", ""])
     for item in ((facts.get("public") or {}).get("items") or [])[:300]:
-        lines.append(f"- `{item.get('kind')}` `{item.get('time')}` {item.get('url') or '[no url]'} - {item.get('text_excerpt')}")
+        reply_state = f" reply_state=`{item.get('reply_state')}` action_state=`{item.get('action_state')}`" if item.get("reply_state") else ""
+        evidence = f" reply_evidence={item.get('reply_evidence')}" if item.get("reply_evidence") else ""
+        author = f" @{item.get('author_username')}" if item.get("author_username") else ""
+        lines.append(f"- `{item.get('kind')}` `{item.get('time')}`{author}{reply_state}{evidence} {item.get('url') or '[no url]'} - {item.get('text_excerpt')}")
         for asset in item.get("media") or []:
             alt = f" alt={asset.get('alt')}" if asset.get("alt") else ""
             poster = f" poster={asset.get('poster')}" if asset.get("poster") else ""

@@ -120,6 +120,8 @@ Mention handling is strict:
 
 - Do not include mentions older than the local 24-hour window in `该处理`, `谁 @ 了你`, or reply drafts.
 - Do not present an already-replied mention as needing reply. Use own-profile/API own posts, browser-visible reply context, or context metadata when available to decide whether the authenticated account already replied after the mention timestamp.
+- When `digest-context.md` marks a mention with `reply_state=already_replied` or `action_state=handled`, it must not appear as a pending reply opportunity. It may be omitted or summarized as already handled.
+- When `digest-context.md` marks `reply_state=reply_unverified`, do not say the user "needs to reply"; write `回复状态未确认` and suggest review only if the content is important.
 - If reply status cannot be verified from the current run's data, label the item as `回复状态未确认` instead of claiming the user still needs to reply.
 
 Read the installed `digest-context.md` with the file Read tool when writing the Chinese digest. Its `Final Summary Facts` section is the content source for the final summary. If more focused context is needed, use the file Read tool on the split current-run files: `digest-context-timeline.md` for home/profile/timeline items, `digest-context-mentions.md` for @ mentions, and `digest-context-dm.md` for visible DM conversations. Use `digest-input.md` only when debugging collection issues, not during normal summarization. Do not add content from older runs. Do not write ad-hoc `python3 -c`, shell, `cat`, `head`, `tail`, `grep`, or temporary scripts to inspect context structure during normal summarization. If counts or non-content structure must be checked, run the built-in `scripts/inspect_digest.py`, which does not print DM bodies.
@@ -217,7 +219,7 @@ Group mentions by reason to care:
 - Opportunity: partnership, hiring, customer lead, investor/media attention, community praise.
 - Noise: spam, generic tags, low-context reposts.
 
-Before putting a mention into `✅ 该处理` or `🔴 值得回 / 需要处理`, confirm it is within the local 24-hour window and not already replied to. If it is already replied to, either omit it from action items or mark it as already handled. If the current run cannot verify reply status, mark `回复状态未确认` and avoid phrasing it as definitely needing a reply.
+Before putting a mention into `✅ 该处理` or `🔴 值得回 / 需要处理`, confirm it is within the local 24-hour window and not already replied to. If it is already replied to, either omit it from action items or mark it as already handled. If the current run cannot verify reply status, mark `回复状态未确认` and avoid phrasing it as definitely needing a reply. For mentions, treat `reply_state` / `action_state` in `digest-context.md` as authoritative over the text of the mention.
 
 Classify DMs as:
 

@@ -47,6 +47,7 @@ Rules for collection:
 - If an item has no parseable timestamp, do not use it for time-bound facts; report it under data gaps as time-unverified.
 - When using `xurl search`, search date operators may be used only as a coarse prefilter; still post-filter each returned item to the exact 24-hour window.
 - Before adding any mention or direct ask to `需要处理` as "needs reply", verify whether the authenticated account has already replied after that mention's timestamp. Use `xurl posts <handle>` and `xurl search "from:<handle> to:<author>" -n 100` or equivalent `xurl` output to check for replies in the same conversation/thread or to the same author. If a reply from the authenticated account already exists after the mention timestamp, mark it as already handled or omit it from `需要处理`; do not ask the user to reply again.
+- For every mention considered for `需要处理`, write down the reply verification result before summarizing: `already_replied`, `reply_unverified`, or `not_replied_found`. Only `not_replied_found` may be phrased as a pending reply. `already_replied` must be omitted from pending actions or shown as already handled. `reply_unverified` must be labeled `回复状态未确认`.
 - If the reply status cannot be verified from available `xurl` output, label it as `回复状态未确认` instead of claiming the user still needs to reply.
 - If a specific `xurl` command fails, report that command under data gaps and continue with successful command outputs.
 - Do not run the DM command during normal daily digest collection. Current DM/API coverage is not reliable for this workflow and should not appear in the daily digest.
@@ -57,7 +58,7 @@ Rules for collection:
 Write the final response in Chinese by default for `X日报` requests. Use this structure:
 
 - 今日概览: 3-6 bullets with the highest-signal changes.
-- 需要处理: unresolved direct asks, risks, and reply opportunities from public timeline, mentions, and searches. Exclude out-of-window mentions and already replied-to mentions.
+- 需要处理: unresolved direct asks, risks, and reply opportunities from public timeline, mentions, and searches. Exclude out-of-window mentions and already replied-to mentions. For mention rows, include the reply verification state; do not call a mention a reply task unless verification found no later reply from the authenticated account.
 - 时间线热点: grouped by topic with why it matters.
 - 我的账号动态: notable own posts or engagement.
 - 数据缺口: failed `xurl` commands, auth/tier errors, rate limits, or items excluded because timestamps were missing/unparseable.
@@ -74,13 +75,13 @@ From the repository `skills/` directory:
 For a one-line Codex install from this beta tag:
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/BofAI/skills/v1.5.11-beta.23/twitter-mcp/install.sh | env X_MCP_REGISTER_CODEX=1 X_MCP_REGISTER_CLAUDE=0 sh
+curl -fsSL https://raw.githubusercontent.com/BofAI/skills/v1.5.11-beta.24/twitter-mcp/install.sh | env X_MCP_REGISTER_CODEX=1 X_MCP_REGISTER_CLAUDE=0 sh
 ```
 
 For a one-line Claude Code install from this beta tag:
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/BofAI/skills/v1.5.11-beta.23/twitter-mcp/install.sh | env X_MCP_REGISTER_CODEX=0 X_MCP_REGISTER_CLAUDE=1 sh
+curl -fsSL https://raw.githubusercontent.com/BofAI/skills/v1.5.11-beta.24/twitter-mcp/install.sh | env X_MCP_REGISTER_CODEX=0 X_MCP_REGISTER_CLAUDE=1 sh
 ```
 
 The installer:

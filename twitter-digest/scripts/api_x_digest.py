@@ -206,6 +206,9 @@ def normalize_tweets(raw: list[dict[str, Any]], includes: dict[str, Any], source
         out.append(
             {
                 "api_source": source_kind,
+                "id": tweet_id,
+                "conversation_id": str(tweet.get("conversation_id") or ""),
+                "author_username": username,
                 "text": text,
                 "metrics": metrics,
                 "url": url,
@@ -215,6 +218,11 @@ def normalize_tweets(raw: list[dict[str, Any]], includes: dict[str, Any], source
                 "cards": cards,
                 "time": tweet.get("created_at"),
                 "authorUrl": f"https://x.com/{username}" if username else "",
+                "referenced_tweets": [
+                    {"id": str(ref.get("id") or ""), "type": str(ref.get("type") or "")}
+                    for ref in (tweet.get("referenced_tweets") or [])
+                    if isinstance(ref, dict)
+                ],
             }
         )
     return out

@@ -147,6 +147,8 @@ Mention handling is strict:
 - Mentions older than the local 24-hour window must not appear in action items, reply drafts, or the `谁 @ 了你` section.
 - Before labeling a mention as needing reply, verify from current-run data whether the authenticated account already replied after the mention timestamp.
 - Already-replied mentions should be omitted from action items or marked as already handled.
+- If `digest-context.md` includes `reply_state=already_replied` or `action_state=handled`, the mention is not a pending reply. Do not include it in `✅ 该处理` as a reply task.
+- If `digest-context.md` includes `reply_state=reply_unverified`, report `回复状态未确认`; do not claim the user definitely needs to reply.
 - If reply status cannot be verified, label the mention as `回复状态未确认` instead of claiming the user still needs to reply.
 
 A hotspot needs at least one of:
