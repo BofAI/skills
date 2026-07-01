@@ -133,12 +133,21 @@ Privacy rule: do not write long-term memory or daily archives. Raw DM text may e
 Date rule:
 
 - Run dates use the user's local timezone, not UTC.
+- Public timeline/profile/mentions facts use a strict `[now - 24 hours, now]` window in the user's current local timezone.
+- Public items with missing or unparseable timestamps are excluded from final-summary facts and must be reported as `time-unverified` data gaps.
 
 ## Hotspot Detection
 
 Cluster home timeline posts by repeated topics, hashtags, URLs, named entities, accounts, and semantic similarity. Optional keyword-search posts may be included only when the user explicitly passes `--keywords`.
 
-Public timeline, profile, and mentions collection follows the same bounded-window model as DM collection: load enough context for a 24-hour digest, cap the amount passed to the model, and stop early when timestamps show older content. Treat public item counts as browser-loaded items in this run, not exhaustive X history.
+Public timeline, profile, and mentions collection follows the same bounded-window model as DM collection: load enough context for a 24-hour digest, cap the amount passed to the model, and stop early when timestamps show older content. Treat public item counts as browser-loaded items in this run, not exhaustive X history. The generated digest context applies a second strict local-time 24-hour filter before writing final-summary public facts; do not reintroduce older raw-capture items while summarizing.
+
+Mention handling is strict:
+
+- Mentions older than the local 24-hour window must not appear in action items, reply drafts, or the `谁 @ 了你` section.
+- Before labeling a mention as needing reply, verify from current-run data whether the authenticated account already replied after the mention timestamp.
+- Already-replied mentions should be omitted from action items or marked as already handled.
+- If reply status cannot be verified, label the mention as `回复状态未确认` instead of claiming the user still needs to reply.
 
 A hotspot needs at least one of:
 

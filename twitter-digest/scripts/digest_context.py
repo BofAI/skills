@@ -4,6 +4,7 @@
 from __future__ import annotations
 
 import argparse
+import datetime as dt
 import json
 import re
 from pathlib import Path
@@ -82,6 +83,8 @@ def summarize_current_run(data: dict[str, Any]) -> dict[str, Any]:
 
 
 def build_digest_facts(data: dict[str, Any], summary: dict[str, Any]) -> dict[str, Any]:
+    now = dt.datetime.now().astimezone()
+    cutoff = now - dt.timedelta(hours=24)
     facts: dict[str, Any] = {
         "schema_version": 1,
         "run": {
@@ -89,6 +92,9 @@ def build_digest_facts(data: dict[str, Any], summary: dict[str, Any]) -> dict[st
             "date": summary.get("date"),
             "source": summary.get("source"),
             "timezone": local_timezone_name(),
+            "window_start": cutoff.isoformat(),
+            "window_end": now.isoformat(),
+            "window_hours": 24,
         },
         "account": {
             "handle": summary.get("handle") or clean_handle(data.get("handle")),
@@ -104,9 +110,11 @@ def build_digest_facts(data: dict[str, Any], summary: dict[str, Any]) -> dict[st
                 "Only threads whose latest preview is not from the user are opened for content.",
                 "Do not treat embedded post authors as DM senders.",
                 "Count low-value waiting-reply DMs but do not expand spam, phishing, generic promotions, or repeated junk.",
+                "Public timeline/profile/mention items must be inside the local-time 24-hour window.",
+                "Do not present already-handled mentions as needing reply; if reply status is unclear, label it as unverified.",
             ],
         },
-        "public": {"counts": summary.get("post_counts") or {}, "items": []},
+        "public": {"counts": {}, "loaded_counts": summary.get("post_counts") or {}, "items": []},
         "dms": {
             "status": summary.get("dm_status"),
             "counts": summary.get("dm_counts") or {},
@@ -201,6 +209,21 @@ def build_digest_facts(data: dict[str, Any], summary: dict[str, Any]) -> dict[st
         for item in page.get("items") or []:
             if not isinstance(item, dict):
                 continue
+            item_time = parse_item_time(item.get("time"))
+            if item_time is None:
+                facts["data_gaps"].append(
+                    {
+                        "source": kind,
+                        "status": "time-unverified",
+                        "detail": f"Excluded public item without parseable timestamp: {compact_text(item.get('url') or item.get('text'))[:180]}",
+                    }
+                )
+                continue
+            local_item_time = item_time.astimezone()
+            if local_item_time < cutoff or local_item_time > now:
+                continue
+            public_counts = facts["public"]["counts"].setdefault(kind, {"total": 0})
+            public_counts["total"] = int(public_counts.get("total") or 0) + 1
             facts["public"]["items"].append(
                 {
                     "kind": kind,
@@ -231,6 +254,19 @@ def build_digest_facts(data: dict[str, Any], summary: dict[str, Any]) -> dict[st
             }
         )
     return facts
+
+
+def parse_item_time(value: Any) -> dt.datetime | None:
+    text = str(value or "").strip()
+    if not text:
+        return None
+    try:
+        parsed = dt.datetime.fromisoformat(text.replace("Z", "+00:00"))
+    except ValueError:
+        return None
+    if parsed.tzinfo is None:
+        parsed = parsed.replace(tzinfo=dt.datetime.now().astimezone().tzinfo)
+    return parsed
 
 
 def assess_dm_thread(thread: dict[str, Any]) -> dict[str, Any]:
@@ -589,6 +625,9 @@ def render_digest_facts(facts: dict[str, Any]) -> str:
         f"- generated_at: `{(facts.get('run') or {}).get('generated_at')}`",
         f"- source: `{(facts.get('run') or {}).get('source') or 'browser'}`",
         f"- timezone: `{(facts.get('run') or {}).get('timezone')}`",
+        f"- window_start: `{(facts.get('run') or {}).get('window_start')}`",
+        f"- window_end: `{(facts.get('run') or {}).get('window_end')}`",
+        f"- window_hours: `{(facts.get('run') or {}).get('window_hours')}`",
         f"- account: `@{(facts.get('account') or {}).get('handle') or ''}`",
     ]
     lines.extend(["", *render_dm_facts_section(facts).splitlines()])
