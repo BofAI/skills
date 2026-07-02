@@ -3,9 +3,11 @@ set -eu
 
 CLIENT="${X_MCP_UNINSTALL_CLIENT:-auto}"
 PURGE_STATE="${X_MCP_PURGE_STATE:-0}"
-REMOVE_MCP_CONFIG="${X_MCP_REMOVE_MCP_CONFIG:-0}"
+REMOVE_MCP_CONFIG="${X_MCP_REMOVE_MCP_CONFIG:-1}"
+REMOVE_XURL_APP="${X_MCP_REMOVE_XURL_APP:-1}"
 UNINSTALL_XURL="${X_MCP_UNINSTALL_XURL:-0}"
 SERVER_NAME="${X_MCP_SERVER_NAME:-xapi}"
+APP_NAME="${X_MCP_APP_NAME:-xmcp}"
 DRY_RUN=0
 
 info() {
@@ -26,16 +28,20 @@ truthy() {
 
 usage() {
   cat <<'EOF'
-Usage: uninstall.sh [--client auto|codex|claude|all] [--purge-state] [--remove-mcp-config] [--uninstall-xurl] [--dry-run]
+Usage: uninstall.sh [--client auto|codex|claude|all] [--purge-state] [--keep-mcp-config] [--keep-xurl-app] [--uninstall-xurl] [--dry-run]
 
 Default uninstall moves installed twitter-mcp skill directories to .backups/
-and disables SKILL.md, preserving .state in the backup. xurl, OAuth app config,
-and MCP registrations are left in place unless explicitly removed.
+and disables SKILL.md, preserving .state in the backup. It also removes the
+matching xapi MCP registration and the xmcp xurl OAuth app/tokens created by
+the installer. The global xurl package is kept unless explicitly removed.
 
 Options:
   --client             Target client. Default: auto.
   --purge-state        Permanently remove the installed skill directory, including .state.
-  --remove-mcp-config  Remove the xapi MCP server registration from Codex/Claude config.
+  --keep-mcp-config    Keep the xapi MCP server registration.
+  --remove-mcp-config  Remove the xapi MCP server registration (default).
+  --keep-xurl-app      Keep the xmcp xurl app and tokens.
+  --remove-xurl-app    Remove the xmcp xurl app and tokens (default).
   --uninstall-xurl     Run npm uninstall -g @xdevplatform/xurl.
   --dry-run            Print actions without changing files.
 EOF
@@ -58,6 +64,18 @@ while [ "$#" -gt 0 ]; do
       ;;
     --remove-mcp-config)
       REMOVE_MCP_CONFIG=1
+      shift
+      ;;
+    --keep-mcp-config)
+      REMOVE_MCP_CONFIG=0
+      shift
+      ;;
+    --remove-xurl-app)
+      REMOVE_XURL_APP=1
+      shift
+      ;;
+    --keep-xurl-app)
+      REMOVE_XURL_APP=0
       shift
       ;;
     --uninstall-xurl)
@@ -204,6 +222,26 @@ remove_xurl() {
   npm uninstall -g @xdevplatform/xurl
 }
 
+remove_xurl_app() {
+  if ! truthy "$REMOVE_XURL_APP"; then
+    return 0
+  fi
+  if [ "$DRY_RUN" = "1" ]; then
+    info "Would run: xurl auth apps remove $APP_NAME"
+    return 0
+  fi
+  if ! command -v xurl >/dev/null 2>&1; then
+    info "xurl not found; skipped xurl app '$APP_NAME' removal."
+    return 0
+  fi
+  if xurl auth apps list 2>/dev/null | grep -F "▸ $APP_NAME " >/dev/null 2>&1; then
+    xurl auth apps remove "$APP_NAME"
+    info "Removed xurl app '$APP_NAME' and its tokens."
+  else
+    info "xurl app '$APP_NAME' was not registered."
+  fi
+}
+
 targets="$CLIENT"
 if [ "$CLIENT" = "auto" ]; then
   targets="$(detect_client)"
@@ -228,4 +266,5 @@ case "$targets" in
     ;;
 esac
 
+remove_xurl_app
 remove_xurl
