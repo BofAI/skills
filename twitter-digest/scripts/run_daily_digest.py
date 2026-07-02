@@ -116,6 +116,15 @@ def api_configured(bearer_token: str) -> bool:
     return bool(bearer_token)
 
 
+def api_configuration_present(api_config: dict, bearer_token: str) -> bool:
+    return bool(
+        bearer_token
+        or api_config.get("bearer_token")
+        or api_config.get("refresh_token")
+        or api_config.get("client_id")
+    )
+
+
 def summarize_child_error(error: subprocess.CalledProcessError) -> str:
     text = "\n".join(part for part in [error.stdout or "", error.stderr or ""] if part)
     return summarize_collector_error(text, returncode=error.returncode)
@@ -237,7 +246,7 @@ def main() -> None:
     refresh_error = str(api_config.get("refresh_error") or "")
     source = args.source
     if source == "auto":
-        source = "api"
+        source = "api" if api_configuration_present(api_config, bearer_token) else "browser"
     if source == "api" and not explicit_bearer_token and (refresh_error or not api_configured(bearer_token)):
         reason = "X API 配置缺失或已失效" if not refresh_error else f"X API token refresh failed: {refresh_error}"
         run_configure_api_flow(reason, args)

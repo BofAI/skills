@@ -4,15 +4,15 @@ Use this reference when implementing, auditing, or troubleshooting the X/Twitter
 
 ## Default Source Rule
 
-Default daily digest source is API. If the latest user message is a normal digest request or a short confirmation such as "生成日报", "日报", "要", "继续", "好", or "可以", run the wrapper with no source override:
+Default daily digest source is automatic. If saved API credentials exist, normal digest requests use API. If no API credentials exist, normal digest requests use browser collection. For a normal digest request or a short confirmation such as "生成日报", "日报", "要", "继续", "好", or "可以", run the wrapper with no source override:
 
 ```bash
 python3 ~/.claude/skills/twitter-digest/scripts/run_daily_digest.py
 ```
 
-Do not use browser source because a previous assistant message mentioned browser mode, because API excludes DMs, because browser could be more complete, or because API output says DM needs browser confirmation. Those are data gaps to report after API collection, not permission to switch sources.
+When API is configured, do not use browser source because a previous assistant message mentioned browser mode, because API excludes DMs, because browser could be more complete, or because API output says DM needs browser confirmation. Those are data gaps to report after API collection, not permission to switch sources. When API is not configured, the same wrapper command uses browser collection.
 
-Use browser source only when the latest user message itself explicitly asks for browser mode, visible DMs / private messages, X Chat, local browser collection, or a literal `--source browser`.
+When API is configured, use browser source only when the latest user message itself explicitly asks for browser mode, visible DMs / private messages, X Chat, local browser collection, or a literal `--source browser`.
 
 ## Access Model
 
@@ -20,7 +20,7 @@ The data collection layer has three scripts:
 
 - `scripts/browser_x_digest.py`: local browser collector. It launches a dedicated Chromium profile at `twitter-digest/.state/chrome-profile`, reads X page DOM, and is required for X Chat / DM content.
 - `scripts/api_x_digest.py`: official API collector. It uses saved OAuth2 user-context credentials, `X_BEARER_TOKEN` / `TWITTER_BEARER_TOKEN`, or `--bearer-token` and writes the same `digest-input.*` shape as the browser collector.
-- `scripts/run_daily_digest.py`: upper wrapper. Default source is auto/API: configure API lazily when credentials are missing or auth is broken, then collect through API. Use browser source only when the latest user instruction explicitly requests browser collection.
+- `scripts/run_daily_digest.py`: upper wrapper. Default source is auto: use API when credentials are configured, use browser when API is not configured, and reconfigure API when saved credentials are broken. Use browser source explicitly when API is configured and the latest user instruction requests browser collection.
 
 Browser mode:
 
@@ -34,9 +34,9 @@ API mode:
 - Intended for stable public-data collection.
 - Requires user-context authorization for user-owned timelines. App-only keys are not enough for home timeline reliability.
 - Reads the official reverse chronological home timeline when the token has user-context timeline access.
-- Normal daily runs use API and do not collect DMs. Browser collection is explicit and is required for visible X Chat / encrypted DM content.
+- Normal daily runs use API when API credentials are configured and do not collect DMs. If API is not configured, normal daily runs use browser collection. Browser collection is also required for visible X Chat / encrypted DM content.
 - Records endpoint-level API failures as data gaps instead of silently treating them as empty pages.
-- Authentication/configuration failures trigger API configuration and one retry from the main command. Permissions, tier limits, rate limits, and endpoint failures do not fall back to browser.
+- When API is explicitly selected or saved API credentials exist, authentication/configuration failures trigger API configuration and one retry from the main command. Permissions, tier limits, rate limits, and endpoint failures do not fall back to browser.
 - Saved OAuth tokens are configured by the agent-triggered `run_daily_digest.py --configure-api` flow or lazily by `run_daily_digest.py` when collection needs credentials. OAuth2 PKCE is the supported path for user-owned local X Apps: the user provides the Client ID, authorizes the app in the browser, and the script saves the access token plus refresh token. OAuth2 tokens are refreshed automatically when a refresh token is saved.
 
 Chat-triggered API setup:
@@ -254,5 +254,5 @@ Reply drafting rules:
 ## 中文每日 Prompt
 
 ```text
-使用 $twitter-digest 按默认 API-first 流程读取我最近 24 小时的 X/Twitter 动态，生成中文日报。重点总结谁 @ 了我、时间线热点、需要处理的公开互动、我的账号动态。除非我明确要求浏览器模式或可见私信，不要使用浏览器/DM 采集。先给今日总结和行动建议，再给明细。回复只生成草稿，不要自动发送。读不到的数据要明确标注。
+使用 $twitter-digest 按默认自动流程读取我最近 24 小时的 X/Twitter 动态，生成中文日报：已配置 API 时用 API，未配置 API 时用浏览器。重点总结谁 @ 了我、时间线热点、需要处理的公开互动、我的账号动态。已配置 API 时，除非我明确要求浏览器模式或可见私信，不要使用浏览器/DM 采集。先给今日总结和行动建议，再给明细。回复只生成草稿，不要自动发送。读不到的数据要明确标注。
 ```

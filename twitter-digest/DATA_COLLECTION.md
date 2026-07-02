@@ -78,7 +78,7 @@ scripts/run_daily_digest.py
 - 统一入口。
 - 提供 `--configure-api`，由 Agent 在对话里触发 OAuth 配置。
 - 默认 `--source auto`。
-- 默认走 API；如果没有 API token 或认证配置失效，先触发 API 配置，配置成功后继续 API 抓取。
+- 默认自动选择来源：已配置 API 时走 API；未配置 API 时走浏览器；API 已配置但认证失效时先触发 API 重配置，配置成功后继续 API 抓取。
 - 用户主动要求浏览器或命令显式传入 `--source browser` 时，强制浏览器抓取。
 - API source 已选择时不启动浏览器，不自动回退浏览器；认证类错误会触发一次重配，其他 API 不可用情况失败或写入 data gap。
 - 如果 OAuth2 access token 快过期且保存了 refresh token，自动刷新后再抓取。
@@ -89,7 +89,7 @@ scripts/run_daily_digest.py
 ```text
 --source api      -> 强制 API，只采公开数据，不启动浏览器
 --source browser  -> 强制浏览器，采公开网页和可见 X Chat / DM
---source auto     -> 默认自动模式；API-first，缺配置或认证坏了就配置后继续 API；不自动回退浏览器
+--source auto     -> 默认自动模式；已配置 API 时走 API；未配置 API 时走浏览器；API 已配置但认证坏了就配置后继续 API；不自动回退浏览器
 ```
 
 隔离规则：
@@ -113,7 +113,7 @@ scripts/browser_x_digest.py  -> 浏览器抓取：公开网页 + X Chat / 加密
 ```text
 用户：生成 X 日报
 Agent：运行 scripts/run_daily_digest.py
-脚本：默认走 API；缺配置或认证失效时先配置 API，然后继续 API 采集，生成 digest-context.md
+脚本：默认自动选择来源；已配置 API 时走 API，未配置 API 时走浏览器；API 已配置但认证失效时先重配 API，然后继续 API 采集；生成 digest-context.md
 Agent：读取 digest-context.md 写中文日报
 ```
 
@@ -146,7 +146,7 @@ Agent：运行 `python3 ~/.claude/skills/twitter-digest/scripts/run_daily_digest
 ```text
 用户：生成 X 日报
 Agent：运行 scripts/run_daily_digest.py
-脚本：默认 auto；使用 API，缺配置或认证失效时先配置 API，然后继续 API 采集，生成 digest-context.md
+脚本：默认 auto；已配置 API 时使用 API，未配置 API 时使用浏览器；API 已配置但认证失效时先重配 API，然后继续 API 采集；生成 digest-context.md
 脚本：只有显式 `--source browser` 时才强制浏览器
 Agent：读取 digest-context.md 写中文日报
 ```
@@ -240,7 +240,7 @@ API DM TODO / 调试规则：
 - 每个页面独立采集，某个 endpoint 失败不会阻塞其他页面。
 - API 错误写入页面级 `collection_error`。
 - Home timeline 会先尝试官方 timeline endpoint，只有 endpoint 返回权限/额度/可用性错误时才进入 data gap。
-- 没有 API token 或认证失效时，上层入口触发 API 配置并继续 API 采集；不自动回退浏览器。
+- 没有 API token 且没有 API 配置时，上层入口走浏览器；已有 API 配置但认证失效时，上层入口触发 API 重配置并继续 API 采集；不自动回退浏览器。
 
 ### 上层摘要
 
@@ -251,7 +251,7 @@ API DM TODO / 调试规则：
 
 ## 常用命令
 
-默认 API-first：
+默认自动模式：
 
 ```bash
 python3 twitter-digest/scripts/run_daily_digest.py

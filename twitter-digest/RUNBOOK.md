@@ -29,9 +29,10 @@ scripts/api_x_digest.py
 
 scripts/run_daily_digest.py
   上层入口。默认 --source auto：
-  - 默认走 API。
-  - 没有 API 配置、token 刷新失败或认证失效时触发 API 配置。
-  - 配置成功后继续 API 采集。
+  - 已配置 API 时走 API。
+  - 没有 API 配置时走浏览器。
+  - 已配置 API 但 token 刷新失败或认证失效时触发 API 重配置。
+  - 重配置成功后继续 API 采集。
   - 用户主动要求浏览器或显式 `--source browser` 时强制浏览器。
   - API source 已选择时不回退浏览器；认证类错误只重配一次，其他 API 失败就报错或写 data gap。
   - 使用 API 且保存了 refresh token 时自动刷新过期 access token。
@@ -89,7 +90,7 @@ CLIENT_SECRET（如 App 要求）
 
 `ACCESS_TOKEN` 和 `REFRESH_TOKEN` 由授权流程生成。
 
-配置成功后，后续日报不再要求用户输入 Client ID、Secret 或重新授权。普通 `run_daily_digest.py` 会读取 `.state/api_config.json` 并默认走 API：
+配置成功后，后续日报不再要求用户输入 Client ID、Secret 或重新授权。普通 `run_daily_digest.py` 会读取 `.state/api_config.json` 并默认走 API；如果没有这个 API 配置文件，普通日报会走浏览器：
 
 - OAuth2：如果保存了 refresh token，access token 快过期时自动 refresh。
 - 如果 token 被撤销、过期且无法刷新，或 API 返回 401 等认证错误，普通日报命令会重新打开配置并重试一次。
@@ -130,7 +131,7 @@ python3 twitter-digest/scripts/install.py --client claude
 - Python 3.9+
 - Google Chrome、Chromium、Microsoft Edge 或 Brave
 
-如果缺少支持的 Chromium 浏览器，安装脚本会停止并提示先安装浏览器。浏览器仅用于显式 `--source browser` 的本地 X 页面采集和 OAuth 授权页打开；默认 API 日报不会启动浏览器采集。
+如果缺少支持的 Chromium 浏览器，安装脚本会停止并提示先安装浏览器。浏览器用于未配置 API 时的默认本地 X 页面采集、显式 `--source browser` 采集，以及 OAuth 授权页打开。已配置 API 的默认日报不会启动浏览器采集。
 
 如果浏览器会稍后安装，可以显式跳过检查：
 

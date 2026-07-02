@@ -8,7 +8,7 @@ twitter-digest/RUNBOOK.md
 
 ## 1. 功能
 
-`twitter-digest` 默认 `--source auto`：通过 API 读取公开数据并生成中文日报；如果没有 API 配置或认证失效，会先触发 API 配置，配置成功后继续采集。用户主动要求浏览器或显式传入 `--source browser` 时才强制浏览器。
+`twitter-digest` 默认 `--source auto`：已配置 API 时通过 API 读取公开数据并生成中文日报；未配置 API 时使用浏览器采集。API 已配置但认证失效时，会先触发 API 重配置，配置成功后继续 API 采集。用户主动要求浏览器或显式传入 `--source browser` 时强制浏览器。
 
 采集内容按来源区分：
 
@@ -64,7 +64,7 @@ twitter-digest/.state/run/digest-context.md
 
 ## 3. 运行规则
 
-- 默认入口 `run_daily_digest.py`：API-first。缺 API 配置或认证失效时自动进入配置流程，配置成功后继续 API 采集。
+- 默认入口 `run_daily_digest.py`：自动选择来源。已配置 API 时走 API；未配置 API 时走浏览器；API 已配置但认证失效时自动进入配置流程，配置成功后继续 API 采集。
 - 用户主动要求浏览器或命令显式 `--source browser` 时强制浏览器；API 模式只抓公开数据，不打开浏览器。
 - DM / X Chat 以本地浏览器抓取为准；API 模式不用于判断是否有私信。
 - API 认证类错误会触发一次重配；权限不足、tier 不支持、限流或其他 API 错误记录数据缺口或失败，不回退浏览器路径。
@@ -85,7 +85,7 @@ twitter-digest/.state/run/digest-context.md
    python3 twitter-digest/scripts/run_daily_digest.py
    ```
 
-2. 脚本检查 API 配置；如果缺失或认证失效，打开配置流程。
+2. 脚本检查 API 配置；如果缺失，走浏览器；如果已配置但认证失效，打开 API 重配置流程。
 
 3. 用户在配置流程里输入 Client ID / Secret 并完成 X OAuth 授权。
 
