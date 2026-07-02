@@ -1,7 +1,7 @@
 #!/bin/sh
 set -eu
 
-TAG="${X_MCP_INSTALL_TAG:-v1.5.12-beta.7}"
+TAG="${X_MCP_INSTALL_TAG:-v1.5.12-beta.8}"
 BASE_URL="${X_MCP_INSTALL_BASE_URL:-https://raw.githubusercontent.com/BofAI/skills/${TAG}/twitter-mcp}"
 REGISTER_CODEX="${X_MCP_REGISTER_CODEX:-1}"
 REGISTER_CLAUDE="${X_MCP_REGISTER_CLAUDE:-auto}"
@@ -55,7 +55,7 @@ xurl_app_exists() {
   if ! command_exists xurl; then
     return 1
   fi
-  xurl auth apps list 2>/dev/null | grep -F "▸ $APP_NAME " >/dev/null 2>&1
+  xurl auth apps list 2>/dev/null | sed -n 's/^▸ \([^ ]*\).*/\1/p' | grep -Fx "$APP_NAME" >/dev/null 2>&1
 }
 
 infer_app_name_if_needed() {

@@ -5,7 +5,7 @@ CLIENT="${X_MCP_UNINSTALL_CLIENT:-auto}"
 PURGE_STATE="${X_MCP_PURGE_STATE:-0}"
 REMOVE_MCP_CONFIG="${X_MCP_REMOVE_MCP_CONFIG:-1}"
 REMOVE_XURL_APP="${X_MCP_REMOVE_XURL_APP:-1}"
-UNINSTALL_XURL="${X_MCP_UNINSTALL_XURL:-0}"
+UNINSTALL_XURL="${X_MCP_UNINSTALL_XURL:-1}"
 SERVER_NAME="${X_MCP_SERVER_NAME:-xapi}"
 APP_NAME="${X_MCP_APP_NAME:-xmcp}"
 DRY_RUN=0
@@ -28,12 +28,12 @@ truthy() {
 
 usage() {
   cat <<'EOF'
-Usage: uninstall.sh [--client auto|codex|claude|all] [--purge-state] [--keep-mcp-config] [--keep-xurl-app] [--uninstall-xurl] [--dry-run]
+Usage: uninstall.sh [--client auto|codex|claude|all] [--purge-state] [--keep-mcp-config] [--keep-xurl-app] [--keep-xurl] [--dry-run]
 
 Default uninstall moves installed twitter-mcp skill directories to .backups/
 and disables SKILL.md, preserving .state in the backup. It also removes the
 matching xapi MCP registration and the xmcp xurl OAuth app/tokens created by
-the installer. The global xurl package is kept unless explicitly removed.
+the installer, then uninstalls the global @xdevplatform/xurl package.
 
 Options:
   --client             Target client. Default: auto.
@@ -42,7 +42,8 @@ Options:
   --remove-mcp-config  Remove the xapi MCP server registration (default).
   --keep-xurl-app      Keep the xmcp xurl app and tokens.
   --remove-xurl-app    Remove the xmcp xurl app and tokens (default).
-  --uninstall-xurl     Run npm uninstall -g @xdevplatform/xurl.
+  --keep-xurl          Keep the global @xdevplatform/xurl package.
+  --uninstall-xurl     Run npm uninstall -g @xdevplatform/xurl (default).
   --dry-run            Print actions without changing files.
 EOF
 }
@@ -80,6 +81,10 @@ while [ "$#" -gt 0 ]; do
       ;;
     --uninstall-xurl)
       UNINSTALL_XURL=1
+      shift
+      ;;
+    --keep-xurl)
+      UNINSTALL_XURL=0
       shift
       ;;
     --dry-run)
@@ -234,7 +239,7 @@ remove_xurl_app() {
     info "xurl not found; skipped xurl app '$APP_NAME' removal."
     return 0
   fi
-  if xurl auth apps list 2>/dev/null | grep -F "▸ $APP_NAME " >/dev/null 2>&1; then
+  if xurl auth apps list 2>/dev/null | sed -n 's/^▸ \([^ ]*\).*/\1/p' | grep -Fx "$APP_NAME" >/dev/null 2>&1; then
     xurl auth apps remove "$APP_NAME"
     info "Removed xurl app '$APP_NAME' and its tokens."
   else

@@ -89,7 +89,7 @@ xurl_app_exists() {
   if [ -z "$command_path" ] || [ ! -x "$command_path" ]; then
     return 1
   fi
-  "$command_path" auth apps list 2>/dev/null | grep -F "▸ $APP_NAME " >/dev/null 2>&1
+  "$command_path" auth apps list 2>/dev/null | sed -n 's/^▸ \([^ ]*\).*/\1/p' | grep -Fx "$APP_NAME" >/dev/null 2>&1
 }
 
 infer_app_name_if_needed() {
