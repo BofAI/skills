@@ -1,4 +1,4 @@
 interface:
   display_name: "Twitter Digest"
   short_description: "Generate X/Twitter daily digests from own account"
-  default_prompt: "Use $twitter-digest to generate my X daily digest via the default API-first flow, including mentions, timeline hotspots, own-account activity, and action items. Do not use browser/DM collection unless I explicitly ask for browser mode or visible DMs."
+  default_prompt: "Use $twitter-digest to generate my X daily digest via the default API flow, including mentions, timeline hotspots, own-account activity, and action items. For ordinary follow-ups like 要, 日报, 生成, or 继续, run the default API command only. Do not use browser/DM collection unless my latest message explicitly asks for browser mode, visible DMs, X Chat, or local browser collection."

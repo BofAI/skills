@@ -15,7 +15,7 @@ python3 twitter-digest/scripts/install.py
 To ask Codex to install this skill for itself, paste this into Codex:
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/BofAI/skills/v1.5.12-beta.5/twitter-digest/install.sh | env TWITTER_DIGEST_INSTALL_CLIENT=codex sh
+curl -fsSL https://raw.githubusercontent.com/BofAI/skills/v1.5.12-beta.6/twitter-digest/install.sh | env TWITTER_DIGEST_INSTALL_CLIENT=codex sh
 ```
 
 When this one-line installer is launched from Codex, Claude Code, or another non-interactive agent on macOS, it opens a real Terminal window and re-runs the full installation there. This avoids agent permission/inspect prompts during `git clone`, Python checks, browser checks, and installer writes. Set `TWITTER_DIGEST_OPEN_TERMINAL=0` only when intentionally running in an already interactive Terminal or CI.
@@ -35,7 +35,7 @@ git clone git@github.com:BofAI/skills.git bofai-skills \
 To ask Claude Code to install this skill for itself, paste this into Claude Code:
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/BofAI/skills/v1.5.12-beta.5/twitter-digest/install.sh | env TWITTER_DIGEST_INSTALL_CLIENT=claude TWITTER_DIGEST_ALLOW_CLAUDE_COMMANDS=1 TWITTER_DIGEST_ALLOW_CLAUDE_STATE_READ=1 sh
+curl -fsSL https://raw.githubusercontent.com/BofAI/skills/v1.5.12-beta.6/twitter-digest/install.sh | env TWITTER_DIGEST_INSTALL_CLIENT=claude TWITTER_DIGEST_ALLOW_CLAUDE_COMMANDS=1 TWITTER_DIGEST_ALLOW_CLAUDE_STATE_READ=1 sh
 ```
 
 Or use the natural-language prompt:
@@ -87,7 +87,7 @@ Claude Code cannot let a skill silently grant itself Bash permission or file acc
 python3 ~/.claude/skills/twitter-digest/scripts/run_daily_digest.py
 ```
 
-On first run, the script checks X API configuration. If API credentials are missing or authentication is broken, it opens the API configuration flow and then continues collection. Use `--source browser` only when you explicitly want local browser collection.
+On first run, the script checks X API configuration. If API credentials are missing or authentication is broken, it opens the API configuration flow and then continues collection. A normal digest request or short follow-up such as "要", "日报", "继续", or "生成" uses API. Use browser source only when you explicitly want local browser collection, visible DMs, or X Chat.
 
 ## Data Collection Sources
 
@@ -117,10 +117,9 @@ Source isolation:
 - Default `--source auto` picks one source for the run and does not merge API and browser data.
 - API DM data gaps are notes only; they do not mean browser DM data was collected.
 
-Force a source:
+Force API source:
 
 ```bash
-python3 ~/.claude/skills/twitter-digest/scripts/run_daily_digest.py --source browser
 X_BEARER_TOKEN=... python3 ~/.claude/skills/twitter-digest/scripts/run_daily_digest.py --source api --handle <handle>
 ```
 

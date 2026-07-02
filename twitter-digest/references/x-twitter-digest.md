@@ -2,13 +2,25 @@
 
 Use this reference when implementing, auditing, or troubleshooting the X/Twitter digest data collection workflow.
 
+## Default Source Rule
+
+Default daily digest source is API. If the latest user message is a normal digest request or a short confirmation such as "生成日报", "日报", "要", "继续", "好", or "可以", run the wrapper with no source override:
+
+```bash
+python3 ~/.claude/skills/twitter-digest/scripts/run_daily_digest.py
+```
+
+Do not use browser source because a previous assistant message mentioned browser mode, because API excludes DMs, because browser could be more complete, or because API output says DM needs browser confirmation. Those are data gaps to report after API collection, not permission to switch sources.
+
+Use browser source only when the latest user message itself explicitly asks for browser mode, visible DMs / private messages, X Chat, local browser collection, or a literal `--source browser`.
+
 ## Access Model
 
 The data collection layer has three scripts:
 
 - `scripts/browser_x_digest.py`: local browser collector. It launches a dedicated Chromium profile at `twitter-digest/.state/chrome-profile`, reads X page DOM, and is required for X Chat / DM content.
 - `scripts/api_x_digest.py`: official API collector. It uses saved OAuth2 user-context credentials, `X_BEARER_TOKEN` / `TWITTER_BEARER_TOKEN`, or `--bearer-token` and writes the same `digest-input.*` shape as the browser collector.
-- `scripts/run_daily_digest.py`: upper wrapper. Default source is auto/API-first: configure API lazily when credentials are missing or auth is broken, then collect through API. Use `--source browser` when the user explicitly wants browser collection.
+- `scripts/run_daily_digest.py`: upper wrapper. Default source is auto/API: configure API lazily when credentials are missing or auth is broken, then collect through API. Use browser source only when the latest user instruction explicitly requests browser collection.
 
 Browser mode:
 
@@ -48,7 +60,7 @@ Typical chat run:
 python3 twitter-digest/scripts/run_daily_digest.py
 ```
 
-Visible DM collection is not part of API mode. Use `--source browser` when the user explicitly wants browser-visible X Chat / DM content.
+Visible DM collection is not part of API mode. This is a data gap in normal API digests. Use browser source only when the latest user message explicitly wants browser-visible X Chat / DM content.
 
 Optional keyword search is off by default. Use it only when the user explicitly asks:
 
@@ -56,7 +68,7 @@ Optional keyword search is off by default. Use it only when the user explicitly 
 python3 twitter-digest/scripts/run_daily_digest.py --keywords "query one,query two"
 ```
 
-Force a visible browser window for debugging:
+Force a visible browser window only for explicit browser debugging:
 
 ```bash
 python3 twitter-digest/scripts/run_daily_digest.py --source browser --headed
@@ -68,10 +80,9 @@ For unattended scheduled runs that should not open a visible browser or wait on 
 python3 twitter-digest/scripts/run_daily_digest.py --non-interactive
 ```
 
-Force a data source:
+Force an API data source:
 
 ```bash
-python3 twitter-digest/scripts/run_daily_digest.py --source browser
 X_BEARER_TOKEN=... python3 twitter-digest/scripts/run_daily_digest.py --source api --handle <handle>
 ```
 
