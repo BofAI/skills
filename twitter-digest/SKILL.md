@@ -1,6 +1,6 @@
 ---
 name: twitter-digest
-description: Use when the user asks to generate an X/Twitter daily digest or says phrases such as "生成X日报", "生成 x 日报", "X日报", "推特日报", "Twitter digest", or wants an agent to analyze their own X/Twitter mentions, home timeline, visible direct messages, reply opportunities, and daily social-media summaries through API or local logged-in browser collection.
+description: Use when the user asks to generate an X/Twitter daily digest or says phrases such as "生成X日报", "生成 x 日报", "X日报", "推特日报", "Twitter digest", or wants an agent to analyze their own X/Twitter mentions, home timeline, reply opportunities, and daily social-media summaries. Default collection is API-first; browser and visible DM collection are only for explicit browser/DM requests.
 ---
 
 # X/Twitter Digest
@@ -30,7 +30,7 @@ For summary writing, read the installed current-run context with the agent's fil
 
 Do not use `cat`, `head`, `tail`, `grep`, `sed`, `python3 -c`, or temporary scripts to read or inspect `digest-context.*` / `digest-input.*` during normal analysis. Those shell reads cause extra Claude Code Bash permission prompts and may expose private DM text in command output.
 
-Load `references/x-twitter-digest.md` when you need implementation details, browser workflow rules, current-run context behavior, or the scoring rubric.
+Load `references/x-twitter-digest.md` when you need implementation details, API/browser workflow rules, current-run context behavior, or the scoring rubric.
 
 ## Data Collection
 
@@ -48,13 +48,14 @@ For chat usage, run the wrapper:
 RUN_DAILY_DIGEST
 ```
 
-`run_daily_digest.py` defaults to `--source auto`. Auto uses API. If saved OAuth2 user-context credentials, `X_BEARER_TOKEN`, or `TWITTER_BEARER_TOKEN` are missing or authentication is broken, it triggers API configuration and then retries API collection once. It must not fall back to browser on API errors. Treat API DM lookup as unavailable; do not use API output to decide whether the user has private messages.
+`run_daily_digest.py` defaults to `--source auto`. Auto uses API. If saved OAuth2 user-context credentials, `X_BEARER_TOKEN`, or `TWITTER_BEARER_TOKEN` are missing or authentication is broken, it triggers API configuration and then retries API collection once. It must not fall back to browser on API errors. Treat API DM lookup as unavailable; do not use API output to decide whether the user has private messages. A normal "生成日报" / "要" follow-up must run plain `RUN_DAILY_DIGEST`, never `RUN_DAILY_DIGEST --source browser`.
 
 Source isolation is strict:
 
 - API source runs only `api_x_digest.py`. It never starts a browser, never opens X pages, never reads the browser profile, and never supplements missing API data with browser data.
 - Browser source runs only `browser_x_digest.py`. It uses the dedicated browser profile and does not use saved API tokens or API collector output.
 - Default source is auto. It uses API-first lazy configuration. Browser is selected only by explicit `--source browser`.
+- Do not infer browser mode from words like "完整", "私信最完整", or an earlier comparison between API and browser. Use browser only when the user's latest instruction explicitly asks for browser mode, visible DMs, X Chat, or local browser collection.
 - If API output says DM needs browser confirmation, treat that as a data gap note only. It does not mean browser data was collected.
 
 If the user asks to configure API access, trigger the OAuth/user-token setup from chat:
@@ -83,7 +84,7 @@ CONFIGURE_API --clear
 
 All normal flows should be triggered from chat by the agent:
 
-- X 日报 / 生成日报: run `RUN_DAILY_DIGEST`; this uses API and configures API lazily when needed.
+- X 日报 / 生成日报 / 要: run `RUN_DAILY_DIGEST`; this uses API and configures API lazily when needed.
 - 用户已有 token / 输入 X token: run `RUN_DAILY_DIGEST --configure-api-token`.
 - 配置 X API / 给 app 授权: run `RUN_DAILY_DIGEST --configure-api`.
 - 验证 X API 配置: run `CONFIGURE_API --verify`.
@@ -189,7 +190,13 @@ When the user asks for an X daily digest or X 日报, run:
 RUN_DAILY_DIGEST
 ```
 
-If they ask to skip DMs:
+If they ask to skip DMs during a normal API daily digest, still run the normal API path because API mode does not collect DMs:
+
+```bash
+RUN_DAILY_DIGEST
+```
+
+If they explicitly ask for browser mode but want to skip DMs:
 
 ```bash
 RUN_DAILY_DIGEST --source browser --no-dms

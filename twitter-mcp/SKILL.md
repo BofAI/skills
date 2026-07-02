@@ -79,13 +79,13 @@ From the repository `skills/` directory:
 For a one-line Codex install from this beta tag:
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/BofAI/skills/v1.5.12-beta.4/twitter-mcp/install.sh | env X_MCP_REGISTER_CODEX=1 X_MCP_REGISTER_CLAUDE=0 sh
+curl -fsSL https://raw.githubusercontent.com/BofAI/skills/v1.5.12-beta.5/twitter-mcp/install.sh | env X_MCP_REGISTER_CODEX=1 X_MCP_REGISTER_CLAUDE=0 sh
 ```
 
 For a one-line Claude Code install from this beta tag:
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/BofAI/skills/v1.5.12-beta.4/twitter-mcp/install.sh | env X_MCP_REGISTER_CODEX=0 X_MCP_REGISTER_CLAUDE=1 sh
+curl -fsSL https://raw.githubusercontent.com/BofAI/skills/v1.5.12-beta.5/twitter-mcp/install.sh | env X_MCP_REGISTER_CODEX=0 X_MCP_REGISTER_CLAUDE=1 sh
 ```
 
 The installer:
