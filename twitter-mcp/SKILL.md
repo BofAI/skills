@@ -79,24 +79,37 @@ From the repository `skills/` directory:
 For a one-line Codex install from this beta tag:
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/BofAI/skills/v1.5.11/twitter-mcp/install.sh | env X_MCP_REGISTER_CODEX=1 X_MCP_REGISTER_CLAUDE=0 sh
+curl -fsSL https://raw.githubusercontent.com/BofAI/skills/v1.5.12-beta.12/twitter-mcp/install.sh | env X_MCP_REGISTER_CODEX=1 X_MCP_REGISTER_CLAUDE=0 sh
 ```
 
 For a one-line Claude Code install from this beta tag:
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/BofAI/skills/v1.5.11/twitter-mcp/install.sh | env X_MCP_REGISTER_CODEX=0 X_MCP_REGISTER_CLAUDE=1 sh
+curl -fsSL https://raw.githubusercontent.com/BofAI/skills/v1.5.12-beta.12/twitter-mcp/install.sh | env X_MCP_REGISTER_CODEX=0 X_MCP_REGISTER_CLAUDE=1 sh
 ```
 
 The installer:
 
 - Installs this `twitter-mcp` skill into the selected local skills directory.
+- Reinstalling is the upgrade path: it replaces the skill code and preserves the existing installed `.state` directory.
+- If the selected `X_MCP_APP_NAME` already has a usable `xurl` OAuth token, reinstall skips `npm install`, Client ID / Secret prompts, and OAuth browser authorization. Set `X_MCP_FORCE_CONFIGURE=1` only when the user explicitly wants to re-enter credentials or reauthorize.
 - Requires Node.js 18+ and npm. Node.js 20 LTS+ is recommended.
 - Installs `@xdevplatform/xurl` globally with npm.
 - Opens the X OAuth2 authorization flow.
 - Does not register the hosted X MCP bridge by default. To also register MCP, set `X_MCP_REGISTER_CODEX_MCP=1` or `X_MCP_REGISTER_CLAUDE_MCP=1`.
 
 When launched by Codex, Claude Code, or another non-interactive agent on macOS, the one-line installer immediately opens a real Terminal window and re-runs the full installation there. Node/npm checks, `xurl` installation, OAuth2 Client ID / Secret input, and browser authorization all happen in Terminal, not inside the agent permission sandbox. Do not ask the user to paste OAuth credentials into chat.
+
+## Uninstall
+
+Safe uninstall moves the installed skill to `.backups/` and preserves `.state`:
+
+```bash
+~/.codex/skills/twitter-mcp/uninstall.sh --client codex
+~/.claude/skills/twitter-mcp/uninstall.sh --client claude
+```
+
+By default, uninstall is symmetric with install: it moves the installed skill to `.backups/`, removes the matching `xapi` MCP registration, removes the `xmcp` xurl app plus tokens with `xurl auth apps remove xmcp`, and uninstalls the global `xurl` CLI with `npm uninstall -g @xdevplatform/xurl`. With `--purge-state`, it also removes `~/.xurl` so custom-named xurl apps and tokens cannot be reused after reinstall. Add `--keep-mcp-config`, `--keep-xurl-app`, `--keep-xurl`, or `--keep-xurl-config` only when intentionally preserving those pieces, and add `--purge-state` when the user explicitly wants local state and matching `.backups` entries removed permanently.
 
 ## Configuration
 

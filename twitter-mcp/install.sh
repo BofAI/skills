@@ -1,13 +1,15 @@
 #!/bin/sh
 set -eu
 
-TAG="${X_MCP_INSTALL_TAG:-v1.5.11}"
+TAG="${X_MCP_INSTALL_TAG:-v1.5.12-beta.12}"
 BASE_URL="${X_MCP_INSTALL_BASE_URL:-https://raw.githubusercontent.com/BofAI/skills/${TAG}/twitter-mcp}"
 REGISTER_CODEX="${X_MCP_REGISTER_CODEX:-1}"
 REGISTER_CLAUDE="${X_MCP_REGISTER_CLAUDE:-auto}"
 REGISTER_CODEX_MCP="${X_MCP_REGISTER_CODEX_MCP:-0}"
 REGISTER_CLAUDE_MCP="${X_MCP_REGISTER_CLAUDE_MCP:-0}"
 OPEN_TERMINAL="${X_MCP_OPEN_TERMINAL:-auto}"
+APP_NAME="${X_MCP_APP_NAME:-xmcp}"
+APP_NAME_EXPLICIT="${X_MCP_APP_NAME+x}"
 
 info() {
   printf '==> %s\n' "$1"
@@ -49,8 +51,40 @@ running_under_agent() {
   return 1
 }
 
+xurl_app_exists() {
+  if ! command_exists xurl; then
+    return 1
+  fi
+  xurl auth apps list 2>/dev/null | sed -n 's/^▸ \([^ ]*\).*/\1/p' | grep -Fx "$APP_NAME" >/dev/null 2>&1
+}
+
+infer_app_name_if_needed() {
+  if [ -n "$APP_NAME_EXPLICIT" ] || ! command_exists xurl; then
+    return 0
+  fi
+  apps="$(xurl auth apps list 2>/dev/null | sed -n 's/^▸ \([^ ]*\).*/\1/p' | sort -u || true)"
+  app_count="$(printf '%s\n' "$apps" | sed '/^$/d' | wc -l | tr -d ' ')"
+  if [ "$app_count" = "1" ]; then
+    APP_NAME="$(printf '%s\n' "$apps" | sed -n '/^$/!{p;q;}')"
+    info "Using existing xurl app '${APP_NAME}'. Set X_MCP_APP_NAME to override."
+  fi
+}
+
+xurl_oauth_ready() {
+  if [ "${X_MCP_FORCE_CONFIGURE:-0}" = "1" ] || [ "${X_MCP_FORCE_CONFIGURE:-}" = "true" ]; then
+    return 1
+  fi
+  if ! xurl_app_exists; then
+    return 1
+  fi
+  xurl token --app "$APP_NAME" >/dev/null 2>&1
+}
+
 should_open_terminal() {
   if [ "${X_MCP_TERMINAL_CHILD:-}" = "1" ]; then
+    return 1
+  fi
+  if xurl_oauth_ready; then
     return 1
   fi
   case "$OPEN_TERMINAL" in
@@ -78,7 +112,7 @@ open_self_in_terminal_and_exit() {
   for arg in "$@"; do
     args_text="${args_text} $(shell_quote "$arg")"
   done
-  command_text="cd ~ && TMPDIR=\"\$(mktemp -d)\" && INSTALL_SH=\"\$TMPDIR/twitter-mcp-install.sh\" && curl -fsSL $(shell_quote "$installer_url") -o \"\$INSTALL_SH\" && chmod 700 \"\$INSTALL_SH\" && env X_MCP_TERMINAL_CHILD=1 X_MCP_OPEN_TERMINAL=0 X_MCP_INSTALL_TAG=$(shell_quote "$TAG") X_MCP_INSTALL_BASE_URL=$(shell_quote "$BASE_URL") X_MCP_REGISTER_CODEX=$(shell_quote "$REGISTER_CODEX") X_MCP_REGISTER_CLAUDE=$(shell_quote "$REGISTER_CLAUDE") X_MCP_REGISTER_CODEX_MCP=$(shell_quote "$REGISTER_CODEX_MCP") X_MCP_REGISTER_CLAUDE_MCP=$(shell_quote "$REGISTER_CLAUDE_MCP") /bin/sh \"\$INSTALL_SH\"${args_text}; printf '\\nPress Enter to close this window...'; IFS= read -r _"
+  command_text="cd ~ && TMPDIR=\"\$(mktemp -d)\" && INSTALL_SH=\"\$TMPDIR/twitter-mcp-install.sh\" && curl -fsSL $(shell_quote "$installer_url") -o \"\$INSTALL_SH\" && chmod 700 \"\$INSTALL_SH\" && env X_MCP_TERMINAL_CHILD=1 X_MCP_OPEN_TERMINAL=0 X_MCP_INSTALL_TAG=$(shell_quote "$TAG") X_MCP_INSTALL_BASE_URL=$(shell_quote "$BASE_URL") X_MCP_REGISTER_CODEX=$(shell_quote "$REGISTER_CODEX") X_MCP_REGISTER_CLAUDE=$(shell_quote "$REGISTER_CLAUDE") X_MCP_REGISTER_CODEX_MCP=$(shell_quote "$REGISTER_CODEX_MCP") X_MCP_REGISTER_CLAUDE_MCP=$(shell_quote "$REGISTER_CLAUDE_MCP") X_MCP_APP_NAME=$(shell_quote "$APP_NAME") X_MCP_FORCE_CONFIGURE=$(shell_quote "${X_MCP_FORCE_CONFIGURE:-0}") /bin/sh \"\$INSTALL_SH\"${args_text}; printf '\\nPress Enter to close this window...'; IFS= read -r _"
   osascript >/dev/null <<OSA
 tell application "Terminal"
   activate
@@ -88,6 +122,8 @@ OSA
   info "Opened Terminal for twitter-mcp installation. Continue there."
   exit 0
 }
+
+infer_app_name_if_needed
 
 if should_open_terminal; then
   open_self_in_terminal_and_exit "$@"
@@ -116,6 +152,8 @@ download_file() {
   fi
 }
 
+RESTORED_BACKUP=""
+
 should_install_claude_skill() {
   if truthy "$REGISTER_CLAUDE"; then
     return 0
@@ -129,6 +167,7 @@ should_install_claude_skill() {
 backup_existing_skill() {
   target="$1"
   skills_dir="$2"
+  RESTORED_BACKUP=""
   if [ ! -e "$target" ] && [ ! -L "$target" ]; then
     return 0
   fi
@@ -145,7 +184,24 @@ backup_existing_skill() {
   if [ -f "$backup/SKILL.md" ]; then
     mv "$backup/SKILL.md" "$backup/SKILL.md.disabled"
   fi
+  RESTORED_BACKUP="$backup"
   info "Existing twitter-mcp skill moved to $backup"
+}
+
+restore_state_from_backup() {
+  backup="$1"
+  target="$2"
+  if [ -z "$backup" ]; then
+    return 0
+  fi
+  if [ ! -d "$backup/.state" ]; then
+    return 0
+  fi
+  if [ -e "$target/.state" ] || [ -L "$target/.state" ]; then
+    return 0
+  fi
+  cp -R "$backup/.state" "$target/.state"
+  info "Preserved existing state: $target/.state"
 }
 
 install_skill_copy() {
@@ -156,12 +212,14 @@ install_skill_copy() {
   mkdir -p "$staging/scripts" "$staging/agents"
   download_file "${BASE_URL%/}/SKILL.md" "$staging/SKILL.md"
   download_file "${BASE_URL%/}/install.sh" "$staging/install.sh"
+  download_file "${BASE_URL%/}/uninstall.sh" "$staging/uninstall.sh"
   download_file "${BASE_URL%/}/agents/openai.yaml" "$staging/agents/openai.yaml"
   download_file "${BASE_URL%/}/scripts/install_xmcp.sh" "$staging/scripts/install_xmcp.sh"
-  chmod 700 "$staging/install.sh" "$staging/scripts/install_xmcp.sh"
+  chmod 700 "$staging/install.sh" "$staging/uninstall.sh" "$staging/scripts/install_xmcp.sh"
   mkdir -p "$skills_dir"
   backup_existing_skill "$target" "$skills_dir"
   mv "$staging" "$target"
+  restore_state_from_backup "$RESTORED_BACKUP" "$target"
   info "Installed twitter-mcp skill to $target"
 }
 
@@ -176,4 +234,4 @@ fi
 download_file "$INSTALLER_URL" "$INSTALLER"
 
 chmod 700 "$INSTALLER"
-X_MCP_REGISTER_CODEX="$REGISTER_CODEX_MCP" X_MCP_REGISTER_CLAUDE="$REGISTER_CLAUDE_MCP" exec /bin/bash "$INSTALLER" "$@"
+X_MCP_REGISTER_CODEX="$REGISTER_CODEX_MCP" X_MCP_REGISTER_CLAUDE="$REGISTER_CLAUDE_MCP" X_MCP_APP_NAME="$APP_NAME" X_MCP_FORCE_CONFIGURE="${X_MCP_FORCE_CONFIGURE:-0}" exec /bin/bash "$INSTALLER" "$@"

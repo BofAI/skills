@@ -10,7 +10,7 @@ from __future__ import annotations
 
 import datetime as dt
 import time
-from typing import Any
+from typing import Any, Optional
 
 from cdp_client import cdp_call, cdp_eval, wait_for_cdp_page_ws
 from dom_script_loader import load_dom_script
@@ -128,7 +128,7 @@ def extract_main_text(ws_url: str) -> str:
     value = cdp_eval(ws_url, script)
     return str(value or "")
 
-def detect_handle(port: int) -> str | None:
+def detect_handle(port: int) -> Optional[str]:
     try:
         ws_url = wait_for_cdp_page_ws(port)
         cdp_call(ws_url, "Page.enable")

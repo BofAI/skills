@@ -8,7 +8,7 @@ twitter-digest/RUNBOOK.md
 
 ## 1. 功能
 
-`twitter-digest` 默认 `--source auto`：如果用户已经配置过 X API，就通过 API 读取公开数据并生成中文日报；如果没有配置过 API，才通过本地已登录浏览器读取。用户主动要求浏览器或显式传入 `--source browser` 时强制浏览器。
+`twitter-digest` 默认 `--source auto`：已配置 API 时通过 API 读取公开数据并生成中文日报；未配置 API 时使用浏览器采集。API 已配置但认证失效时，会先触发 API 重配置，配置成功后继续 API 采集。用户主动要求浏览器或显式传入 `--source browser` 时强制浏览器。
 
 采集内容按来源区分：
 
@@ -64,10 +64,10 @@ twitter-digest/.state/run/digest-context.md
 
 ## 3. 运行规则
 
-- 默认入口 `run_daily_digest.py`：自动选择来源。已保存 OAuth2 user-context API 配置或环境里有 `X_BEARER_TOKEN` / `TWITTER_BEARER_TOKEN` 时走 API；没有 API 配置时走浏览器。
+- 默认入口 `run_daily_digest.py`：自动选择来源。已配置 API 时走 API；未配置 API 时走浏览器；API 已配置但认证失效时自动进入配置流程，配置成功后继续 API 采集。
 - 用户主动要求浏览器或命令显式 `--source browser` 时强制浏览器；API 模式只抓公开数据，不打开浏览器。
-- DM / X Chat 以本地浏览器抓取为准；API DM 现阶段仅保留为 TODO/调试，不用于判断是否有私信。
-- API 不可用、权限不足、tier 不支持或限流时，记录数据缺口或失败，不回退浏览器路径。
+- DM / X Chat 以本地浏览器抓取为准；API 模式不用于判断是否有私信。
+- API 认证类错误会触发一次重配；权限不足、tier 不支持、限流或其他 API 错误记录数据缺口或失败，不回退浏览器路径。
 - 不要求用户复制 cookie 或 token。
 - 默认 headless 运行。
 - 第一次没有登录态时，会自动打开可见浏览器让用户登录。
@@ -85,19 +85,22 @@ twitter-digest/.state/run/digest-context.md
    python3 twitter-digest/scripts/run_daily_digest.py
    ```
 
-2. 脚本先尝试用 headless 浏览器读取保存的登录态。
+2. 脚本检查 API 配置；如果缺失，走浏览器；如果已配置但认证失效，打开 API 重配置流程。
 
-3. 如果没有登录态，脚本自动打开可见浏览器窗口。
+3. 用户在配置流程里输入 Client ID / Secret 并完成 X OAuth 授权。
 
-4. 用户在该浏览器窗口里登录 X。
+4. 脚本保存并验证 API 配置。
 
-5. 脚本检测登录成功。
+5. 脚本继续用 API 采集 timeline、mentions、own profile 等公开数据。
 
-6. 脚本自动识别当前 X 账号 handle；如果 headless 识别失败，会打开可见浏览器重试。
+如果用户显式使用 `--source browser`：
 
-7. 如果仍无法识别 handle，脚本直接停止并要求用户带 `--handle <用户名>` 重跑，不能生成缺 `@你` 和自己动态的日报。
-
-8. 识别成功后，脚本采集 timeline、mentions、own profile、DM。
+1. 脚本先尝试用 headless 浏览器读取保存的登录态。
+2. 如果没有登录态，脚本自动打开可见浏览器窗口。
+3. 用户在该浏览器窗口里登录 X。
+4. 脚本自动识别当前 X 账号 handle；如果 headless 识别失败，会打开可见浏览器重试。
+5. 如果仍无法识别 handle，脚本直接停止并要求用户带 `--handle <用户名>` 重跑，不能生成缺 `@你` 和自己动态的日报。
+6. 识别成功后，脚本采集 timeline、mentions、own profile、DM。
 
 9. 脚本生成 `twitter-digest/.state/run/*` 当次采集文件。
 
@@ -190,13 +193,13 @@ python3 twitter-digest/scripts/run_daily_digest.py
 跳过 DM：
 
 ```bash
-python3 twitter-digest/scripts/run_daily_digest.py --no-dms
+python3 twitter-digest/scripts/run_daily_digest.py --source browser --no-dms
 ```
 
 强制显示浏览器窗口：
 
 ```bash
-python3 twitter-digest/scripts/run_daily_digest.py --headed
+python3 twitter-digest/scripts/run_daily_digest.py --source browser --headed
 ```
 
 无人值守定时运行：
@@ -208,7 +211,7 @@ python3 twitter-digest/scripts/run_daily_digest.py --non-interactive
 增加滚动覆盖：
 
 ```bash
-python3 twitter-digest/scripts/run_daily_digest.py --scrolls 5
+python3 twitter-digest/scripts/run_daily_digest.py --source browser --scrolls 5
 ```
 
 增加关键词搜索：

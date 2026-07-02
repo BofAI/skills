@@ -30,9 +30,8 @@ scripts/browser_x_digest.py
 
 适合：
 
-- 无 API 配置的普通用户。
 - 需要读取 X Chat / DM 内容的场景。
-- 没有 API 配置时的默认来源，或用户显式选择浏览器模式时使用。
+- 用户显式选择浏览器模式时使用。
 
 ### 2. API 抓取脚本
 
@@ -45,7 +44,7 @@ scripts/api_x_digest.py
 - 使用已保存的 OAuth2 user-context token，或 `X_BEARER_TOKEN` / `TWITTER_BEARER_TOKEN` / `--bearer-token` 传入的 OAuth2 user token。
 - 主路径是 OAuth2 PKCE：用户准备 X App 的 `Client ID`，使用 `python3 ~/.claude/skills/twitter-digest/scripts/run_daily_digest.py --configure-api` 让脚本打开授权页并通过本地 callback 换取 user access token / refresh token。
 - 如果用户已经有 OAuth2 user access token，使用 `python3 ~/.claude/skills/twitter-digest/scripts/run_daily_digest.py --configure-api-token` 由脚本安全保存。
-- OAuth1 不再作为日报 API 配置路径，因为它不能可靠读取 DM；需要完整 DM 时走 OAuth2，API DM 拿不到时走浏览器脚本。
+- OAuth1 不再作为日报 API 配置路径，因为它不能可靠读取 DM；需要完整 DM 时必须显式使用浏览器模式，API DM 拿不到时不能自动补采浏览器。
 - 读取 home timeline：`/2/users/:id/timelines/reverse_chronological`。
 - 读取用户公开发帖。
 - 读取 mentions。
@@ -55,12 +54,12 @@ scripts/api_x_digest.py
 
 适合：
 
-- 用户显式选择 API，且需要更稳定公开数据的场景。
+- 普通日报默认公开数据采集。
 - 定时任务中减少浏览器页面变化影响。
 
 限制：
 
-- `run_daily_digest.py` 的正常日报路径不使用 API DM 做最终判断；DM / X Chat 一律由浏览器脚本读取。
+- `run_daily_digest.py` 的正常日报路径不使用 API DM 做最终判断；DM / X Chat 只在显式浏览器模式中读取。
 - `api_x_digest.py --include-dms` 保留为 TODO/调试路径：它会尝试 `/2/dm_events`，但结果只作为 API 可见事件参考。
 - Home timeline endpoint 需要可访问该用户上下文的 token；如果账号权限、套餐或 token 类型不支持，会在 `home` 页面写入具体 `collection_error`。
 - App-only API key / app-only bearer token 不等于用户授权，不能保证读取用户 home timeline 或 DM。
@@ -79,10 +78,9 @@ scripts/run_daily_digest.py
 - 统一入口。
 - 提供 `--configure-api`，由 Agent 在对话里触发 OAuth 配置。
 - 默认 `--source auto`。
-- 如果检测到环境变量 token，或 `.state/api_config.json` 里保存的 OAuth2 user-context 配置，走 API 抓取。
-- 如果没有 API token，走浏览器抓取。
+- 默认自动选择来源：已配置 API 时走 API；未配置 API 时走浏览器；API 已配置但认证失效时先触发 API 重配置，配置成功后继续 API 抓取。
 - 用户主动要求浏览器或命令显式传入 `--source browser` 时，强制浏览器抓取。
-- API source 已选择时不启动浏览器，不自动回退浏览器；API 不可用时失败或写入 data gap。
+- API source 已选择时不启动浏览器，不自动回退浏览器；认证类错误会触发一次重配，其他 API 不可用情况失败或写入 data gap。
 - 如果 OAuth2 access token 快过期且保存了 refresh token，自动刷新后再抓取。
 - 抓取完成后调用 `digest_context.py` 生成 `digest-context.*`。
 
@@ -91,7 +89,7 @@ scripts/run_daily_digest.py
 ```text
 --source api      -> 强制 API，只采公开数据，不启动浏览器
 --source browser  -> 强制浏览器，采公开网页和可见 X Chat / DM
---source auto     -> 默认自动模式；有 X_BEARER_TOKEN/TWITTER_BEARER_TOKEN 或已保存 OAuth2 user token 用 API，否则浏览器；API 已配置时不回退浏览器
+--source auto     -> 默认自动模式；已配置 API 时走 API；未配置 API 时走浏览器；API 已配置但认证坏了就配置后继续 API；不自动回退浏览器
 ```
 
 隔离规则：
@@ -99,6 +97,7 @@ scripts/run_daily_digest.py
 - API 来源只运行 `api_x_digest.py`，不启动浏览器、不读取浏览器 profile、不用浏览器补采 API 缺口。
 - 浏览器来源只运行 `browser_x_digest.py`，不读取 API token、不合并 API collector 输出。
 - 默认 `--source auto` 每次只选择一个来源，不合并 API 和浏览器两边的数据。
+- 来源不是会话状态，不能继承上一轮。上一次用浏览器不代表下一次普通“日报”继续浏览器；上一次用 API 也不要求特殊命令。每次新日报都重新运行默认入口，由脚本按当前 API 配置选择来源。
 - API 输出里的“需要浏览器确认 DM”只能作为 data gap 提示，不表示本次已经读取了浏览器 DM。
 
 ## 对话触发流程
@@ -115,7 +114,7 @@ scripts/browser_x_digest.py  -> 浏览器抓取：公开网页 + X Chat / 加密
 ```text
 用户：生成 X 日报
 Agent：运行 scripts/run_daily_digest.py
-脚本：自动选择 API 或浏览器，生成 digest-context.md
+脚本：默认自动选择来源；已配置 API 时走 API，未配置 API 时走浏览器；API 已配置但认证失效时先重配 API，然后继续 API 采集；生成 digest-context.md
 Agent：读取 digest-context.md 写中文日报
 ```
 
@@ -148,18 +147,16 @@ Agent：运行 `python3 ~/.claude/skills/twitter-digest/scripts/run_daily_digest
 ```text
 用户：生成 X 日报
 Agent：运行 scripts/run_daily_digest.py
-脚本：默认 auto；有 API 配置则使用 API，否则使用浏览器，生成 digest-context.md
-脚本：只有显式 `--source browser` 时才在有 API 配置的情况下强制浏览器
+脚本：默认 auto；已配置 API 时使用 API，未配置 API 时使用浏览器；API 已配置但认证失效时先重配 API，然后继续 API 采集；生成 digest-context.md
+脚本：只有显式 `--source browser` 时才强制浏览器
 Agent：读取 digest-context.md 写中文日报
 ```
 
 如果凭据失效：
 
 ```text
-脚本：如果显式使用 API，则把 API endpoint 错误写入 data gap
-Agent：告知用户需要重新配置/授权
-用户：在对话里说“重新配置 X API”
-Agent：再次运行 `python3 ~/.claude/skills/twitter-digest/scripts/run_daily_digest.py --configure-api`
+脚本：认证类错误会打开 API 配置并重试一次
+脚本：权限、tier、限流或 endpoint 不可用时写入 data gap 或失败，不回退浏览器
 ```
 
 清除 API：
@@ -167,7 +164,7 @@ Agent：再次运行 `python3 ~/.claude/skills/twitter-digest/scripts/run_daily_
 ```text
 用户：清除 X API 配置
 Agent：运行 `python3 ~/.claude/skills/twitter-digest/scripts/configure_api.py --clear`
-后续：`python3 ~/.claude/skills/twitter-digest/scripts/run_daily_digest.py` 因没有 API 配置而使用浏览器抓取
+后续：`python3 ~/.claude/skills/twitter-digest/scripts/run_daily_digest.py` 因为没有 API 配置会走浏览器；如需重新走 API，用户需要再次配置 API
 ```
 
 ## 标准输出结构
@@ -219,7 +216,7 @@ DM page 尽量包含：
 
 API DM TODO / 调试规则：
 
-- 正常日报不使用 API DM 做最终判断；`run_daily_digest.py` 会用浏览器补 DM。
+- 正常日报不使用 API DM 做最终判断；`run_daily_digest.py` 不会用浏览器补 DM，除非显式传入 `--source browser`。
 - 只有直接运行 `api_x_digest.py --include-dms` 做调试时，才调用 `/2/dm_events`。
 - 按 `dm_conversation_id` 分组。
 - 只把最后一条不是用户发出的会话正文放进 `dm_threads`，用于判断是否需要回复。
@@ -244,7 +241,7 @@ API DM TODO / 调试规则：
 - 每个页面独立采集，某个 endpoint 失败不会阻塞其他页面。
 - API 错误写入页面级 `collection_error`。
 - Home timeline 会先尝试官方 timeline endpoint，只有 endpoint 返回权限/额度/可用性错误时才进入 data gap。
-- 没有 API token 时不报错；上层仅在完全没有 API 配置时使用浏览器。
+- 没有 API token 且没有 API 配置时，上层入口走浏览器；已有 API 配置但认证失效时，上层入口触发 API 重配置并继续 API 采集；不自动回退浏览器。
 
 ### 上层摘要
 
@@ -255,7 +252,7 @@ API DM TODO / 调试规则：
 
 ## 常用命令
 
-自动选择：
+默认自动模式：
 
 ```bash
 python3 twitter-digest/scripts/run_daily_digest.py

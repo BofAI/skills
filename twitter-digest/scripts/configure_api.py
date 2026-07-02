@@ -19,6 +19,7 @@ import urllib.parse
 import urllib.request
 import webbrowser
 from pathlib import Path
+from typing import Optional
 
 from api_config_store import API_CONFIG_PATH, DEFAULT_API_BASE, clear_api_config, load_api_config, refresh_oauth_token_if_needed, save_api_config
 from script_utils import display_path, open_script_in_terminal, rerun_from_installed_if_needed
@@ -47,7 +48,7 @@ def parse_args() -> argparse.Namespace:
     return parser.parse_args()
 
 
-def apple_prompt(prompt: str, hidden: bool = False, buttons: list[str] | None = None) -> str | None:
+def apple_prompt(prompt: str, hidden: bool = False, buttons: Optional[list[str]] = None) -> Optional[str]:
     if platform.system() != "Darwin":
         return None
     button_list = buttons or ["Cancel", "Save"]

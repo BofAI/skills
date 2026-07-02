@@ -1,6 +1,6 @@
 # X/Twitter Digest
 
-Skill for generating a Chinese daily digest from a user's own X/Twitter account. It defaults to API collection after X API is configured, otherwise it uses a saved local browser session.
+Skill for generating a Chinese daily digest from a user's own X/Twitter account. The main command is automatic: it uses saved X API credentials when configured, otherwise it uses browser collection. Browser collection can also be requested explicitly.
 
 ## Quick Install
 
@@ -15,7 +15,7 @@ python3 twitter-digest/scripts/install.py
 To ask Codex to install this skill for itself, paste this into Codex:
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/BofAI/skills/v1.5.11/twitter-digest/install.sh | env TWITTER_DIGEST_INSTALL_CLIENT=codex sh
+curl -fsSL https://raw.githubusercontent.com/BofAI/skills/v1.5.12-beta.12/twitter-digest/install.sh | env TWITTER_DIGEST_INSTALL_CLIENT=codex sh
 ```
 
 When this one-line installer is launched from Codex, Claude Code, or another non-interactive agent on macOS, it opens a real Terminal window and re-runs the full installation there. This avoids agent permission/inspect prompts during `git clone`, Python checks, browser checks, and installer writes. Set `TWITTER_DIGEST_OPEN_TERMINAL=0` only when intentionally running in an already interactive Terminal or CI.
@@ -29,13 +29,13 @@ git clone git@github.com:BofAI/skills.git bofai-skills \
   && cd bofai-skills \
   && python3 twitter-digest/scripts/install.py --client codex
 
-安装后请确认 ~/.codex/skills/twitter-digest 存在。首次运行日报时，如果弹出浏览器，请让我登录 X。
+安装后请确认 ~/.codex/skills/twitter-digest 存在。首次运行日报时，如果缺少 X API 配置，请打开配置流程并让我完成授权；只有我明确要求浏览器模式时才打开 X 登录浏览器。
 ```
 
 To ask Claude Code to install this skill for itself, paste this into Claude Code:
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/BofAI/skills/v1.5.11/twitter-digest/install.sh | env TWITTER_DIGEST_INSTALL_CLIENT=claude TWITTER_DIGEST_ALLOW_CLAUDE_COMMANDS=1 TWITTER_DIGEST_ALLOW_CLAUDE_STATE_READ=1 sh
+curl -fsSL https://raw.githubusercontent.com/BofAI/skills/v1.5.12-beta.12/twitter-digest/install.sh | env TWITTER_DIGEST_INSTALL_CLIENT=claude TWITTER_DIGEST_ALLOW_CLAUDE_COMMANDS=1 TWITTER_DIGEST_ALLOW_CLAUDE_STATE_READ=1 sh
 ```
 
 Or use the natural-language prompt:
@@ -47,7 +47,7 @@ git clone git@github.com:BofAI/skills.git bofai-skills \
   && cd bofai-skills \
   && python3 twitter-digest/scripts/install.py --client claude --allow-claude-commands --allow-claude-state-read
 
-安装后请确认 ~/.claude/skills/twitter-digest 存在。首次运行日报时，如果 Claude Code 弹出 Bash 授权，批准 `python3 ~/.claude/skills/twitter-digest/scripts/run_daily_digest.py`；如果弹出浏览器，请让我登录 X。
+安装后请确认 ~/.claude/skills/twitter-digest 存在。首次运行日报时，如果 Claude Code 弹出 Bash 授权，批准 `python3 ~/.claude/skills/twitter-digest/scripts/run_daily_digest.py`；如果缺少 X API 配置，请打开配置流程并让我完成授权。只有我明确要求浏览器模式时才打开 X 登录浏览器。
 ```
 
 The installer chooses the target by client:
@@ -57,9 +57,20 @@ Codex: ~/.codex/skills/twitter-digest
 Claude Code: ~/.claude/skills/twitter-digest
 ```
 
-It also checks for Python 3.10+ and a supported Chromium browser: Google Chrome, Chromium, Microsoft Edge, or Brave.
-Reinstalling preserves the existing installed `.state` directory, including saved API and browser-session settings. The installer still excludes `.state` from the development checkout.
-After installation, configure and run the installed copy. If a script is accidentally started from a temporary clone while an installed copy exists, it automatically re-runs the installed copy so state is saved under `~/.claude/skills/twitter-digest/.state` or `~/.codex/skills/twitter-digest/.state`.
+It also checks for Python 3.9+ and a supported Chromium browser: Google Chrome, Chromium, Microsoft Edge, or Brave. The installer does not install or upgrade Python or browsers; if a prerequisite is missing, install it and rerun the same install command.
+Reinstalling is the upgrade path: it replaces the skill code and preserves the existing installed `.state` directory, including saved API and browser-session settings. The installer still excludes `.state` from the development checkout.
+After installation, run the installed copy. If a script is accidentally started from a temporary clone while an installed copy exists, it automatically re-runs the installed copy so state is saved under `~/.claude/skills/twitter-digest/.state` or `~/.codex/skills/twitter-digest/.state`.
+
+## Uninstall
+
+Safe uninstall moves the installed skill to `.backups/` and preserves `.state`:
+
+```bash
+~/.codex/skills/twitter-digest/uninstall.sh --client codex
+~/.claude/skills/twitter-digest/uninstall.sh --client claude
+```
+
+To permanently remove the installed skill, `.state`, and matching `.backups` entries, add `--purge-state`.
 
 Use one stable installed command form for normal runs. This prevents repeated Claude Code Bash permission prompts across different projects:
 
@@ -76,7 +87,7 @@ Claude Code cannot let a skill silently grant itself Bash permission or file acc
 python3 ~/.claude/skills/twitter-digest/scripts/run_daily_digest.py
 ```
 
-On first run, a dedicated browser profile opens. Log in to X once in that browser. Later runs reuse the saved profile and default to headless collection.
+On first run, the script checks X API configuration. If API credentials are missing, it uses browser collection. If API credentials are configured, a normal digest request or short follow-up such as "要", "日报", "继续", or "生成" uses API. Use browser source explicitly when you want local browser collection, visible DMs, or X Chat after API has been configured.
 
 ## Data Collection Sources
 
@@ -95,9 +106,10 @@ python3 ~/.claude/skills/twitter-digest/scripts/run_daily_digest.py
 
 `run_daily_digest.py` defaults to `--source auto`:
 
-- A normal daily run uses API when saved API credentials or `X_BEARER_TOKEN` / `TWITTER_BEARER_TOKEN` exist.
-- If no API credentials exist, it uses the browser collector.
-- Use `--source browser` only when the user explicitly wants browser collection.
+- A normal daily run uses API when API credentials are configured.
+- If no API credentials are configured, a normal daily run uses browser collection.
+- If API credentials are configured but authentication is broken, it opens API configuration and then retries API collection once.
+- Use `--source browser` when the user explicitly wants browser collection after API has been configured.
 
 Source isolation:
 
@@ -106,10 +118,9 @@ Source isolation:
 - Default `--source auto` picks one source for the run and does not merge API and browser data.
 - API DM data gaps are notes only; they do not mean browser DM data was collected.
 
-Force a source:
+Force API source:
 
 ```bash
-python3 ~/.claude/skills/twitter-digest/scripts/run_daily_digest.py --source browser
 X_BEARER_TOKEN=... python3 ~/.claude/skills/twitter-digest/scripts/run_daily_digest.py --source api --handle <handle>
 ```
 
@@ -139,7 +150,7 @@ python3 ~/.claude/skills/twitter-digest/scripts/run_daily_digest.py --configure-
 
 The script opens a hidden system prompt for the token, then asks for optional handle/user id and saves the config locally.
 
-OAuth1 is no longer exposed as a normal setup path for this skill because it did not reliably return DM data during validation. Use OAuth2 with user-context scopes for API collection; otherwise rely on the browser collector.
+OAuth1 is no longer exposed as a normal setup path for this skill because it did not reliably return DM data during validation. Use OAuth2 with user-context scopes for API collection; use explicit browser mode when visible X Chat / DM collection is required.
 
 The app's callback URL in X Developer Portal must match the redirect URI shown by the script, by default:
 
@@ -161,13 +172,13 @@ On macOS prompts appear as system dialogs; non-GUI terminals fall back to hidden
 twitter-digest/.state/api_config.json
 ```
 
-The file is created with owner-only permissions where supported. Later normal runs read this saved config and use API without opening the browser. Use `run_daily_digest.py --source browser` only when the user explicitly wants browser collection. To clear API config:
+The file is created with owner-only permissions where supported. Later normal runs read this saved config and use API without opening the browser. If this file is absent, normal runs use browser collection. Use `run_daily_digest.py --source browser` when the user explicitly wants browser collection after API has been configured. To clear API config:
 
 ```bash
 python3 ~/.claude/skills/twitter-digest/scripts/configure_api.py --clear
 ```
 
-If OAuth returns a refresh token, later API-source runs refresh the saved access token automatically before collection.
+If OAuth returns a refresh token, later API-source runs refresh the saved access token automatically before collection. If refresh/authentication fails, the main collection command reopens API configuration and retries once.
 
 Chat flow summary:
 

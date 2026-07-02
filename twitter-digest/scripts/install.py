@@ -11,6 +11,7 @@ import shutil as shutil_module
 import shutil
 import sys
 from pathlib import Path
+from typing import Optional
 
 from script_utils import display_path
 
@@ -81,7 +82,7 @@ def browser_candidates() -> list[str]:
     ]
 
 
-def find_supported_browser() -> str | None:
+def find_supported_browser() -> Optional[str]:
     for candidate in browser_candidates():
         path = Path(candidate).expanduser()
         if path.is_absolute() and path.exists():
@@ -93,8 +94,8 @@ def find_supported_browser() -> str | None:
 
 
 def check_runtime(skip_browser_check: bool) -> None:
-    if sys.version_info < (3, 10):
-        raise SystemExit("Python 3.10+ is required to run twitter-digest.")
+    if sys.version_info < (3, 9):
+        raise SystemExit("Python 3.9+ is required to run twitter-digest. Install or switch python3, then rerun this installer.")
     if skip_browser_check:
         print("Skipped browser check. Runtime still requires Chrome, Chromium, Edge, or Brave.", flush=True)
         return
@@ -138,7 +139,7 @@ def move_to_hidden_backup(path: Path, skills_dir: Path, dry_run: bool) -> Path:
     return backup
 
 
-def restore_state_from_backup(backup: Path | None, target: Path) -> None:
+def restore_state_from_backup(backup: Optional[Path], target: Path) -> None:
     if not backup:
         return
     state_dir = backup / ".state"
@@ -168,7 +169,7 @@ def install_skill(root: Path, skills_dir: Path, copy: bool, dry_run: bool) -> Pa
         return target
     skills_dir.mkdir(parents=True, exist_ok=True)
     cleanup_legacy_installs(skills_dir, dry_run=False)
-    existing_backup: Path | None = None
+    existing_backup: Optional[Path] = None
     if target.is_symlink() or target.exists():
         if target.is_symlink() and target.resolve() == root and not copy:
             print(f"Skill already installed: {display_path(target)}", flush=True)

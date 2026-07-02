@@ -5,6 +5,7 @@ PACKAGE="${XMCP_PACKAGE:-@xdevplatform/xurl}"
 VERSION="${XMCP_VERSION:-latest}"
 INSTALL_SPEC="${PACKAGE}@${VERSION}"
 APP_NAME="${X_MCP_APP_NAME:-xmcp}"
+APP_NAME_EXPLICIT="${X_MCP_APP_NAME+x}"
 REDIRECT_URI="${X_MCP_REDIRECT_URI:-http://localhost:8080/callback}"
 SERVER_NAME="${X_MCP_SERVER_NAME:-xapi}"
 REGISTER_CODEX="${X_MCP_REGISTER_CODEX:-0}"
@@ -12,6 +13,7 @@ REGISTER_CLAUDE="${X_MCP_REGISTER_CLAUDE:-0}"
 CODEX_CONFIG="${CODEX_CONFIG:-$HOME/.codex/config.toml}"
 OPEN_TERMINAL="${X_MCP_OPEN_TERMINAL:-auto}"
 XURL_COMMAND="${X_MCP_XURL_COMMAND:-}"
+XURL_ALREADY_CONFIGURED=0
 
 info() {
   printf '==> %s\n' "$1"
@@ -79,8 +81,59 @@ running_under_agent() {
   return 1
 }
 
+xurl_app_exists() {
+  local command_path="$XURL_COMMAND"
+  if [ -z "$command_path" ]; then
+    command_path="$(resolve_command_path xurl || true)"
+  fi
+  if [ -z "$command_path" ] || [ ! -x "$command_path" ]; then
+    return 1
+  fi
+  "$command_path" auth apps list 2>/dev/null | sed -n 's/^▸ \([^ ]*\).*/\1/p' | grep -Fx "$APP_NAME" >/dev/null 2>&1
+}
+
+infer_app_name_if_needed() {
+  if [ -n "$APP_NAME_EXPLICIT" ]; then
+    return 0
+  fi
+  local command_path="$XURL_COMMAND"
+  if [ -z "$command_path" ]; then
+    command_path="$(resolve_command_path xurl || true)"
+  fi
+  if [ -z "$command_path" ] || [ ! -x "$command_path" ]; then
+    return 0
+  fi
+  local apps
+  apps="$("$command_path" auth apps list 2>/dev/null | sed -n 's/^▸ \([^ ]*\).*/\1/p' | sort -u || true)"
+  local app_count
+  app_count="$(printf '%s\n' "$apps" | sed '/^$/d' | wc -l | tr -d ' ')"
+  if [ "$app_count" = "1" ]; then
+    APP_NAME="$(printf '%s\n' "$apps" | sed -n '/^$/!{p;q;}')"
+    info "Using existing xurl app '${APP_NAME}'. Set X_MCP_APP_NAME to override."
+  fi
+}
+
+xurl_oauth_ready() {
+  if [ "${X_MCP_FORCE_CONFIGURE:-0}" = "1" ] || [ "${X_MCP_FORCE_CONFIGURE:-}" = "true" ]; then
+    return 1
+  fi
+  local command_path="$XURL_COMMAND"
+  if [ -z "$command_path" ]; then
+    command_path="$(resolve_command_path xurl || true)"
+  fi
+  if [ -z "$command_path" ] || [ ! -x "$command_path" ]; then
+    return 1
+  fi
+  xurl_app_exists && "$command_path" token --app "$APP_NAME" >/dev/null 2>&1
+}
+
+infer_app_name_if_needed
+
 should_open_terminal() {
   if [ "${X_MCP_TERMINAL_CHILD:-}" = "1" ]; then
+    return 1
+  fi
+  if xurl_oauth_ready; then
     return 1
   fi
   case "$OPEN_TERMINAL" in
@@ -207,59 +260,70 @@ if should_open_terminal; then
   open_in_terminal_and_exit
 fi
 
-if ! command_exists node; then
-  fail "Node.js is required before installing xurl. Install Node.js 18 or newer, then rerun this script."
-fi
-
-if ! command_exists npm; then
-  fail "npm is required before installing xurl. Install npm, then rerun this script."
-fi
-
-info "Installing ${INSTALL_SPEC}"
-npm install -g "${INSTALL_SPEC}"
-
 if [ -z "$XURL_COMMAND" ]; then
   XURL_COMMAND="$(resolve_command_path xurl || true)"
+fi
+
+if xurl_oauth_ready; then
+  XURL_ALREADY_CONFIGURED=1
+  info "Existing xurl app '${APP_NAME}' is already authorized; skipping xurl install and OAuth setup."
+else
+  if ! command_exists node; then
+    fail "Node.js is required before installing xurl. Install Node.js 18 or newer, then rerun this script."
+  fi
+
+  if ! command_exists npm; then
+    fail "npm is required before installing xurl. Install npm, then rerun this script."
+  fi
+
+  info "Installing ${INSTALL_SPEC}"
+  npm install -g "${INSTALL_SPEC}"
+
+  if [ -z "$XURL_COMMAND" ]; then
+    XURL_COMMAND="$(resolve_command_path xurl || true)"
+  fi
 fi
 
 if [ -z "$XURL_COMMAND" ] || [ ! -x "$XURL_COMMAND" ]; then
   fail "xurl was installed by npm, but the xurl command is not on PATH."
 fi
 
-info "Installed $("$XURL_COMMAND" --version 2>/dev/null || printf 'xurl') at ${XURL_COMMAND}"
+info "Using $("$XURL_COMMAND" --version 2>/dev/null || printf 'xurl') at ${XURL_COMMAND}"
 
-CLIENT_ID="${X_MCP_CLIENT_ID:-${X_OAUTH_CLIENT_ID:-}}"
-CLIENT_SECRET="${X_MCP_CLIENT_SECRET:-${X_OAUTH_CLIENT_SECRET:-}}"
+if [ "$XURL_ALREADY_CONFIGURED" != "1" ]; then
+  CLIENT_ID="${X_MCP_CLIENT_ID:-${X_OAUTH_CLIENT_ID:-}}"
+  CLIENT_SECRET="${X_MCP_CLIENT_SECRET:-${X_OAUTH_CLIENT_SECRET:-}}"
 
-if [ -z "$CLIENT_ID" ]; then
-  if [ ! -t 0 ]; then
-    fail "X_MCP_CLIENT_ID is required when stdin is not interactive."
+  if [ -z "$CLIENT_ID" ]; then
+    if [ ! -t 0 ]; then
+      fail "X_MCP_CLIENT_ID is required when stdin is not interactive."
+    fi
+    CLIENT_ID="$(prompt 'X OAuth Client ID')"
   fi
-  CLIENT_ID="$(prompt 'X OAuth Client ID')"
-fi
 
-if [ -z "$CLIENT_ID" ]; then
-  fail "X OAuth Client ID is required."
-fi
+  if [ -z "$CLIENT_ID" ]; then
+    fail "X OAuth Client ID is required."
+  fi
 
-if [ -z "${X_MCP_CLIENT_SECRET+x}" ] && [ -z "${X_OAUTH_CLIENT_SECRET+x}" ] && [ -t 0 ]; then
-  CLIENT_SECRET="$(prompt_secret 'X OAuth Client Secret (leave empty for public PKCE apps)')"
-fi
+  if [ -z "${X_MCP_CLIENT_SECRET+x}" ] && [ -z "${X_OAUTH_CLIENT_SECRET+x}" ] && [ -t 0 ]; then
+    CLIENT_SECRET="$(prompt_secret 'X OAuth Client Secret (leave empty for public PKCE apps)')"
+  fi
 
-if [ -t 0 ]; then
-  APP_NAME="$(prompt 'xurl app name' "$APP_NAME")"
-  REDIRECT_URI="$(prompt 'OAuth callback URL' "$REDIRECT_URI")"
-fi
+  if [ -t 0 ]; then
+    APP_NAME="$(prompt 'xurl app name' "$APP_NAME")"
+    REDIRECT_URI="$(prompt 'OAuth callback URL' "$REDIRECT_URI")"
+  fi
 
-info "Registering xurl OAuth app '${APP_NAME}'"
-app_cmd=("$XURL_COMMAND" auth apps add "$APP_NAME" --client-id "$CLIENT_ID" --redirect-uri "$REDIRECT_URI")
-if [ -n "$CLIENT_SECRET" ]; then
-  app_cmd+=(--client-secret "$CLIENT_SECRET")
-fi
-"${app_cmd[@]}"
+  info "Registering xurl OAuth app '${APP_NAME}'"
+  app_cmd=("$XURL_COMMAND" auth apps add "$APP_NAME" --client-id "$CLIENT_ID" --redirect-uri "$REDIRECT_URI")
+  if [ -n "$CLIENT_SECRET" ]; then
+    app_cmd+=(--client-secret "$CLIENT_SECRET")
+  fi
+  "${app_cmd[@]}"
 
-info "Opening X OAuth authorization flow"
-"$XURL_COMMAND" auth oauth2 --app "$APP_NAME"
+  info "Opening X OAuth authorization flow"
+  "$XURL_COMMAND" auth oauth2 --app "$APP_NAME"
+fi
 
 info "Setting '${APP_NAME}' as the default xurl auth app"
 "$XURL_COMMAND" auth default "$APP_NAME"

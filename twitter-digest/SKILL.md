@@ -1,13 +1,27 @@
 ---
 name: twitter-digest
-description: Use when the user asks to generate an X/Twitter daily digest or says phrases such as "生成X日报", "生成 x 日报", "X日报", "推特日报", "Twitter digest", or wants an agent to analyze their own X/Twitter mentions, home timeline, visible direct messages, reply opportunities, and daily social-media summaries through API or local logged-in browser collection.
+description: Use when the user asks to generate an X/Twitter daily digest or says phrases such as "生成X日报", "生成 x 日报", "X日报", "推特日报", "Twitter digest", or wants an agent to analyze their own X/Twitter mentions, home timeline, reply opportunities, and daily social-media summaries. Default collection uses saved API credentials when configured; otherwise it uses browser collection. Browser can also be requested explicitly.
 ---
 
 # X/Twitter Digest
 
 ## Overview
 
-Use this skill to produce a concise Chinese daily digest from the user's own X/Twitter account. Use `scripts/run_daily_digest.py`, which defaults to `--source auto`: API collection when API credentials are configured, otherwise local browser collection with a persistent dedicated Chromium profile. Installing this skill does not configure X API and must not open an API configuration Terminal. After the user explicitly configures X API once, normal `RUN_DAILY_DIGEST` runs use API by default. Use `RUN_DAILY_DIGEST --source browser` when the user explicitly wants browser collection. Once API source is selected by default or explicitly, API failures should fail or report data gaps until the user fixes or clears the API configuration.
+Use this skill to produce a concise Chinese daily digest from the user's own X/Twitter account. Use `scripts/run_daily_digest.py`, which defaults to `--source auto`: saved API credentials are used when configured; if no API credentials are configured, browser collection is used. Installing this skill does not configure X API and must not open an API configuration Terminal. Once API source is selected by default or explicitly, non-auth API failures should fail or report data gaps instead of falling back to browser.
+
+## Source Selection Contract
+
+Default source is automatic. If saved API credentials exist, automatic runs use API. If no API credentials exist, automatic runs use browser collection. If the latest user message does not explicitly request a source, run exactly:
+
+```bash
+RUN_DAILY_DIGEST
+```
+
+Source is not sticky across turns or runs. A previous browser run must never make later normal "日报" requests use browser. A previous API run also does not require a special command; later normal "日报" requests still run `RUN_DAILY_DIGEST`, and the script selects API when saved API credentials exist. For every new digest request, run the collection command again before reading `digest-context.*`; do not reuse a previous browser or API context as if it were fresh.
+
+Short follow-up replies such as "要", "日报", "生成", "继续", "好", or "可以" inherit only the user's intent to generate a digest. They do not inherit browser source from prior assistant suggestions, data-gap explanations, or API/browser comparisons. Never choose browser because it might be "more complete", because API excludes DMs, because API output says DMs need browser confirmation, or because an earlier assistant message offered browser mode. If API is configured, run API and report the data gap after collection; if API is not configured, the automatic command uses browser.
+
+When API is configured, only use browser source when the latest user message itself explicitly asks for browser mode, visible private messages / DMs, X Chat, or local browser collection. When API is not configured, the default automatic run uses browser.
 
 After installation, configuration and daily runs should use the installed skill copy, not a temporary clone/source checkout. Installed locations are `~/.claude/skills/twitter-digest` for Claude Code and `~/.codex/skills/twitter-digest` for Codex. If `run_daily_digest.py` or `configure_api.py` is accidentally run from a source checkout while an installed copy exists, the script automatically re-runs the installed copy so `.state` is written to the installed skill directory.
 
@@ -30,7 +44,7 @@ For summary writing, read the installed current-run context with the agent's fil
 
 Do not use `cat`, `head`, `tail`, `grep`, `sed`, `python3 -c`, or temporary scripts to read or inspect `digest-context.*` / `digest-input.*` during normal analysis. Those shell reads cause extra Claude Code Bash permission prompts and may expose private DM text in command output.
 
-Load `references/x-twitter-digest.md` when you need implementation details, browser workflow rules, current-run context behavior, or the scoring rubric.
+Load `references/x-twitter-digest.md` when you need implementation details, API/browser workflow rules, current-run context behavior, or the scoring rubric.
 
 ## Data Collection
 
@@ -48,13 +62,14 @@ For chat usage, run the wrapper:
 RUN_DAILY_DIGEST
 ```
 
-`run_daily_digest.py` defaults to `--source auto`. Auto uses saved OAuth2 user-context credentials, `X_BEARER_TOKEN`, or `TWITTER_BEARER_TOKEN` for public data when present; otherwise it uses the browser collector. When API credentials are present, normal `RUN_DAILY_DIGEST` uses API and must not fall back to browser on API errors. Treat API DM lookup as TODO / waiting for X to fix XChat-encrypted DM coverage; do not use API DM to decide whether the user has private messages.
+`run_daily_digest.py` defaults to `--source auto`. Auto uses API only when saved OAuth2 user-context credentials, `X_BEARER_TOKEN`, or `TWITTER_BEARER_TOKEN` are present. If no API configuration exists, auto uses browser collection. If API configuration exists but authentication is broken, it triggers API reconfiguration and then retries API collection once. It must not fall back to browser on API errors. Treat API DM lookup as unavailable; do not use API output to decide whether the user has private messages. A normal "生成日报" / "要" follow-up must run plain `RUN_DAILY_DIGEST`.
 
 Source isolation is strict:
 
 - API source runs only `api_x_digest.py`. It never starts a browser, never opens X pages, never reads the browser profile, and never supplements missing API data with browser data.
 - Browser source runs only `browser_x_digest.py`. It uses the dedicated browser profile and does not use saved API tokens or API collector output.
-- Default source is auto. It picks exactly one source for the run: API when API credentials exist, otherwise browser. It does not merge both sources.
+- Default source is auto. It uses saved API credentials when configured. If API is not configured, it uses browser collection. If API is configured, browser is selected only when the latest user message explicitly asks for browser mode or equivalent visible-DM/browser wording.
+- Do not infer browser mode from words like "完整", "私信最完整", or an earlier comparison between API and browser. Use browser only when the user's latest instruction explicitly asks for browser mode, visible DMs, X Chat, or local browser collection.
 - If API output says DM needs browser confirmation, treat that as a data gap note only. It does not mean browser data was collected.
 
 If the user asks to configure API access, trigger the OAuth/user-token setup from chat:
@@ -73,7 +88,7 @@ This is an agent-triggered flow. It supports OAuth2 user authorization:
 
 If a refresh token is saved, API-source runs refresh the access token automatically. Do not ask the user to export environment variables manually. App-only API keys are not enough for user-context home timeline access.
 
-After API setup succeeds once, future daily digest runs should not ask the user for credentials again. Normal `RUN_DAILY_DIGEST` reads `.state/api_config.json` automatically and uses API by default. OAuth2 credentials are refreshed automatically when a refresh token is saved. Only rerun `--configure-api` when the saved credentials are missing, revoked, expired without refresh, or the user explicitly asks to change accounts/apps. Use `RUN_DAILY_DIGEST --source browser` only when the user explicitly wants browser collection.
+After API setup succeeds once, future daily digest runs should not ask the user for credentials again. Normal `RUN_DAILY_DIGEST` reads `.state/api_config.json` automatically and uses API by default. OAuth2 credentials are refreshed automatically when a refresh token is saved. If API credentials are missing, normal `RUN_DAILY_DIGEST` uses browser. If API credentials exist but authentication is broken during API collection, `RUN_DAILY_DIGEST` opens configuration and retries once. Use browser source only when the latest user message explicitly wants browser collection.
 
 If the user asks to clear API access, run:
 
@@ -83,27 +98,27 @@ CONFIGURE_API --clear
 
 All normal flows should be triggered from chat by the agent:
 
-- X 日报 / 生成日报: run `RUN_DAILY_DIGEST`; this uses API if configured, otherwise browser.
+- X 日报 / 生成日报 / 要: run `RUN_DAILY_DIGEST`; this uses API when configured, otherwise browser.
+- API 日报 / 用 API 生成日报: run `RUN_DAILY_DIGEST --source api`; after this, later plain "日报" requests still run `RUN_DAILY_DIGEST` and use API if credentials are saved.
 - 用户已有 token / 输入 X token: run `RUN_DAILY_DIGEST --configure-api-token`.
 - 配置 X API / 给 app 授权: run `RUN_DAILY_DIGEST --configure-api`.
 - 验证 X API 配置: run `CONFIGURE_API --verify`.
 - 检查本次采集计数 / JSON 结构: run `scripts/inspect_digest.py`.
 - 清除 X API 配置: run `CONFIGURE_API --clear`.
-- 调试浏览器: run `RUN_DAILY_DIGEST --source browser --headed`.
+- 调试浏览器: only when the latest user message explicitly asks to debug browser collection, run `RUN_DAILY_DIGEST --source browser --headed`.
 
-Force a script source:
+Explicit browser/debug source only:
 
 ```bash
-RUN_DAILY_DIGEST --source browser
 X_BEARER_TOKEN=... RUN_DAILY_DIGEST --source api --handle <handle>
 ```
 
-Browser-source runs use a dedicated browser profile at `twitter-digest/.state/chrome-profile`. The user logs in to X once in that browser. Later browser runs default to headless collection and reuse the saved local browser session. If the saved login is unavailable during a browser-source run, the script automatically opens a visible browser window for manual login. API-source runs do not touch this profile and are used automatically after API credentials are configured unless the user explicitly selects `--source browser`. The skill has two collector scripts: `scripts/api_x_digest.py` for official API public data, and `scripts/browser_x_digest.py` for browser-visible X Chat / encrypted DM content. API-visible DM events remain TODO-only until X fixes or documents reliable XChat coverage.
+API-source runs do not touch the browser profile and are used automatically when API is configured unless the latest user instruction explicitly selects browser collection. If API is not configured, auto uses browser collection. Browser-source runs use a dedicated browser profile at `twitter-digest/.state/chrome-profile`. The user logs in to X once in that browser. Later browser runs default to headless collection and reuse the saved local browser session. If the saved login is unavailable during a browser-source run, the script automatically opens a visible browser window for manual login. The skill has two collector scripts: `scripts/api_x_digest.py` for official API public data, and `scripts/browser_x_digest.py` for browser-visible X Chat / encrypted DM content. API-visible DM events remain TODO-only until X fixes or documents reliable XChat coverage.
 
 DM reading is enabled by default only for browser-source runs and only reads visible local browser content. API-source runs do not start a browser, even when `--include-dms` is passed. To skip DMs for a browser run:
 
 ```bash
-RUN_DAILY_DIGEST --no-dms
+RUN_DAILY_DIGEST --source browser --no-dms
 ```
 
 Default scope:
@@ -149,11 +164,20 @@ python3 twitter-digest/scripts/install.py --client claude --allow-claude-command
 
 This explicitly adds one Claude Code Bash allow rule for `python3 ~/.claude/skills/twitter-digest/scripts/run_daily_digest.py:*` and adds `~/.claude/skills/twitter-digest/.state` to Claude Code `additionalDirectories` so the Read tool can read `digest-context.md` without a separate file-access prompt. It does not bypass permissions globally and does not grant arbitrary Bash access.
 
-The installer checks for Python 3.10+ and a supported Chromium browser before installing. Supported browsers are Google Chrome, Chromium, Microsoft Edge, and Brave. If the browser will be installed later, use `--skip-browser-check`.
+The installer checks for Python 3.9+ and a supported Chromium browser before installing. Supported browsers are Google Chrome, Chromium, Microsoft Edge, and Brave. If a prerequisite is missing, install it and rerun the same install command; the installer does not install or upgrade Python or browsers. If the browser will be installed later, use `--skip-browser-check`.
 
-The installer moves old `twitter-briefing`, `twitter-briefing.bak`, or existing `twitter-digest` installs into the selected skills directory's `.backups/` folder and disables their `SKILL.md` files so the current agent does not load duplicate old skills. It preserves `.state` from an existing installed `twitter-digest` copy during reinstall, but does not copy `.state` from the development checkout.
+Reinstalling is upgrading. The installer moves old `twitter-briefing`, `twitter-briefing.bak`, or existing `twitter-digest` installs into the selected skills directory's `.backups/` folder and disables their `SKILL.md` files so the current agent does not load duplicate old skills. It preserves `.state` from an existing installed `twitter-digest` copy during reinstall, but does not copy `.state` from the development checkout.
 
-Claude Code or other agents can use the installed skill by running the same browser scripts.
+To uninstall, run the installed script:
+
+```bash
+~/.codex/skills/twitter-digest/uninstall.sh --client codex
+~/.claude/skills/twitter-digest/uninstall.sh --client claude
+```
+
+Default uninstall moves the installed skill to `.backups/` and preserves `.state`. Use `--purge-state` only when the user explicitly wants API config, browser profile, current-run files, and matching `.backups` entries removed permanently.
+
+Claude Code or other agents can use the installed skill by running the same installed commands.
 
 ## Run Outputs
 
@@ -180,10 +204,20 @@ When the user asks for an X daily digest or X 日报, run:
 RUN_DAILY_DIGEST
 ```
 
-If they ask to skip DMs:
+When the user's latest message is a short confirmation such as "要", "日报", "生成", "继续", "好", or "可以", run the same default command above. Do not treat an earlier assistant suggestion like "browser is more complete" as source selection.
+
+Do not treat an earlier browser-source result, a visible DM result, or a previous assistant mention of "浏览器源" as a user request for browser on the next digest. The latest user message must explicitly ask for browser/DM/X Chat/local browser before adding `--source browser`.
+
+If they ask to skip DMs during a normal API daily digest, still run the normal API path because API mode does not collect DMs:
 
 ```bash
-RUN_DAILY_DIGEST --no-dms
+RUN_DAILY_DIGEST
+```
+
+If they explicitly ask for browser mode but want to skip DMs:
+
+```bash
+RUN_DAILY_DIGEST --source browser --no-dms
 ```
 
 If the authenticated handle is not detected or the user corrects it:
@@ -197,7 +231,7 @@ Browser-source daily digests must identify the authenticated handle before colle
 For debugging or manual inspection:
 
 ```bash
-RUN_DAILY_DIGEST --headed
+RUN_DAILY_DIGEST --source browser --headed
 ```
 
 For unattended scheduled runs that should not block on passcode recovery:

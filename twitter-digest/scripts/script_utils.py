@@ -10,6 +10,7 @@ import subprocess
 import sys
 import tempfile
 from pathlib import Path
+from typing import Optional
 
 
 def display_path(path: Path) -> str:
@@ -64,7 +65,7 @@ def installed_skill_roots() -> list[Path]:
     return [claude, codex]
 
 
-def rerun_from_installed_if_needed(script_file: str, argv: list[str] | None = None) -> None:
+def rerun_from_installed_if_needed(script_file: str, argv: Optional[list[str]] = None) -> None:
     if os.environ.get("TWITTER_DIGEST_NO_INSTALL_REDIRECT"):
         return
     current_script = Path(script_file).resolve()

@@ -4,7 +4,7 @@
 
 `twitter-digest` 读取用户自己的 X/Twitter 数据并生成中文日报。抓数据层支持 API 和本地已登录浏览器两种来源。
 
-默认入口是 `scripts/run_daily_digest.py`，默认 `--source auto`。如果已经通过对话内 OAuth 授权保存了 user-context token，或环境里配置了 X API token，普通日报自动走 API；如果没有 API 配置，才使用本地浏览器抓取。只有用户主动要求浏览器，或命令显式传入 `--source browser` 时，才强制浏览器。API 模式只抓公开数据，不打开浏览器。
+默认入口是 `scripts/run_daily_digest.py`，默认 `--source auto`。普通日报每次重新判断来源：已配置 API 时走 API；没有 API 配置时走浏览器；已配置 API 但 token 刷新失败或认证失效时触发 API 重配置，配置成功后继续 API 采集。上一轮使用浏览器或 API 不会成为下一轮的默认来源。只有用户主动要求浏览器，或命令显式传入 `--source browser` 时，才强制浏览器。API 模式只抓公开数据，不打开浏览器。
 
 核心链路：
 
@@ -29,10 +29,12 @@ scripts/api_x_digest.py
 
 scripts/run_daily_digest.py
   上层入口。默认 --source auto：
-  - 检测到已保存 OAuth token 或 X_BEARER_TOKEN / TWITTER_BEARER_TOKEN 时走 API。
+  - 已配置 API 时走 API。
   - 没有 API 配置时走浏览器。
+  - 已配置 API 但 token 刷新失败或认证失效时触发 API 重配置。
+  - 重配置成功后继续 API 采集。
   - 用户主动要求浏览器或显式 `--source browser` 时强制浏览器。
-  - API source 已选择时不回退浏览器；API 失败就报错或写 data gap。
+  - API source 已选择时不回退浏览器；认证类错误只重配一次，其他 API 失败就报错或写 data gap。
   - 使用 API 且保存了 refresh token 时自动刷新过期 access token。
 ```
 
@@ -48,7 +50,7 @@ python3 twitter-digest/scripts/run_daily_digest.py --source browser
 X_BEARER_TOKEN=... python3 twitter-digest/scripts/run_daily_digest.py --source api --handle <handle>
 ```
 
-API 模式重点用于更稳定地抓公开数据。API 模式不会打开浏览器。X Chat / DM 内容仍以浏览器模式为准；如果 API 模式无法读取 DM，会在 `digest-context` 的 Data Gaps 中标注。
+API 模式重点用于更稳定地抓公开数据。API 模式不会打开浏览器。X Chat / DM 内容只在显式浏览器模式中读取；API 模式不使用 DM 作为日报判断依据。
 
 来源隔离规则：
 
@@ -77,7 +79,7 @@ python3 ~/.claude/skills/twitter-digest/scripts/run_daily_digest.py --configure-
 6. 脚本通过本地 callback 收到授权码。
 7. 脚本换取 user access token 和 refresh token。
 8. token 保存到已安装 skill 的 `.state/api_config.json`，文件权限尽量设为 owner-only。
-9. 后续普通日报自动走 API；要临时使用浏览器时显式运行 `--source browser`。
+9. 后续普通日报通过默认 auto 命令自动走 API；要临时使用浏览器时显式运行 `--source browser`。
 
 用户只需要准备：
 
@@ -88,10 +90,11 @@ CLIENT_SECRET（如 App 要求）
 
 `ACCESS_TOKEN` 和 `REFRESH_TOKEN` 由授权流程生成。
 
-配置成功后，后续日报不再要求用户输入 Client ID、Secret 或重新授权。普通 `run_daily_digest.py` 会读取 `.state/api_config.json` 并默认走 API：
+配置成功后，后续日报不再要求用户输入 Client ID、Secret 或重新授权。普通 `run_daily_digest.py` 会读取 `.state/api_config.json` 并默认走 API；如果没有这个 API 配置文件，普通日报会走浏览器：
 
 - OAuth2：如果保存了 refresh token，access token 快过期时自动 refresh。
-- 如果 token 被撤销、权限变更、tier 不支持或 API 返回 401/403/429，脚本把 endpoint 错误写入 data gap，Agent 再提示用户是否重新配置。
+- 如果 token 被撤销、过期且无法刷新，或 API 返回 401 等认证错误，普通日报命令会重新打开配置并重试一次。
+- 如果权限变更、tier 不支持、限流或 endpoint 不可用，脚本把 endpoint 错误写入 data gap 或失败，不自动切到浏览器。
 
 OAuth1 PIN 不再作为正常配置路径：验证中它不能可靠读取 DM，不适合这个日报 skill 的核心目标。
 
@@ -125,10 +128,10 @@ python3 twitter-digest/scripts/install.py --client claude
 
 安装脚本会检查：
 
-- Python 3.10+
+- Python 3.9+
 - Google Chrome、Chromium、Microsoft Edge 或 Brave
 
-如果缺少支持的 Chromium 浏览器，安装脚本会停止并提示先安装浏览器。浏览器必须存在，因为后续采集完全依赖本地浏览器打开 `x.com`。
+如果缺少支持的 Chromium 浏览器，安装脚本会停止并提示先安装浏览器。浏览器用于未配置 API 时的默认本地 X 页面采集、显式 `--source browser` 采集，以及 OAuth 授权页打开。已配置 API 的默认日报不会启动浏览器采集。
 
 如果浏览器会稍后安装，可以显式跳过检查：
 
@@ -138,7 +141,9 @@ python3 twitter-digest/scripts/install.py --skip-browser-check
 
 安装脚本不会复制 `.state/`，因此不会把开发机器上的 X 登录态、运行结果或 DM 原文复制到用户的 skill 安装目录。
 
-## 登录与浏览器状态
+## 显式浏览器模式与登录状态
+
+以下流程只适用于用户主动要求浏览器采集，或命令显式传入 `--source browser`。
 
 首次运行：
 
@@ -147,7 +152,7 @@ python3 twitter-digest/scripts/install.py --skip-browser-check
 3. 用户在窗口里正常登录 X。
 4. 登录态保存在 `twitter-digest/.state/chrome-profile`。
 
-后续运行：
+后续浏览器运行：
 
 1. 默认 headless 启动浏览器。
 2. 复用 `twitter-digest/.state/chrome-profile`。
@@ -164,7 +169,13 @@ python3 twitter-digest/scripts/run_daily_digest.py --handle <handle>
 
 ## 默认采集范围
 
-默认页面：
+API 默认页面：
+
+- `home`：首页时间线，用于看热点。
+- `own_profile`：自己的主页，用于看自己最近发帖/互动。
+- `mentions` / `mentions_search`：谁 @ 了当前账号。
+
+显式浏览器模式页面：
 
 - `home`：首页时间线，用于看热点。
 - `own_profile`：自己的主页，用于看自己最近发帖/互动。
@@ -215,7 +226,7 @@ python3 twitter-digest/scripts/run_daily_digest.py --handle <handle>
 
 ## DM 采集逻辑
 
-DM 默认读取。
+DM 只在显式浏览器模式中读取。API 模式不采集 DM，也不根据 API DM 结果判断“没有私信”。
 
 先读取 X Chat 左侧会话列表，并统计今天可见会话：
 
@@ -390,13 +401,13 @@ python3 twitter-digest/scripts/run_daily_digest.py
 跳过 DM：
 
 ```bash
-python3 twitter-digest/scripts/run_daily_digest.py --no-dms
+python3 twitter-digest/scripts/run_daily_digest.py --source browser --no-dms
 ```
 
 强制显示浏览器：
 
 ```bash
-python3 twitter-digest/scripts/run_daily_digest.py --headed
+python3 twitter-digest/scripts/run_daily_digest.py --source browser --headed
 ```
 
 清理登录态并重新登录：
