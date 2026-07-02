@@ -10,6 +10,8 @@ Default daily digest source is automatic. If saved API credentials exist, normal
 python3 ~/.claude/skills/twitter-digest/scripts/run_daily_digest.py
 ```
 
+Source choice is recalculated on every run. It is not sticky. A previous browser run, visible-DM run, or assistant statement such as "浏览器源" must not make the next normal digest use browser. A previous API run also does not require a special follow-up command; the next normal digest still runs the wrapper with no source override and uses API when credentials are saved. Always collect again for a new digest request before reading `digest-context.*`; do not reuse a prior run context.
+
 When API is configured, do not use browser source because a previous assistant message mentioned browser mode, because API excludes DMs, because browser could be more complete, or because API output says DM needs browser confirmation. Those are data gaps to report after API collection, not permission to switch sources. When API is not configured, the same wrapper command uses browser collection.
 
 When API is configured, use browser source only when the latest user message itself explicitly asks for browser mode, visible DMs / private messages, X Chat, local browser collection, or a literal `--source browser`.

@@ -4,7 +4,7 @@
 
 `twitter-digest` 读取用户自己的 X/Twitter 数据并生成中文日报。抓数据层支持 API 和本地已登录浏览器两种来源。
 
-默认入口是 `scripts/run_daily_digest.py`，默认 `--source auto`。普通日报始终优先走 API；如果没有 API 配置、token 刷新失败或认证失效，脚本会先触发 API 配置，配置成功后继续 API 采集。只有用户主动要求浏览器，或命令显式传入 `--source browser` 时，才强制浏览器。API 模式只抓公开数据，不打开浏览器。
+默认入口是 `scripts/run_daily_digest.py`，默认 `--source auto`。普通日报每次重新判断来源：已配置 API 时走 API；没有 API 配置时走浏览器；已配置 API 但 token 刷新失败或认证失效时触发 API 重配置，配置成功后继续 API 采集。上一轮使用浏览器或 API 不会成为下一轮的默认来源。只有用户主动要求浏览器，或命令显式传入 `--source browser` 时，才强制浏览器。API 模式只抓公开数据，不打开浏览器。
 
 核心链路：
 
@@ -79,7 +79,7 @@ python3 ~/.claude/skills/twitter-digest/scripts/run_daily_digest.py --configure-
 6. 脚本通过本地 callback 收到授权码。
 7. 脚本换取 user access token 和 refresh token。
 8. token 保存到已安装 skill 的 `.state/api_config.json`，文件权限尽量设为 owner-only。
-9. 后续普通日报自动走 API；要临时使用浏览器时显式运行 `--source browser`。
+9. 后续普通日报通过默认 auto 命令自动走 API；要临时使用浏览器时显式运行 `--source browser`。
 
 用户只需要准备：
 

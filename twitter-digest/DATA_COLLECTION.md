@@ -97,6 +97,7 @@ scripts/run_daily_digest.py
 - API 来源只运行 `api_x_digest.py`，不启动浏览器、不读取浏览器 profile、不用浏览器补采 API 缺口。
 - 浏览器来源只运行 `browser_x_digest.py`，不读取 API token、不合并 API collector 输出。
 - 默认 `--source auto` 每次只选择一个来源，不合并 API 和浏览器两边的数据。
+- 来源不是会话状态，不能继承上一轮。上一次用浏览器不代表下一次普通“日报”继续浏览器；上一次用 API 也不要求特殊命令。每次新日报都重新运行默认入口，由脚本按当前 API 配置选择来源。
 - API 输出里的“需要浏览器确认 DM”只能作为 data gap 提示，不表示本次已经读取了浏览器 DM。
 
 ## 对话触发流程
@@ -163,7 +164,7 @@ Agent：读取 digest-context.md 写中文日报
 ```text
 用户：清除 X API 配置
 Agent：运行 `python3 ~/.claude/skills/twitter-digest/scripts/configure_api.py --clear`
-后续：`python3 ~/.claude/skills/twitter-digest/scripts/run_daily_digest.py` 会重新触发 API 配置；如需浏览器必须显式传 `--source browser`
+后续：`python3 ~/.claude/skills/twitter-digest/scripts/run_daily_digest.py` 因为没有 API 配置会走浏览器；如需重新走 API，用户需要再次配置 API
 ```
 
 ## 标准输出结构

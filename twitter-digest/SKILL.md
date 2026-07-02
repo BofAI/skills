@@ -17,6 +17,8 @@ Default source is automatic. If saved API credentials exist, automatic runs use 
 RUN_DAILY_DIGEST
 ```
 
+Source is not sticky across turns or runs. A previous browser run must never make later normal "日报" requests use browser. A previous API run also does not require a special command; later normal "日报" requests still run `RUN_DAILY_DIGEST`, and the script selects API when saved API credentials exist. For every new digest request, run the collection command again before reading `digest-context.*`; do not reuse a previous browser or API context as if it were fresh.
+
 Short follow-up replies such as "要", "日报", "生成", "继续", "好", or "可以" inherit only the user's intent to generate a digest. They do not inherit browser source from prior assistant suggestions, data-gap explanations, or API/browser comparisons. Never choose browser because it might be "more complete", because API excludes DMs, because API output says DMs need browser confirmation, or because an earlier assistant message offered browser mode. If API is configured, run API and report the data gap after collection; if API is not configured, the automatic command uses browser.
 
 When API is configured, only use browser source when the latest user message itself explicitly asks for browser mode, visible private messages / DMs, X Chat, or local browser collection. When API is not configured, the default automatic run uses browser.
@@ -97,6 +99,7 @@ CONFIGURE_API --clear
 All normal flows should be triggered from chat by the agent:
 
 - X 日报 / 生成日报 / 要: run `RUN_DAILY_DIGEST`; this uses API when configured, otherwise browser.
+- API 日报 / 用 API 生成日报: run `RUN_DAILY_DIGEST --source api`; after this, later plain "日报" requests still run `RUN_DAILY_DIGEST` and use API if credentials are saved.
 - 用户已有 token / 输入 X token: run `RUN_DAILY_DIGEST --configure-api-token`.
 - 配置 X API / 给 app 授权: run `RUN_DAILY_DIGEST --configure-api`.
 - 验证 X API 配置: run `CONFIGURE_API --verify`.
@@ -201,7 +204,9 @@ When the user asks for an X daily digest or X 日报, run:
 RUN_DAILY_DIGEST
 ```
 
-When the user's latest message is a short confirmation such as "要", "日报", "生成", "继续", "好", or "可以", run the same API command above. Do not treat an earlier assistant suggestion like "browser is more complete" as source selection.
+When the user's latest message is a short confirmation such as "要", "日报", "生成", "继续", "好", or "可以", run the same default command above. Do not treat an earlier assistant suggestion like "browser is more complete" as source selection.
+
+Do not treat an earlier browser-source result, a visible DM result, or a previous assistant mention of "浏览器源" as a user request for browser on the next digest. The latest user message must explicitly ask for browser/DM/X Chat/local browser before adding `--source browser`.
 
 If they ask to skip DMs during a normal API daily digest, still run the normal API path because API mode does not collect DMs:
 
