@@ -1,13 +1,14 @@
 #!/bin/sh
 set -eu
 
-TAG="${X_MCP_INSTALL_TAG:-v1.5.12-beta.2}"
+TAG="${X_MCP_INSTALL_TAG:-v1.5.12-beta.3}"
 BASE_URL="${X_MCP_INSTALL_BASE_URL:-https://raw.githubusercontent.com/BofAI/skills/${TAG}/twitter-mcp}"
 REGISTER_CODEX="${X_MCP_REGISTER_CODEX:-1}"
 REGISTER_CLAUDE="${X_MCP_REGISTER_CLAUDE:-auto}"
 REGISTER_CODEX_MCP="${X_MCP_REGISTER_CODEX_MCP:-0}"
 REGISTER_CLAUDE_MCP="${X_MCP_REGISTER_CLAUDE_MCP:-0}"
 OPEN_TERMINAL="${X_MCP_OPEN_TERMINAL:-auto}"
+APP_NAME="${X_MCP_APP_NAME:-xmcp}"
 
 info() {
   printf '==> %s\n' "$1"
@@ -49,8 +50,21 @@ running_under_agent() {
   return 1
 }
 
+xurl_oauth_ready() {
+  if [ "${X_MCP_FORCE_CONFIGURE:-0}" = "1" ] || [ "${X_MCP_FORCE_CONFIGURE:-}" = "true" ]; then
+    return 1
+  fi
+  if ! command_exists xurl; then
+    return 1
+  fi
+  xurl token --app "$APP_NAME" >/dev/null 2>&1
+}
+
 should_open_terminal() {
   if [ "${X_MCP_TERMINAL_CHILD:-}" = "1" ]; then
+    return 1
+  fi
+  if xurl_oauth_ready; then
     return 1
   fi
   case "$OPEN_TERMINAL" in
@@ -78,7 +92,7 @@ open_self_in_terminal_and_exit() {
   for arg in "$@"; do
     args_text="${args_text} $(shell_quote "$arg")"
   done
-  command_text="cd ~ && TMPDIR=\"\$(mktemp -d)\" && INSTALL_SH=\"\$TMPDIR/twitter-mcp-install.sh\" && curl -fsSL $(shell_quote "$installer_url") -o \"\$INSTALL_SH\" && chmod 700 \"\$INSTALL_SH\" && env X_MCP_TERMINAL_CHILD=1 X_MCP_OPEN_TERMINAL=0 X_MCP_INSTALL_TAG=$(shell_quote "$TAG") X_MCP_INSTALL_BASE_URL=$(shell_quote "$BASE_URL") X_MCP_REGISTER_CODEX=$(shell_quote "$REGISTER_CODEX") X_MCP_REGISTER_CLAUDE=$(shell_quote "$REGISTER_CLAUDE") X_MCP_REGISTER_CODEX_MCP=$(shell_quote "$REGISTER_CODEX_MCP") X_MCP_REGISTER_CLAUDE_MCP=$(shell_quote "$REGISTER_CLAUDE_MCP") /bin/sh \"\$INSTALL_SH\"${args_text}; printf '\\nPress Enter to close this window...'; IFS= read -r _"
+  command_text="cd ~ && TMPDIR=\"\$(mktemp -d)\" && INSTALL_SH=\"\$TMPDIR/twitter-mcp-install.sh\" && curl -fsSL $(shell_quote "$installer_url") -o \"\$INSTALL_SH\" && chmod 700 \"\$INSTALL_SH\" && env X_MCP_TERMINAL_CHILD=1 X_MCP_OPEN_TERMINAL=0 X_MCP_INSTALL_TAG=$(shell_quote "$TAG") X_MCP_INSTALL_BASE_URL=$(shell_quote "$BASE_URL") X_MCP_REGISTER_CODEX=$(shell_quote "$REGISTER_CODEX") X_MCP_REGISTER_CLAUDE=$(shell_quote "$REGISTER_CLAUDE") X_MCP_REGISTER_CODEX_MCP=$(shell_quote "$REGISTER_CODEX_MCP") X_MCP_REGISTER_CLAUDE_MCP=$(shell_quote "$REGISTER_CLAUDE_MCP") X_MCP_APP_NAME=$(shell_quote "$APP_NAME") X_MCP_FORCE_CONFIGURE=$(shell_quote "${X_MCP_FORCE_CONFIGURE:-0}") /bin/sh \"\$INSTALL_SH\"${args_text}; printf '\\nPress Enter to close this window...'; IFS= read -r _"
   osascript >/dev/null <<OSA
 tell application "Terminal"
   activate
