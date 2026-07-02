@@ -153,6 +153,15 @@ The installer checks for Python 3.9+ and a supported Chromium browser before ins
 
 Reinstalling is upgrading. The installer moves old `twitter-briefing`, `twitter-briefing.bak`, or existing `twitter-digest` installs into the selected skills directory's `.backups/` folder and disables their `SKILL.md` files so the current agent does not load duplicate old skills. It preserves `.state` from an existing installed `twitter-digest` copy during reinstall, but does not copy `.state` from the development checkout.
 
+To uninstall, run the installed script:
+
+```bash
+~/.codex/skills/twitter-digest/uninstall.sh --client codex
+~/.claude/skills/twitter-digest/uninstall.sh --client claude
+```
+
+Default uninstall moves the installed skill to `.backups/` and preserves `.state`. Use `--purge-state` only when the user explicitly wants API config, browser profile, and current-run files removed permanently.
+
 Claude Code or other agents can use the installed skill by running the same installed commands.
 
 ## Run Outputs

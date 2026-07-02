@@ -15,7 +15,7 @@ python3 twitter-digest/scripts/install.py
 To ask Codex to install this skill for itself, paste this into Codex:
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/BofAI/skills/v1.5.12-beta.1/twitter-digest/install.sh | env TWITTER_DIGEST_INSTALL_CLIENT=codex sh
+curl -fsSL https://raw.githubusercontent.com/BofAI/skills/v1.5.12-beta.2/twitter-digest/install.sh | env TWITTER_DIGEST_INSTALL_CLIENT=codex sh
 ```
 
 When this one-line installer is launched from Codex, Claude Code, or another non-interactive agent on macOS, it opens a real Terminal window and re-runs the full installation there. This avoids agent permission/inspect prompts during `git clone`, Python checks, browser checks, and installer writes. Set `TWITTER_DIGEST_OPEN_TERMINAL=0` only when intentionally running in an already interactive Terminal or CI.
@@ -35,7 +35,7 @@ git clone git@github.com:BofAI/skills.git bofai-skills \
 To ask Claude Code to install this skill for itself, paste this into Claude Code:
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/BofAI/skills/v1.5.12-beta.1/twitter-digest/install.sh | env TWITTER_DIGEST_INSTALL_CLIENT=claude TWITTER_DIGEST_ALLOW_CLAUDE_COMMANDS=1 TWITTER_DIGEST_ALLOW_CLAUDE_STATE_READ=1 sh
+curl -fsSL https://raw.githubusercontent.com/BofAI/skills/v1.5.12-beta.2/twitter-digest/install.sh | env TWITTER_DIGEST_INSTALL_CLIENT=claude TWITTER_DIGEST_ALLOW_CLAUDE_COMMANDS=1 TWITTER_DIGEST_ALLOW_CLAUDE_STATE_READ=1 sh
 ```
 
 Or use the natural-language prompt:
@@ -60,6 +60,17 @@ Claude Code: ~/.claude/skills/twitter-digest
 It also checks for Python 3.9+ and a supported Chromium browser: Google Chrome, Chromium, Microsoft Edge, or Brave. The installer does not install or upgrade Python or browsers; if a prerequisite is missing, install it and rerun the same install command.
 Reinstalling is the upgrade path: it replaces the skill code and preserves the existing installed `.state` directory, including saved API and browser-session settings. The installer still excludes `.state` from the development checkout.
 After installation, run the installed copy. If a script is accidentally started from a temporary clone while an installed copy exists, it automatically re-runs the installed copy so state is saved under `~/.claude/skills/twitter-digest/.state` or `~/.codex/skills/twitter-digest/.state`.
+
+## Uninstall
+
+Safe uninstall moves the installed skill to `.backups/` and preserves `.state`:
+
+```bash
+~/.codex/skills/twitter-digest/uninstall.sh --client codex
+~/.claude/skills/twitter-digest/uninstall.sh --client claude
+```
+
+To permanently remove the installed skill and `.state`, add `--purge-state`.
 
 Use one stable installed command form for normal runs. This prevents repeated Claude Code Bash permission prompts across different projects:
 

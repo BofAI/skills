@@ -79,13 +79,13 @@ From the repository `skills/` directory:
 For a one-line Codex install from this beta tag:
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/BofAI/skills/v1.5.12-beta.1/twitter-mcp/install.sh | env X_MCP_REGISTER_CODEX=1 X_MCP_REGISTER_CLAUDE=0 sh
+curl -fsSL https://raw.githubusercontent.com/BofAI/skills/v1.5.12-beta.2/twitter-mcp/install.sh | env X_MCP_REGISTER_CODEX=1 X_MCP_REGISTER_CLAUDE=0 sh
 ```
 
 For a one-line Claude Code install from this beta tag:
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/BofAI/skills/v1.5.12-beta.1/twitter-mcp/install.sh | env X_MCP_REGISTER_CODEX=0 X_MCP_REGISTER_CLAUDE=1 sh
+curl -fsSL https://raw.githubusercontent.com/BofAI/skills/v1.5.12-beta.2/twitter-mcp/install.sh | env X_MCP_REGISTER_CODEX=0 X_MCP_REGISTER_CLAUDE=1 sh
 ```
 
 The installer:
@@ -98,6 +98,17 @@ The installer:
 - Does not register the hosted X MCP bridge by default. To also register MCP, set `X_MCP_REGISTER_CODEX_MCP=1` or `X_MCP_REGISTER_CLAUDE_MCP=1`.
 
 When launched by Codex, Claude Code, or another non-interactive agent on macOS, the one-line installer immediately opens a real Terminal window and re-runs the full installation there. Node/npm checks, `xurl` installation, OAuth2 Client ID / Secret input, and browser authorization all happen in Terminal, not inside the agent permission sandbox. Do not ask the user to paste OAuth credentials into chat.
+
+## Uninstall
+
+Safe uninstall moves the installed skill to `.backups/` and preserves `.state`:
+
+```bash
+~/.codex/skills/twitter-mcp/uninstall.sh --client codex
+~/.claude/skills/twitter-mcp/uninstall.sh --client claude
+```
+
+By default, uninstall leaves global `xurl`, OAuth app config, and MCP registrations in place. Add `--remove-mcp-config` to remove the `xapi` MCP registration, add `--uninstall-xurl` to run `npm uninstall -g @xdevplatform/xurl`, and add `--purge-state` only when the user explicitly wants local state removed permanently.
 
 ## Configuration
 
