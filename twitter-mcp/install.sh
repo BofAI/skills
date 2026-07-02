@@ -1,7 +1,7 @@
 #!/bin/sh
 set -eu
 
-TAG="${X_MCP_INSTALL_TAG:-v1.5.12-beta.3}"
+TAG="${X_MCP_INSTALL_TAG:-v1.5.12-beta.4}"
 BASE_URL="${X_MCP_INSTALL_BASE_URL:-https://raw.githubusercontent.com/BofAI/skills/${TAG}/twitter-mcp}"
 REGISTER_CODEX="${X_MCP_REGISTER_CODEX:-1}"
 REGISTER_CLAUDE="${X_MCP_REGISTER_CLAUDE:-auto}"
@@ -9,6 +9,7 @@ REGISTER_CODEX_MCP="${X_MCP_REGISTER_CODEX_MCP:-0}"
 REGISTER_CLAUDE_MCP="${X_MCP_REGISTER_CLAUDE_MCP:-0}"
 OPEN_TERMINAL="${X_MCP_OPEN_TERMINAL:-auto}"
 APP_NAME="${X_MCP_APP_NAME:-xmcp}"
+APP_NAME_EXPLICIT="${X_MCP_APP_NAME+x}"
 
 info() {
   printf '==> %s\n' "$1"
@@ -50,11 +51,30 @@ running_under_agent() {
   return 1
 }
 
+xurl_app_exists() {
+  if ! command_exists xurl; then
+    return 1
+  fi
+  xurl auth apps list 2>/dev/null | grep -F "▸ $APP_NAME " >/dev/null 2>&1
+}
+
+infer_app_name_if_needed() {
+  if [ -n "$APP_NAME_EXPLICIT" ] || ! command_exists xurl; then
+    return 0
+  fi
+  apps="$(xurl auth apps list 2>/dev/null | sed -n 's/^▸ \([^ ]*\).*/\1/p' | sort -u || true)"
+  app_count="$(printf '%s\n' "$apps" | sed '/^$/d' | wc -l | tr -d ' ')"
+  if [ "$app_count" = "1" ]; then
+    APP_NAME="$(printf '%s\n' "$apps" | sed -n '/^$/!{p;q;}')"
+    info "Using existing xurl app '${APP_NAME}'. Set X_MCP_APP_NAME to override."
+  fi
+}
+
 xurl_oauth_ready() {
   if [ "${X_MCP_FORCE_CONFIGURE:-0}" = "1" ] || [ "${X_MCP_FORCE_CONFIGURE:-}" = "true" ]; then
     return 1
   fi
-  if ! command_exists xurl; then
+  if ! xurl_app_exists; then
     return 1
   fi
   xurl token --app "$APP_NAME" >/dev/null 2>&1
@@ -102,6 +122,8 @@ OSA
   info "Opened Terminal for twitter-mcp installation. Continue there."
   exit 0
 }
+
+infer_app_name_if_needed
 
 if should_open_terminal; then
   open_self_in_terminal_and_exit "$@"
@@ -212,4 +234,4 @@ fi
 download_file "$INSTALLER_URL" "$INSTALLER"
 
 chmod 700 "$INSTALLER"
-X_MCP_REGISTER_CODEX="$REGISTER_CODEX_MCP" X_MCP_REGISTER_CLAUDE="$REGISTER_CLAUDE_MCP" exec /bin/bash "$INSTALLER" "$@"
+X_MCP_REGISTER_CODEX="$REGISTER_CODEX_MCP" X_MCP_REGISTER_CLAUDE="$REGISTER_CLAUDE_MCP" X_MCP_APP_NAME="$APP_NAME" X_MCP_FORCE_CONFIGURE="${X_MCP_FORCE_CONFIGURE:-0}" exec /bin/bash "$INSTALLER" "$@"

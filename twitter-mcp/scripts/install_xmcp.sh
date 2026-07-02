@@ -5,6 +5,7 @@ PACKAGE="${XMCP_PACKAGE:-@xdevplatform/xurl}"
 VERSION="${XMCP_VERSION:-latest}"
 INSTALL_SPEC="${PACKAGE}@${VERSION}"
 APP_NAME="${X_MCP_APP_NAME:-xmcp}"
+APP_NAME_EXPLICIT="${X_MCP_APP_NAME+x}"
 REDIRECT_URI="${X_MCP_REDIRECT_URI:-http://localhost:8080/callback}"
 SERVER_NAME="${X_MCP_SERVER_NAME:-xapi}"
 REGISTER_CODEX="${X_MCP_REGISTER_CODEX:-0}"
@@ -80,6 +81,38 @@ running_under_agent() {
   return 1
 }
 
+xurl_app_exists() {
+  local command_path="$XURL_COMMAND"
+  if [ -z "$command_path" ]; then
+    command_path="$(resolve_command_path xurl || true)"
+  fi
+  if [ -z "$command_path" ] || [ ! -x "$command_path" ]; then
+    return 1
+  fi
+  "$command_path" auth apps list 2>/dev/null | grep -F "▸ $APP_NAME " >/dev/null 2>&1
+}
+
+infer_app_name_if_needed() {
+  if [ -n "$APP_NAME_EXPLICIT" ]; then
+    return 0
+  fi
+  local command_path="$XURL_COMMAND"
+  if [ -z "$command_path" ]; then
+    command_path="$(resolve_command_path xurl || true)"
+  fi
+  if [ -z "$command_path" ] || [ ! -x "$command_path" ]; then
+    return 0
+  fi
+  local apps
+  apps="$("$command_path" auth apps list 2>/dev/null | sed -n 's/^▸ \([^ ]*\).*/\1/p' | sort -u || true)"
+  local app_count
+  app_count="$(printf '%s\n' "$apps" | sed '/^$/d' | wc -l | tr -d ' ')"
+  if [ "$app_count" = "1" ]; then
+    APP_NAME="$(printf '%s\n' "$apps" | sed -n '/^$/!{p;q;}')"
+    info "Using existing xurl app '${APP_NAME}'. Set X_MCP_APP_NAME to override."
+  fi
+}
+
 xurl_oauth_ready() {
   if [ "${X_MCP_FORCE_CONFIGURE:-0}" = "1" ] || [ "${X_MCP_FORCE_CONFIGURE:-}" = "true" ]; then
     return 1
@@ -91,8 +124,10 @@ xurl_oauth_ready() {
   if [ -z "$command_path" ] || [ ! -x "$command_path" ]; then
     return 1
   fi
-  "$command_path" token --app "$APP_NAME" >/dev/null 2>&1
+  xurl_app_exists && "$command_path" token --app "$APP_NAME" >/dev/null 2>&1
 }
+
+infer_app_name_if_needed
 
 should_open_terminal() {
   if [ "${X_MCP_TERMINAL_CHILD:-}" = "1" ]; then
