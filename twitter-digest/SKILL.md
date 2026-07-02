@@ -172,7 +172,7 @@ To uninstall, run the installed script:
 ~/.claude/skills/twitter-digest/uninstall.sh --client claude
 ```
 
-Default uninstall moves the installed skill to `.backups/` and preserves `.state`. Use `--purge-state` only when the user explicitly wants API config, browser profile, and current-run files removed permanently.
+Default uninstall moves the installed skill to `.backups/` and preserves `.state`. Use `--purge-state` only when the user explicitly wants API config, browser profile, current-run files, and matching `.backups` entries removed permanently.
 
 Claude Code or other agents can use the installed skill by running the same installed commands.
 

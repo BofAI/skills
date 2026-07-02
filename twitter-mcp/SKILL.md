@@ -79,13 +79,13 @@ From the repository `skills/` directory:
 For a one-line Codex install from this beta tag:
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/BofAI/skills/v1.5.12-beta.8/twitter-mcp/install.sh | env X_MCP_REGISTER_CODEX=1 X_MCP_REGISTER_CLAUDE=0 sh
+curl -fsSL https://raw.githubusercontent.com/BofAI/skills/v1.5.12-beta.9/twitter-mcp/install.sh | env X_MCP_REGISTER_CODEX=1 X_MCP_REGISTER_CLAUDE=0 sh
 ```
 
 For a one-line Claude Code install from this beta tag:
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/BofAI/skills/v1.5.12-beta.8/twitter-mcp/install.sh | env X_MCP_REGISTER_CODEX=0 X_MCP_REGISTER_CLAUDE=1 sh
+curl -fsSL https://raw.githubusercontent.com/BofAI/skills/v1.5.12-beta.9/twitter-mcp/install.sh | env X_MCP_REGISTER_CODEX=0 X_MCP_REGISTER_CLAUDE=1 sh
 ```
 
 The installer:
@@ -109,7 +109,7 @@ Safe uninstall moves the installed skill to `.backups/` and preserves `.state`:
 ~/.claude/skills/twitter-mcp/uninstall.sh --client claude
 ```
 
-By default, uninstall is symmetric with install: it moves the installed skill to `.backups/`, removes the matching `xapi` MCP registration, removes the `xmcp` xurl app plus tokens with `xurl auth apps remove xmcp`, and uninstalls the global `xurl` CLI with `npm uninstall -g @xdevplatform/xurl`. Add `--keep-mcp-config`, `--keep-xurl-app`, or `--keep-xurl` only when intentionally preserving those pieces, and add `--purge-state` when the user explicitly wants local state removed permanently.
+By default, uninstall is symmetric with install: it moves the installed skill to `.backups/`, removes the matching `xapi` MCP registration, removes the `xmcp` xurl app plus tokens with `xurl auth apps remove xmcp`, and uninstalls the global `xurl` CLI with `npm uninstall -g @xdevplatform/xurl`. Add `--keep-mcp-config`, `--keep-xurl-app`, or `--keep-xurl` only when intentionally preserving those pieces, and add `--purge-state` when the user explicitly wants local state and matching `.backups` entries removed permanently.
 
 ## Configuration
 

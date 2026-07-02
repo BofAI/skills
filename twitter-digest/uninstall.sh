@@ -26,11 +26,12 @@ usage() {
 Usage: uninstall.sh [--client auto|codex|claude|all] [--purge-state] [--dry-run]
 
 Default uninstall moves installed twitter-digest skill directories to .backups/
-and disables SKILL.md, preserving .state in the backup.
+and disables SKILL.md, preserving .state in the backup. With --purge-state,
+the active install and existing twitter-digest backups are permanently removed.
 
 Options:
   --client        Target client. Default: auto.
-  --purge-state   Permanently remove the installed skill directory, including .state.
+  --purge-state   Permanently remove the installed skill directory, .state, and matching backups.
   --dry-run       Print actions without changing files.
 EOF
 }
@@ -92,18 +93,24 @@ detect_client() {
 backup_target() {
   skills_dir="$1"
   target="$skills_dir/twitter-digest"
-  if [ ! -e "$target" ] && [ ! -L "$target" ]; then
-    info "twitter-digest is not installed at $target"
-    return 0
-  fi
 
   if truthy "$PURGE_STATE"; then
     if [ "$DRY_RUN" = "1" ]; then
       info "Would permanently remove $target"
+      info "Would permanently remove $skills_dir/.backups/twitter-digest*"
     else
       rm -rf "$target"
+      if [ -d "$skills_dir/.backups" ]; then
+        find "$skills_dir/.backups" -mindepth 1 -maxdepth 1 \( -name 'twitter-digest*' -o -name 'twitter-briefing*' \) -exec rm -rf {} +
+      fi
       info "Removed $target"
+      info "Removed matching twitter-digest backups from $skills_dir/.backups"
     fi
+    return 0
+  fi
+
+  if [ ! -e "$target" ] && [ ! -L "$target" ]; then
+    info "twitter-digest is not installed at $target"
     return 0
   fi
 

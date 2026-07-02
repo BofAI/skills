@@ -31,13 +31,15 @@ usage() {
 Usage: uninstall.sh [--client auto|codex|claude|all] [--purge-state] [--keep-mcp-config] [--keep-xurl-app] [--keep-xurl] [--dry-run]
 
 Default uninstall moves installed twitter-mcp skill directories to .backups/
-and disables SKILL.md, preserving .state in the backup. It also removes the
-matching xapi MCP registration and the xmcp xurl OAuth app/tokens created by
-the installer, then uninstalls the global @xdevplatform/xurl package.
+and disables SKILL.md, preserving .state in the backup. With --purge-state,
+the active install and existing twitter-mcp backups are permanently removed.
+Uninstall also removes the matching xapi MCP registration and the xmcp xurl
+OAuth app/tokens created by the installer, then uninstalls the global
+@xdevplatform/xurl package.
 
 Options:
   --client             Target client. Default: auto.
-  --purge-state        Permanently remove the installed skill directory, including .state.
+  --purge-state        Permanently remove the installed skill directory, .state, and matching backups.
   --keep-mcp-config    Keep the xapi MCP server registration.
   --remove-mcp-config  Remove the xapi MCP server registration (default).
   --keep-xurl-app      Keep the xmcp xurl app and tokens.
@@ -129,18 +131,24 @@ detect_client() {
 backup_target() {
   skills_dir="$1"
   target="$skills_dir/twitter-mcp"
-  if [ ! -e "$target" ] && [ ! -L "$target" ]; then
-    info "twitter-mcp is not installed at $target"
-    return 0
-  fi
 
   if truthy "$PURGE_STATE"; then
     if [ "$DRY_RUN" = "1" ]; then
       info "Would permanently remove $target"
+      info "Would permanently remove $skills_dir/.backups/twitter-mcp*"
     else
       rm -rf "$target"
+      if [ -d "$skills_dir/.backups" ]; then
+        find "$skills_dir/.backups" -mindepth 1 -maxdepth 1 -name 'twitter-mcp*' -exec rm -rf {} +
+      fi
       info "Removed $target"
+      info "Removed matching twitter-mcp backups from $skills_dir/.backups"
     fi
+    return 0
+  fi
+
+  if [ ! -e "$target" ] && [ ! -L "$target" ]; then
+    info "twitter-mcp is not installed at $target"
     return 0
   fi
 
