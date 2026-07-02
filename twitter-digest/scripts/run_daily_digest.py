@@ -9,8 +9,9 @@ import os
 import subprocess
 import sys
 from pathlib import Path
+from typing import Optional
 
-from api_config_store import API_CONFIG_PATH, load_api_config, refresh_oauth_token_if_needed
+from api_config_store import load_api_config, refresh_oauth_token_if_needed
 from collector_commands import api_collector_command, browser_collector_command, summarize_collector_error
 from digest_context import build_current_context_from_file
 from script_utils import display_path, open_script_in_terminal, rerun_from_installed_if_needed
@@ -31,7 +32,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--configure-only", action="store_true", help="Only save default account config; do not collect data.")
     parser.add_argument("--keywords", default="", help="Optional comma-separated search queries. Default is empty; the daily digest focuses on timeline, mentions, and DMs.")
     parser.add_argument("--out", default=str(DEFAULT_OUT_DIR))
-    parser.add_argument("--source", choices=("auto", "browser", "api"), default="auto", help="Data collection source. Default auto: API when configured, otherwise browser. Use browser to force local browser collection.")
+    parser.add_argument("--source", choices=("auto", "browser", "api"), default="auto", help="Data collection source. Default auto uses API, configuring or reconfiguring it when needed. Use browser to force local browser collection.")
     parser.add_argument("--configure-api", action="store_true", help="Open a secure prompt to save X API credentials, then exit.")
     parser.add_argument("--configure-api-token", action="store_true", help="Open a secure prompt to paste an existing X user access token, then exit.")
     parser.add_argument("--api-base", default=os.environ.get("X_API_BASE_URL") or "")
@@ -70,7 +71,7 @@ def load_config() -> dict:
         return {}
 
 
-def save_config(handle: str | None, account_name: str | None) -> None:
+def save_config(handle: Optional[str], account_name: Optional[str]) -> None:
     CONFIG_PATH.parent.mkdir(parents=True, exist_ok=True)
     config = load_config()
     if handle:
@@ -96,12 +97,23 @@ def open_config_in_terminal(extra_args: list[str]) -> bool:
     return True
 
 
+def open_self_in_terminal_for_config(args: argparse.Namespace, reason: str) -> bool:
+    opened = open_script_in_terminal(
+        script=Path(__file__).resolve(),
+        args=[arg for arg in sys.argv[1:] if arg not in {"--non-interactive"}],
+        cwd=Path(__file__).resolve().parents[1],
+        heading="X 日报配置与采集",
+        description=f"{reason}。请在这个 Terminal 窗口完成 X API 配置，脚本随后会继续采集 X 数据。",
+    )
+    if not opened:
+        return False
+    print("已打开 Terminal 窗口用于配置 X API，并会在配置成功后继续采集 X 数据。", flush=True)
+    print(f"配置会保存到：{display_path(Path(__file__).resolve().parents[1] / '.state' / 'api_config.json')}", flush=True)
+    return True
+
+
 def api_configured(bearer_token: str) -> bool:
     return bool(bearer_token)
-
-
-def has_saved_api_credentials(config: dict) -> bool:
-    return any(str(config.get(key) or "") for key in ("bearer_token", "refresh_token", "client_id"))
 
 
 def summarize_child_error(error: subprocess.CalledProcessError) -> str:
@@ -166,6 +178,41 @@ def run_browser_command(cmd: list[str]) -> None:
     subprocess.run(cmd, check=True)
 
 
+def run_configure_api_flow(reason: str, args: argparse.Namespace) -> None:
+    print(f"{reason} Starting X API configuration...", flush=True)
+    if not sys.stdin.isatty():
+        if open_self_in_terminal_for_config(args, reason):
+            raise SystemExit(0)
+        raise SystemExit("当前没有可交互终端，且无法自动打开 Terminal。请在 Terminal 中运行本命令完成 X API 配置。")
+    subprocess.run([sys.executable, str(Path(__file__).with_name("configure_api.py")), "--oauth"], check=True)
+
+
+def load_fresh_api_state(args: argparse.Namespace, config: dict) -> tuple[dict, str, str, str, str, str]:
+    raw_api_config = load_api_config()
+    api_config = refresh_oauth_token_if_needed(raw_api_config)
+    refresh_error = str(api_config.get("refresh_error") or "")
+    saved_bearer_token = "" if refresh_error and not args.bearer_token else str(api_config.get("bearer_token") or "")
+    bearer_token = args.bearer_token or saved_bearer_token
+    api_base = args.api_base or str(api_config.get("api_base") or "https://api.x.com/2")
+    user_id = args.user_id or str(api_config.get("user_id") or "")
+    handle = (args.handle or api_config.get("handle") or config.get("handle") or "").lstrip("@")
+    return api_config, refresh_error, bearer_token, api_base, user_id, handle
+
+
+def api_auth_needs_reconfigure(summary: str) -> bool:
+    lowered = summary.lower()
+    markers = (
+        "unauthorized",
+        "http 401",
+        "no saved api bearer token",
+        "no bearer token",
+        "token refresh failed",
+        "invalid token",
+        "expired token",
+    )
+    return any(marker in lowered for marker in markers)
+
+
 def main() -> None:
     rerun_from_installed_if_needed(__file__)
     args = parse_args()
@@ -185,24 +232,18 @@ def main() -> None:
         print(json.dumps({"config": str(CONFIG_PATH), "saved": bool(args.save_default)}, ensure_ascii=False, indent=2))
         return
     config = load_config()
-    raw_api_config = load_api_config()
-    saved_api_configured = has_saved_api_credentials(raw_api_config)
-    api_config = refresh_oauth_token_if_needed(raw_api_config)
     explicit_bearer_token = bool(args.bearer_token)
+    api_config, refresh_error, bearer_token, api_base, user_id, handle = load_fresh_api_state(args, config)
     refresh_error = str(api_config.get("refresh_error") or "")
-    if refresh_error and not explicit_bearer_token:
-        print(
-            f"Saved X OAuth token refresh failed: {refresh_error}. Run --configure-api to reauthorize, or pass X_BEARER_TOKEN to override.",
-            flush=True,
-        )
-    saved_bearer_token = "" if refresh_error and not explicit_bearer_token else str(api_config.get("bearer_token") or "")
-    bearer_token = args.bearer_token or saved_bearer_token
-    api_base = args.api_base or str(api_config.get("api_base") or "https://api.x.com/2")
-    user_id = args.user_id or str(api_config.get("user_id") or "")
-    handle = (args.handle or api_config.get("handle") or config.get("handle") or "").lstrip("@")
     source = args.source
     if source == "auto":
-        source = "api" if (explicit_bearer_token or saved_api_configured or api_configured(bearer_token)) else "browser"
+        source = "api"
+    if source == "api" and not explicit_bearer_token and (refresh_error or not api_configured(bearer_token)):
+        reason = "X API 配置缺失或已失效" if not refresh_error else f"X API token refresh failed: {refresh_error}"
+        run_configure_api_flow(reason, args)
+        api_config, refresh_error, bearer_token, api_base, user_id, handle = load_fresh_api_state(args, config)
+        if refresh_error or not api_configured(bearer_token):
+            raise SystemExit("X API configuration did not produce a usable token. Re-run configuration and try again.")
     if source == "api" and refresh_error and not explicit_bearer_token:
         raise SystemExit("Saved X OAuth token refresh failed. Re-run --configure-api or pass X_BEARER_TOKEN to use API source. Browser collection will not be opened while API is configured.")
     include_dms = not args.no_dms
@@ -219,16 +260,34 @@ def main() -> None:
     if source == "api" and include_dms:
         print("API source selected. Browser DM collection is not run for API source; use --source browser when DMs are required.", flush=True)
     print(f"Collecting X digest data via {source} source.", flush=True)
-    try:
+    retried_after_reconfigure = False
+    while True:
         if source == "api":
-            run_api_command(cmd, child_env)
+            try:
+                run_api_command(cmd, child_env)
+                break
+            except subprocess.CalledProcessError as exc:
+                summary = summarize_child_error(exc)
+                if not explicit_bearer_token and not retried_after_reconfigure and api_auth_needs_reconfigure(summary):
+                    retried_after_reconfigure = True
+                    run_configure_api_flow(f"X API authentication failed: {summary}", args)
+                    api_config, refresh_error, bearer_token, api_base, user_id, handle = load_fresh_api_state(args, config)
+                    if refresh_error or not api_configured(bearer_token):
+                        raise SystemExit("X API reconfiguration did not produce a usable token.") from exc
+                    cmd = api_command(args, args.out, api_base, user_id, handle)
+                    child_env = os.environ.copy()
+                    child_env["X_BEARER_TOKEN"] = bearer_token
+                    continue
+                print(f"API collection failed: {summary}", file=sys.stderr, flush=True)
+                raise SystemExit(exc.returncode) from exc
         else:
-            run_browser_command(cmd)
-    except subprocess.CalledProcessError as exc:
-        summary = summarize_child_error(exc)
-        source_label = "API" if source == "api" else source.capitalize()
-        print(f"{source_label} collection failed: {summary}", file=sys.stderr, flush=True)
-        raise SystemExit(exc.returncode) from exc
+            try:
+                run_browser_command(cmd)
+                break
+            except subprocess.CalledProcessError as exc:
+                summary = summarize_child_error(exc)
+                print(f"Browser collection failed: {summary}", file=sys.stderr, flush=True)
+                raise SystemExit(exc.returncode) from exc
     out_dir = Path(args.out)
     build_current_context_from_file(
         input_path=out_dir / "digest-input.json",

@@ -8,7 +8,7 @@ The data collection layer has three scripts:
 
 - `scripts/browser_x_digest.py`: local browser collector. It launches a dedicated Chromium profile at `twitter-digest/.state/chrome-profile`, reads X page DOM, and is required for X Chat / DM content.
 - `scripts/api_x_digest.py`: official API collector. It uses saved OAuth2 user-context credentials, `X_BEARER_TOKEN` / `TWITTER_BEARER_TOKEN`, or `--bearer-token` and writes the same `digest-input.*` shape as the browser collector.
-- `scripts/run_daily_digest.py`: upper wrapper. Default source is auto: API when credentials are configured, otherwise browser. Use `--source browser` when the user explicitly wants browser collection.
+- `scripts/run_daily_digest.py`: upper wrapper. Default source is auto/API-first: configure API lazily when credentials are missing or auth is broken, then collect through API. Use `--source browser` when the user explicitly wants browser collection.
 
 Browser mode:
 
@@ -22,10 +22,10 @@ API mode:
 - Intended for stable public-data collection.
 - Requires user-context authorization for user-owned timelines. App-only keys are not enough for home timeline reliability.
 - Reads the official reverse chronological home timeline when the token has user-context timeline access.
-- Normal daily runs use browser collection for DMs. API DM lookup is retained only as TODO/debug because XChat / encrypted messages may not appear in `/2/dm_events`.
+- Normal daily runs use API and do not collect DMs. Browser collection is explicit and is required for visible X Chat / encrypted DM content.
 - Records endpoint-level API failures as data gaps instead of silently treating them as empty pages.
-- DM lookup failures, zero-event API responses, and inconclusive API DM results are recorded as `api_dm_todo`; do not summarize them as empty inboxes. Use browser collection for X Chat / encrypted DMs while waiting for X to fix or document reliable API coverage.
-- Saved OAuth tokens are configured only by the agent-triggered `run_daily_digest.py --configure-api` flow, after the user explicitly asks to configure X API. OAuth2 PKCE is the supported path for user-owned local X Apps: the user provides the Client ID, authorizes the app in the browser, and the script saves the access token plus refresh token. OAuth2 tokens are refreshed automatically when a refresh token is saved.
+- Authentication/configuration failures trigger API configuration and one retry from the main command. Permissions, tier limits, rate limits, and endpoint failures do not fall back to browser.
+- Saved OAuth tokens are configured by the agent-triggered `run_daily_digest.py --configure-api` flow or lazily by `run_daily_digest.py` when collection needs credentials. OAuth2 PKCE is the supported path for user-owned local X Apps: the user provides the Client ID, authorizes the app in the browser, and the script saves the access token plus refresh token. OAuth2 tokens are refreshed automatically when a refresh token is saved.
 
 Chat-triggered API setup:
 
@@ -48,11 +48,7 @@ Typical chat run:
 python3 twitter-digest/scripts/run_daily_digest.py
 ```
 
-Visible DM collection is enabled by default. To skip DMs:
-
-```bash
-python3 twitter-digest/scripts/run_daily_digest.py --no-dms
-```
+Visible DM collection is not part of API mode. Use `--source browser` when the user explicitly wants browser-visible X Chat / DM content.
 
 Optional keyword search is off by default. Use it only when the user explicitly asks:
 
@@ -63,7 +59,7 @@ python3 twitter-digest/scripts/run_daily_digest.py --keywords "query one,query t
 Force a visible browser window for debugging:
 
 ```bash
-python3 twitter-digest/scripts/run_daily_digest.py --headed
+python3 twitter-digest/scripts/run_daily_digest.py --source browser --headed
 ```
 
 For unattended scheduled runs that should not open a visible browser or wait on passcode recovery:

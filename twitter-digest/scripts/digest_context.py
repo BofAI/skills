@@ -8,7 +8,7 @@ import datetime as dt
 import json
 import re
 from pathlib import Path
-from typing import Any
+from typing import Any, Optional
 
 from script_utils import format_local_time, local_timezone_name, now_iso
 
@@ -27,7 +27,7 @@ def parse_args() -> argparse.Namespace:
     return parser.parse_args()
 
 
-def build_current_context_from_file(input_path: Path, out_dir: Path, markdown_path: Path | None = None) -> dict[str, Any]:
+def build_current_context_from_file(input_path: Path, out_dir: Path, markdown_path: Optional[Path] = None) -> dict[str, Any]:
     data = json.loads(input_path.read_text(encoding="utf-8"))
     out_dir.mkdir(parents=True, exist_ok=True)
     try:
@@ -359,7 +359,7 @@ def author_from_url(value: Any) -> str:
     return match.group(1) if match else ""
 
 
-def parse_item_time(value: Any) -> dt.datetime | None:
+def parse_item_time(value: Any) -> Optional[dt.datetime]:
     text = str(value or "").strip()
     if not text:
         return None

@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from pathlib import Path
+from typing import Optional
 
 
 ERROR_MARKERS = [
@@ -19,7 +20,7 @@ ERROR_MARKERS = [
 ]
 
 
-def summarize_collector_error(text: str, returncode: int | None = None) -> str:
+def summarize_collector_error(text: str, returncode: Optional[int] = None) -> str:
     if not text:
         return f"collector exited with code {returncode}" if returncode is not None else ""
     matched = [marker for marker in ERROR_MARKERS if marker in text]

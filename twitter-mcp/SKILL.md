@@ -79,18 +79,19 @@ From the repository `skills/` directory:
 For a one-line Codex install from this beta tag:
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/BofAI/skills/v1.5.11/twitter-mcp/install.sh | env X_MCP_REGISTER_CODEX=1 X_MCP_REGISTER_CLAUDE=0 sh
+curl -fsSL https://raw.githubusercontent.com/BofAI/skills/v1.5.11-beta.30/twitter-mcp/install.sh | env X_MCP_REGISTER_CODEX=1 X_MCP_REGISTER_CLAUDE=0 sh
 ```
 
 For a one-line Claude Code install from this beta tag:
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/BofAI/skills/v1.5.11/twitter-mcp/install.sh | env X_MCP_REGISTER_CODEX=0 X_MCP_REGISTER_CLAUDE=1 sh
+curl -fsSL https://raw.githubusercontent.com/BofAI/skills/v1.5.11-beta.30/twitter-mcp/install.sh | env X_MCP_REGISTER_CODEX=0 X_MCP_REGISTER_CLAUDE=1 sh
 ```
 
 The installer:
 
 - Installs this `twitter-mcp` skill into the selected local skills directory.
+- Reinstalling is the upgrade path: it replaces the skill code and preserves the existing installed `.state` directory.
 - Requires Node.js 18+ and npm. Node.js 20 LTS+ is recommended.
 - Installs `@xdevplatform/xurl` globally with npm.
 - Opens the X OAuth2 authorization flow.

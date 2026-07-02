@@ -1,7 +1,7 @@
 #!/bin/sh
 set -eu
 
-TAG="${X_MCP_INSTALL_TAG:-v1.5.11}"
+TAG="${X_MCP_INSTALL_TAG:-v1.5.11-beta.30}"
 BASE_URL="${X_MCP_INSTALL_BASE_URL:-https://raw.githubusercontent.com/BofAI/skills/${TAG}/twitter-mcp}"
 REGISTER_CODEX="${X_MCP_REGISTER_CODEX:-1}"
 REGISTER_CLAUDE="${X_MCP_REGISTER_CLAUDE:-auto}"
@@ -116,6 +116,8 @@ download_file() {
   fi
 }
 
+RESTORED_BACKUP=""
+
 should_install_claude_skill() {
   if truthy "$REGISTER_CLAUDE"; then
     return 0
@@ -129,6 +131,7 @@ should_install_claude_skill() {
 backup_existing_skill() {
   target="$1"
   skills_dir="$2"
+  RESTORED_BACKUP=""
   if [ ! -e "$target" ] && [ ! -L "$target" ]; then
     return 0
   fi
@@ -145,7 +148,24 @@ backup_existing_skill() {
   if [ -f "$backup/SKILL.md" ]; then
     mv "$backup/SKILL.md" "$backup/SKILL.md.disabled"
   fi
+  RESTORED_BACKUP="$backup"
   info "Existing twitter-mcp skill moved to $backup"
+}
+
+restore_state_from_backup() {
+  backup="$1"
+  target="$2"
+  if [ -z "$backup" ]; then
+    return 0
+  fi
+  if [ ! -d "$backup/.state" ]; then
+    return 0
+  fi
+  if [ -e "$target/.state" ] || [ -L "$target/.state" ]; then
+    return 0
+  fi
+  cp -R "$backup/.state" "$target/.state"
+  info "Preserved existing state: $target/.state"
 }
 
 install_skill_copy() {
@@ -162,6 +182,7 @@ install_skill_copy() {
   mkdir -p "$skills_dir"
   backup_existing_skill "$target" "$skills_dir"
   mv "$staging" "$target"
+  restore_state_from_backup "$RESTORED_BACKUP" "$target"
   info "Installed twitter-mcp skill to $target"
 }
 

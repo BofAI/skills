@@ -15,7 +15,7 @@ import datetime as dt
 import json
 import urllib.parse
 from pathlib import Path
-from typing import Any
+from typing import Any, Optional
 
 from browser_lifecycle import ensure_logged_in, launch_browser, stop_browser, wait_for_login
 from cdp_client import cdp_call, cdp_error, wait_for_cdp_page_ws
@@ -50,7 +50,7 @@ def parse_args() -> argparse.Namespace:
     return parser.parse_args()
 
 
-def build_pages(handle: str | None, keywords: str, include_dms: bool, dm_only: bool = False) -> list[dict[str, str]]:
+def build_pages(handle: Optional[str], keywords: str, include_dms: bool, dm_only: bool = False) -> list[dict[str, str]]:
     if dm_only:
         return [{"kind": "messages", "url": "https://x.com/messages"}] if include_dms else []
     pages = [{"kind": "home", "url": "https://x.com/home"}]

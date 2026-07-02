@@ -13,7 +13,7 @@ import urllib.error
 import urllib.parse
 import urllib.request
 from pathlib import Path
-from typing import Any
+from typing import Any, Optional
 
 from digest_io import write_digest_output
 
@@ -44,7 +44,7 @@ def auth_headers(args: argparse.Namespace) -> dict[str, str]:
     return {"User-Agent": "twitter-digest/1.0"}
 
 
-def api_get(args: argparse.Namespace, path: str, params: dict[str, Any] | None = None) -> dict[str, Any]:
+def api_get(args: argparse.Namespace, path: str, params: Optional[dict[str, Any]] = None) -> dict[str, Any]:
     query = urllib.parse.urlencode({k: v for k, v in (params or {}).items() if v is not None and v != ""})
     url = args.api_base.rstrip("/") + path
     if query:
@@ -60,7 +60,7 @@ def api_get(args: argparse.Namespace, path: str, params: dict[str, Any] | None =
         raise RuntimeError(f"GET {path} failed: {exc}") from exc
 
 
-def resolve_user(args: argparse.Namespace, handle: str | None, user_id: str | None) -> dict[str, str]:
+def resolve_user(args: argparse.Namespace, handle: Optional[str], user_id: Optional[str]) -> dict[str, str]:
     if user_id:
         try:
             result = api_get(args, f"/users/{user_id}", {"user.fields": "username,name"})
@@ -228,7 +228,7 @@ def normalize_tweets(raw: list[dict[str, Any]], includes: dict[str, Any], source
     return out
 
 
-def parse_time(value: Any) -> dt.datetime | None:
+def parse_time(value: Any) -> Optional[dt.datetime]:
     if not value:
         return None
     try:

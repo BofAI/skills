@@ -11,7 +11,7 @@ import struct
 import time
 import urllib.parse
 import urllib.request
-from typing import Any
+from typing import Any, Optional
 
 
 def wait_for_cdp(port: int) -> None:
@@ -29,7 +29,7 @@ def wait_for_cdp(port: int) -> None:
 def wait_for_cdp_page_ws(port: int) -> str:
     url = f"http://127.0.0.1:{port}/json/list"
     deadline = time.time() + 30
-    fallback: str | None = None
+    fallback: Optional[str] = None
     while time.time() < deadline:
         try:
             with urllib.request.urlopen(url, timeout=1) as response:
@@ -74,10 +74,10 @@ def cdp_eval(ws_url: str, expression: str) -> Any:
 def cdp_error(result: Any) -> bool:
     return isinstance(result, dict) and isinstance(result.get("_cdp_error"), str)
 
-def cdp_call(ws_url: str, method: str, params: dict[str, Any] | None = None, retries: int = 2) -> Any:
+def cdp_call(ws_url: str, method: str, params: Optional[dict[str, Any]] = None, retries: int = 2) -> Any:
     last_error = ""
     for _ in range(max(retries, 1)):
-        sock: socket.socket | None = None
+        sock: Optional[socket.socket] = None
         try:
             sock = websocket_connect(ws_url)
             websocket_send_json(sock, {"id": 1, "method": method, "params": params or {}})
