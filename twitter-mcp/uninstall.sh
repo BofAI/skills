@@ -6,6 +6,7 @@ PURGE_STATE="${X_MCP_PURGE_STATE:-0}"
 REMOVE_MCP_CONFIG="${X_MCP_REMOVE_MCP_CONFIG:-1}"
 REMOVE_XURL_APP="${X_MCP_REMOVE_XURL_APP:-1}"
 UNINSTALL_XURL="${X_MCP_UNINSTALL_XURL:-1}"
+REMOVE_XURL_CONFIG="${X_MCP_REMOVE_XURL_CONFIG:-auto}"
 SERVER_NAME="${X_MCP_SERVER_NAME:-xapi}"
 APP_NAME="${X_MCP_APP_NAME:-xmcp}"
 DRY_RUN=0
@@ -28,14 +29,15 @@ truthy() {
 
 usage() {
   cat <<'EOF'
-Usage: uninstall.sh [--client auto|codex|claude|all] [--purge-state] [--keep-mcp-config] [--keep-xurl-app] [--keep-xurl] [--dry-run]
+Usage: uninstall.sh [--client auto|codex|claude|all] [--purge-state] [--keep-mcp-config] [--keep-xurl-app] [--keep-xurl] [--keep-xurl-config] [--dry-run]
 
 Default uninstall moves installed twitter-mcp skill directories to .backups/
 and disables SKILL.md, preserving .state in the backup. With --purge-state,
 the active install and existing twitter-mcp backups are permanently removed.
 Uninstall also removes the matching xapi MCP registration and the xmcp xurl
 OAuth app/tokens created by the installer, then uninstalls the global
-@xdevplatform/xurl package.
+@xdevplatform/xurl package. With --purge-state, it also removes ~/.xurl so
+custom-named xurl apps and tokens cannot be reused after reinstall.
 
 Options:
   --client             Target client. Default: auto.
@@ -46,6 +48,8 @@ Options:
   --remove-xurl-app    Remove the xmcp xurl app and tokens (default).
   --keep-xurl          Keep the global @xdevplatform/xurl package.
   --uninstall-xurl     Run npm uninstall -g @xdevplatform/xurl (default).
+  --keep-xurl-config   Keep ~/.xurl even with --purge-state.
+  --remove-xurl-config Remove ~/.xurl.
   --dry-run            Print actions without changing files.
 EOF
 }
@@ -87,6 +91,14 @@ while [ "$#" -gt 0 ]; do
       ;;
     --keep-xurl)
       UNINSTALL_XURL=0
+      shift
+      ;;
+    --remove-xurl-config)
+      REMOVE_XURL_CONFIG=1
+      shift
+      ;;
+    --keep-xurl-config)
+      REMOVE_XURL_CONFIG=0
       shift
       ;;
     --dry-run)
@@ -255,6 +267,27 @@ remove_xurl_app() {
   fi
 }
 
+remove_xurl_config() {
+  remove_config="$REMOVE_XURL_CONFIG"
+  if [ "$remove_config" = "auto" ]; then
+    if truthy "$PURGE_STATE"; then
+      remove_config=1
+    else
+      remove_config=0
+    fi
+  fi
+  if ! truthy "$remove_config"; then
+    return 0
+  fi
+  config_dir="$HOME/.xurl"
+  if [ "$DRY_RUN" = "1" ]; then
+    info "Would permanently remove $config_dir"
+    return 0
+  fi
+  rm -rf "$config_dir"
+  info "Removed $config_dir"
+}
+
 targets="$CLIENT"
 if [ "$CLIENT" = "auto" ]; then
   targets="$(detect_client)"
@@ -280,4 +313,5 @@ case "$targets" in
 esac
 
 remove_xurl_app
+remove_xurl_config
 remove_xurl
