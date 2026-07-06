@@ -20,7 +20,7 @@ def render_markdown(data: dict[str, Any]) -> str:
         "# X 采集输入",
         "",
         f"- 生成时间: `{data['generated_at']}`",
-        f"- 浏览器 profile: `{data.get('profile_dir') or ''}`",
+        f"- 数据源: `{data.get('source') or 'api'}`",
         f"- 当前账号: `{data.get('handle') or ''}`",
         "",
     ]
@@ -64,9 +64,9 @@ def render_markdown(data: dict[str, Any]) -> str:
         [
             "## 数据缺口",
             "",
-            "- 浏览器采集依赖 X 页面结构和已加载的可见内容。",
-            "- 日报默认使用较小滚动次数；需要更全覆盖时再提高 `--scrolls`。",
-            "- DM 属于私密内容。只有用户明确同意本地读取时才使用 `--include-dms`。",
+            "- API 采集受 X API 权限、套餐、端点可用性和限流影响。",
+            "- DM / X Chat 可能不会完整出现在 API 结果中；不要把 0 条 API DM 当作没有私信。",
+            "- DM 属于私密内容，不写长期 memory 或 daily archive。",
         ]
     )
     return "\n".join(lines) + "\n"

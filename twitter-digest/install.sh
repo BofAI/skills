@@ -1,12 +1,11 @@
 #!/bin/sh
 set -eu
 
-TAG="${TWITTER_DIGEST_INSTALL_TAG:-v1.5.12-beta.12}"
+TAG="${TWITTER_DIGEST_INSTALL_TAG:-v1.5.13-beta.2}"
 REPO="${TWITTER_DIGEST_INSTALL_REPO:-https://github.com/BofAI/skills.git}"
 CLIENT="${TWITTER_DIGEST_INSTALL_CLIENT:-auto}"
 ALLOW_CLAUDE_COMMANDS="${TWITTER_DIGEST_ALLOW_CLAUDE_COMMANDS:-0}"
 ALLOW_CLAUDE_STATE_READ="${TWITTER_DIGEST_ALLOW_CLAUDE_STATE_READ:-0}"
-SKIP_BROWSER_CHECK="${TWITTER_DIGEST_SKIP_BROWSER_CHECK:-0}"
 OPEN_TERMINAL="${TWITTER_DIGEST_OPEN_TERMINAL:-auto}"
 
 info() {
@@ -78,7 +77,7 @@ open_self_in_terminal_and_exit() {
   for arg in "$@"; do
     args_text="${args_text} $(shell_quote "$arg")"
   done
-  command_text="cd ~ && TMPDIR=\"\$(mktemp -d)\" && INSTALL_SH=\"\$TMPDIR/twitter-digest-install.sh\" && curl -fsSL $(shell_quote "$installer_url") -o \"\$INSTALL_SH\" && chmod 700 \"\$INSTALL_SH\" && env TWITTER_DIGEST_TERMINAL_CHILD=1 TWITTER_DIGEST_OPEN_TERMINAL=0 TWITTER_DIGEST_INSTALL_TAG=$(shell_quote "$TAG") TWITTER_DIGEST_INSTALL_REPO=$(shell_quote "$REPO") TWITTER_DIGEST_INSTALL_CLIENT=$(shell_quote "$CLIENT") TWITTER_DIGEST_ALLOW_CLAUDE_COMMANDS=$(shell_quote "$ALLOW_CLAUDE_COMMANDS") TWITTER_DIGEST_ALLOW_CLAUDE_STATE_READ=$(shell_quote "$ALLOW_CLAUDE_STATE_READ") TWITTER_DIGEST_SKIP_BROWSER_CHECK=$(shell_quote "$SKIP_BROWSER_CHECK") /bin/sh \"\$INSTALL_SH\"${args_text}; printf '\\nPress Enter to close this window...'; IFS= read -r _"
+  command_text="cd ~ && TMPDIR=\"\$(mktemp -d)\" && INSTALL_SH=\"\$TMPDIR/twitter-digest-install.sh\" && curl -fsSL $(shell_quote "$installer_url") -o \"\$INSTALL_SH\" && chmod 700 \"\$INSTALL_SH\" && env TWITTER_DIGEST_TERMINAL_CHILD=1 TWITTER_DIGEST_OPEN_TERMINAL=0 TWITTER_DIGEST_INSTALL_TAG=$(shell_quote "$TAG") TWITTER_DIGEST_INSTALL_REPO=$(shell_quote "$REPO") TWITTER_DIGEST_INSTALL_CLIENT=$(shell_quote "$CLIENT") TWITTER_DIGEST_ALLOW_CLAUDE_COMMANDS=$(shell_quote "$ALLOW_CLAUDE_COMMANDS") TWITTER_DIGEST_ALLOW_CLAUDE_STATE_READ=$(shell_quote "$ALLOW_CLAUDE_STATE_READ") /bin/sh \"\$INSTALL_SH\"${args_text}; printf '\\nPress Enter to close this window...'; IFS= read -r _"
   osascript >/dev/null <<OSA
 tell application "Terminal"
   activate
@@ -126,10 +125,6 @@ fi
 
 if truthy "$ALLOW_CLAUDE_STATE_READ"; then
   args="$args --allow-claude-state-read"
-fi
-
-if truthy "$SKIP_BROWSER_CHECK"; then
-  args="$args --skip-browser-check"
 fi
 
 info "Running twitter-digest installer"
