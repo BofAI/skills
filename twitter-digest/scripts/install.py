@@ -7,7 +7,6 @@ import argparse
 import datetime as dt
 import json
 import os
-import shutil as shutil_module
 import shutil
 import sys
 from pathlib import Path
@@ -42,7 +41,6 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--skills-dir", default="", help="Override the target skills directory.")
     parser.add_argument("--copy", action="store_true", help="Copy files instead of creating a symlink. This is the default.")
     parser.add_argument("--symlink", action="store_true", help="Install as a symlink for local skill development.")
-    parser.add_argument("--skip-browser-check", action="store_true", help="Skip checking for a supported Chromium browser.")
     parser.add_argument(
         "--allow-claude-commands",
         action="store_true",
@@ -67,45 +65,9 @@ def skill_root() -> Path:
     return Path(__file__).resolve().parents[1]
 
 
-def browser_candidates() -> list[str]:
-    return [
-        "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome",
-        "/Applications/Chromium.app/Contents/MacOS/Chromium",
-        "/Applications/Microsoft Edge.app/Contents/MacOS/Microsoft Edge",
-        "/Applications/Brave Browser.app/Contents/MacOS/Brave Browser",
-        "google-chrome",
-        "google-chrome-stable",
-        "chromium",
-        "chromium-browser",
-        "microsoft-edge",
-        "brave-browser",
-    ]
-
-
-def find_supported_browser() -> Optional[str]:
-    for candidate in browser_candidates():
-        path = Path(candidate).expanduser()
-        if path.is_absolute() and path.exists():
-            return str(path)
-        resolved = shutil_module.which(candidate)
-        if resolved:
-            return resolved
-    return None
-
-
-def check_runtime(skip_browser_check: bool) -> None:
+def check_runtime() -> None:
     if sys.version_info < (3, 9):
         raise SystemExit("Python 3.9+ is required to run twitter-digest. Install or switch python3, then rerun this installer.")
-    if skip_browser_check:
-        print("Skipped browser check. Runtime still requires Chrome, Chromium, Edge, or Brave.", flush=True)
-        return
-    browser = find_supported_browser()
-    if not browser:
-        raise SystemExit(
-            "No supported Chromium browser found. Install one of: Google Chrome, Chromium, Microsoft Edge, or Brave. "
-            "Then rerun the installer. Use --skip-browser-check only if the browser will be installed later."
-        )
-    print(f"Supported browser found: {display_path(Path(browser))}", flush=True)
 
 
 def backup_path(skills_dir: Path, name: str) -> Path:
@@ -284,7 +246,7 @@ def write_claude_settings(target: Path, dry_run: bool, allow_commands: bool, all
 
 def main() -> None:
     args = parse_args()
-    check_runtime(args.skip_browser_check)
+    check_runtime()
     root = skill_root()
     copy = args.copy or not args.symlink
     client = detect_client() if args.client == "auto" else args.client
