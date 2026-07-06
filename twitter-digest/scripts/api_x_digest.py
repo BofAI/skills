@@ -437,16 +437,16 @@ def collect_api(args: argparse.Namespace) -> dict[str, Any]:
         dm_summary = normalize_dm_events(dm_window_raw, dm_includes, user_id, max_threads=50)
         if dm_errors:
             dm_status = "api_dm_todo"
-            dm_note = "TODO: X API DM lookup failed. Do not treat this as an empty inbox; use browser DM collection if DM coverage is required."
-            dm_todo_detail = "API DM request failed; check OAuth2 dm.read scope, Project/API access, rate limits, or use browser DM collection."
+            dm_note = "TODO: X API DM lookup failed. Do not treat this as an empty inbox."
+            dm_todo_detail = "API DM request failed; check OAuth2 dm.read scope, Project/API access, or rate limits."
         elif dm_summary["visible_count"] == 0:
             dm_status = "api_dm_todo"
-            dm_note = "TODO: X API returned 0 DM events in the digest window. XChat/encrypted messages may not be exposed through DM Events API; use browser DM collection if DM coverage is required."
-            dm_todo_detail = "API DM returned 0 events; verify with browser X Chat before saying there are no DMs."
+            dm_note = "TODO: X API returned 0 DM events in the digest window. XChat/encrypted messages may not be exposed through DM Events API; do not claim there are no DMs."
+            dm_todo_detail = "API DM returned 0 events; do not say there are no DMs."
         elif dm_summary["unreplied_count"] == 0:
             dm_status = "api_dm_todo"
-            dm_note = "TODO: X API returned DM events but no waiting-reply conversation. Browser X Chat should be checked before concluding no DM action is needed."
-            dm_todo_detail = "API DM has events but no waiting-reply thread; browser DM collection remains authoritative for XChat/encrypted conversations."
+            dm_note = "TODO: X API returned DM events but no waiting-reply conversation. Do not conclude no DM action is needed from API alone."
+            dm_todo_detail = "API DM has events but no waiting-reply thread; XChat/encrypted conversations may be missing from API."
         else:
             dm_status = "captured_unreplied_threads"
             dm_note = "X API DM lookup captured recent waiting-reply conversations. API events are limited by X API retention, permissions, and rate limits."

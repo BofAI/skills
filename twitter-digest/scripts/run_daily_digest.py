@@ -12,7 +12,7 @@ from pathlib import Path
 from typing import Optional
 
 from api_config_store import load_api_config, refresh_oauth_token_if_needed
-from collector_commands import api_collector_command, browser_collector_command, summarize_collector_error
+from collector_commands import api_collector_command, summarize_collector_error
 from digest_context import build_current_context_from_file
 from script_utils import display_path, open_script_in_terminal, rerun_from_installed_if_needed
 
@@ -21,7 +21,7 @@ STATE_DIR = Path(__file__).resolve().parents[1] / ".state"
 CONFIG_PATH = STATE_DIR / "config.json"
 DEFAULT_OUT_DIR = STATE_DIR / "run"
 DEFAULT_API_PUBLIC_ITEMS = 300
-DEFAULT_BROWSER_PUBLIC_ITEMS = 100
+UNSUPPORTED_OPTION_MESSAGE = "Source selection is no longer supported. twitter-digest uses API only."
 
 
 def parse_args() -> argparse.Namespace:
@@ -30,35 +30,39 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--account-name")
     parser.add_argument("--save-default", action="store_true", help="Save --handle/--account-name as the default account for future chat runs.")
     parser.add_argument("--configure-only", action="store_true", help="Only save default account config; do not collect data.")
-    parser.add_argument("--keywords", default="", help="Optional comma-separated search queries. Default is empty; the daily digest focuses on timeline, mentions, and DMs.")
+    parser.add_argument("--keywords", default="", help="Optional comma-separated search queries. Default is empty; the daily digest focuses on timeline and mentions.")
     parser.add_argument("--out", default=str(DEFAULT_OUT_DIR))
-    parser.add_argument("--source", choices=("auto", "browser", "api"), default="auto", help="Data collection source. Default auto uses API, configuring or reconfiguring it when needed. Use browser to force local browser collection.")
     parser.add_argument("--configure-api", action="store_true", help="Open a secure prompt to save X API credentials, then exit.")
     parser.add_argument("--configure-api-token", action="store_true", help="Open a secure prompt to paste an existing X user access token, then exit.")
     parser.add_argument("--api-base", default=os.environ.get("X_API_BASE_URL") or "")
     parser.add_argument("--user-id", default=os.environ.get("X_USER_ID") or os.environ.get("TWITTER_USER_ID") or "")
     parser.add_argument("--bearer-token", default=os.environ.get("X_BEARER_TOKEN") or os.environ.get("TWITTER_BEARER_TOKEN") or "")
-    parser.add_argument("--include-dms", action="store_true", help="Include visible DMs. This is already the default; kept for compatibility.")
-    parser.add_argument("--no-dms", action="store_true", help="Skip X Messages collection for this run.")
-    parser.add_argument("--dm-threads", type=int, default=5)
-    parser.add_argument("--dm-list-scrolls", type=int, default=20, help="Maximum downward scroll rounds used to scan today's DM conversation list.")
-    parser.add_argument("--dm-scrolls", type=int, default=200, help="Maximum upward scroll rounds per opened DM thread.")
-    parser.add_argument("--dm-max-messages", type=int, default=2000, help="Maximum message bubbles kept per opened DM thread.")
+    parser.add_argument("--include-dms", action="store_true", help=argparse.SUPPRESS)
+    parser.add_argument("--no-dms", action="store_true", help=argparse.SUPPRESS)
+    parser.add_argument("--dm-threads", type=int, default=5, help=argparse.SUPPRESS)
+    parser.add_argument("--dm-list-scrolls", type=int, default=20, help=argparse.SUPPRESS)
+    parser.add_argument("--dm-scrolls", type=int, default=200, help=argparse.SUPPRESS)
+    parser.add_argument("--dm-max-messages", type=int, default=2000, help=argparse.SUPPRESS)
     parser.add_argument("--dm-max-events", type=int, default=300, help="Maximum Direct Message API events kept per run.")
-    parser.add_argument("--dm-window-hours", type=int, default=0, help="Stop loading older DM history once messages beyond this window are detected. 0 means load full available thread history.")
-    parser.add_argument("--scrolls", type=int, default=40, help="Maximum scroll rounds per public page.")
-    parser.add_argument("--min-public-scrolls", type=int, default=5, help="Minimum public-page scroll rounds before early stop rules can end collection.")
+    parser.add_argument("--dm-window-hours", type=int, default=0, help=argparse.SUPPRESS)
+    parser.add_argument("--scrolls", type=int, default=40, help=argparse.SUPPRESS)
+    parser.add_argument("--min-public-scrolls", type=int, default=5, help=argparse.SUPPRESS)
     parser.add_argument(
         "--max-public-items",
         type=int,
         default=None,
-        help="Override maximum public post items for both collectors. Defaults: API 300, browser 100.",
+        help="Override maximum public post items for API collection. Default: API 300.",
     )
     parser.add_argument("--public-window-hours", type=int, default=24, help="Stop loading older public timeline items once posts beyond this window are detected.")
-    parser.add_argument("--headless", action="store_true", help="Run browser collection headlessly. This is the default when login is already saved.")
-    parser.add_argument("--headed", action="store_true", help="Force a visible browser window for debugging or manual login.")
-    parser.add_argument("--non-interactive", action="store_true", help="Do not open a visible browser for DM passcode recovery; record a data gap instead.")
-    return parser.parse_args()
+    parser.add_argument("--headless", action="store_true", help=argparse.SUPPRESS)
+    parser.add_argument("--headed", action="store_true", help=argparse.SUPPRESS)
+    parser.add_argument("--non-interactive", action="store_true", help=argparse.SUPPRESS)
+    args, unknown = parser.parse_known_args()
+    if "--source" in unknown or any(arg.startswith("--source=") for arg in unknown):
+        raise SystemExit(UNSUPPORTED_OPTION_MESSAGE)
+    if unknown:
+        parser.error(f"unrecognized arguments: {' '.join(unknown)}")
+    return args
 
 
 def load_config() -> dict:
@@ -88,7 +92,7 @@ def open_config_in_terminal(extra_args: list[str]) -> bool:
         args=extra_args,
         cwd=Path(__file__).resolve().parents[1],
         heading="X API 配置向导",
-        description="使用 OAuth2 PKCE，需要 X Developer App 的 Client ID，并通过浏览器授权账号。",
+        description="使用 OAuth2 PKCE，需要 X Developer App 的 Client ID，并完成 X OAuth2 授权。",
     )
     if not opened:
         return False
@@ -134,10 +138,6 @@ def api_public_item_limit(args: argparse.Namespace) -> int:
     return max(1, int(args.max_public_items if args.max_public_items is not None else DEFAULT_API_PUBLIC_ITEMS))
 
 
-def browser_public_item_limit(args: argparse.Namespace) -> int:
-    return max(1, int(args.max_public_items if args.max_public_items is not None else DEFAULT_BROWSER_PUBLIC_ITEMS))
-
-
 def api_command(args: argparse.Namespace, out_dir: str, api_base: str, user_id: str, handle: str) -> list[str]:
     return api_collector_command(
         sys.executable,
@@ -152,40 +152,10 @@ def api_command(args: argparse.Namespace, out_dir: str, api_base: str, user_id: 
         handle=handle,
     )
 
-
-def browser_command(args: argparse.Namespace, out_dir: str, handle: str, include_dms: bool, dm_only: bool = False) -> list[str]:
-    return browser_collector_command(
-        sys.executable,
-        Path(__file__).resolve().parent,
-        out_dir,
-        keywords=args.keywords,
-        max_public_items=browser_public_item_limit(args),
-        public_window_hours=args.public_window_hours,
-        min_public_scrolls=args.min_public_scrolls,
-        scrolls=args.scrolls,
-        dm_threads=args.dm_threads,
-        dm_list_scrolls=args.dm_list_scrolls,
-        dm_scrolls=args.dm_scrolls,
-        dm_max_messages=args.dm_max_messages,
-        dm_window_hours=args.dm_window_hours,
-        handle=handle,
-        include_dms=include_dms,
-        dm_only=dm_only,
-        headed=args.headed,
-        headless=args.headless,
-        non_interactive=args.non_interactive,
-    )
-
-
 def run_api_command(cmd: list[str], env: dict[str, str]) -> None:
     completed = subprocess.run(cmd, check=True, env=env, capture_output=True, text=True)
     if completed.stdout:
         print(completed.stdout.strip(), flush=True)
-
-
-def run_browser_command(cmd: list[str]) -> None:
-    subprocess.run(cmd, check=True)
-
 
 def run_configure_api_flow(reason: str, args: argparse.Namespace) -> None:
     print(f"{reason} Starting X API configuration...", flush=True)
@@ -244,59 +214,40 @@ def main() -> None:
     explicit_bearer_token = bool(args.bearer_token)
     api_config, refresh_error, bearer_token, api_base, user_id, handle = load_fresh_api_state(args, config)
     refresh_error = str(api_config.get("refresh_error") or "")
-    source = args.source
-    if source == "auto":
-        source = "api" if api_configuration_present(api_config, bearer_token) else "browser"
-    if source == "api" and not explicit_bearer_token and (refresh_error or not api_configured(bearer_token)):
+    if not explicit_bearer_token and (refresh_error or not api_configured(bearer_token)):
         reason = "X API 配置缺失或已失效" if not refresh_error else f"X API token refresh failed: {refresh_error}"
         run_configure_api_flow(reason, args)
         api_config, refresh_error, bearer_token, api_base, user_id, handle = load_fresh_api_state(args, config)
         if refresh_error or not api_configured(bearer_token):
             raise SystemExit("X API configuration did not produce a usable token. Re-run configuration and try again.")
-    if source == "api" and refresh_error and not explicit_bearer_token:
-        raise SystemExit("Saved X OAuth token refresh failed. Re-run --configure-api or pass X_BEARER_TOKEN to use API source. Browser collection will not be opened while API is configured.")
-    include_dms = not args.no_dms
-    if args.include_dms:
-        include_dms = True
-    if source == "api":
-        cmd = api_command(args, args.out, api_base, user_id, handle)
-        child_env = os.environ.copy()
-        if bearer_token:
-            child_env["X_BEARER_TOKEN"] = bearer_token
-    else:
-        cmd = browser_command(args, args.out, handle, include_dms)
-        child_env = None
-    if source == "api" and include_dms:
-        print("API source selected. Browser DM collection is not run for API source; use --source browser when DMs are required.", flush=True)
-    print(f"Collecting X digest data via {source} source.", flush=True)
+    if refresh_error and not explicit_bearer_token:
+        raise SystemExit("Saved X OAuth token refresh failed. Re-run --configure-api or pass X_BEARER_TOKEN to use API source.")
+    cmd = api_command(args, args.out, api_base, user_id, handle)
+    child_env = os.environ.copy()
+    if bearer_token:
+        child_env["X_BEARER_TOKEN"] = bearer_token
+    if args.include_dms and not args.no_dms:
+        print("DM collection is not supported in this API-only digest.", flush=True)
+    print("Collecting X digest data via API.", flush=True)
     retried_after_reconfigure = False
     while True:
-        if source == "api":
-            try:
-                run_api_command(cmd, child_env)
-                break
-            except subprocess.CalledProcessError as exc:
-                summary = summarize_child_error(exc)
-                if not explicit_bearer_token and not retried_after_reconfigure and api_auth_needs_reconfigure(summary):
-                    retried_after_reconfigure = True
-                    run_configure_api_flow(f"X API authentication failed: {summary}", args)
-                    api_config, refresh_error, bearer_token, api_base, user_id, handle = load_fresh_api_state(args, config)
-                    if refresh_error or not api_configured(bearer_token):
-                        raise SystemExit("X API reconfiguration did not produce a usable token.") from exc
-                    cmd = api_command(args, args.out, api_base, user_id, handle)
-                    child_env = os.environ.copy()
-                    child_env["X_BEARER_TOKEN"] = bearer_token
-                    continue
-                print(f"API collection failed: {summary}", file=sys.stderr, flush=True)
-                raise SystemExit(exc.returncode) from exc
-        else:
-            try:
-                run_browser_command(cmd)
-                break
-            except subprocess.CalledProcessError as exc:
-                summary = summarize_child_error(exc)
-                print(f"Browser collection failed: {summary}", file=sys.stderr, flush=True)
-                raise SystemExit(exc.returncode) from exc
+        try:
+            run_api_command(cmd, child_env)
+            break
+        except subprocess.CalledProcessError as exc:
+            summary = summarize_child_error(exc)
+            if not explicit_bearer_token and not retried_after_reconfigure and api_auth_needs_reconfigure(summary):
+                retried_after_reconfigure = True
+                run_configure_api_flow(f"X API authentication failed: {summary}", args)
+                api_config, refresh_error, bearer_token, api_base, user_id, handle = load_fresh_api_state(args, config)
+                if refresh_error or not api_configured(bearer_token):
+                    raise SystemExit("X API reconfiguration did not produce a usable token.") from exc
+                cmd = api_command(args, args.out, api_base, user_id, handle)
+                child_env = os.environ.copy()
+                child_env["X_BEARER_TOKEN"] = bearer_token
+                continue
+            print(f"API collection failed: {summary}", file=sys.stderr, flush=True)
+            raise SystemExit(exc.returncode) from exc
     out_dir = Path(args.out)
     build_current_context_from_file(
         input_path=out_dir / "digest-input.json",
@@ -314,7 +265,7 @@ def main() -> None:
         "debug_raw_markdown": str(out_dir / "digest-input.md"),
         "debug_raw_json": str(out_dir / "digest-input.json"),
         "memory": "disabled",
-        "source": source,
+        "source": "api",
     }
     print(json.dumps(result, ensure_ascii=False, indent=2))
 

@@ -73,7 +73,7 @@ def summarize_current_run(data: dict[str, Any]) -> dict[str, Any]:
     return {
         "generated_at": generated_at,
         "date": generated_at[:10],
-        "source": str(data.get("source") or "browser"),
+        "source": str(data.get("source") or "api"),
         "handle": clean_handle(data.get("handle")),
         "post_counts": post_counts,
         "dm_status": dm_status,
@@ -246,7 +246,7 @@ def build_digest_facts(data: dict[str, Any], summary: dict[str, Any]) -> dict[st
             {
                 "source": "messages",
                 "status": "api_dm_todo",
-                "detail": facts["dms"].get("note") or "API DM was inconclusive; use browser DM collection before making a final DM claim.",
+                "detail": facts["dms"].get("note") or "API DM was inconclusive; do not make a final DM claim.",
             }
         )
     return facts
@@ -457,10 +457,10 @@ def normalize_context_assets(value: Any) -> list[dict[str, str]]:
 
 def render_digest_input(data: dict[str, Any]) -> str:
     lines = [
-        "# X 浏览器采集输入",
+        "# X API 采集输入",
         "",
         f"- 生成时间: `{data.get('generated_at')}`",
-        f"- 浏览器 profile: `{data.get('profile_dir')}`",
+        f"- 数据源: `{data.get('source') or 'api'}`",
         f"- 当前账号: `{data.get('handle') or ''}`",
         "",
     ]
@@ -505,9 +505,9 @@ def render_digest_input(data: dict[str, Any]) -> str:
         [
             "## 数据缺口",
             "",
-            "- 浏览器采集依赖 X 页面结构和已加载的可见内容。",
+            "- API 采集受 X API 权限、套餐、端点可用性和限流影响。",
             "- 公开内容标记为 `[current]`，最终日报只依赖本次采集。",
-            "- DM 属于私密内容，不写长期 memory 或 daily archive。",
+            "- DM / X Chat 可能不会完整出现在 API 结果中；不要把 0 条 API DM 当作没有私信。",
         ]
     )
     return "\n".join(lines) + "\n"
@@ -525,7 +525,7 @@ def render_digest_context(summary: dict[str, Any], facts: dict[str, Any]) -> str
             "",
             f"- date: `{summary.get('date')}`",
             f"- handle: `@{summary.get('handle') or ''}`",
-            f"- source: `{summary.get('source') or 'browser'}`",
+            f"- source: `{summary.get('source') or 'api'}`",
             f"- context policy: {summary.get('context_policy')}",
             f"- DM status: `{summary.get('dm_status')}`",
             (
@@ -562,7 +562,7 @@ def render_context_slice(summary: dict[str, Any], facts: dict[str, Any], slice_n
         "",
         f"- date: `{summary.get('date')}`",
         f"- handle: `@{summary.get('handle') or ''}`",
-        f"- source: `{summary.get('source') or 'browser'}`",
+        f"- source: `{summary.get('source') or 'api'}`",
         f"- context policy: {summary.get('context_policy')}",
         "",
     ]
@@ -729,7 +729,7 @@ def render_digest_facts(facts: dict[str, Any]) -> str:
         "",
         f"- date: `{(facts.get('run') or {}).get('date')}`",
         f"- generated_at: `{(facts.get('run') or {}).get('generated_at')}`",
-        f"- source: `{(facts.get('run') or {}).get('source') or 'browser'}`",
+        f"- source: `{(facts.get('run') or {}).get('source') or 'api'}`",
         f"- timezone: `{(facts.get('run') or {}).get('timezone')}`",
         f"- window_start: `{(facts.get('run') or {}).get('window_start')}`",
         f"- window_end: `{(facts.get('run') or {}).get('window_end')}`",
