@@ -1,7 +1,7 @@
 ---
 name: x402-payment
 description: "Pay for x402-enabled Agent endpoints using ERC20 tokens (USDT/USDC) on EVM or TRC20 tokens (USDT/USDD) on TRON."
-version: 1.5.8
+version: 1.6.0
 author: bankofai
 homepage: https://bankofai.io
 tags: [crypto, payments, x402, agents, api, usdt, usdd, usdc, tron, ethereum, evm, erc20, trc20]
@@ -35,7 +35,7 @@ Invoke x402-enabled AI agent endpoints with automatic token payments on both TRO
 
 The `x402-payment` skill enables agents to interact with paid API endpoints. When an agent receives a `402 Payment Required` response, this skill handles the negotiation, signing, and execution of the payment using the `x402_invoke` tool.
 
-This release is aligned with `@bankofai/x402@0.5.9`, including Exact V2-compatible payload generation for EVM and TRON.
+This release uses the modular BankofAI x402 SDK 1.0 packages, including Exact V2-compatible payload generation for EVM and TRON and TRON `exact_gasfree`.
 
 ## Prerequisites
 
@@ -49,8 +49,8 @@ This release is aligned with `@bankofai/x402@0.5.9`, including Exact V2-compatib
   - Configure a TRON wallet for TRC20 payments (USDT/USDD) and/or an EVM wallet for ERC20 payments (USDT/USDC).
 - **Signing Model**: This skill resolves signers through `agent-wallet`. It does not scan raw private keys from generic config files or unrelated MCP server configs.
 - **TronGrid API Key (optional)**: `TRON_GRID_API_KEY` is optional. Recommended on **Mainnet** to reduce rate-limit issues.
-- **GasFree (optional)**: GasFree credentials are now managed internally by the `@bankofai/x402` library. The tool will prefer the `exact_gasfree` scheme over `exact_permit`. GasFree requires an account that is **activated** with **sufficient token balance** in the GasFree wallet.
-- **Node.js**: Use **Node 20+** to match the minimum runtime required by `@bankofai/x402@0.5.9`.
+- **GasFree (optional)**: Provided by `@bankofai/x402-tron/gasfree`. The tool prefers `exact_gasfree` over `exact`. GasFree requires an account with sufficient token balance in its GasFree wallet; inactive accounts can be activated on first payment when the advertised fees permit it.
+- **Node.js**: Use **Node 20+** to match the SDK runtime requirement.
 - **Dependencies**: Run `npm install` in the `x402-payment/` directory before first use.
 - `TRON_GRID_API_KEY` can also be set in `x402-config.json`.
 

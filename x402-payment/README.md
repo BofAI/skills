@@ -14,10 +14,11 @@ npx tsx src/x402_invoke.ts --check
 
 - TRON payments on `tron:nile`, `tron:mainnet`, and `tron:shasta`
 - EVM payments on `eip155:*`, including BSC testnet and mainnet flows
-- Automatic 402 challenge handling through `X402Client` and `X402FetchClient`
-- Optional GasFree support for TRON when the upstream x402 library exposes `exact_gasfree`
+- Automatic 402 challenge handling through `@bankofai/x402-fetch`
+- TRON `exact`/Permit2 and `exact_gasfree` through `@bankofai/x402-tron`
+- EVM `exact` through `@bankofai/x402-evm`
 
-This skill is aligned with `@bankofai/x402@0.5.9`, including Exact V2-compatible payload generation.
+This skill is aligned with the modular BankofAI x402 SDK `1.0.0` packages.
 
 ## Files
 
@@ -72,7 +73,7 @@ npx tsx src/x402_invoke.ts \
 
 ## Notes
 
-- Wallet resolution uses Agent Wallet (`TronClientSigner.create()` / `EvmClientSigner.create()`).
+- Wallet resolution uses Agent Wallet and the SDK 1.0 signer adapters; the skill never reads raw private keys.
 - The tool decodes `payment-response` headers and prints settlement details to stderr for easier verification.
 - For local BSC exact compatibility tests, the demo route is `/protected-bsc-testnet-coinbase`.
 
