@@ -62,17 +62,27 @@ function extractSignedTronTx(unsignedTx: Record<string, unknown>, signedResult: 
 }
 
 // Used when we need the raw agent-wallet instance (e.g., TRON signTransaction in gasfree-activate).
+// The resolved wallet is a network-agnostic credential source; the target network is applied
+// later when creating SDK signers. We probe multiple CAIP-2 networks so a wallet configured
+// only for mainnet (or only a testnet) is still discovered.
 async function resolveAgentWallet(network: WalletNetwork): Promise<ResolvedWallet | undefined> {
   try {
     const { resolveWallet } = await import('@bankofai/agent-wallet');
-    const networkId = network === 'tron' ? 'tron:nile' : 'eip155:97';
-    const wallet = await resolveWallet({ network: networkId });
-    const address = await wallet.getAddress();
-
-    if (network === 'tron' && !isTronAddress(address)) return undefined;
-    if (network === 'eip155' && !isEvmAddress(address)) return undefined;
-
-    return { wallet: wallet as unknown as AgentWallet, address };
+    const candidates = network === 'tron'
+      ? ['tron:mainnet', 'tron:nile', 'tron:shasta']
+      : ['eip155:56', 'eip155:97'];
+    for (const networkId of candidates) {
+      try {
+        const wallet = await resolveWallet({ network: networkId });
+        const address = await wallet.getAddress();
+        if (network === 'tron' && !isTronAddress(address)) continue;
+        if (network === 'eip155' && !isEvmAddress(address)) continue;
+        return { wallet: wallet as unknown as AgentWallet, address };
+      } catch (_) {
+        // No wallet for this network; try the next candidate.
+      }
+    }
+    return undefined;
   } catch (_) {
     return undefined;
   }
@@ -118,7 +128,11 @@ function normalizeNetwork(network: string): string {
 }
 
 function signerAddress(signer: any): string {
-  return signer.address || signer.getAddress();
+  const addr = signer.address ?? signer.getAddress();
+  if (typeof addr !== 'string') {
+    throw new Error('Signer did not return a string address; check the SDK signer adapter.');
+  }
+  return addr;
 }
 
 async function waitForTxConfirmation(tronWeb: any, txId: string, timeoutMs = 60000, intervalMs = 3000): Promise<boolean> {
@@ -519,17 +533,22 @@ async function main() {
   console.log = console.error;
 
   const requestedNetwork = options.network ? normalizeNetwork(options.network) : undefined;
+  const registeredNetworks = new Set<string>();
   const client = new x402Client((_version, accepts) => {
     debug('paymentRequirements', accepts.map((r: any) => ({
       scheme: r.scheme, network: r.network, asset: r.asset, amount: r.amount,
     })));
-    const candidates = requestedNetwork
-      ? accepts.filter((requirement) => requirement.network === requestedNetwork)
-      : accepts;
+    const candidates = accepts.filter((requirement) =>
+      (!requestedNetwork || requirement.network === requestedNetwork) &&
+      registeredNetworks.has(requirement.network),
+    );
     const selected = candidates.find((requirement) => requirement.scheme === 'exact_gasfree')
       || candidates.find((requirement) => requirement.scheme === 'exact');
     if (!selected) {
-      throw new Error(`No compatible payment requirement${requestedNetwork ? ` for ${requestedNetwork}` : ''}`);
+      throw new Error(
+        `No compatible payment requirement${requestedNetwork ? ` for ${requestedNetwork}` : ''}` +
+        `; registered networks: ${[...registeredNetworks].join(', ') || 'none'}`,
+      );
     }
     return selected;
   });
@@ -540,6 +559,7 @@ async function main() {
       const signer = await createClientTronSigner(resolvedTronWallet.wallet as any, { network, apiKey });
       client.register(network, new ExactTronScheme(signer));
       registerExactGasFreeTronScheme(client, { signer, networks: [network] });
+      registeredNetworks.add(network);
     }
     console.error(`[x402] TRON schemes enabled (exact, exact_gasfree).`);
     debug('registeredTronNetworks', networks);
@@ -553,12 +573,13 @@ async function main() {
         rpcUrl: process.env.EVM_RPC_URL,
       });
       client.register(network, new ExactEvmScheme(signer));
+      registeredNetworks.add(network);
     }
     console.error(`[x402] EVM exact scheme enabled.`);
     debug('registeredEvmNetworks', networks);
   }
 
-  console.error(`[x402] GasFree priority policy enabled.`);
+  console.error(`[x402] Payment selector: prefer exact_gasfree, then exact.`);
 
   let finalUrl = url;
   let finalMethod = methodArg || 'GET';

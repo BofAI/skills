@@ -13,7 +13,7 @@ npx tsx src/x402_invoke.ts --check
 ## What It Supports
 
 - TRON payments on `tron:nile`, `tron:mainnet`, and `tron:shasta`
-- EVM payments on `eip155:*`, including BSC testnet and mainnet flows
+- EVM payments on `eip155:56` (BSC mainnet) and `eip155:97` (BSC testnet)
 - Automatic 402 challenge handling through `@bankofai/x402-fetch`
 - TRON `exact`/Permit2 and `exact_gasfree` through `@bankofai/x402-tron`
 - EVM `exact` through `@bankofai/x402-evm`
