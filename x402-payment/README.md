@@ -31,6 +31,7 @@ This skill is aligned with the modular BankofAI x402 SDK `1.0.0` packages.
 - Node.js 20+
 - Agent Wallet configured for TRON and/or EVM signing
 - Optional `TRON_GRID_API_KEY` for TRON mainnet reliability
+- Optional `EVM_RPC_URL_56` / `EVM_RPC_URL_97` for custom BSC mainnet/testnet RPC endpoints
 - Optional `X402_DEBUG=1` for expanded debug output
 
 This skill uses `agent-wallet` as its signing source. It does not read raw private keys from shared MCP config files.

@@ -51,7 +51,7 @@ This release uses the modular BankofAI x402 SDK 1.0 packages, including Exact V2
 - **TronGrid API Key (optional)**: `TRON_GRID_API_KEY` is optional. Recommended on **Mainnet** to reduce rate-limit issues.
 - **GasFree (optional)**: Provided by `@bankofai/x402-tron/gasfree`. The tool prefers `exact_gasfree` over `exact`. GasFree requires an account with sufficient token balance in its GasFree wallet; inactive accounts can be activated on first payment when the advertised fees permit it.
 - **Node.js**: Use **Node 20+** to match the SDK runtime requirement.
-- **EVM RPC (optional)**: `EVM_RPC_URL` for non-default BSC RPC endpoints.
+- **EVM RPC (optional)**: `EVM_RPC_URL_56` (BSC mainnet) and `EVM_RPC_URL_97` (BSC testnet) for non-default RPC endpoints; each network reads its own var so a custom RPC never bleeds across chains.
 - **Dependencies**: Run `npm install` in the `x402-payment/` directory before first use.
 - `TRON_GRID_API_KEY` can also be set in `x402-config.json`.
 

@@ -135,6 +135,13 @@ function signerAddress(signer: any): string {
   return addr;
 }
 
+// Resolve a per-chain EVM RPC URL. BSC mainnet (eip155:56) and testnet (eip155:97) use
+// separate env vars so a custom RPC for one never bleeds into the other.
+function evmRpcUrl(network: string): string | undefined {
+  const chainId = network.split(':')[1];
+  return process.env[`EVM_RPC_URL_${chainId}`];
+}
+
 async function waitForTxConfirmation(tronWeb: any, txId: string, timeoutMs = 60000, intervalMs = 3000): Promise<boolean> {
   const start = Date.now();
   while (Date.now() - start < timeoutMs) {
@@ -457,7 +464,7 @@ async function main() {
     if (resolvedEvmWallet) {
       evmSigner = await createClientEvmSigner(resolvedEvmWallet.wallet as any, {
         network: 'eip155:97',
-        rpcUrl: process.env.EVM_RPC_URL,
+        rpcUrl: evmRpcUrl('eip155:97'),
       });
     }
   } catch (err: any) {
@@ -570,7 +577,7 @@ async function main() {
     for (const network of networks) {
       const signer = await createClientEvmSigner(resolvedEvmWallet.wallet as any, {
         network,
-        rpcUrl: process.env.EVM_RPC_URL,
+        rpcUrl: evmRpcUrl(network),
       });
       client.register(network, new ExactEvmScheme(signer));
       registeredNetworks.add(network);
