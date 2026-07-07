@@ -37,6 +37,10 @@ The `x402-payment` skill enables agents to interact with paid API endpoints. Whe
 
 This release uses the modular BankofAI x402 SDK 1.0 packages, including Exact V2-compatible payload generation for EVM and TRON and TRON `exact_gasfree`.
 
+> **Breaking changes vs 1.5.x:**
+> - The `exact_permit` scheme is gone from SDK 1.0; endpoints still advertising `exact_permit` (pre-1.0 servers) are no longer payable and must upgrade to `exact` (Permit2-based in SDK 1.0).
+> - EVM support is limited to BSC (`eip155:56` / `eip155:97`); the former `eip155:*` wildcard coverage of other EVM chains was removed.
+
 ## Prerequisites
 
 > **Wallet required:** Run `agent-wallet list` first.  

@@ -20,6 +20,8 @@ npx tsx src/x402_invoke.ts --check
 
 This skill is aligned with the modular BankofAI x402 SDK `1.0.0` packages.
 
+> **Breaking changes vs 1.5.x:** the `exact_permit` scheme (removed in SDK 1.0) and the `eip155:*` wildcard (EVM chains other than BSC) are no longer supported.
+
 ## Files
 
 - [SKILL.md](SKILL.md) - Full skill instructions and operator guidance

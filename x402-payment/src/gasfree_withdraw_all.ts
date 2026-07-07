@@ -2,24 +2,14 @@
 import { TronWeb } from 'tronweb';
 import { resolveWallet } from '@bankofai/agent-wallet';
 import { createClientTronSigner } from '@bankofai/x402-tron';
+import { GasFreeAPIClient, GASFREE_API_BASE_URLS } from '@bankofai/x402-tron/gasfree';
 import {
-  assembleGasFreeTransaction,
-  GasFreeAPIClient,
-  GASFREE_API_BASE_URLS,
-} from '@bankofai/x402-tron/gasfree';
-
-const TRONWEB_READONLY_DUMMY_KEY = '0000000000000000000000000000000000000000000000000000000000000001';
-const TRON_RPC_URLS: Record<string, string> = {
-  mainnet: 'https://api.trongrid.io',
-  nile: 'https://nile.trongrid.io',
-  shasta: 'https://api.shasta.trongrid.io',
-};
-
-const NETWORK_IDS: Record<string, string> = {
-  mainnet: 'tron:mainnet',
-  nile: 'tron:nile',
-  shasta: 'tron:shasta',
-};
+  TRONWEB_READONLY_DUMMY_KEY,
+  gasfreeDeadline,
+  normalizeNetwork,
+  signAndSubmitGasFree,
+  tronRpcUrl,
+} from './networks.js';
 
 async function main() {
   const args = process.argv.slice(2);
@@ -41,17 +31,21 @@ async function main() {
   const network = options.network || 'nile';
   const tokenAddress = options.token || 'TXYZopYRdj2D9XRtbG411XZZ3kM5VkAeBf';
 
-  const networkId = NETWORK_IDS[network] || network;
+  const networkId = normalizeNetwork(network);
   const baseUrl = GASFREE_API_BASE_URLS[networkId];
   if (!baseUrl) {
     console.error(`Error: GasFree not supported on "${network}". Supported: mainnet, nile, shasta`);
     process.exit(1);
   }
 
-  const tronWeb = new TronWeb({
-    fullHost: TRON_RPC_URLS[network],
+  const tronWebOpts: Record<string, unknown> = {
+    fullHost: tronRpcUrl(networkId),
     privateKey: TRONWEB_READONLY_DUMMY_KEY,
-  });
+  };
+  if (process.env.TRON_GRID_API_KEY) {
+    tronWebOpts.headers = { 'TRON-PRO-API-KEY': process.env.TRON_GRID_API_KEY };
+  }
+  const tronWeb = new TronWeb(tronWebOpts as any);
 
   const wallet = await resolveWallet({ network: networkId });
   const signer = await createClientTronSigner(wallet as any, {
@@ -85,7 +79,9 @@ async function main() {
 
   const decimals = asset.decimal ?? 6;
   const transferFee = BigInt(asset.transferFee || 0);
-  const maxFee = transferFee;
+  // The first transfer from an inactive account also pays the activation fee.
+  const activateFee = info.active ? 0n : BigInt(asset.activateFee || 0);
+  const maxFee = transferFee + activateFee;
 
   const contract = await tronWeb.contract().at(tokenAddress);
   const gfBalance = BigInt((await contract.methods.balanceOf(gasfreeAddress).call()).toString());
@@ -98,7 +94,7 @@ async function main() {
   }
 
   const returnValue = gfBalance - maxFee;
-  const deadline = Math.floor(Date.now() / 1000) + 3600;
+  const deadline = gasfreeDeadline(networkId);
 
   const providers = await gasFreeClient.getProviders();
   if (!providers || providers.length === 0) {
@@ -119,16 +115,8 @@ async function main() {
     version: '1',
     nonce: info.nonce.toString(),
   };
-  const assembled = assembleGasFreeTransaction(message, networkId);
-  const signature = await signer.signTypedData({
-    domain: assembled.domain,
-    types: assembled.types as unknown as Record<string, Array<{ name: string; type: string }>>,
-    primaryType: assembled.primaryType,
-    message: assembled.message,
-  });
-
   console.error('[gasfree-withdraw] Submitting GasFree transaction...');
-  const traceId = await gasFreeClient.submit(message, signature);
+  const traceId = await signAndSubmitGasFree(signer, gasFreeClient, message, networkId);
   console.error(`[gasfree-withdraw] Trace ID: ${traceId}`);
   console.error('[gasfree-withdraw] Waiting for completion...');
 
