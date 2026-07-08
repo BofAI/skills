@@ -55,9 +55,25 @@ This release uses the modular BankofAI x402 SDK 1.0 packages, including Exact V2
 - **TronGrid API Key (optional)**: `TRON_GRID_API_KEY` is optional. Recommended on **Mainnet** to reduce rate-limit issues.
 - **GasFree (optional)**: Provided by `@bankofai/x402-tron/gasfree`. The tool prefers `exact_gasfree` over `exact`. GasFree requires an account with sufficient token balance in its GasFree wallet; inactive accounts can be activated on first payment when the advertised fees permit it.
 - **Node.js**: Use **Node 20+** to match the SDK runtime requirement.
-- **EVM RPC (optional)**: `EVM_RPC_URL_56` (BSC mainnet) and `EVM_RPC_URL_97` (BSC testnet) for non-default RPC endpoints; each network reads its own var so a custom RPC never bleeds across chains.
+- **EVM RPC (optional)**: BSC Mainnet normally uses the SDK default RPC. For BSC Testnet, configure `EVM_RPC_URL_97` when the default RPC is unavailable.
 - **Dependencies**: Run `npm install` in the `x402-payment/` directory before first use.
 - `TRON_GRID_API_KEY` can also be set in `x402-config.json`.
+
+### BSC Testnet RPC
+
+`EVM_RPC_URL_97` may point to any compatible BSC Testnet JSON-RPC endpoint (chain ID `97`):
+
+```bash
+export EVM_RPC_URL_97=<YOUR_BSC_TESTNET_RPC_URL>
+```
+
+For example:
+
+```bash
+export EVM_RPC_URL_97=https://bsc-testnet-rpc.publicnode.com
+```
+
+The example URL is only a reference; users may use another provider or their own node. Prefer an existing user-provided value, never reuse a Testnet RPC for Mainnet, do not modify shell profile files automatically, and do not print RPC URLs containing credentials. BSC Mainnet uses the separate optional `EVM_RPC_URL_56` override.
 
 ## Usage Instructions
 
@@ -107,16 +123,13 @@ Without `--wallet`, requires a configured TRON wallet from agent-wallet. Returns
 
 ### 5. GasFree Account Activation
 Activate a GasFree account that has not been activated yet. Use `--gasfree-info` first to check activation status.
-Defaults: network=**nile**, token=**USDT**.
+Defaults: network=**nile**, uses **USDT** internally.
 ```bash
 # Default: nile + USDT
 npx tsx x402-payment/src/x402_invoke.ts --gasfree-activate
 
 # Specify network
 npx tsx x402-payment/src/x402_invoke.ts --gasfree-activate --network mainnet
-
-# Specify network and token
-npx tsx x402-payment/src/x402_invoke.ts --gasfree-activate --network nile --token USDT
 ```
 Requires: TRON wallet configured in agent-wallet. Wallet must have enough tokens to cover activation fees (~3.05 USDT on nile). If the account is already activated, returns `{"status": "already_active"}` immediately.
 
