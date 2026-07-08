@@ -500,21 +500,28 @@ async function main() {
   });
 
   if (resolvedTronWallet) {
+    const registeredTronNetworks: string[] = [];
     for (const network of TRON_NETWORKS) {
       try {
         const signer = await createClientTronSigner(resolvedTronWallet.wallet as any, { network, apiKey });
         client.register(network, new ExactTronScheme(signer));
         registerExactGasFreeTronScheme(client, { signer, networks: [network] });
         registeredNetworks.add(network);
+        registeredTronNetworks.push(network);
       } catch (err: any) {
         console.warn(`[x402] Skipping ${network}: ${err?.message || err}`);
       }
     }
-    console.error(`[x402] TRON schemes enabled (exact, exact_gasfree).`);
-    debug('registeredTronNetworks', TRON_NETWORKS);
+    if (registeredTronNetworks.length > 0) {
+      console.error(`[x402] TRON schemes enabled for ${registeredTronNetworks.join(', ')} (exact, exact_gasfree).`);
+    } else {
+      console.warn('[x402] No TRON payment schemes were registered.');
+    }
+    debug('registeredTronNetworks', registeredTronNetworks);
   }
 
   if (resolvedEvmWallet) {
+    const registeredEvmNetworks: string[] = [];
     for (const network of EVM_NETWORKS) {
       try {
         const signer = await createClientEvmSigner(resolvedEvmWallet.wallet as any, {
@@ -523,12 +530,17 @@ async function main() {
         });
         client.register(network, new ExactEvmScheme(signer));
         registeredNetworks.add(network);
+        registeredEvmNetworks.push(network);
       } catch (err: any) {
         console.warn(`[x402] Skipping ${network}: ${err?.message || err}`);
       }
     }
-    console.error(`[x402] EVM exact scheme enabled.`);
-    debug('registeredEvmNetworks', EVM_NETWORKS);
+    if (registeredEvmNetworks.length > 0) {
+      console.error(`[x402] EVM exact scheme enabled for ${registeredEvmNetworks.join(', ')}.`);
+    } else {
+      console.warn('[x402] No EVM payment schemes were registered.');
+    }
+    debug('registeredEvmNetworks', registeredEvmNetworks);
   }
 
   console.error(`[x402] Payment selector: prefer exact_gasfree, then exact; auto-fallback to exact if gasfree payload creation fails.`);

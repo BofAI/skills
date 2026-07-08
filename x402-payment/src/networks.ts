@@ -3,6 +3,7 @@
 // the supported-network list, RPC selection, and GasFree signing flow have a
 // single source of truth.
 import { assembleGasFreeTransaction } from '@bankofai/x402-tron/gasfree';
+import { getToken } from '@bankofai/x402-tron';
 
 // Read-only TronWeb instantiation only; never use this key for signing.
 // If this key is ever used to sign, it will produce valid signatures for a known public address.
@@ -24,6 +25,14 @@ const NETWORK_IDS: Record<string, string> = {
 
 export function normalizeNetwork(network: string): string {
   return NETWORK_IDS[network] || network;
+}
+
+export function defaultTronTokenAddress(networkId: string, symbol = 'USDT'): string {
+  const token = getToken(networkId as `${string}:${string}`, symbol);
+  if (!token) {
+    throw new Error(`No default ${symbol} token configured for ${networkId}`);
+  }
+  return token.address;
 }
 
 // Resolved lazily so a TRON_GRID_API_KEY injected from x402-config.json after

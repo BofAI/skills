@@ -5,6 +5,7 @@ import { createClientTronSigner } from '@bankofai/x402-tron';
 import { GasFreeAPIClient, GASFREE_API_BASE_URLS } from '@bankofai/x402-tron/gasfree';
 import {
   TRONWEB_READONLY_DUMMY_KEY,
+  defaultTronTokenAddress,
   gasfreeDeadline,
   normalizeNetwork,
   signAndSubmitGasFree,
@@ -29,9 +30,8 @@ async function main() {
   }
 
   const network = options.network || 'nile';
-  const tokenAddress = options.token || 'TXYZopYRdj2D9XRtbG411XZZ3kM5VkAeBf';
-
   const networkId = normalizeNetwork(network);
+  const tokenAddress = options.token || defaultTronTokenAddress(networkId);
   const baseUrl = GASFREE_API_BASE_URLS[networkId];
   if (!baseUrl) {
     console.error(`Error: GasFree not supported on "${network}". Supported: mainnet, nile, shasta`);
