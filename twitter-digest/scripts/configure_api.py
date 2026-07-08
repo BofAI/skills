@@ -274,7 +274,7 @@ def main() -> None:
             args=sys.argv[1:],
             cwd=Path(__file__).resolve().parents[1],
             heading="X API 配置向导",
-            description="请在这个 Terminal 窗口里输入 Client ID / Secret，并在浏览器里完成 X OAuth2 授权。",
+            description="请在这个 Terminal 窗口里输入 Client ID / Secret，并完成 X OAuth2 授权。",
         )
         if opened:
             print("已打开 Terminal 窗口用于配置 X API。", flush=True)
@@ -347,7 +347,7 @@ def main() -> None:
                 "handle": saved.get("handle") or config["handle"],
                 "user_id": saved.get("user_id") or config["user_id"],
                 "verification": verification,
-                "next_step": "Normal scripts/run_daily_digest.py runs now use the saved API token. Use --source browser only when you explicitly want browser collection.",
+                "next_step": "Normal scripts/run_daily_digest.py runs now use the saved API token.",
             },
             ensure_ascii=False,
             indent=2,
