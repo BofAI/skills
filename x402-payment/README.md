@@ -2,6 +2,20 @@
 
 Invoke x402-protected APIs and agent resources with automatic payment handling on TRON and EVM networks.
 
+## Installation
+
+### One-line install
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/BofAI/skills/v1.5.14/x402-payment/install.sh | sh
+```
+
+### Uninstall
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/BofAI/skills/v1.5.14/x402-payment/uninstall.sh | sh
+```
+
 ## Quick Start
 
 ```bash
