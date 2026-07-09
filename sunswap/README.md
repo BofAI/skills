@@ -90,4 +90,4 @@ See [CHANGELOG.md](CHANGELOG.md) for migration notes.
 
 ## License
 
-MIT - see [LICENSE](../../LICENSE) for details
+MIT - see [LICENSE](../LICENSE) for details
