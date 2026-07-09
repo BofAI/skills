@@ -225,7 +225,7 @@ async function handleGasFreeActivate(
   const activateFee = BigInt(asset.activateFee || 0);
   const transferFee = BigInt(asset.transferFee || 0);
   const totalFees = activateFee + transferFee;
-  const oneUnit = BigInt(10 ** decimals);
+  const oneUnit = 10n ** BigInt(decimals);
   const transferAmount = totalFees + oneUnit;
 
   const fmt = (v: bigint) => `${Number(v) / 10 ** decimals} ${tokenSymbol}`;
@@ -354,7 +354,11 @@ function handleCheck(deps: {
   if (!tronAddress && !evmAddress) {
     console.error(`[--] No compatible active wallet resolved from agent-wallet.`);
   }
-  console.error(`[OK] GasFree gasless payments enabled (exact_gasfree preferred when available).`);
+  if (tronAddress) {
+    console.error(`[OK] GasFree gasless payments available for TRON when the GasFree account is funded/active.`);
+  } else {
+    console.error(`[--] GasFree gasless payments require a TRON agent-wallet account.`);
+  }
 }
 
 async function main() {

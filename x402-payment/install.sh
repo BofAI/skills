@@ -161,7 +161,7 @@ OSA
   exit 0
 }
 
-if should_open_terminal; then
+if [ "$DRY_RUN" != "1" ] && should_open_terminal; then
   open_self_in_terminal_and_exit "$@"
 fi
 
@@ -264,6 +264,7 @@ backup_path() {
 backup_existing_skill() {
   target="$1"
   skills_dir="$2"
+  BACKUP_CREATED=""
   if [ ! -e "$target" ] && [ ! -L "$target" ]; then
     return 0
   fi
@@ -277,6 +278,7 @@ backup_existing_skill() {
   if [ -f "$backup/SKILL.md" ]; then
     mv "$backup/SKILL.md" "$backup/SKILL.md.disabled"
   fi
+  BACKUP_CREATED="$backup"
   info "Existing ${SKILL_NAME} moved to $backup"
 }
 
@@ -308,12 +310,9 @@ install_skill() {
   fi
 
   mkdir -p "$skills_dir"
+  BACKUP_CREATED=""
   backup_existing_skill "$target" "$skills_dir"
-  RESTORED_BACKUP=""
-  if [ -d "$skills_dir/.backups" ]; then
-    latest_backup="$(ls -dt "$skills_dir/.backups/${SKILL_NAME}-uninstalled-"* 2>/dev/null | head -1 || true)"
-    RESTORED_BACKUP="$latest_backup"
-  fi
+  RESTORED_BACKUP="$BACKUP_CREATED"
 
   if truthy "$SYMLINK"; then
     # Persist the clone so the symlink remains valid after this script exits.
@@ -344,6 +343,7 @@ install_skill() {
   fi
 
   info "Installed skill path: $target"
+  info "Verify with: npx tsx $target/src/x402_invoke.ts --check"
 }
 
 # ---------------------------------------------------------------------------
@@ -355,21 +355,14 @@ if [ "$CLIENT" = "auto" ]; then
   targets="$(detect_client)"
 fi
 
-if [ "$targets" = "all" ]; then
+if [ -n "$SKILLS_DIR_OVERRIDE" ]; then
+  install_skill "$SKILLS_DIR_OVERRIDE"
+elif [ "$targets" = "all" ]; then
   for client in codex claude; do
-    if [ -n "$SKILLS_DIR_OVERRIDE" ]; then
-      install_skill "$SKILLS_DIR_OVERRIDE"
-    else
-      install_skill "$(default_skills_dir "$client")"
-    fi
+    install_skill "$(default_skills_dir "$client")"
   done
 else
-  if [ -n "$SKILLS_DIR_OVERRIDE" ]; then
-    skills_dir="$SKILLS_DIR_OVERRIDE"
-  else
-    skills_dir="$(default_skills_dir "$targets")"
-  fi
-  install_skill "$skills_dir"
+  install_skill "$(default_skills_dir "$targets")"
 fi
 
 # ---------------------------------------------------------------------------
@@ -384,8 +377,7 @@ Next steps:
   1. Configure your wallet via agent-wallet (set AGENT_WALLET_PASSWORD or
      AGENT_WALLET_PRIVATE_KEY). Run: agent-wallet list
   2. Optional: set TRON_GRID_API_KEY for TRON mainnet reliability.
-  3. Verify the installation:
-     npx tsx $HOME/.codex/skills/${SKILL_NAME}/src/x402_invoke.ts --check
+  3. Verify the installation with the command printed for each installed path above.
 
 For full usage instructions see SKILL.md in the installed skill directory.
 EOF
