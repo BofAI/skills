@@ -1,9 +1,9 @@
 ---
 name: SunSwap DEX Trading
 description: Execute token swaps, manage liquidity, and query market data on SunSwap DEX via the sun-cli.
-version: 3.2.0
+version: 3.3.0
 dependencies:
-  - "@bankofai/sun-cli"
+  - "@sun-protocol/sun-cli"
 tags:
   - defi
   - dex
@@ -21,12 +21,14 @@ This skill enables AI agents to interact with SunSwap DEX on the TRON blockchain
 
 ### Prerequisites
 
-> **Wallet required:** Run `agent-wallet list` first.  
+> **Wallet required for real writes only:** Run `agent-wallet list` before executing swaps,
+> liquidity changes, or `contract send`.
+> Read-only queries and `--dry-run` previews do not need a wallet.
 > If no wallets exist, invoke `bankofai-guide` (Section C — Wallet Guard) before proceeding.
 
 1. **Install sun-cli** (globally):
    ```bash
-   npm install -g @bankofai/sun-cli
+   npm install -g @sun-protocol/sun-cli@^1.2.2
    ```
 
 2. **Configure wallet** (required for write operations only):
@@ -41,7 +43,7 @@ This skill enables AI agents to interact with SunSwap DEX on the TRON blockchain
    export TRONGRID_API_KEY=your_key
    ```
 
-Read-only commands (price, quote, pool list, etc.) work without wallet credentials.
+Read-only commands (price, quote, pool list, etc.) and `--dry-run` previews work without wallet credentials.
 
 ---
 
@@ -911,11 +913,12 @@ These are CLI-level behaviors that the AI agent must work around:
 
 ### "sun: command not found"
 ```bash
-npm install -g @bankofai/sun-cli
+npm install -g @sun-protocol/sun-cli@^1.2.2
 ```
 
-### "Wallet not configured"
+### "Wallet not configured" on real writes
 Set one of: `TRON_PRIVATE_KEY`, `TRON_MNEMONIC`, or `AGENT_WALLET_PASSWORD`.
+`--dry-run` should return a preview without wallet credentials on `@sun-protocol/sun-cli >= 1.2.2`.
 
 > **NOTE on AGENT_WALLET_PASSWORD:** This mode requires an initialized wallet store
 > at `~/.agent-wallet`. If the directory does not exist, the CLI will fail with
@@ -940,6 +943,6 @@ Set one of: `TRON_PRIVATE_KEY`, `TRON_MNEMONIC`, or `AGENT_WALLET_PASSWORD`.
 
 ---
 
-**Version**: 3.2.0 (sun-cli based)
-**Last Updated**: 2026-03-20
+**Version**: 3.3.0 (sun-protocol sun-cli scope)
+**Last Updated**: 2026-07-09
 **Maintainer**: Bank of AI Team

@@ -1,8 +1,30 @@
 # Release Notes — SunPump Meme Token Toolkit
 
+## v1.4.0 — 2026-07-09 _(docs only)_
+
+> **TL;DR** — Runtime package moved to `@sun-protocol/sun-cli`.
+> This skill now requires `@sun-protocol/sun-cli >= 1.2.2`, which keeps
+> `sunpump launch`, bonding-curve trading, and `--dry-run` previews aligned
+> with the migrated SUN.IO tooling.
+
+### Changes
+
+- **Runtime dependency scope changed** from the legacy sun-cli package scope
+  to `@sun-protocol/sun-cli`.
+- **Install command updated**:
+  ```bash
+  npm install -g @sun-protocol/sun-cli@^1.2.2
+  ```
+- **Wallet guidance clarified**: read-only SunPump queries, `sunpump launch`,
+  and `--dry-run` previews do not need wallet credentials. Real trades still
+  require a wallet.
+- **Network guidance unchanged**: all `sunpump` subcommands remain mainnet-only.
+
+---
+
 ## v1.3.1 — 2026-06-08 _(docs only)_
 
-> **TL;DR** — Sync with `@bankofai/sun-cli` dropping SunPump nile support
+> **TL;DR** — Sync with `@sun-protocol/sun-cli` dropping SunPump nile support
 > again: **`sun sunpump launch` is mainnet-only**, like every other
 > `sunpump` subcommand. No skill behaviour changes — just makes the
 > launch section's network requirement explicit.
@@ -31,7 +53,7 @@
 > meme token through the SunPump agent endpoint
 > (`POST /ai/agentTokenLaunch`). Creation is **server-side** — the platform
 > signs and broadcasts the creation transaction, so **no wallet is needed**.
-> Requires `@bankofai/sun-cli ≥ 1.2.1`.
+> Requires `@sun-protocol/sun-cli ≥ 1.2.1`.
 
 ### Highlights
 
@@ -70,7 +92,7 @@
 
 ### Compatibility
 
-- **Required runtime:** `@bankofai/sun-cli ≥ 1.2.1` (earlier versions
+- **Required runtime:** `@sun-protocol/sun-cli ≥ 1.2.1` (earlier versions
   lack `sunpump launch`).
 - **Wallet:** unchanged for trading; `sunpump launch` itself needs **no
   wallet** (server-side creation).
@@ -82,7 +104,7 @@
 npx skills add BofAI/skills
 
 # 2. Install / upgrade the runtime CLI
-npm install -g @bankofai/sun-cli@^1.2.1
+npm install -g @sun-protocol/sun-cli@^1.2.1
 ```
 
 ---
@@ -106,7 +128,7 @@ npm install -g @bankofai/sun-cli@^1.2.1
   troubleshooting guide were all rewritten — no more references to nile
   testnet, "silent fallback", or shasta.
 - **Slimmer API surface.** Endpoints that didn't fit the
-  trading + discovery loop have been removed in `@bankofai/sun-cli`.
+  trading + discovery loop have been removed in `@sun-protocol/sun-cli`.
   Agents calling any of the removed groups (see below) need to be
   updated.
 
@@ -129,7 +151,7 @@ The mainnet router contract is unchanged:
 
 #### 2. Upstream `sun-cli` SunPump command groups removed
 
-The following `sun sunpump *` subcommands were removed in `@bankofai/sun-cli ≥ 1.2.0` and are **no longer documented** in this skill:
+The following `sun sunpump *` subcommands were removed in `@sun-protocol/sun-cli ≥ 1.2.0` and are **no longer documented** in this skill:
 
 - `sunpump home` — `stats` / `data` / `banners`
 - `sunpump tx ticker` — server-capped at ~15 rows anyway
@@ -179,7 +201,7 @@ state            quote-buy  quote-sell   buy        sell
 
 ### Compatibility
 
-- **Required runtime:** `@bankofai/sun-cli ≥ 1.2.0`
+- **Required runtime:** `@sun-protocol/sun-cli ≥ 1.2.0`
 - **Wallet:** unchanged — only `swap` / `sunpump buy` / `sunpump sell`
   need `TRON_PRIVATE_KEY`, `TRON_MNEMONIC`, or `AGENT_WALLET_PASSWORD`.
 - **Read endpoints** (`token`, `portfolio`, `tx user`, `state`,
@@ -192,7 +214,7 @@ state            quote-buy  quote-sell   buy        sell
 npx skills add BofAI/skills
 
 # 2. Install / upgrade the runtime CLI
-npm install -g @bankofai/sun-cli@^1.2.0
+npm install -g @sun-protocol/sun-cli@^1.2.0
 ```
 
 ---
@@ -207,7 +229,7 @@ npm install -g @bankofai/sun-cli@^1.2.0
   installs, and the
   [vercel-labs/skills#851](https://github.com/vercel-labs/skills/issues/851)
   symlink workaround for `-g -a claude-code`.
-- Pinned runtime requirement to `@bankofai/sun-cli@^1.2.0`.
+- Pinned runtime requirement to `@sun-protocol/sun-cli@^1.2.0`.
 
 ### v1.1.0 — 2026-05-20
 
@@ -246,7 +268,7 @@ token creation and SunSwap migration:
 
 ### v1.0.0 — 2026-05-20 _(initial release)_
 
-Six core SunPump flows via `@bankofai/sun-cli`:
+Six core SunPump flows via `@sun-protocol/sun-cli`:
 
 1. Buy and sell tokens through SunSwap — `sun swap` / `sun swap:quote`.
 2. User position check — `sun sunpump portfolio <walletAddress>`.

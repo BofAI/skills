@@ -1,5 +1,11 @@
 # Changelog
 
+## [1.5.9] - 2026-07-09
+
+### Improvements
+- **sunswap**: Migrated runtime guidance to `@sun-protocol/sun-cli@^1.2.2` and documented wallet-free `--dry-run` previews.
+- **sunpump-agent-skill**: Migrated runtime guidance to `@sun-protocol/sun-cli@^1.2.2`, bumped skill docs to v1.4.0, and clarified that read-only queries, launch, and dry-run previews do not need wallet credentials.
+
 ## [1.5.8] - 2026-04-21
 
 ### Improvements

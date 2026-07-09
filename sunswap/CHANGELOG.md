@@ -2,6 +2,15 @@
 
 All notable changes to the SunSwap skill will be documented in this file.
 
+## [3.3.0] - 2026-07-09
+
+### Changed
+- Migrated the runtime dependency from the legacy sun-cli package scope to `@sun-protocol/sun-cli`.
+- Pinned install guidance to `@sun-protocol/sun-cli@^1.2.2`.
+
+### Fixed
+- Updated wallet guidance to match current CLI behavior: `--dry-run` previews no longer require wallet credentials, while real write operations still do.
+
 ## [3.2.0] - 2026-03-20
 
 ### Breaking Changes
@@ -109,7 +118,7 @@ Based on test report (134 cases, 7 failures), added documentation for CLI-level 
 
 **Migration from script-based to sun-cli approach**
 
-This version replaces all custom Node.js scripts with `sun-cli` (`@bankofai/sun-cli`), a unified CLI for SUN.IO / SunSwap on TRON.
+This version replaces all custom Node.js scripts with `sun-cli` (`@sun-protocol/sun-cli`), a unified CLI for SUN.IO / SunSwap on TRON.
 
 ### Why the Change?
 

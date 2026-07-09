@@ -1,9 +1,9 @@
 ---
 name: SunPump Meme Token Toolkit
 description: Create meme tokens on SunPump (`sun sunpump launch`), trade them — both pre-launch (bonding curve via `sun sunpump buy/sell`) and post-launch (SunSwap via `sun swap`) — and query token info, rankings, holders, portfolios, and trade history.
-version: 1.3.1
+version: 1.4.0
 dependencies:
-  - "@bankofai/sun-cli"
+  - "@sun-protocol/sun-cli"
 tags:
   - defi
   - meme
@@ -42,6 +42,7 @@ Always call `sun sunpump state <addr>` or `sun sunpump token get <addr>` first t
 > If no wallets exist, invoke `bankofai-guide` (Section C — Wallet Guard) before proceeding.
 > All read-only SunPump queries (portfolio, tx history, token info, ranking, holders) work without a wallet.
 > Token creation (`sun sunpump launch`) is server-side and also needs **no wallet**.
+> `--dry-run` previews do not need wallet credentials on `@sun-protocol/sun-cli >= 1.2.2`.
 
 1. **Install this skill** (once, picked up by Claude Code / Cursor / Codex):
    ```bash
@@ -49,9 +50,9 @@ Always call `sun sunpump state <addr>` or `sun sunpump token get <addr>` first t
    ```
 
 
-2. **Install sun-cli** (≥ 1.2.1 required — earlier versions lack `sunpump launch`; ≥ 1.2.0 lacks only that but has `sunpump buy/sell/state`):
+2. **Install sun-cli** (≥ 1.2.2 required — includes `sunpump launch`, bonding-curve trading, and wallet-free `--dry-run` previews):
    ```bash
-   npm install -g @bankofai/sun-cli@^1.2.1
+   npm install -g @sun-protocol/sun-cli@^1.2.2
    ```
 
 3. **Configure wallet** (required for write commands — `sun swap`, `sun sunpump buy`, `sun sunpump sell`):
@@ -817,7 +818,7 @@ Token created.
 
 ### "sun: command not found"
 ```bash
-npm install -g @bankofai/sun-cli
+npm install -g @sun-protocol/sun-cli@^1.2.2
 ```
 
 ### Empty results from a SunPump query
@@ -847,7 +848,7 @@ sun --json sunpump token search <symbol>
 If the token exists, treat the launch as successful — do **not** launch again.
 
 ### "Wallet not configured" (write commands only)
-Set one of `TRON_PRIVATE_KEY`, `TRON_MNEMONIC`, or `AGENT_WALLET_PASSWORD`. Read-only sunpump commands and `sunpump launch` do **not** need a wallet.
+Set one of `TRON_PRIVATE_KEY`, `TRON_MNEMONIC`, or `AGENT_WALLET_PASSWORD`. Read-only sunpump commands, `sunpump launch`, and `--dry-run` previews do **not** need a wallet.
 
 ### Network error / timeout
 - Check internet
@@ -856,6 +857,6 @@ Set one of `TRON_PRIVATE_KEY`, `TRON_MNEMONIC`, or `AGENT_WALLET_PASSWORD`. Read
 
 ---
 
-**Version**: 1.3.1 (docs: `sun sunpump launch` is mainnet-only)
-**Last Updated**: 2026-06-08
+**Version**: 1.4.0 (sun-protocol sun-cli scope)
+**Last Updated**: 2026-07-09
 **Maintainer**: Bank of AI Team
