@@ -2,6 +2,23 @@
 import * as fs from 'fs';
 import * as path from 'path';
 import * as os from 'os';
+import { x402Client, wrapFetchWithPayment } from '@bankofai/x402-fetch';
+import { createClientTronSigner } from '@bankofai/x402-tron';
+import { ExactTronScheme } from '@bankofai/x402-tron/exact/client';
+import { registerExactGasFreeTronScheme } from '@bankofai/x402-tron/gasfree/client';
+import { GasFreeAPIClient, GASFREE_API_BASE_URLS } from '@bankofai/x402-tron/gasfree';
+import { createClientEvmSigner } from '@bankofai/x402-evm/adapters/agent-wallet';
+import { ExactEvmScheme } from '@bankofai/x402-evm/exact/client';
+import {
+  TRONWEB_READONLY_DUMMY_KEY,
+  TRON_NETWORKS,
+  EVM_NETWORKS,
+  normalizeNetwork,
+  tronRpcUrl,
+  evmRpcUrl,
+  gasfreeDeadline,
+  signAndSubmitGasFree,
+} from './networks.js';
 
 type WalletNetwork = 'tron' | 'eip155';
 
@@ -17,39 +34,12 @@ interface ResolvedWallet {
   address: string;
 }
 
-// Read-only TronWeb instantiation only; never use this key for signing.
-// If this key is ever used to sign, it will produce valid signatures for a known public address.
-const TRONWEB_READONLY_DUMMY_KEY = '0000000000000000000000000000000000000000000000000000000000000001';
-
 function isTronAddress(address: string): boolean {
   return /^T[1-9A-HJ-NP-Za-km-z]{33}$/.test(address);
 }
 
 function isEvmAddress(address: string): boolean {
   return /^0x[0-9a-fA-F]{40}$/.test(address);
-}
-
-function tronAddressToEvmHex(tronWeb: any, address: string): string {
-  if (!isTronAddress(address)) return address;
-  const hex41 = String(tronWeb.address.toHex(address));
-  return `0x${hex41.replace(/^41/i, '')}`;
-}
-
-function convertTronAddressesDeep(tronWeb: any, value: unknown): unknown {
-  if (typeof value === 'string') {
-    return isTronAddress(value) ? tronAddressToEvmHex(tronWeb, value) : value;
-  }
-  if (Array.isArray(value)) {
-    return value.map((v) => convertTronAddressesDeep(tronWeb, v));
-  }
-  if (value && typeof value === 'object') {
-    const next: Record<string, unknown> = {};
-    for (const [key, val] of Object.entries(value as Record<string, unknown>)) {
-      next[key] = convertTronAddressesDeep(tronWeb, val);
-    }
-    return next;
-  }
-  return value;
 }
 
 function normalizeHexSignature(signature: string): string {
@@ -74,18 +64,18 @@ function extractSignedTronTx(unsignedTx: Record<string, unknown>, signedResult: 
 }
 
 // Used when we need the raw agent-wallet instance (e.g., TRON signTransaction in gasfree-activate).
+// The resolved wallet is a network-agnostic credential source; agent-wallet resolves by chain
+// family ('tron' / 'eip155'), and the target network is applied later when creating SDK signers.
 async function resolveAgentWallet(network: WalletNetwork): Promise<ResolvedWallet | undefined> {
   try {
-    const { resolveWalletProvider } = await import('@bankofai/agent-wallet');
-    const provider = resolveWalletProvider({ network });
-    const wallet = await provider.getActiveWallet();
+    const { resolveWallet } = await import('@bankofai/agent-wallet');
+    const wallet = await resolveWallet({ network });
     const address = await wallet.getAddress();
-
     if (network === 'tron' && !isTronAddress(address)) return undefined;
     if (network === 'eip155' && !isEvmAddress(address)) return undefined;
-
     return { wallet: wallet as unknown as AgentWallet, address };
-  } catch (_) {
+  } catch (err: any) {
+    console.warn(`[x402] No ${network} agent-wallet resolved: ${err?.message || err}`);
     return undefined;
   }
 }
@@ -110,12 +100,6 @@ async function findApiKey(): Promise<string | undefined> {
   return undefined;
 }
 
-const TRON_RPC_URLS: Record<string, string> = {
-  mainnet: process.env.TRON_GRID_API_KEY ? 'https://api.trongrid.io' : 'https://hptg.bankofai.io',
-  nile: 'https://nile.trongrid.io',
-  shasta: 'https://api.shasta.trongrid.io',
-};
-
 async function waitForTxConfirmation(tronWeb: any, txId: string, timeoutMs = 60000, intervalMs = 3000): Promise<boolean> {
   const start = Date.now();
   while (Date.now() - start < timeoutMs) {
@@ -130,27 +114,21 @@ async function waitForTxConfirmation(tronWeb: any, txId: string, timeoutMs = 600
 
 async function handleGasFreeInfo(
   options: Record<string, string>,
-  deps: {
-    tronSigner: any;
-    GasFreeAPIClient: any;
-    GASFREE_API_BASE_URLS: Record<string, string>;
-  },
+  defaultWalletAddress: string | undefined,
 ): Promise<void> {
-  const { tronSigner, GasFreeAPIClient, GASFREE_API_BASE_URLS } = deps;
-
   let walletAddress: string;
   if (options['wallet']) {
     walletAddress = options['wallet'];
-  } else if (tronSigner) {
-    walletAddress = tronSigner.getAddress();
+  } else if (defaultWalletAddress) {
+    walletAddress = defaultWalletAddress;
   } else {
     console.error('Error: Provide --wallet <address> or configure a TRON agent-wallet account');
     process.exit(1);
   }
 
   const gasfreeNetwork = options.network || 'mainnet';
-  const networkKey = `tron:${gasfreeNetwork}`;
-  const baseUrl = GASFREE_API_BASE_URLS[networkKey];
+  const networkKey = normalizeNetwork(gasfreeNetwork);
+  const baseUrl = (GASFREE_API_BASE_URLS as Record<string, string>)[networkKey];
 
   if (!baseUrl) {
     console.error(`Error: GasFree is not supported on network "${gasfreeNetwork}". Supported: mainnet, nile, shasta`);
@@ -191,35 +169,31 @@ async function handleGasFreeActivate(
   options: Record<string, string>,
   deps: {
     tronWallet: AgentWallet;
-    tronSigner: any;
     apiKey: string | undefined;
     TronWeb: any;
-    GasFreeAPIClient: any;
-    GASFREE_API_BASE_URLS: Record<string, string>;
-    getChainId: (networkKey: string) => number;
   },
 ): Promise<void> {
-  const { tronWallet, tronSigner, apiKey, TronWeb, GasFreeAPIClient, GASFREE_API_BASE_URLS, getChainId } = deps;
+  const { tronWallet, apiKey, TronWeb } = deps;
 
   const tokenSymbol = (options.token || 'USDT').toUpperCase();
   const gasfreeNetwork = options.network || 'nile';
-  const networkKey = `tron:${gasfreeNetwork}`;
-  const baseUrl = GASFREE_API_BASE_URLS[networkKey];
+  const networkKey = normalizeNetwork(gasfreeNetwork);
+  const baseUrl = (GASFREE_API_BASE_URLS as Record<string, string>)[networkKey];
 
   if (!baseUrl) {
     console.error(`Error: GasFree not supported on "${gasfreeNetwork}". Supported: mainnet, nile, shasta`);
     process.exit(1);
   }
 
-  const tronWebOpts: any = { fullHost: TRON_RPC_URLS[gasfreeNetwork], privateKey: TRONWEB_READONLY_DUMMY_KEY };
+  const tronWebOpts: any = { fullHost: tronRpcUrl(networkKey), privateKey: TRONWEB_READONLY_DUMMY_KEY };
   if (apiKey) tronWebOpts.headers = { 'TRON-PRO-API-KEY': apiKey };
   const tronWeb = new TronWeb(tronWebOpts);
 
-  const walletAddress = tronSigner.getAddress();
+  // Bind the signer to the requested network so any chain-reading signer
+  // capability targets the same chain the activation runs on.
+  const tronSigner = await createClientTronSigner(tronWallet as any, { network: networkKey, apiKey });
+  const walletAddress = tronSigner.address;
   const gasFreeClient = new GasFreeAPIClient(baseUrl);
-
-  // @ts-ignore - CJS module with named exports
-  const { TronGasFree } = await import('@gasfree/gasfree-sdk');
 
   // Step 1: Query account info
   console.error(`[gasfree-activate] Network: ${gasfreeNetwork}, Wallet: ${walletAddress}, Token: ${tokenSymbol}`);
@@ -251,7 +225,7 @@ async function handleGasFreeActivate(
   const activateFee = BigInt(asset.activateFee || 0);
   const transferFee = BigInt(asset.transferFee || 0);
   const totalFees = activateFee + transferFee;
-  const oneUnit = BigInt(10 ** decimals);
+  const oneUnit = 10n ** BigInt(decimals);
   const transferAmount = totalFees + oneUnit;
 
   const fmt = (v: bigint) => `${Number(v) / 10 ** decimals} ${tokenSymbol}`;
@@ -323,14 +297,11 @@ async function handleGasFreeActivate(
   }
 
   const maxFee = totalFees;
-  const deadline = Math.floor(Date.now() / 1000) + 3600;
+  const deadline = gasfreeDeadline(networkKey);
 
   console.error(`[gasfree-activate] Return: ${fmt(returnValue)}, maxFee: ${fmt(maxFee)}, nonce: ${nonce}`);
 
-  const chainId = getChainId(networkKey);
-  const gasFree = new TronGasFree({ chainId });
-
-  const { domain, types, message } = gasFree.assembleGasFreeTransactionJson({
+  const gasFreeMessage = {
     token: tokenAddress,
     serviceProvider: provider.address,
     user: walletAddress,
@@ -340,15 +311,9 @@ async function handleGasFreeActivate(
     deadline: deadline.toString(),
     version: '1',
     nonce: nonce.toString(),
-  });
-
-  const domainForSig = convertTronAddressesDeep(tronWeb, domain) as Record<string, unknown>;
-  const messageForSig = convertTronAddressesDeep(tronWeb, message) as Record<string, unknown>;
-
-  const signature = await tronSigner.signTypedData(domainForSig, types, messageForSig, 'GasFreeTransaction');
-
+  };
   console.error('[gasfree-activate] Submitting GasFree transaction...');
-  const traceId = await gasFreeClient.submit(domain, message, signature);
+  const traceId = await signAndSubmitGasFree(tronSigner, gasFreeClient, gasFreeMessage, networkKey);
   console.error(`[gasfree-activate] Trace ID: ${traceId}`);
 
   // Step 5: Wait for completion
@@ -374,22 +339,26 @@ async function handleGasFreeActivate(
 }
 
 function handleCheck(deps: {
-  tronSigner: any;
-  evmSigner: any;
+  tronAddress: string | undefined;
+  evmAddress: string | undefined;
   apiKey: string | undefined;
 }): void {
-  const { tronSigner, evmSigner, apiKey } = deps;
-  if (tronSigner) {
-    console.error(`[OK] TRON Wallet: ${tronSigner.getAddress()}`);
+  const { tronAddress, evmAddress, apiKey } = deps;
+  if (tronAddress) {
+    console.error(`[OK] TRON Wallet: ${tronAddress}`);
     if (apiKey) console.error(`[OK] TRON_GRID_API_KEY is configured.`);
   }
-  if (evmSigner) {
-    console.error(`[OK] EVM Wallet: ${evmSigner.getAddress()}`);
+  if (evmAddress) {
+    console.error(`[OK] EVM Wallet: ${evmAddress}`);
   }
-  if (!tronSigner && !evmSigner) {
+  if (!tronAddress && !evmAddress) {
     console.error(`[--] No compatible active wallet resolved from agent-wallet.`);
   }
-  console.error(`[OK] GasFree gasless payments enabled (exact_gasfree preferred when available).`);
+  if (tronAddress) {
+    console.error(`[OK] GasFree gasless payments available for TRON when the GasFree account is funded/active.`);
+  } else {
+    console.error(`[--] GasFree gasless payments require a TRON agent-wallet account.`);
+  }
 }
 
 async function main() {
@@ -420,96 +389,46 @@ async function main() {
   const inputRaw = options.input;
   const methodArg = options.method;
 
-  // Use dynamic imports
-  // @ts-ignore
-  const { TronWeb } = await import('tronweb');
-  (global as any).TronWeb = TronWeb;
-
-  const {
-    TronClientSigner,
-    EvmClientSigner,
-    X402Client,
-    X402FetchClient,
-    ExactTronClientMechanism,
-    ExactEvmClientMechanism,
-    ExactPermitTronClientMechanism,
-    ExactPermitEvmClientMechanism,
-    ExactGasFreeClientMechanism,
-    GasFreeAPIClient,
-    GASFREE_API_BASE_URLS,
-    SufficientBalancePolicy,
-    getChainId,
-  } = await import('@bankofai/x402');
-  let tronSigner: InstanceType<typeof TronClientSigner> | undefined;
-  try {
-    tronSigner = await TronClientSigner.create();
-    if (!isTronAddress(tronSigner.getAddress())) {
-      console.warn(`[x402] TronClientSigner returned unexpected address "${tronSigner.getAddress()}" — discarding signer.`);
-      tronSigner = undefined;
-    }
-  } catch (err: any) {
-    const message = err?.message || err;
-    console.warn(`[x402] No TRON signer available: ${message}`);
-    tronSigner = undefined;
-  }
-
-  let evmSigner: InstanceType<typeof EvmClientSigner> | undefined;
-  try {
-    evmSigner = await EvmClientSigner.create();
-    if (!isEvmAddress(evmSigner.getAddress())) {
-      console.warn(`[x402] EvmClientSigner returned unexpected address "${evmSigner.getAddress()}" — discarding signer.`);
-      evmSigner = undefined;
-    }
-  } catch (err: any) {
-    const message = err?.message || err;
-    console.warn(`[x402] No EVM signer available: ${message}`);
-    evmSigner = undefined;
-  }
   const apiKey = await findApiKey();
-
-  debug('tronSigner', tronSigner ? tronSigner.getAddress() : null);
-  debug('evmSigner', evmSigner ? evmSigner.getAddress() : null);
-  debug('apiKeyConfigured', Boolean(apiKey));
-
   // Ensure signer/library internals can pick up keys from env
   if (apiKey && !process.env.TRON_GRID_API_KEY) {
     process.env.TRON_GRID_API_KEY = apiKey;
   }
 
+  const [resolvedTronWallet, resolvedEvmWallet] = await Promise.all([
+    resolveAgentWallet('tron'),
+    resolveAgentWallet('eip155'),
+  ]);
+
+  debug('tronWallet', resolvedTronWallet?.address ?? null);
+  debug('evmWallet', resolvedEvmWallet?.address ?? null);
+  debug('apiKeyConfigured', Boolean(apiKey));
+
   if (options.check || options.status) {
     handleCheck({
-      tronSigner, evmSigner, apiKey,
+      tronAddress: resolvedTronWallet?.address,
+      evmAddress: resolvedEvmWallet?.address,
+      apiKey,
     });
     process.exit(0);
   }
 
   if (options['gasfree-info']) {
-    await handleGasFreeInfo(options, {
-      tronSigner, GasFreeAPIClient,
-      GASFREE_API_BASE_URLS: GASFREE_API_BASE_URLS as Record<string, string>,
-    });
+    await handleGasFreeInfo(options, resolvedTronWallet?.address);
     process.exit(0);
   }
 
   if (options['gasfree-activate']) {
-    const resolvedTronWallet = await resolveAgentWallet('tron');
-    if (!resolvedTronWallet || !tronSigner) {
+    if (!resolvedTronWallet) {
       console.error('Error: A TRON wallet from agent-wallet is required for --gasfree-activate');
       process.exit(1);
     }
-    if (resolvedTronWallet.address !== tronSigner.getAddress()) {
-      console.error('[x402] Error: TRON wallet address mismatch between agent-wallet and TronClientSigner; aborting gasfree-activate.');
-      process.exit(1);
-    }
+    const { TronWeb } = await import('tronweb');
     try {
       await handleGasFreeActivate(options, {
         tronWallet: resolvedTronWallet.wallet,
-        tronSigner,
         apiKey,
         TronWeb,
-        GasFreeAPIClient,
-        GASFREE_API_BASE_URLS: GASFREE_API_BASE_URLS as Record<string, string>,
-        getChainId,
       });
     } catch (error: any) {
       console.error(`[gasfree-activate] Error: ${error.message || 'Unknown error'}`);
@@ -519,8 +438,8 @@ async function main() {
     process.exit(0);
   }
 
-  if (!tronSigner && !evmSigner) {
-    console.error('[x402] Warning: no compatible agent-wallet signer resolved; payment-required endpoints may fail.');
+  if (!resolvedTronWallet && !resolvedEvmWallet) {
+    console.error('[x402] Warning: no compatible agent-wallet resolved; payment-required endpoints may fail.');
   }
 
   if (!url) {
@@ -536,46 +455,99 @@ async function main() {
   const originalConsoleLog = console.log;
   console.log = console.error;
 
-  const client = new X402Client();
-
-  if (tronSigner) {
-    // Build GasFree API clients per network
-    const gasFreeClients: Record<string, any> = {};
-    for (const [networkId, baseUrl] of Object.entries(GASFREE_API_BASE_URLS as Record<string, string>)) {
-      gasFreeClients[networkId] = new GasFreeAPIClient(baseUrl);
+  const requestedNetwork = options.network ? normalizeNetwork(options.network) : undefined;
+  const registeredNetworks = new Set<string>();
+  const client = new x402Client((_version, accepts) => {
+    debug('paymentRequirements', accepts.map((r: any) => ({
+      scheme: r.scheme, network: r.network, asset: r.asset, amount: r.amount,
+    })));
+    const candidates = accepts.filter((requirement) =>
+      (!requestedNetwork || requirement.network === requestedNetwork) &&
+      registeredNetworks.has(requirement.network),
+    );
+    const selected = candidates.find((requirement) => requirement.scheme === 'exact_gasfree')
+      || candidates.find((requirement) => requirement.scheme === 'exact');
+    if (!selected) {
+      throw new Error(
+        `No compatible payment requirement${requestedNetwork ? ` for ${requestedNetwork}` : ''}` +
+        `; registered networks: ${[...registeredNetworks].join(', ') || 'none'}`,
+      );
     }
+    return selected;
+  });
 
-    const networks = ['mainnet', 'nile', 'shasta', '*'];
-    for (const net of networks) {
-      const networkId = net === '*' ? 'tron:*' : `tron:${net}`;
-      client.register(networkId, new ExactTronClientMechanism(tronSigner));
-      client.register(networkId, new ExactPermitTronClientMechanism(tronSigner));
-      client.register(networkId, new ExactGasFreeClientMechanism(tronSigner, gasFreeClients));
-    }
-    console.error(`[x402] TRON mechanisms enabled (exact, exact_permit, exact_gasfree).`);
-    debug('registeredTronNetworks', networks.map((n) => (n === '*' ? 'tron:*' : `tron:${n}`)));
-    debug('gasFreeApiNetworks', Object.keys(gasFreeClients));
-  }
-
-  if (evmSigner) {
-    client.register('eip155:*', new ExactEvmClientMechanism(evmSigner));
-    client.register('eip155:*', new ExactPermitEvmClientMechanism(evmSigner));
-    console.error(`[x402] EVM mechanisms enabled.`);
-  }
-
-  client.registerPolicy(new SufficientBalancePolicy(client));
-
-  // Always prefer exact_gasfree over other payment schemes when available
-  client.registerPolicy({
-    async apply(requirements: any[]) {
-      debug('policy.requirements', requirements.map((r: any) => ({ scheme: r.scheme, network: r.network, asset: r.asset, amount: r.amount })));
-      const gasfree = requirements.filter((r: any) => r.scheme === 'exact_gasfree');
-      const others = requirements.filter((r: any) => r.scheme !== 'exact_gasfree');
-
-      return [...gasfree, ...others];
+  // The core selector pipeline is synchronous, so it cannot pre-check GasFree
+  // balances, and the SDK does not retry with another requirement when payload
+  // creation throws. Recover here: if exact_gasfree fails (e.g. inactive
+  // account or insufficient GasFree wallet balance), rebuild the payload from
+  // the remaining advertised requirements (exact) instead of failing the
+  // whole request.
+  client.onPaymentCreationFailure(async (ctx) => {
+    if (ctx.selectedRequirements.scheme !== 'exact_gasfree') return undefined;
+    const fallbackAccepts = ctx.paymentRequired.accepts.filter(
+      (requirement) => requirement.scheme !== 'exact_gasfree',
+    );
+    if (fallbackAccepts.length === 0) return undefined;
+    const reason = ctx.error instanceof Error ? ctx.error.message : String(ctx.error);
+    console.error(`[x402] exact_gasfree payment creation failed (${reason}); falling back to exact.`);
+    try {
+      const payload = await client.createPaymentPayload({
+        ...ctx.paymentRequired,
+        accepts: fallbackAccepts,
+      });
+      return { recovered: true, payload };
+    } catch (fallbackError) {
+      const fallbackReason = fallbackError instanceof Error ? fallbackError.message : String(fallbackError);
+      console.error(`[x402] Fallback to exact also failed (${fallbackReason}); reporting original error.`);
+      return undefined;
     }
   });
-  console.error(`[x402] GasFree priority policy enabled.`);
+
+  if (resolvedTronWallet) {
+    const registeredTronNetworks: string[] = [];
+    for (const network of TRON_NETWORKS) {
+      try {
+        const signer = await createClientTronSigner(resolvedTronWallet.wallet as any, { network, apiKey });
+        client.register(network, new ExactTronScheme(signer));
+        registerExactGasFreeTronScheme(client, { signer, networks: [network] });
+        registeredNetworks.add(network);
+        registeredTronNetworks.push(network);
+      } catch (err: any) {
+        console.warn(`[x402] Skipping ${network}: ${err?.message || err}`);
+      }
+    }
+    if (registeredTronNetworks.length > 0) {
+      console.error(`[x402] TRON schemes enabled for ${registeredTronNetworks.join(', ')} (exact, exact_gasfree).`);
+    } else {
+      console.warn('[x402] No TRON payment schemes were registered.');
+    }
+    debug('registeredTronNetworks', registeredTronNetworks);
+  }
+
+  if (resolvedEvmWallet) {
+    const registeredEvmNetworks: string[] = [];
+    for (const network of EVM_NETWORKS) {
+      try {
+        const signer = await createClientEvmSigner(resolvedEvmWallet.wallet as any, {
+          network,
+          rpcUrl: evmRpcUrl(network),
+        });
+        client.register(network, new ExactEvmScheme(signer));
+        registeredNetworks.add(network);
+        registeredEvmNetworks.push(network);
+      } catch (err: any) {
+        console.warn(`[x402] Skipping ${network}: ${err?.message || err}`);
+      }
+    }
+    if (registeredEvmNetworks.length > 0) {
+      console.error(`[x402] EVM exact scheme enabled for ${registeredEvmNetworks.join(', ')}.`);
+    } else {
+      console.warn('[x402] No EVM payment schemes were registered.');
+    }
+    debug('registeredEvmNetworks', registeredEvmNetworks);
+  }
+
+  console.error(`[x402] Payment selector: prefer exact_gasfree, then exact; auto-fallback to exact if gasfree payload creation fails.`);
 
   let finalUrl = url;
   let finalMethod = methodArg || 'GET';
@@ -598,7 +570,7 @@ async function main() {
   debug('finalRequest', { method: finalMethod, url: finalUrl, bodyBytes: finalBody ? Buffer.byteLength(finalBody, 'utf8') : 0 });
 
   try {
-    const fetchClient = new X402FetchClient(client);
+    const fetchWithPayment = wrapFetchWithPayment(fetch, client);
     const requestInit: any = {
       method: finalMethod,
       headers: { 'Content-Type': 'application/json' },
@@ -606,7 +578,7 @@ async function main() {
     };
 
     console.error(`[x402] Requesting: ${finalMethod} ${finalUrl}`);
-    const response = await fetchClient.request(finalUrl, requestInit);
+    const response = await fetchWithPayment(finalUrl, requestInit);
 
     const contentType = response.headers.get('content-type') || '';
     let responseBody;

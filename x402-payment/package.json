@@ -1,6 +1,6 @@
 {
   "name": "x402-payment-skill",
-  "version": "1.5.8",
+  "version": "1.6.0",
   "description": "x402 payment skill for TRON and EVM",
   "engines": {
     "node": ">=20.0.0"
@@ -15,7 +15,10 @@
   },
   "dependencies": {
     "@bankofai/agent-wallet": "^2.4.0",
-    "@bankofai/x402": "0.5.9",
-    "tronweb": "^6.0.0"
+    "@bankofai/x402-core": "1.0.0",
+    "@bankofai/x402-evm": "1.0.0",
+    "@bankofai/x402-fetch": "1.0.0",
+    "@bankofai/x402-tron": "1.0.0",
+    "tronweb": "^6.1.0"
   }
 }

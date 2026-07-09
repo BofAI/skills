@@ -2,6 +2,20 @@
 
 Invoke x402-protected APIs and agent resources with automatic payment handling on TRON and EVM networks.
 
+## Installation
+
+### One-line install
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/BofAI/skills/v1.5.14/x402-payment/install.sh | sh
+```
+
+### Uninstall
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/BofAI/skills/v1.5.14/x402-payment/uninstall.sh | sh
+```
+
 ## Quick Start
 
 ```bash
@@ -13,11 +27,14 @@ npx tsx src/x402_invoke.ts --check
 ## What It Supports
 
 - TRON payments on `tron:nile`, `tron:mainnet`, and `tron:shasta`
-- EVM payments on `eip155:*`, including BSC testnet and mainnet flows
-- Automatic 402 challenge handling through `X402Client` and `X402FetchClient`
-- Optional GasFree support for TRON when the upstream x402 library exposes `exact_gasfree`
+- EVM payments on `eip155:56` (BSC mainnet) and `eip155:97` (BSC testnet)
+- Automatic 402 challenge handling through `@bankofai/x402-fetch`
+- TRON `exact`/Permit2 and `exact_gasfree` through `@bankofai/x402-tron`
+- EVM `exact` through `@bankofai/x402-evm`
 
-This skill is aligned with `@bankofai/x402@0.5.9`, including Exact V2-compatible payload generation.
+This skill is aligned with the modular BankofAI x402 SDK `1.0.0` packages.
+
+> **Breaking changes vs 1.5.x:** the `exact_permit` scheme (removed in SDK 1.0) and the `eip155:*` wildcard (EVM chains other than BSC) are no longer supported.
 
 ## Files
 
@@ -30,6 +47,7 @@ This skill is aligned with `@bankofai/x402@0.5.9`, including Exact V2-compatible
 - Node.js 20+
 - Agent Wallet configured for TRON and/or EVM signing
 - Optional `TRON_GRID_API_KEY` for TRON mainnet reliability
+- Optional `EVM_RPC_URL_56` / `EVM_RPC_URL_97` for custom BSC mainnet/testnet RPC endpoints
 - Optional `X402_DEBUG=1` for expanded debug output
 
 This skill uses `agent-wallet` as its signing source. It does not read raw private keys from shared MCP config files.
@@ -72,7 +90,7 @@ npx tsx src/x402_invoke.ts \
 
 ## Notes
 
-- Wallet resolution uses Agent Wallet (`TronClientSigner.create()` / `EvmClientSigner.create()`).
+- Wallet resolution uses Agent Wallet and the SDK 1.0 signer adapters; the skill never reads raw private keys.
 - The tool decodes `payment-response` headers and prints settlement details to stderr for easier verification.
 - For local BSC exact compatibility tests, the demo route is `/protected-bsc-testnet-coinbase`.
 

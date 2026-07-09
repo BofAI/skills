@@ -64,7 +64,7 @@ Some skills require wallet signature operations and are built on Agent Wallet. B
 
 ### Payments & x402
 
-- [**x402-payment**](./x402-payment) - x402 payment skill for calling paid APIs and agent resources across TRON and EVM. Aligned with `@bankofai/x402@0.5.9`. See [README](./x402-payment/README.md).
+- [**x402-payment**](./x402-payment) - x402 payment skill for calling paid APIs and agent resources on TRON and BSC (EVM). Aligned with the modular BankofAI x402 SDK 1.0 packages. See [README](./x402-payment/README.md).
 
 ### AI & Account Recharge
 
