@@ -11,7 +11,7 @@ Execute token swaps, manage liquidity, and query market data on SunSwap DEX via 
 
 ## Approach
 
-This skill uses **sun-cli** (`@bankofai/sun-cli`) — a unified CLI for SUN.IO / SunSwap on TRON. All swap, liquidity, price, pool, and position operations are handled through `sun` commands with `--json` output for AI agent consumption.
+This skill uses **sun-cli** (`@sun-protocol/sun-cli`) — a unified CLI for SUN.IO / SunSwap on TRON. All swap, liquidity, price, pool, and position operations are handled through `sun` commands with `--json` output for AI agent consumption.
 
 ## Files
 
@@ -21,8 +21,10 @@ This skill uses **sun-cli** (`@bankofai/sun-cli`) — a unified CLI for SUN.IO /
 ## Prerequisites
 
 ```bash
-npm install -g @bankofai/sun-cli
+npm install -g @sun-protocol/sun-cli@^1.2.2
 ```
+
+`@sun-protocol/sun-cli >= 1.2.2` is required for wallet-free `--dry-run` previews.
 
 ## Networks
 
@@ -76,9 +78,11 @@ sun --json position list --owner TAddress
 
 ## Dependencies
 
-- `@bankofai/sun-cli` (installed globally)
+- `@sun-protocol/sun-cli >= 1.2.2` (installed globally)
 
 ## Version
+
+3.3.0 (2026-07-09) - migrate runtime dependency to `@sun-protocol/sun-cli` and document wallet-free dry-run previews
 
 3.0.0 (2026-03-15) - sun-cli based approach
 
@@ -86,4 +90,4 @@ See [CHANGELOG.md](CHANGELOG.md) for migration notes.
 
 ## License
 
-MIT - see [LICENSE](../../LICENSE) for details
+MIT - see [LICENSE](../LICENSE) for details

@@ -11,7 +11,7 @@ Create and trade meme tokens on **SunPump** and query token info, rankings, hold
 
 ## Approach
 
-This skill uses **sun-cli** (`@bankofai/sun-cli`) — a unified CLI for SUN.IO / SunSwap / SunPump on TRON. Token creation goes through the SunPump agent endpoint (`sun sunpump launch` — server-side, no wallet). Trading auto-routes by token state: pre-launch (bonding curve) tokens go through `sun sunpump buy/sell`, post-launch (migrated to DEX) tokens go through `sun swap`. All SunPump data is read through the `sun sunpump *` subcommands with `--json` output for AI agent consumption.
+This skill uses **sun-cli** (`@sun-protocol/sun-cli`) — a unified CLI for SUN.IO / SunSwap / SunPump on TRON. Token creation goes through the SunPump agent endpoint (`sun sunpump launch` — server-side, no wallet). Trading auto-routes by token state: pre-launch (bonding curve) tokens go through `sun sunpump buy/sell`, post-launch (migrated to DEX) tokens go through `sun swap`. All SunPump data is read through the `sun sunpump *` subcommands with `--json` output for AI agent consumption.
 
 ## Files
 
@@ -31,14 +31,15 @@ npx skills add BofAI/skills
 ### 2. Install the runtime CLI
 
 ```bash
-npm install -g @bankofai/sun-cli@^1.2.1
+npm install -g @sun-protocol/sun-cli@^1.2.2
 ```
 
-`@bankofai/sun-cli >= 1.2.1` is required (earlier versions lack `sun sunpump launch`; < 1.2.0 also lack `sun sunpump buy/sell/state`). The skills CLI does **not** auto-install npm dependencies.
+`@sun-protocol/sun-cli >= 1.2.2` is required (includes `sun sunpump launch`, `sun sunpump buy/sell/state`, and wallet-free `--dry-run` previews). The skills CLI does **not** auto-install npm dependencies.
 
 ### 3. Configure a wallet (only for trading commands)
 
 A wallet (`TRON_PRIVATE_KEY`, `TRON_MNEMONIC`, or `AGENT_WALLET_PASSWORD`) is required only for `sun swap` / `sun sunpump buy` / `sun sunpump sell`. All read endpoints work without one, and so does token creation (`sun sunpump launch` — the platform signs server-side).
+`--dry-run` previews also work without wallet credentials on `@sun-protocol/sun-cli >= 1.2.2`.
 
 
 ## Network
@@ -119,11 +120,13 @@ sun --json sunpump tx user T... --size 20
 
 ## Dependencies
 
-- `@bankofai/sun-cli` (installed globally)
+- `@sun-protocol/sun-cli >= 1.2.2` (installed globally)
 
 ## Version
 
-1.3.1 (2026-06-08) — docs: clarify `sun sunpump launch` is mainnet-only (sun-cli dropped SunPump nile support again); document that `--dry-run` skips the mainnet check
+1.4.0 (2026-07-09) — migrate runtime dependency to `@sun-protocol/sun-cli`; require `>= 1.2.2` and document wallet-free `--dry-run` previews
+
+1.3.1 (2026-06-08) — docs: clarify `sun sunpump launch` is mainnet-only (sun-cli dropped SunPump nile support again); document that `--dry-run` does not skip the mainnet check
 
 1.3.0 (2026-06-04) — adds token creation via `sun sunpump launch` (server-side `POST /ai/agentTokenLaunch`, no wallet needed); requires sun-cli ≥ 1.2.1
 
