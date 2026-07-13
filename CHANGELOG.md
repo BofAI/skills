@@ -5,6 +5,7 @@
 ### Improvements
 - **sunswap**: Migrated runtime guidance to `@sun-protocol/sun-cli@^1.2.2` and documented wallet-free `--dry-run` previews.
 - **sunpump-agent-skill**: Migrated runtime guidance to `@sun-protocol/sun-cli@^1.2.2`, bumped skill docs to v1.4.0, and clarified that read-only queries, launch, and dry-run previews do not need wallet credentials.
+- **sunpump-agent-skill**: Documented that `token holders` / `holders-v2` may force a 10-row page size even when `--size` is smaller.
 
 ## [1.5.8] - 2026-04-21
 

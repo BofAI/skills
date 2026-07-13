@@ -19,6 +19,8 @@
   and `--dry-run` previews do not need wallet credentials. Real trades still
   require a wallet.
 - **Network guidance unchanged**: all `sunpump` subcommands remain mainnet-only.
+- **Holder pagination documented**: `token holders` and `holders-v2` honor
+  `--page`, but the SunPump API may force page size to 10 regardless of `--size`.
 
 ---
 

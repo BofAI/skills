@@ -394,7 +394,7 @@ Options:
 | Flag | Description |
 |------|-------------|
 | `--include-zero` | Include zero-balance wallets |
-| `--page <n>` / `--size <n>` | Pagination |
+| `--page <n>` / `--size <n>` | Pagination; current API honors `--page` but may force page size to 10 |
 | `--sort <field>` | Sort field (default: balance descending) |
 
 Default table columns: `Holder | Type | Balance | Percent`.
@@ -807,6 +807,7 @@ Token created.
 | First sell needs TRC20 approve | `sunpump sell` | Two on-chain txs (approve + sell), only sell tx hash returned | Expected; subsequent sells use cached `MaxUint256` allowance |
 | SunPump is mainnet only | All `sunpump` subcommands | CLI throws `SunPump is only available on mainnet` on any other `--network` | Drop `--network` or pass `--network mainnet`; the nile/shasta API hosts aren't publicly reachable |
 | Invalid `--type` for ranking | `token ranking` | API rejects with non-obvious error | Only pass `MARKET_CAP`, `VOLUME_24H`, or `PRICE_CHANGE_24H` |
+| Holders page size is server-fixed | `token holders`, `token holders-v2` | `--size` may be ignored and responses can return 10 holders per page | Use `--page` for pagination; limit rows client-side if fewer are needed |
 | `--start-time` / `--end-time` are seconds, not ms | `tx user`, `tx token` | Ms values produce empty results | Use epoch seconds |
 | `percent` field magnitude differs by endpoint | `token holders` vs `token list` | Holders endpoint returns 38.51, list endpoint returns 0.3851 | The CLI normalizes, but check magnitude when consuming raw JSON |
 | Launch without a logo fails opaquely | `sunpump launch` | Server returns `Invoke third part error` when no image accompanies the launch | Always pass `--image <path>` (or `--image-base64`) |

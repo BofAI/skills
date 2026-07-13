@@ -66,6 +66,10 @@ Ranking types: `MARKET_CAP`, `VOLUME_24H`, `PRICE_CHANGE_24H`.
 
 State values: `0 NOT_EXIST`, `1 TRADING`, `2 READY_TO_LAUNCH`, `3 LAUNCHED`.
 
+Holder pagination note: `sunpump token holders` and `holders-v2` currently honor `--page`,
+but the API may force page size to 10 even when `--size` is smaller. Limit rows client-side
+if fewer holders are needed.
+
 ## Usage Examples
 
 ### Create a new meme token (no wallet needed — server-side creation)
