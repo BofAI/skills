@@ -200,7 +200,7 @@ cat <<EOF
 ${SKILL_NAME} uninstalled.
 
 Reinstall at any time with:
-  curl -fsSL https://raw.githubusercontent.com/BofAI/skills/v1.5.14/${SKILL_NAME}/install.sh | sh
+  curl -fsSL https://raw.githubusercontent.com/BofAI/skills/main/${SKILL_NAME}/install.sh | sh
 
 Backups (if any) are preserved under <skills-dir>/.backups/${SKILL_NAME}-*.
 EOF
