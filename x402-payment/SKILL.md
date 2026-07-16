@@ -10,7 +10,7 @@ Use `x402-cli`; do not run local TypeScript payment scripts.
 ## Prerequisites
 
 1. Run `command -v x402-cli && x402-cli --version`.
-2. Require x402 CLI 1.0.1-beta.2 or newer (built with x402 SDK 1.0.1-beta.4). If it is missing, ask the user to install it with `npm install -g @bankofai/x402-cli@beta`.
+2. Require x402 CLI 1.0.1-beta.3 or newer (built with x402 SDK 1.0.1-beta.4). If it is missing, ask the user to install it with `npm install -g @bankofai/x402-cli@beta`.
 3. Run `agent-wallet list` and confirm a compatible payer wallet exists.
 4. Never print, echo, or interpolate a private key or mnemonic into a command. Let the CLI resolve Agent Wallet credentials, or rely on private-key environment variables already configured outside the conversation.
 
@@ -43,7 +43,7 @@ If the user specifies payment constraints, pass them directly:
 
 ```bash
 x402-cli pay <url> \
-  --network tron:nile \
+  --network tron:0xcd8690dc \
   --token USDT \
   --scheme exact_gasfree \
   --max-amount 0.01 \
@@ -70,9 +70,9 @@ GasFree is TRON-only. Do not combine it with an `eip155:*` network. The payer ne
 
 ## Supported networks
 
-- `tron:mainnet`: USDT, USDD
-- `tron:nile`: USDT, USDD
-- `tron:shasta`: USDT
+- `tron:0x2b6653dc`: USDT, USDD
+- `tron:0xcd8690dc`: USDT, USDD
+- `tron:0x94a9059e`: USDT
 - `eip155:56`: USDT
 - `eip155:97`: USDT, USDC
 
