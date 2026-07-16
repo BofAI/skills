@@ -11,7 +11,7 @@ OPEN_TERMINAL="${X402_OPEN_TERMINAL:-auto}"
 
 SKILL_NAME="x402-payment"
 CLI_PACKAGE="@bankofai/x402-cli"
-CLI_VERSION="${X402_CLI_VERSION:-1.0.1-beta.4}"
+CLI_VERSION="${X402_CLI_VERSION:-1.0.1-beta.5}"
 
 info() {
   printf '==> %s\n' "$1"
@@ -60,7 +60,7 @@ EOF
 }
 
 DRY_RUN=0
-SKILLS_DIR_OVERRIDE=""
+SKILLS_DIR_OVERRIDE="${X402_SKILLS_DIR:-}"
 
 while [ "$#" -gt 0 ]; do
   case "$1" in
@@ -148,11 +148,7 @@ open_self_in_terminal_and_exit() {
   command_exists curl || fail "curl is required to open the installer in Terminal."
 
   installer_url="https://raw.githubusercontent.com/BofAI/skills/${TAG}/${SKILL_NAME}/install.sh"
-  args_text=""
-  for arg in "$@"; do
-    args_text="${args_text} $(shell_quote "$arg")"
-  done
-  command_text="cd ~ && TMPDIR=\"\$(mktemp -d)\" && INSTALL_SH=\"\$TMPDIR/${SKILL_NAME}-install.sh\" && curl -fsSL $(shell_quote "$installer_url") -o \"\$INSTALL_SH\" && chmod 700 \"\$INSTALL_SH\" && env X402_TERMINAL_CHILD=1 X402_OPEN_TERMINAL=0 X402_INSTALL_TAG=$(shell_quote "$TAG") X402_INSTALL_REPO=$(shell_quote "$REPO") X402_INSTALL_CLIENT=$(shell_quote "$CLIENT") X402_SYMLINK=$(shell_quote "$SYMLINK") X402_SKIP_CLI_INSTALL=$(shell_quote "$SKIP_CLI_INSTALL") X402_SKIP_NODE_CHECK=$(shell_quote "$SKIP_NODE_CHECK") /bin/sh \"\$INSTALL_SH\"${args_text}; printf '\\nPress Enter to close this window...'; IFS= read -r _"
+  command_text="cd ~ && TMPDIR=\"\$(mktemp -d)\" && INSTALL_SH=\"\$TMPDIR/${SKILL_NAME}-install.sh\" && curl -fsSL $(shell_quote "$installer_url") -o \"\$INSTALL_SH\" && chmod 700 \"\$INSTALL_SH\" && env X402_TERMINAL_CHILD=1 X402_OPEN_TERMINAL=0 X402_INSTALL_TAG=$(shell_quote "$TAG") X402_INSTALL_REPO=$(shell_quote "$REPO") X402_INSTALL_CLIENT=$(shell_quote "$CLIENT") X402_SYMLINK=$(shell_quote "$SYMLINK") X402_SKIP_CLI_INSTALL=$(shell_quote "$SKIP_CLI_INSTALL") X402_SKIP_NODE_CHECK=$(shell_quote "$SKIP_NODE_CHECK") X402_CLI_VERSION=$(shell_quote "$CLI_VERSION") X402_SKILLS_DIR=$(shell_quote "$SKILLS_DIR_OVERRIDE") /bin/sh \"\$INSTALL_SH\"; STATUS=\$?; rm -rf \"\$TMPDIR\"; printf '\\nPress Enter to close this window...'; IFS= read -r _; exit \"\$STATUS\""
   osascript >/dev/null <<OSA
 tell application "Terminal"
   activate
@@ -210,6 +206,17 @@ else
   WORKDIR="${TMPDIR:-/tmp}/${SKILL_NAME}-install.$$"
   mkdir -p "$WORKDIR"
 fi
+
+cleanup() {
+  rm -rf "$WORKDIR"
+}
+interrupted() {
+  trap - 0 HUP INT TERM
+  cleanup
+  exit 1
+}
+trap cleanup 0
+trap interrupted HUP INT TERM
 
 CLONE_DIR="$WORKDIR/skills"
 if [ "$DRY_RUN" = "1" ]; then

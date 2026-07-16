@@ -8,7 +8,7 @@ Pay x402-protected HTTP resources with `x402-cli`. Payment execution no longer u
 curl -fsSL https://raw.githubusercontent.com/BofAI/skills/main/x402-payment/install.sh | sh
 ```
 
-The installer installs the skill and `@bankofai/x402-cli@1.0.1-beta.4` (x402 SDK 1.0.1-beta.4) globally. After installation:
+The installer installs the skill and `@bankofai/x402-cli@1.0.1-beta.5` (x402 SDK 1.0.1-beta.4 and Gateway 1.0.1-beta.5) globally. After installation:
 
 ```bash
 x402-cli --version
