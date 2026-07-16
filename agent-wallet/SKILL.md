@@ -143,7 +143,7 @@ Run `agent-wallet <command> --help` for full options. See `commands-reference.md
 
 ## Network Identifiers
 
-Format: `eip155:<chainId>` for EVM, `tron:mainnet` or `tron:nile` for TRON.
+Format: `eip155:<chainId>` for EVM and canonical CAIP-2 IDs for TRON: `tron:0x2b6653dc` (Mainnet), `tron:0xcd8690dc` (Nile), or `tron:0x94a9059e` (Shasta).
 
 Common: `eip155:1` (Ethereum), `eip155:137` (Polygon), `eip155:56` (BSC), `eip155:42161` (Arbitrum), `eip155:8453` (Base).
 
@@ -158,5 +158,5 @@ One wallet derives separate EVM and TRON addresses from the same key — use `re
 | `DecryptionError` / wrong password | Check `AGENT_WALLET_PASSWORD` or runtime secrets |
 | `Already initialized` | Directory already set up — skip `init`, proceed to `add` |
 | `Wallet not found: <id>` | `agent-wallet list` to see valid IDs |
-| `Network not supported` | Use `eip155:<chainId>` or `tron:mainnet`/`tron:nile` |
+| `Network not supported` | Use `eip155:<chainId>` or a canonical TRON CAIP-2 ID such as `tron:0x2b6653dc`/`tron:0xcd8690dc` |
 | `Private key must be 32 bytes` | Invalid key format — user-side issue, run import manually |
