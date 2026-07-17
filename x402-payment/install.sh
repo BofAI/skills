@@ -11,7 +11,7 @@ OPEN_TERMINAL="${X402_OPEN_TERMINAL:-auto}"
 
 SKILL_NAME="x402-payment"
 CLI_PACKAGE="@bankofai/x402-cli"
-CLI_VERSION="${X402_CLI_VERSION:-1.0.1-beta.6}"
+CLI_VERSION="${X402_CLI_VERSION:-1.0.1-beta.7}"
 
 info() {
   printf '==> %s\n' "$1"
