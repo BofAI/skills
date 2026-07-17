@@ -193,7 +193,9 @@ else
   info "Installing ${CLI_PACKAGE}@${CLI_VERSION}"
   npm install --global --no-fund --no-audit "${CLI_PACKAGE}@${CLI_VERSION}"
   command_exists x402-cli || fail "x402-cli was installed but is not available on PATH."
-  info "Installed $(x402-cli --version)"
+  installed_version="$(x402-cli --version 2>/dev/null || true)"
+  [ "$installed_version" = "$CLI_VERSION" ] || fail "Expected x402-cli ${CLI_VERSION}, found ${installed_version:-unknown}."
+  info "Installed ${installed_version}"
 fi
 
 # ---------------------------------------------------------------------------
