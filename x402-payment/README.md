@@ -10,7 +10,7 @@ Requires Node.js 20+ and npm.
 curl -fsSL https://raw.githubusercontent.com/BofAI/skills/main/x402-payment/install.sh | sh
 ```
 
-The installer installs the skill and verifies `@bankofai/x402-cli@1.0.1-beta.7` (x402 SDK 1.0.1 and Gateway 1.0.1-beta.6) globally. After installation:
+The installer installs the skill and verifies `@bankofai/x402-cli@1.0.1-beta.10` (x402 SDK 1.0.1 and Gateway 1.0.1-beta.10) globally. After installation:
 
 ```bash
 x402-cli --version
