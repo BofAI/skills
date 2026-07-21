@@ -5,6 +5,7 @@ CLIENT="${X402_UNINSTALL_CLIENT:-auto}"
 PURGE_STATE="${X402_PURGE_STATE:-0}"
 REMOVE_DEV_SRC="${X402_REMOVE_DEV_SRC:-auto}"
 DRY_RUN=0
+SKILLS_DIR_OVERRIDE="${X402_SKILLS_DIR:-}"
 
 SKILL_NAME="x402-payment"
 
@@ -26,7 +27,7 @@ truthy() {
 
 usage() {
   cat <<EOF
-Usage: uninstall.sh [--client auto|codex|claude|all] [--purge-state] [--remove-dev-src] [--keep-dev-src] [--dry-run]
+Usage: uninstall.sh [--client auto|codex|claude|all] [--skills-dir <dir>] [--purge-state] [--remove-dev-src] [--keep-dev-src] [--dry-run]
 
 Default uninstall moves installed ${SKILL_NAME} skill directories to .backups/
 and disables SKILL.md, preserving configuration in the backup. With --purge-state,
@@ -34,6 +35,7 @@ the active install and existing ${SKILL_NAME} backups are permanently removed.
 
 Options:
   --client          Target client. Default: auto.
+  --skills-dir      Override the target skills directory.
   --purge-state     Permanently remove the installed skill directory, config, and matching backups.
   --remove-dev-src   Remove the persistent dev source directory (\$HOME/.local/share/${SKILL_NAME}-src).
   --keep-dev-src     Keep the persistent dev source directory (default unless --symlink was used).
@@ -54,6 +56,15 @@ while [ "$#" -gt 0 ]; do
       ;;
     --purge-state)
       PURGE_STATE=1
+      shift
+      ;;
+    --skills-dir)
+      [ "$#" -ge 2 ] || fail "--skills-dir requires a value"
+      SKILLS_DIR_OVERRIDE="$2"
+      shift 2
+      ;;
+    --skills-dir=*)
+      SKILLS_DIR_OVERRIDE="${1#--skills-dir=}"
       shift
       ;;
     --remove-dev-src)
@@ -180,18 +191,22 @@ if [ "$CLIENT" = "auto" ]; then
   targets="$(detect_client)"
 fi
 
-case "$targets" in
-  codex)
-    backup_target "$HOME/.codex/skills"
-    ;;
-  claude)
-    backup_target "$HOME/.claude/skills"
-    ;;
-  all)
-    backup_target "$HOME/.codex/skills"
-    backup_target "$HOME/.claude/skills"
-    ;;
-esac
+if [ -n "$SKILLS_DIR_OVERRIDE" ]; then
+  backup_target "$SKILLS_DIR_OVERRIDE"
+else
+  case "$targets" in
+    codex)
+      backup_target "$HOME/.codex/skills"
+      ;;
+    claude)
+      backup_target "$HOME/.claude/skills"
+      ;;
+    all)
+      backup_target "$HOME/.codex/skills"
+      backup_target "$HOME/.claude/skills"
+      ;;
+  esac
+fi
 
 remove_dev_src
 
@@ -200,7 +215,7 @@ cat <<EOF
 ${SKILL_NAME} uninstalled.
 
 Reinstall at any time with:
-  curl -fsSL https://raw.githubusercontent.com/BofAI/skills/v1.5.14/${SKILL_NAME}/install.sh | sh
+  curl -fsSL https://raw.githubusercontent.com/BofAI/skills/main/${SKILL_NAME}/install.sh | sh
 
 Backups (if any) are preserved under <skills-dir>/.backups/${SKILL_NAME}-*.
 EOF

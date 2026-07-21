@@ -1,15 +1,17 @@
 #!/bin/sh
 set -eu
 
-TAG="${X402_INSTALL_TAG:-v1.5.14}"
+TAG="${X402_INSTALL_TAG:-main}"
 REPO="${X402_INSTALL_REPO:-https://github.com/BofAI/skills.git}"
 CLIENT="${X402_INSTALL_CLIENT:-auto}"
 SYMLINK="${X402_SYMLINK:-0}"
-SKIP_NPM_INSTALL="${X402_SKIP_NPM_INSTALL:-0}"
+SKIP_CLI_INSTALL="${X402_SKIP_CLI_INSTALL:-0}"
 SKIP_NODE_CHECK="${X402_SKIP_NODE_CHECK:-0}"
 OPEN_TERMINAL="${X402_OPEN_TERMINAL:-auto}"
 
 SKILL_NAME="x402-payment"
+CLI_PACKAGE="@bankofai/x402-cli"
+CLI_VERSION="${X402_CLI_VERSION:-1.0.1}"
 
 info() {
   printf '==> %s\n' "$1"
@@ -43,14 +45,14 @@ truthy() {
 
 usage() {
   cat <<EOF
-Usage: install.sh [--client auto|codex|claude|all] [--symlink] [--skip-npm-install] [--skip-node-check] [--skills-dir <dir>] [--dry-run] [-h]
+Usage: install.sh [--client auto|codex|claude|all] [--symlink] [--skip-cli-install] [--skip-node-check] [--skills-dir <dir>] [--dry-run] [-h]
 
 Install the ${SKILL_NAME} skill into the target agent client's local skills directory.
 
 Options:
   --client          Target client. Default: auto (detected from environment).
   --symlink         Install as a symlink to a persistent dev source directory instead of copying.
-  --skip-npm-install   Skip running npm install after copying files.
+  --skip-cli-install   Skip installing ${CLI_PACKAGE}@${CLI_VERSION} globally.
   --skip-node-check    Skip the Node.js 20+ and npm availability check.
   --skills-dir      Override the target skills directory.
   --dry-run         Print actions without changing files.
@@ -58,7 +60,7 @@ EOF
 }
 
 DRY_RUN=0
-SKILLS_DIR_OVERRIDE=""
+SKILLS_DIR_OVERRIDE="${X402_SKILLS_DIR:-}"
 
 while [ "$#" -gt 0 ]; do
   case "$1" in
@@ -75,8 +77,8 @@ while [ "$#" -gt 0 ]; do
       SYMLINK=1
       shift
       ;;
-    --skip-npm-install)
-      SKIP_NPM_INSTALL=1
+    --skip-cli-install|--skip-npm-install)
+      SKIP_CLI_INSTALL=1
       shift
       ;;
     --skip-node-check)
@@ -146,11 +148,7 @@ open_self_in_terminal_and_exit() {
   command_exists curl || fail "curl is required to open the installer in Terminal."
 
   installer_url="https://raw.githubusercontent.com/BofAI/skills/${TAG}/${SKILL_NAME}/install.sh"
-  args_text=""
-  for arg in "$@"; do
-    args_text="${args_text} $(shell_quote "$arg")"
-  done
-  command_text="cd ~ && TMPDIR=\"\$(mktemp -d)\" && INSTALL_SH=\"\$TMPDIR/${SKILL_NAME}-install.sh\" && curl -fsSL $(shell_quote "$installer_url") -o \"\$INSTALL_SH\" && chmod 700 \"\$INSTALL_SH\" && env X402_TERMINAL_CHILD=1 X402_OPEN_TERMINAL=0 X402_INSTALL_TAG=$(shell_quote "$TAG") X402_INSTALL_REPO=$(shell_quote "$REPO") X402_INSTALL_CLIENT=$(shell_quote "$CLIENT") X402_SYMLINK=$(shell_quote "$SYMLINK") X402_SKIP_NPM_INSTALL=$(shell_quote "$SKIP_NPM_INSTALL") X402_SKIP_NODE_CHECK=$(shell_quote "$SKIP_NODE_CHECK") /bin/sh \"\$INSTALL_SH\"${args_text}; printf '\\nPress Enter to close this window...'; IFS= read -r _"
+  command_text="cd ~ && TMPDIR=\"\$(mktemp -d)\" && INSTALL_SH=\"\$TMPDIR/${SKILL_NAME}-install.sh\" && curl -fsSL $(shell_quote "$installer_url") -o \"\$INSTALL_SH\" && chmod 700 \"\$INSTALL_SH\" && env X402_TERMINAL_CHILD=1 X402_OPEN_TERMINAL=0 X402_INSTALL_TAG=$(shell_quote "$TAG") X402_INSTALL_REPO=$(shell_quote "$REPO") X402_INSTALL_CLIENT=$(shell_quote "$CLIENT") X402_SYMLINK=$(shell_quote "$SYMLINK") X402_SKIP_CLI_INSTALL=$(shell_quote "$SKIP_CLI_INSTALL") X402_SKIP_NODE_CHECK=$(shell_quote "$SKIP_NODE_CHECK") X402_CLI_VERSION=$(shell_quote "$CLI_VERSION") X402_SKILLS_DIR=$(shell_quote "$SKILLS_DIR_OVERRIDE") /bin/sh \"\$INSTALL_SH\"; STATUS=\$?; rm -rf \"\$TMPDIR\"; printf '\\nPress Enter to close this window...'; IFS= read -r _; exit \"\$STATUS\""
   osascript >/dev/null <<OSA
 tell application "Terminal"
   activate
@@ -187,6 +185,19 @@ if ! truthy "$SKIP_NODE_CHECK"; then
   fi
 fi
 
+if truthy "$SKIP_CLI_INSTALL"; then
+  info "Skipped ${CLI_PACKAGE} installation."
+elif [ "$DRY_RUN" = "1" ]; then
+  info "Would install ${CLI_PACKAGE}@${CLI_VERSION} globally"
+else
+  info "Installing ${CLI_PACKAGE}@${CLI_VERSION}"
+  npm install --global --no-fund --no-audit "${CLI_PACKAGE}@${CLI_VERSION}"
+  command_exists x402-cli || fail "x402-cli was installed but is not available on PATH."
+  installed_version="$(x402-cli --version 2>/dev/null || true)"
+  [ "$installed_version" = "$CLI_VERSION" ] || fail "Expected x402-cli ${CLI_VERSION}, found ${installed_version:-unknown}."
+  info "Installed ${installed_version}"
+fi
+
 # ---------------------------------------------------------------------------
 # Clone the repository
 # ---------------------------------------------------------------------------
@@ -197,6 +208,17 @@ else
   WORKDIR="${TMPDIR:-/tmp}/${SKILL_NAME}-install.$$"
   mkdir -p "$WORKDIR"
 fi
+
+cleanup() {
+  rm -rf "$WORKDIR"
+}
+interrupted() {
+  trap - 0 HUP INT TERM
+  cleanup
+  exit 1
+}
+trap cleanup 0
+trap interrupted HUP INT TERM
 
 CLONE_DIR="$WORKDIR/skills"
 if [ "$DRY_RUN" = "1" ]; then
@@ -303,9 +325,6 @@ install_skill() {
     if truthy "$SYMLINK"; then
       info "Would create symlink to persistent dev source."
     fi
-    if ! truthy "$SKIP_NPM_INSTALL"; then
-      info "Would run npm install in $target"
-    fi
     return 0
   fi
 
@@ -334,16 +353,8 @@ install_skill() {
 
   restore_config "$RESTORED_BACKUP" "$install_dir"
 
-  if ! truthy "$SKIP_NPM_INSTALL"; then
-    info "Installing npm dependencies in $install_dir"
-    ( cd "$install_dir" && npm install --no-fund --no-audit )
-    info "npm install completed."
-  else
-    info "Skipped npm install (X402_SKIP_NPM_INSTALL=1)."
-  fi
-
   info "Installed skill path: $target"
-  info "Verify with: npx tsx $target/src/x402_invoke.ts --check"
+  info "Verify with: x402-cli --version"
 }
 
 # ---------------------------------------------------------------------------
@@ -377,7 +388,7 @@ Next steps:
   1. Configure your wallet via agent-wallet (set AGENT_WALLET_PASSWORD or
      AGENT_WALLET_PRIVATE_KEY). Run: agent-wallet list
   2. Optional: set TRON_GRID_API_KEY for TRON mainnet reliability.
-  3. Verify the installation with the command printed for each installed path above.
+  3. Verify the installation with: x402-cli --version
 
 For full usage instructions see SKILL.md in the installed skill directory.
 EOF

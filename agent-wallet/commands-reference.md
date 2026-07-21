@@ -82,7 +82,7 @@ Omitting `wallet-id` shows interactive selection — **always pass it explicitly
 
 | Flag | Short | Notes |
 |------|-------|-------|
-| `--network <net>` | `-n` | Target network, e.g. `eip155:1`, `tron:mainnet` (**required**) |
+| `--network <net>` | `-n` | Target network, e.g. `eip155:1`, `tron:0x2b6653dc` (**required**) |
 | `--wallet-id <id>` | `-w` | Wallet to sign with (defaults to active wallet) |
 | `--password <pw>` | `-p` | Master password |
 | `--save-runtime-secrets` | | Persist password |
