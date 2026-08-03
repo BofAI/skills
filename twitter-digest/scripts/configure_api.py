@@ -27,14 +27,12 @@ from script_utils import display_path, open_script_in_terminal, rerun_from_insta
 AUTHORIZE_URL = "https://x.com/i/oauth2/authorize"
 TOKEN_URL = "https://api.x.com/2/oauth2/token"
 DEFAULT_REDIRECT_URI = "http://127.0.0.1:8765/callback"
-DEFAULT_SCOPES = "dm.read tweet.read users.read offline.access"
+DEFAULT_SCOPES = "dm.read dm.write tweet.read users.read offline.access"
 
 
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--bearer-token", help="X API bearer token. Omit to prompt securely.")
     parser.add_argument("--oauth", action="store_true", help="Run OAuth 2.0 Authorization Code with PKCE to get a user-context access token.")
-    parser.add_argument("--paste-token", action="store_true", help="Paste an existing user access token instead of running OAuth.")
     parser.add_argument("--client-id", default="")
     parser.add_argument("--client-secret", default="", help="Optional OAuth client secret for confidential apps.")
     parser.add_argument("--redirect-uri", default=DEFAULT_REDIRECT_URI)
@@ -78,16 +76,16 @@ def prompt_value(label: str, default: str = "", hidden: bool = False) -> str:
     prompt = f"{label}"
     if default and not hidden:
         prompt += f" [{default}]"
+    if sys.stdin.isatty():
+        if hidden:
+            value = getpass.getpass(f"{prompt}: ")
+        else:
+            value = input(f"{prompt}: ").strip()
+        return value or default
     value = apple_prompt(prompt, hidden=hidden)
     if value is not None:
         return value or default
-    if not sys.stdin.isatty():
-        raise SystemExit("当前没有可交互终端。请通过已安装 skill 的 run_daily_digest.py --configure-api 触发，或在 Terminal 中运行本命令。")
-    if hidden:
-        value = getpass.getpass(f"{prompt}: ")
-    else:
-        value = input(f"{prompt}: ").strip()
-    return value or default
+    raise SystemExit("当前没有可交互终端。请通过已安装 skill 的 run_daily_digest.py --configure 触发，或在 Terminal 中运行本命令。")
 
 
 def parse_redirect_uri(uri: str) -> tuple[str, int, str]:
@@ -267,7 +265,7 @@ def verify_api_config(config: dict[str, object], save: bool = True) -> dict[str,
 def main() -> None:
     rerun_from_installed_if_needed(__file__)
     args = parse_args()
-    needs_prompt = not (args.clear or args.show_status or args.verify or args.bearer_token)
+    needs_prompt = not (args.clear or args.show_status or args.verify)
     if needs_prompt and not sys.stdin.isatty():
         opened = open_script_in_terminal(
             script=Path(__file__).resolve(),
@@ -316,15 +314,7 @@ def main() -> None:
         return
 
     existing = load_api_config()
-    mode = "paste" if args.paste_token or args.bearer_token else "oauth2"
-    if mode == "oauth2":
-        token_config = run_oauth_flow(args, existing)
-        bearer_token = token_config["bearer_token"]
-    else:
-        bearer_token = args.bearer_token or prompt_value("请粘贴 OAuth user access token", hidden=True)
-        if not bearer_token:
-            raise SystemExit("No access token provided. API configuration was not changed.")
-        token_config = {"bearer_token": bearer_token.strip(), "auth_method": "pasted_user_access_token"}
+    token_config = run_oauth_flow(args, existing)
     api_base = args.api_base or existing.get("api_base") or DEFAULT_API_BASE
     handle = args.handle or str(token_config.get("handle") or existing.get("handle") or "")
     user_id = args.user_id or str(token_config.get("user_id") or existing.get("user_id") or "")

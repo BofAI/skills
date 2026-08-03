@@ -44,7 +44,9 @@ def render_markdown(data: dict[str, Any]) -> str:
                 f"最后我发出 `{int(page.get('dm_replied_thread_count') or 0)}` / "
                 f"等我回复 `{int(page.get('dm_unreplied_thread_count') or 0)}`"
             )
-            lines.append(f"DM 消息统计: 已打开等我回复会话中捕获消息气泡 `{int(page.get('dm_captured_message_count') or 0)}`")
+            lines.append(f"状态未知会话: `{int(page.get('dm_unknown_thread_count') or 0)}`")
+            lines.append(f"DM 消息统计: 当前窗口内捕获消息 `{int(page.get('dm_captured_message_count') or 0)}`")
+            lines.append(f"Chat 请求: `{'有待处理请求' if page.get('dm_has_message_requests') else '无'}`")
             if page.get("dm_note"):
                 lines.append(str(page["dm_note"]))
         if page.get("collection_error"):
@@ -54,7 +56,10 @@ def render_markdown(data: dict[str, Any]) -> str:
             lines.extend(["", f"### DM thread: {participant}", ""])
             if participant:
                 lines.append(f"会话对象: `{participant}`")
-                lines.append(f"会话状态: `{'最后我发出' if thread.get('replied') else '等我回复'}`")
+                reply_state = str(thread.get("reply_state") or ("最后我发出" if thread.get("replied") else "等我回复"))
+                lines.append(f"会话状态: `{reply_state}`")
+                if thread.get("collection_detail"):
+                    lines.append(f"采集说明: {thread.get('collection_detail')}")
                 lines.append(f"消息数量: `{int(thread.get('message_count') or 0)}`")
                 lines.append("发信人判断: 使用会话对象/消息气泡判断；引用帖、转发卡片或链接预览里的作者不是 DM 发信人。")
                 lines.append("")
@@ -65,7 +70,7 @@ def render_markdown(data: dict[str, Any]) -> str:
             "## 数据缺口",
             "",
             "- API 采集受 X API 权限、套餐、端点可用性和限流影响。",
-            "- DM / X Chat 可能不会完整出现在 API 结果中；不要把 0 条 API DM 当作没有私信。",
+            "- X Chat 由官方 Chat API 提供，并在本地通过 Chat XDK 解密；采集或解密失败时整次日报失败。",
             "- DM 属于私密内容，不写长期 memory 或 daily archive。",
         ]
     )

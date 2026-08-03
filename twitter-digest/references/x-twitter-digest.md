@@ -14,8 +14,8 @@ python3 ~/.codex/skills/twitter-digest/scripts/run_daily_digest.py
 Configure API:
 
 ```bash
-python3 ~/.claude/skills/twitter-digest/scripts/run_daily_digest.py --configure-api
-python3 ~/.codex/skills/twitter-digest/scripts/run_daily_digest.py --configure-api
+python3 ~/.claude/skills/twitter-digest/scripts/run_daily_digest.py --configure
+python3 ~/.codex/skills/twitter-digest/scripts/run_daily_digest.py --configure
 ```
 
 Verify API:
@@ -29,7 +29,7 @@ python3 ~/.codex/skills/twitter-digest/scripts/configure_api.py --verify
 
 The wrapper uses API directly.
 
-API configuration is required. If API config is missing or broken, the wrapper opens API configuration and the current command stops with `api_configuration_required`. After the user finishes the Terminal flow, rerun the digest command. It never switches to another collector.
+API and X Chat configuration are required. If either is missing or broken, the wrapper opens one Terminal wizard and the current command stops with `configuration_required`. The wizard asks for Client ID, Client Secret, and X Chat passcode as needed and skips valid existing state. After it finishes, rerun the digest command. It never switches to another collector.
 
 ## Data Rules
 
@@ -39,11 +39,9 @@ API configuration is required. If API config is missing or broken, the wrapper o
 - Do not show already-replied mentions as needing reply.
 - If reply status is unclear, mark it `回复状态未确认`.
 
-## DM Rules
+## X Chat Rules
 
-API DM coverage may be incomplete. Treat failed or zero DM results as a data gap, not proof that there are no DMs.
-
-Non-API X Chat / encrypted DM collection is not part of this skill.
+X Chat is required and uses the official API plus Chat XDK for local decryption. If Chat configuration, collection, signature verification, or decryption fails, do not generate a partial digest.
 
 ## Summary Rubric
 

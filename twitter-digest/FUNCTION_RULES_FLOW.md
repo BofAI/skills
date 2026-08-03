@@ -5,7 +5,7 @@
 `twitter-digest` is API-only.
 
 ```text
-normal digest -> run_daily_digest.py -> api_x_digest.py -> digest_context.py
+normal digest -> run_daily_digest.py -> api_x_digest.py + chat_x_digest.py -> digest_context.py
 ```
 
 The wrapper uses API directly.
@@ -43,9 +43,9 @@ Older mentions must not be listed as current reply tasks.
 - `reply_unverified`: show as `回复状态未确认`.
 - Missing source: report as data gap.
 
-## DM Rule
+## X Chat Rule
 
-API DM data is not authoritative for X Chat. If unavailable or zero, report a data gap and avoid saying "没有私信".
+X Chat is required. If Chat configuration, collection, or decryption fails, stop the digest instead of producing a partial result or saying "没有私信".
 
 ## Privacy
 

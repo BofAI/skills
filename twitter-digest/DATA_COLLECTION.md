@@ -6,6 +6,7 @@
 
 ```bash
 python3 twitter-digest/scripts/api_x_digest.py
+python3 twitter-digest/scripts/chat_x_digest.py
 ```
 
 The chat-facing wrapper is:
@@ -27,13 +28,7 @@ twitter-digest/.state/api_config.json
 OAuth2 PKCE setup:
 
 ```bash
-python3 twitter-digest/scripts/run_daily_digest.py --configure-api
-```
-
-Existing token setup:
-
-```bash
-python3 twitter-digest/scripts/run_daily_digest.py --configure-api-token
+python3 twitter-digest/scripts/run_daily_digest.py --configure
 ```
 
 Verification:
@@ -45,10 +40,10 @@ python3 twitter-digest/scripts/configure_api.py --verify
 ## Runtime Contract
 
 - Normal daily digest requests run the wrapper with no source override.
-- API credentials are required for every digest run.
+- API credentials and X Chat key configuration are required for every digest run.
 - If saved API credentials exist, they are used.
 - If credentials are missing or invalid, the wrapper opens API configuration. After configuration succeeds, run the digest command again.
-- API errors are reported as failures or data gaps.
+- Public API errors are reported as failures or data gaps. X Chat API or decryption errors fail the whole digest.
 - The collector never switches to another data source.
 
 OAuth setup can open the X authorization page. That is authorization only, not collection.
@@ -65,15 +60,15 @@ The API collector attempts to collect:
 
 Public items are normalized into the current-run context. Final facts are filtered to the local 24-hour window.
 
-## DM Data
+## X Chat Data
 
-The API may expose DM events for some accounts, but X Chat/encrypted messages are often incomplete or absent.
+X Chat is collected from `/2/chat/conversations` and conversation event history, then decrypted locally with Chat XDK. The exact 24-hour window is enforced from API event timestamps. Every listed conversation is retained: conversations without readable history are marked `unknown` and reported as a data gap. `has_message_requests` becomes a todo because the list endpoint does not expose the requester. A Chat API or decryption failure fails the whole digest.
 
 Rules:
 
-- Never claim "no DMs" from zero API DM events.
-- Treat API DM failures as data gaps.
-- Non-API DM collection is not part of this skill.
+- Never save or request the X Chat passcode in Agent chat.
+- Never generate a partial digest when required Chat collection or decryption fails.
+- Browser/cookie DM collection is not part of this skill.
 
 ## Output Shape
 

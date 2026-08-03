@@ -37,7 +37,6 @@ def api_collector_command(
     keywords: str,
     max_public_items: int,
     public_window_hours: int,
-    dm_max_events: int,
     api_base: str = "",
     user_id: str = "",
     handle: str = "",
@@ -53,8 +52,6 @@ def api_collector_command(
         str(max_public_items),
         "--public-window-hours",
         str(public_window_hours),
-        "--dm-max-events",
-        str(dm_max_events),
     ]
     if api_base:
         cmd.extend(["--api-base", api_base])

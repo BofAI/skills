@@ -12,9 +12,11 @@ from pathlib import Path
 from typing import Optional
 
 from api_config_store import load_api_config, refresh_oauth_token_if_needed
+from chat_config_store import CHAT_RUNTIME_DIR, chat_configured, load_chat_config
 from collector_commands import api_collector_command, summarize_collector_error
 from digest_context import build_current_context_from_file
-from script_utils import display_path, open_script_in_terminal, rerun_from_installed_if_needed
+from digest_io import write_digest_output
+from script_utils import open_script_in_terminal, rerun_from_installed_if_needed
 
 
 STATE_DIR = Path(__file__).resolve().parents[1] / ".state"
@@ -22,6 +24,7 @@ CONFIG_PATH = STATE_DIR / "config.json"
 DEFAULT_OUT_DIR = STATE_DIR / "run"
 DEFAULT_API_PUBLIC_ITEMS = 300
 UNSUPPORTED_OPTION_MESSAGE = "Source selection is no longer supported. twitter-digest uses API only."
+REQUIRED_CHAT_SCOPES = {"dm.read", "dm.write", "users.read", "tweet.read"}
 
 
 def parse_args() -> argparse.Namespace:
@@ -32,19 +35,12 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--configure-only", action="store_true", help="Only save default account config; do not collect data.")
     parser.add_argument("--keywords", default="", help="Optional comma-separated search queries. Default is empty; the daily digest focuses on timeline and mentions.")
     parser.add_argument("--out", default=str(DEFAULT_OUT_DIR))
-    parser.add_argument("--configure-api", action="store_true", help="Open a secure prompt to save required X API credentials, then exit.")
-    parser.add_argument("--configure-api-token", action="store_true", help="Open a secure prompt to paste an existing X user access token, then exit.")
+    parser.add_argument("--configure", action="store_true", help="Configure required X API and X Chat access in one secure Terminal flow, then exit.")
+    parser.add_argument("--chat-status", action="store_true", help="Show whether required X Chat collection is configured, then exit.")
+    parser.add_argument("--disable-chat", action="store_true", help="Disable X Chat collection and remove the saved local key blob, then exit.")
     parser.add_argument("--api-base", default=os.environ.get("X_API_BASE_URL") or "")
     parser.add_argument("--user-id", default=os.environ.get("X_USER_ID") or os.environ.get("TWITTER_USER_ID") or "")
     parser.add_argument("--bearer-token", default=os.environ.get("X_BEARER_TOKEN") or os.environ.get("TWITTER_BEARER_TOKEN") or "")
-    parser.add_argument("--include-dms", action="store_true", help=argparse.SUPPRESS)
-    parser.add_argument("--no-dms", action="store_true", help=argparse.SUPPRESS)
-    parser.add_argument("--dm-threads", type=int, default=5, help=argparse.SUPPRESS)
-    parser.add_argument("--dm-list-scrolls", type=int, default=20, help=argparse.SUPPRESS)
-    parser.add_argument("--dm-scrolls", type=int, default=200, help=argparse.SUPPRESS)
-    parser.add_argument("--dm-max-messages", type=int, default=2000, help=argparse.SUPPRESS)
-    parser.add_argument("--dm-max-events", type=int, default=300, help="Maximum Direct Message API events kept per run.")
-    parser.add_argument("--dm-window-hours", type=int, default=0, help=argparse.SUPPRESS)
     parser.add_argument("--scrolls", type=int, default=40, help=argparse.SUPPRESS)
     parser.add_argument("--min-public-scrolls", type=int, default=5, help=argparse.SUPPRESS)
     parser.add_argument(
@@ -85,40 +81,23 @@ def save_config(handle: Optional[str], account_name: Optional[str]) -> None:
     CONFIG_PATH.write_text(json.dumps(config, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
 
 
-def open_config_in_terminal(extra_args: list[str]) -> bool:
-    script = Path(__file__).with_name("configure_api.py")
-    opened = open_script_in_terminal(
-        script=script,
-        args=extra_args,
-        cwd=Path(__file__).resolve().parents[1],
-        heading="X API 配置向导",
-        description="使用 OAuth2 PKCE，需要 X Developer App 的 Client ID，并完成 X OAuth2 授权。",
-    )
-    if not opened:
-        return False
-    print("已打开 Terminal 窗口用于配置 X API。", flush=True)
-    print(f"配置会保存到：{display_path(Path(__file__).resolve().parents[1] / '.state' / 'api_config.json')}", flush=True)
-    return True
-
-
 def open_required_config_in_terminal(reason: str) -> bool:
     opened = open_script_in_terminal(
-        script=Path(__file__).with_name("configure_api.py"),
-        args=["--oauth"],
+        script=Path(__file__).with_name("configure_all.py"),
+        args=[],
         cwd=Path(__file__).resolve().parents[1],
-        heading="X API 配置向导",
-        description=f"{reason}。X API 配置是生成日报的必需步骤；请在这个 Terminal 窗口完成配置。",
+        heading="X 日报统一配置向导",
+        description=f"{reason}。请在此窗口依次输入 Client ID、Client Secret 和 X Chat passcode。",
     )
     if not opened:
         return False
-    print("已打开 Terminal 窗口用于配置 X API。", flush=True)
-    print(f"配置会保存到：{display_path(Path(__file__).resolve().parents[1] / '.state' / 'api_config.json')}", flush=True)
+    print("已打开一个 Terminal 窗口，用于一次性完成 X API 和 X Chat 配置。", flush=True)
     print(
         json.dumps(
             {
-                "status": "api_configuration_required",
+                "status": "configuration_required",
                 "terminal_opened": True,
-                "next_step": "请先在刚打开的 Terminal 窗口完成 X API 配置。配置完成后，回到当前对话重新运行生成日报命令。不要在聊天里粘贴 Client Secret。",
+                "next_step": "请在刚打开的 Terminal 窗口完成全部配置。完成后回到当前对话重新生成日报。不要在聊天里粘贴 Client Secret 或 X Chat passcode。",
             },
             ensure_ascii=False,
             indent=2,
@@ -150,6 +129,14 @@ def api_public_item_limit(args: argparse.Namespace) -> int:
     return max(1, int(args.max_public_items if args.max_public_items is not None else DEFAULT_API_PUBLIC_ITEMS))
 
 
+def clear_current_run(out_dir: Path) -> None:
+    if not out_dir.exists():
+        return
+    for path in out_dir.glob("digest-*"):
+        if path.is_file():
+            path.unlink()
+
+
 def api_command(args: argparse.Namespace, out_dir: str, api_base: str, user_id: str, handle: str) -> list[str]:
     return api_collector_command(
         sys.executable,
@@ -158,7 +145,6 @@ def api_command(args: argparse.Namespace, out_dir: str, api_base: str, user_id: 
         keywords=args.keywords,
         max_public_items=api_public_item_limit(args),
         public_window_hours=args.public_window_hours,
-        dm_max_events=args.dm_max_events,
         api_base=api_base,
         user_id=user_id,
         handle=handle,
@@ -169,13 +155,62 @@ def run_api_command(cmd: list[str], env: dict[str, str]) -> None:
     if completed.stdout:
         print(completed.stdout.strip(), flush=True)
 
-def run_configure_api_flow(reason: str, args: argparse.Namespace) -> None:
-    print(f"{reason} Starting X API configuration...", flush=True)
+def run_full_configuration(reason: str) -> None:
+    print(f"{reason} Starting unified X API and X Chat configuration...", flush=True)
     if not sys.stdin.isatty():
         if open_required_config_in_terminal(reason):
             raise SystemExit(0)
         raise SystemExit("当前没有可交互终端，且无法自动打开 Terminal。请在 Terminal 中运行本命令完成 X API 配置。")
-    subprocess.run([sys.executable, str(Path(__file__).with_name("configure_api.py")), "--oauth"], check=True)
+    subprocess.run([sys.executable, str(Path(__file__).with_name("configure_all.py"))], check=True)
+
+
+def run_chat_configuration(extra_args: list[str]) -> None:
+    script = Path(__file__).with_name("configure_chat.py")
+    if not sys.stdin.isatty() and not extra_args:
+        opened = open_script_in_terminal(
+            script=script,
+            args=[],
+            cwd=Path(__file__).resolve().parents[1],
+            heading="X Chat 配置向导",
+            description="请输入 X Chat passcode 解锁密钥。passcode 不会保存，也不要粘贴到 Agent 对话。",
+        )
+        if opened:
+            print("已打开 Terminal 窗口用于配置 X Chat。", flush=True)
+            return
+    subprocess.run([sys.executable, str(script), *extra_args], check=True)
+
+
+def collect_chat(out_dir: Path, env: dict[str, str], hours: int) -> None:
+    runtime_python = CHAT_RUNTIME_DIR / "bin" / "python"
+    if not runtime_python.exists():
+        raise SystemExit("X Chat runtime is missing. Run --configure again.")
+    chat_page_path = out_dir / "chat-page.json"
+    cmd = [
+        str(runtime_python),
+        str(Path(__file__).with_name("chat_x_digest.py")),
+        "--hours",
+        str(max(1, hours)),
+        "--out",
+        str(chat_page_path),
+    ]
+    try:
+        subprocess.run(cmd, check=True, env=env, capture_output=True, text=True)
+        data = json.loads((out_dir / "digest-input.json").read_text(encoding="utf-8"))
+        chat_page = json.loads(chat_page_path.read_text(encoding="utf-8"))
+        pages = data.get("pages") if isinstance(data.get("pages"), list) else []
+        data["pages"] = [page for page in pages if not (isinstance(page, dict) and page.get("kind") == "messages")]
+        data["pages"].append(chat_page)
+        data["chat_source"] = "x_chat_api_chatxdk"
+        write_digest_output(out_dir, data)
+        print("Collected and decrypted required X Chat data.", flush=True)
+    except (subprocess.CalledProcessError, OSError, json.JSONDecodeError) as exc:
+        detail = ""
+        if isinstance(exc, subprocess.CalledProcessError):
+            detail = summarize_collector_error("\n".join([exc.stdout or "", exc.stderr or ""]), exc.returncode)
+        raise SystemExit(f"X Chat collection failed; digest was not generated: {detail or exc}") from exc
+    finally:
+        if chat_page_path.exists():
+            chat_page_path.unlink()
 
 
 def load_fresh_api_state(args: argparse.Namespace, config: dict) -> tuple[dict, str, str, str, str, str]:
@@ -207,15 +242,14 @@ def api_auth_needs_reconfigure(summary: str) -> bool:
 def main() -> None:
     rerun_from_installed_if_needed(__file__)
     args = parse_args()
-    if args.configure_api:
-        if not sys.stdin.isatty() and open_config_in_terminal(["--oauth"]):
-            return
-        subprocess.run([sys.executable, str(Path(__file__).with_name("configure_api.py")), "--oauth"], check=True)
+    if args.configure:
+        run_full_configuration("User requested configuration.")
         return
-    if args.configure_api_token:
-        if not sys.stdin.isatty() and open_config_in_terminal(["--paste-token"]):
-            return
-        subprocess.run([sys.executable, str(Path(__file__).with_name("configure_api.py")), "--paste-token"], check=True)
+    if args.chat_status:
+        run_chat_configuration(["--status"])
+        return
+    if args.disable_chat:
+        run_chat_configuration(["--clear"])
         return
     if args.save_default:
         save_config(args.handle, args.account_name)
@@ -226,20 +260,32 @@ def main() -> None:
     explicit_bearer_token = bool(args.bearer_token)
     api_config, refresh_error, bearer_token, api_base, user_id, handle = load_fresh_api_state(args, config)
     refresh_error = str(api_config.get("refresh_error") or "")
+    saved_scopes = set(str(api_config.get("scopes") or "").split())
+    missing_chat_scopes = REQUIRED_CHAT_SCOPES - saved_scopes if saved_scopes else set()
+    if not explicit_bearer_token and missing_chat_scopes:
+        run_full_configuration(
+            "Saved X OAuth token is missing required X Chat scopes: " + ", ".join(sorted(missing_chat_scopes))
+        )
+        raise SystemExit(0)
     if not explicit_bearer_token and (refresh_error or not api_configured(bearer_token)):
         reason = "X API 配置是必需项，但当前缺失或已失效" if not refresh_error else f"X API token refresh failed: {refresh_error}"
-        run_configure_api_flow(reason, args)
+        run_full_configuration(reason)
         api_config, refresh_error, bearer_token, api_base, user_id, handle = load_fresh_api_state(args, config)
         if refresh_error or not api_configured(bearer_token):
             raise SystemExit("X API configuration did not produce a usable token. Re-run configuration and try again.")
     if refresh_error and not explicit_bearer_token:
-        raise SystemExit("Saved X OAuth token refresh failed. Re-run --configure-api or pass X_BEARER_TOKEN to use API source.")
+        raise SystemExit("Saved X OAuth token refresh failed. Re-run --configure or pass X_BEARER_TOKEN to use API source.")
+    chat_config = load_chat_config()
+    if not chat_configured():
+        run_full_configuration("X Chat configuration is required before a complete digest can be generated.")
+        raise SystemExit(0)
+    if user_id and str(chat_config.get("user_id") or "") != user_id:
+        raise SystemExit("Saved X Chat keys belong to a different X account. Run --disable-chat, then --configure for the current account.")
+    clear_current_run(Path(args.out))
     cmd = api_command(args, args.out, api_base, user_id, handle)
     child_env = os.environ.copy()
     if bearer_token:
         child_env["X_BEARER_TOKEN"] = bearer_token
-    if args.include_dms and not args.no_dms:
-        print("DM collection is not supported in this API-only digest.", flush=True)
     print("Collecting X digest data via API.", flush=True)
     retried_after_reconfigure = False
     while True:
@@ -250,7 +296,7 @@ def main() -> None:
             summary = summarize_child_error(exc)
             if not explicit_bearer_token and not retried_after_reconfigure and api_auth_needs_reconfigure(summary):
                 retried_after_reconfigure = True
-                run_configure_api_flow(f"X API authentication failed: {summary}", args)
+                run_full_configuration(f"X API authentication failed: {summary}")
                 api_config, refresh_error, bearer_token, api_base, user_id, handle = load_fresh_api_state(args, config)
                 if refresh_error or not api_configured(bearer_token):
                     raise SystemExit("X API reconfiguration did not produce a usable token.") from exc
@@ -261,6 +307,7 @@ def main() -> None:
             print(f"API collection failed: {summary}", file=sys.stderr, flush=True)
             raise SystemExit(exc.returncode) from exc
     out_dir = Path(args.out)
+    collect_chat(out_dir, child_env, args.public_window_hours)
     build_current_context_from_file(
         input_path=out_dir / "digest-input.json",
         markdown_path=out_dir / "digest-input.md",

@@ -66,8 +66,8 @@ def skill_root() -> Path:
 
 
 def check_runtime() -> None:
-    if sys.version_info < (3, 9):
-        raise SystemExit("Python 3.9+ is required to run twitter-digest. Install or switch python3, then rerun this installer.")
+    if sys.version_info < (3, 10):
+        raise SystemExit("Python 3.10+ is required to run twitter-digest with X Chat. Install or switch python3, then rerun this installer.")
 
 
 def backup_path(skills_dir: Path, name: str) -> Path:

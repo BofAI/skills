@@ -53,7 +53,7 @@ def summarize_current_run(data: dict[str, Any]) -> dict[str, Any]:
     generated_at = str(data.get("generated_at") or now_iso())
     post_counts: dict[str, dict[str, int]] = {}
     dm_status = "not_requested"
-    dm_counts = {"visible": 0, "last_from_me": 0, "waiting_reply": 0, "captured_messages": 0}
+    dm_counts = {"visible": 0, "last_from_me": 0, "waiting_reply": 0, "unknown": 0, "captured_messages": 0, "message_requests": 0}
 
     for page in data.get("pages", []):
         if not isinstance(page, dict):
@@ -67,7 +67,9 @@ def summarize_current_run(data: dict[str, Any]) -> dict[str, Any]:
                 "visible": int(page.get("dm_visible_thread_count") or 0),
                 "last_from_me": int(page.get("dm_replied_thread_count") or 0),
                 "waiting_reply": int(page.get("dm_unreplied_thread_count") or 0),
+                "unknown": int(page.get("dm_unknown_thread_count") or 0),
                 "captured_messages": int(page.get("dm_captured_message_count") or 0),
+                "message_requests": 1 if page.get("dm_has_message_requests") else 0,
             }
 
     return {
@@ -172,16 +174,30 @@ def build_digest_facts(data: dict[str, Any], summary: dict[str, Any]) -> dict[st
                             "detail": str(todo.get("detail") or page.get("dm_note") or ""),
                         }
                     )
+            for gap in page.get("data_gaps") or []:
+                if isinstance(gap, dict):
+                    facts["data_gaps"].append(
+                        {
+                            "source": str(gap.get("source") or kind),
+                            "status": str(gap.get("status") or "incomplete"),
+                            "detail": str(gap.get("detail") or ""),
+                        }
+                    )
             for thread in page.get("dm_threads") or []:
                 if not isinstance(thread, dict):
                     continue
                 assessment = assess_dm_thread(thread)
+                reply_state = str(thread.get("reply_state") or ("last_from_me" if thread.get("replied") else "waiting_reply"))
+                if reply_state == "unknown":
+                    assessment = {"should_summarize": False, "noise_reason": "collection_state_unknown"}
                 facts["dms"]["threads"].append(
                     {
                         "participant": thread.get("participant") or thread.get("label") or thread.get("url") or "",
                         "url": thread.get("url") or "",
                         "label": thread.get("label") or "",
-                        "reply_state": "last_from_me" if thread.get("replied") else "waiting_reply",
+                        "reply_state": reply_state,
+                        "collection_status": str(thread.get("collection_status") or "complete"),
+                        "collection_detail": str(thread.get("collection_detail") or ""),
                         "message_count": int(thread.get("message_count") or 0),
                         "should_summarize": assessment["should_summarize"],
                         "noise_reason": assessment["noise_reason"],
@@ -196,7 +212,7 @@ def build_digest_facts(data: dict[str, Any], summary: dict[str, Any]) -> dict[st
                         },
                     }
                 )
-                if not bool(thread.get("dm_load_complete")):
+                if not bool(thread.get("dm_load_complete")) and str(thread.get("collection_status") or "complete") == "complete":
                     facts["data_gaps"].append(
                         {
                             "source": "messages",
@@ -233,22 +249,6 @@ def build_digest_facts(data: dict[str, Any], summary: dict[str, Any]) -> dict[st
             public_items.append(normalize_public_item(kind, item))
     facts["public"]["items"] = annotate_public_reply_states(public_items, str((facts.get("account") or {}).get("handle") or ""))
     add_public_source_gaps(facts, loaded_public_kinds, kept_public_counts, summary)
-    if (summary.get("dm_status") or "") in {"blocked_by_x_chat_passcode", "visible_threads_unopened", "no_visible_threads", "dm_page_loading_timeout", "api_dm_unavailable", "api_dm_error", "api_dm_todo"}:
-        facts["data_gaps"].append(
-            {
-                "source": "messages",
-                "status": summary.get("dm_status"),
-                "detail": facts["dms"].get("note") or "DM content was incomplete or unavailable.",
-            }
-        )
-    if (summary.get("dm_status") or "") == "api_dm_todo" and not facts["todo_items"]:
-        facts["todo_items"].append(
-            {
-                "source": "messages",
-                "status": "api_dm_todo",
-                "detail": facts["dms"].get("note") or "API DM was inconclusive; do not make a final DM claim.",
-            }
-        )
     return facts
 
 
@@ -485,7 +485,9 @@ def render_digest_input(data: dict[str, Any]) -> str:
                 f"最后我发出 `{int(page.get('dm_replied_thread_count') or 0)}` / "
                 f"等我回复 `{int(page.get('dm_unreplied_thread_count') or 0)}`"
             )
-            lines.append(f"DM 消息统计: 已打开等我回复会话中捕获消息气泡 `{int(page.get('dm_captured_message_count') or 0)}`")
+            lines.append(f"状态未知会话: `{int(page.get('dm_unknown_thread_count') or 0)}`")
+            lines.append(f"DM 消息统计: 当前窗口内捕获消息 `{int(page.get('dm_captured_message_count') or 0)}`")
+            lines.append(f"Chat 请求: `{'有待处理请求' if page.get('dm_has_message_requests') else '无'}`")
             if page.get("dm_note"):
                 lines.append(str(page["dm_note"]))
         if page.get("collection_error"):
@@ -496,7 +498,10 @@ def render_digest_input(data: dict[str, Any]) -> str:
             participant = thread.get("participant") or thread.get("label") or thread.get("url")
             lines.extend(["", f"### DM thread [current]: {participant}", ""])
             lines.append(f"会话对象: `{participant}`")
-            lines.append(f"会话状态: `{'最后我发出' if thread.get('replied') else '等我回复'}`")
+            reply_state = str(thread.get("reply_state") or ("最后我发出" if thread.get("replied") else "等我回复"))
+            lines.append(f"会话状态: `{reply_state}`")
+            if thread.get("collection_detail"):
+                lines.append(f"采集说明: {thread.get('collection_detail')}")
             lines.append(f"消息数量: `{int(thread.get('message_count') or 0)}`")
             lines.append("发信人判断: 使用会话对象/消息气泡判断；引用帖、转发卡片或链接预览里的作者不是 DM 发信人。")
             lines.extend(["", str(thread.get("text") or "")[:3000]])
@@ -507,7 +512,7 @@ def render_digest_input(data: dict[str, Any]) -> str:
             "",
             "- API 采集受 X API 权限、套餐、端点可用性和限流影响。",
             "- 公开内容标记为 `[current]`，最终日报只依赖本次采集。",
-            "- DM / X Chat 可能不会完整出现在 API 结果中；不要把 0 条 API DM 当作没有私信。",
+            "- X Chat 由官方 Chat API 提供，并在本地通过 Chat XDK 解密；采集或解密失败时整次日报失败。",
         ]
     )
     return "\n".join(lines) + "\n"
@@ -592,7 +597,9 @@ def render_dm_facts_section(facts: dict[str, Any]) -> str:
             f"today visible `{dm_counts.get('visible', 0)}`, "
             f"last_from_me `{dm_counts.get('last_from_me', 0)}`, "
             f"waiting_reply `{dm_counts.get('waiting_reply', 0)}`, "
+            f"unknown `{dm_counts.get('unknown', 0)}`, "
             f"captured messages `{dm_counts.get('captured_messages', 0)}`"
+            f", message requests `{dm_counts.get('message_requests', 0)}`"
         ),
         "- rule: summarize only `waiting_reply` threads with `should_summarize: true`; count noise but do not expand it.",
     ]
