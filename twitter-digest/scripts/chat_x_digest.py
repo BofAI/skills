@@ -331,7 +331,7 @@ def main() -> None:
                 "source": "x_chat",
                 "status": "conversation_history_unavailable",
                 "detail": (
-                    f"{unavailable_thread_count} listed X Chat conversation(s) had no readable messages in the 24-hour window. "
+                    f"{unavailable_thread_count} listed X Chat conversation(s) had no readable messages in the requested {max(1, args.hours)}-hour window. "
                     "Do not infer that these conversations are empty or already handled."
                 ),
             }

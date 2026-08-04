@@ -266,7 +266,13 @@ fi
 
 if xurl_oauth_ready; then
   XURL_ALREADY_CONFIGURED=1
-  info "Existing xurl app '${APP_NAME}' is already authorized; skipping xurl install and OAuth setup."
+  if command_exists node && command_exists npm; then
+    info "Existing xurl app '${APP_NAME}' is already authorized; updating ${INSTALL_SPEC} without re-running OAuth."
+    npm install -g "${INSTALL_SPEC}"
+    XURL_COMMAND="$(resolve_command_path xurl || true)"
+  else
+    info "Existing xurl app '${APP_NAME}' is already authorized; Node/npm unavailable, so keeping the installed xurl and skipping OAuth setup."
+  fi
 else
   if ! command_exists node; then
     fail "Node.js is required before installing xurl. Install Node.js 18 or newer, then rerun this script."

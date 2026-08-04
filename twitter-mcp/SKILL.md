@@ -1,13 +1,13 @@
 ---
 name: twitter-mcp
-description: Use when the user wants to install or authorize xurl for X/Twitter, generate "生成X日报", "X日报", "推特日报", or "Twitter digest" from the local xurl CLI, or optionally register/troubleshoot the hosted X MCP bridge.
+description: Use when the user wants to install or authorize xurl for X/Twitter, read encrypted X Chat, generate "生成X日报", "X日报", "推特日报", or "Twitter digest" from the local xurl CLI, or optionally register/troubleshoot the hosted X MCP bridge.
 ---
 
 # X/Twitter xurl Digest
 
 ## Overview
 
-Use this skill to install and authorize `@xdevplatform/xurl`, and to generate X/Twitter daily digests from the local `xurl` CLI. The primary digest data source is `xurl` CLI output, not the hosted X MCP tool list. This skill does not use local API collectors, local browser collectors, or `twitter-digest` scripts.
+Use this skill to install and authorize the latest `@xdevplatform/xurl`, read end-to-end encrypted X Chat locally, and generate X/Twitter daily digests from the local `xurl` CLI. The primary digest data source is `xurl` CLI output, not the hosted X MCP tool list. This skill does not use local API collectors, local browser collectors, or `twitter-digest` scripts.
 
 The hosted X MCP bridge can still be registered as `xapi` when explicitly requested, but daily digest generation should not depend on MCP tools being visible. `xurl` CLI exposes direct digest-relevant commands such as `whoami`, `timeline`, `mentions`, `posts`, and `search`.
 
@@ -29,6 +29,7 @@ Use that local time as `now`, compute `cutoff = now - 24 hours`, and include onl
 xurl whoami
 xurl timeline -n 100
 xurl mentions -n 100
+xurl chat conversations -n 100 --json
 ```
 
 Detect the authenticated handle from `xurl whoami`. Then run:
@@ -45,6 +46,11 @@ These commands are mandatory for daily digest collection. Do not write a final d
 Rules for collection:
 
 - If `xurl whoami` does not reveal a handle, ask the user for the handle or skip handle-dependent commands and report the gap.
+- Run `xurl chat keys status` before reading encrypted Chat. If keys are missing, open a real Terminal and run `xurl chat keys restore`; let xurl prompt for the recovery PIN there. Never request or expose the PIN in Agent chat.
+- For each conversation that may contain an in-window message, run `xurl chat read <conversation-id> -n 100 --json --no-mark-read`. Do not mark conversations read merely to generate a digest.
+- Use each decrypted event timestamp for the same strict local 24-hour filter. A conversation needs a reply only when its latest in-window text message came from another participant.
+- Inspect `chat conversations --json` metadata for `has_message_requests`. If true, add a required todo. If the API does not identify the requester, report that limitation instead of inventing a participant.
+- If Chat keys are missing, history is empty, or decryption fails, report the affected conversation as `unknown`; never classify it as handled or waiting for reply.
 - Keep only posts, mentions, searches, and timeline items from the last 24 hours in the user's current local timezone. This rule is strict for `xurl mentions`: mentions older than `cutoff` must be discarded before analysis and must not appear in `需要处理`.
 - `xurl mentions` is not enough to conclude current mention state. If `xurl mentions` returns only old items or no in-window items, the `@<handle>` and `to:<handle>` searches are still required before saying there are no current mentions or no reply tasks.
 - Do not put "未跑关键词搜索" in the final data gaps for mandatory `from:/@/to:` searches. Missing mandatory searches are a collection error to fix by running the commands before the final answer. Only report a mandatory search as a data gap if it was attempted and failed with an error, auth limit, tier limit, or rate limit.
@@ -79,20 +85,20 @@ From the repository `skills/` directory:
 For a one-line Codex install from this beta tag:
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/BofAI/skills/v1.5.12-beta.12/twitter-mcp/install.sh | env X_MCP_REGISTER_CODEX=1 X_MCP_REGISTER_CLAUDE=0 sh
+curl -fsSL https://raw.githubusercontent.com/BofAI/skills/v1.5.14-beta.3/twitter-mcp/install.sh | env X_MCP_REGISTER_CODEX=1 X_MCP_REGISTER_CLAUDE=0 sh
 ```
 
 For a one-line Claude Code install from this beta tag:
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/BofAI/skills/v1.5.12-beta.12/twitter-mcp/install.sh | env X_MCP_REGISTER_CODEX=0 X_MCP_REGISTER_CLAUDE=1 sh
+curl -fsSL https://raw.githubusercontent.com/BofAI/skills/v1.5.14-beta.3/twitter-mcp/install.sh | env X_MCP_REGISTER_CODEX=0 X_MCP_REGISTER_CLAUDE=1 sh
 ```
 
 The installer:
 
 - Installs this `twitter-mcp` skill into the selected local skills directory.
 - Reinstalling is the upgrade path: it replaces the skill code and preserves the existing installed `.state` directory.
-- If the selected `X_MCP_APP_NAME` already has a usable `xurl` OAuth token, reinstall skips `npm install`, Client ID / Secret prompts, and OAuth browser authorization. Set `X_MCP_FORCE_CONFIGURE=1` only when the user explicitly wants to re-enter credentials or reauthorize.
+- If the selected `X_MCP_APP_NAME` already has a usable `xurl` OAuth token, reinstall updates `@xdevplatform/xurl` to `XMCP_VERSION` when Node/npm are available while preserving the app and token. It skips Client ID / Secret prompts and OAuth browser authorization. If Node/npm are unavailable, it keeps the working CLI. Set `X_MCP_FORCE_CONFIGURE=1` only when the user explicitly wants to re-enter credentials or reauthorize.
 - Requires Node.js 18+ and npm. Node.js 20 LTS+ is recommended.
 - Installs `@xdevplatform/xurl` globally with npm.
 - Opens the X OAuth2 authorization flow.
@@ -161,7 +167,8 @@ After installation:
 
 1. Run `xurl whoami` to verify the local CLI is authorized.
 2. Run `xurl timeline -n 10` and `xurl mentions -n 10` to verify digest collection.
-3. If optional MCP registration was enabled, start a new Codex or Claude Code session and check whether X MCP tools are visible under the `xapi` server.
+3. Run `xurl chat keys status` and `xurl chat conversations -n 10 --json` to verify encrypted Chat capability. Restoring keys is a separate one-time secure Terminal flow.
+4. If optional MCP registration was enabled, start a new Codex or Claude Code session and check whether X MCP tools are visible under the `xapi` server.
 
 If an X MCP endpoint returns an auth, subscription, tier, or scope error, report the exact failing capability as a setup or account limitation. Do not infer that the requested X data does not exist.
 
