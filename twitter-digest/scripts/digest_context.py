@@ -10,7 +10,7 @@ import re
 from pathlib import Path
 from typing import Any, Optional
 
-from script_utils import format_local_time, local_timezone_name, now_iso
+from script_utils import format_local_time, local_timezone_name, now_iso, write_private_text
 
 CONTEXT_SLICE_FILES = {
     "timeline": "digest-context-timeline.md",
@@ -36,16 +36,16 @@ def build_current_context_from_file(input_path: Path, out_dir: Path, markdown_pa
         pass
 
     summary = summarize_current_run(data)
-    input_path.write_text(json.dumps(data, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
+    write_private_text(input_path, json.dumps(data, ensure_ascii=False, indent=2) + "\n")
     if markdown_path:
-        markdown_path.write_text(render_digest_input(data), encoding="utf-8")
+        write_private_text(markdown_path, render_digest_input(data))
 
     facts = build_digest_facts(data, summary)
     context_json = {"summary": summary, "facts": facts, "memory": "disabled", "slices": CONTEXT_SLICE_FILES}
-    (out_dir / "digest-context.md").write_text(render_digest_context(summary, facts), encoding="utf-8")
-    (out_dir / "digest-context.json").write_text(json.dumps(context_json, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
+    write_private_text(out_dir / "digest-context.md", render_digest_context(summary, facts))
+    write_private_text(out_dir / "digest-context.json", json.dumps(context_json, ensure_ascii=False, indent=2) + "\n")
     for slice_name, file_name in CONTEXT_SLICE_FILES.items():
-        (out_dir / file_name).write_text(render_context_slice(summary, facts, slice_name), encoding="utf-8")
+        write_private_text(out_dir / file_name, render_context_slice(summary, facts, slice_name))
     return context_json
 
 
@@ -53,6 +53,7 @@ def summarize_current_run(data: dict[str, Any]) -> dict[str, Any]:
     generated_at = str(data.get("generated_at") or now_iso())
     post_counts: dict[str, dict[str, int]] = {}
     dm_status = "not_requested"
+    dm_window_hours = 24
     dm_counts = {"visible": 0, "last_from_me": 0, "waiting_reply": 0, "unknown": 0, "captured_messages": 0, "message_requests": 0}
 
     for page in data.get("pages", []):
@@ -63,6 +64,7 @@ def summarize_current_run(data: dict[str, Any]) -> dict[str, Any]:
         post_counts[kind] = {"total": len(items)}
         if kind == "messages":
             dm_status = str(page.get("dm_status") or "unknown")
+            dm_window_hours = max(1, int(page.get("dm_window_hours") or 24))
             dm_counts = {
                 "visible": int(page.get("dm_visible_thread_count") or 0),
                 "last_from_me": int(page.get("dm_replied_thread_count") or 0),
@@ -79,6 +81,7 @@ def summarize_current_run(data: dict[str, Any]) -> dict[str, Any]:
         "handle": clean_handle(data.get("handle")),
         "post_counts": post_counts,
         "dm_status": dm_status,
+        "dm_window_hours": dm_window_hours,
         "dm_counts": dm_counts,
         "context_policy": "No long-term memory. Final summary uses only this run's current collector capture.",
     }
@@ -87,6 +90,8 @@ def summarize_current_run(data: dict[str, Any]) -> dict[str, Any]:
 def build_digest_facts(data: dict[str, Any], summary: dict[str, Any]) -> dict[str, Any]:
     now = dt.datetime.now().astimezone()
     cutoff = now - dt.timedelta(hours=24)
+    dm_window_hours = max(1, int(summary.get("dm_window_hours") or 24))
+    dm_cutoff = now - dt.timedelta(hours=dm_window_hours)
     public_items: list[dict[str, Any]] = []
     loaded_public_kinds: set[str] = set()
     kept_public_counts: dict[str, int] = {}
@@ -123,6 +128,9 @@ def build_digest_facts(data: dict[str, Any], summary: dict[str, Any]) -> dict[st
         "dms": {
             "status": summary.get("dm_status"),
             "counts": summary.get("dm_counts") or {},
+            "window_start": dm_cutoff.isoformat(),
+            "window_end": now.isoformat(),
+            "window_hours": dm_window_hours,
             "threads": [],
         },
         "todo_items": [],

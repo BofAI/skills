@@ -12,7 +12,7 @@ from pathlib import Path
 from typing import Optional
 
 from api_config_store import load_api_config, refresh_oauth_token_if_needed
-from chat_config_store import CHAT_RUNTIME_DIR, chat_configured, load_chat_config
+from chat_config_store import CHAT_RUNTIME_DIR, chat_configured, chat_runtime_status, load_chat_config
 from collector_commands import api_collector_command, summarize_collector_error
 from digest_context import build_current_context_from_file
 from digest_io import write_digest_output
@@ -24,7 +24,7 @@ CONFIG_PATH = STATE_DIR / "config.json"
 DEFAULT_OUT_DIR = STATE_DIR / "run"
 DEFAULT_API_PUBLIC_ITEMS = 300
 UNSUPPORTED_OPTION_MESSAGE = "Source selection is no longer supported. twitter-digest uses API only."
-REQUIRED_CHAT_SCOPES = {"dm.read", "dm.write", "users.read", "tweet.read"}
+REQUIRED_CHAT_SCOPES = {"dm.read", "users.read", "tweet.read"}
 
 
 def parse_args() -> argparse.Namespace:
@@ -40,7 +40,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--disable-chat", action="store_true", help="Disable X Chat collection and remove the saved local key blob, then exit.")
     parser.add_argument("--api-base", default=os.environ.get("X_API_BASE_URL") or "")
     parser.add_argument("--user-id", default=os.environ.get("X_USER_ID") or os.environ.get("TWITTER_USER_ID") or "")
-    parser.add_argument("--bearer-token", default=os.environ.get("X_BEARER_TOKEN") or os.environ.get("TWITTER_BEARER_TOKEN") or "")
+    parser.add_argument("--bearer-token", default="", help=argparse.SUPPRESS)
     parser.add_argument("--scrolls", type=int, default=40, help=argparse.SUPPRESS)
     parser.add_argument("--min-public-scrolls", type=int, default=5, help=argparse.SUPPRESS)
     parser.add_argument(
@@ -50,10 +50,13 @@ def parse_args() -> argparse.Namespace:
         help="Override maximum public post items for API collection. Default: API 300.",
     )
     parser.add_argument("--public-window-hours", type=int, default=24, help="Stop loading older public timeline items once posts beyond this window are detected.")
+    parser.add_argument("--chat-window-hours", type=int, default=24, help="Collect X Chat messages from this many recent hours. Default: 24; use 168 for seven days.")
     parser.add_argument("--headless", action="store_true", help=argparse.SUPPRESS)
     parser.add_argument("--headed", action="store_true", help=argparse.SUPPRESS)
     parser.add_argument("--non-interactive", action="store_true", help=argparse.SUPPRESS)
     args, unknown = parser.parse_known_args()
+    if args.bearer_token:
+        raise SystemExit("Direct bearer-token overrides are disabled; twitter-digest requires its verified read-only OAuth configuration.")
     if "--source" in unknown or any(arg.startswith("--source=") for arg in unknown):
         raise SystemExit(UNSUPPORTED_OPTION_MESSAGE)
     if unknown:
@@ -182,8 +185,9 @@ def run_chat_configuration(extra_args: list[str]) -> None:
 
 def collect_chat(out_dir: Path, env: dict[str, str], hours: int) -> None:
     runtime_python = CHAT_RUNTIME_DIR / "bin" / "python"
-    if not runtime_python.exists():
-        raise SystemExit("X Chat runtime is missing. Run --configure again.")
+    runtime_ready, runtime_error = chat_runtime_status()
+    if not runtime_ready:
+        raise SystemExit(f"{runtime_error} Run --configure again.")
     chat_page_path = out_dir / "chat-page.json"
     cmd = [
         str(runtime_python),
@@ -261,6 +265,12 @@ def main() -> None:
     api_config, refresh_error, bearer_token, api_base, user_id, handle = load_fresh_api_state(args, config)
     refresh_error = str(api_config.get("refresh_error") or "")
     saved_scopes = set(str(api_config.get("scopes") or "").split())
+    if not saved_scopes:
+        run_full_configuration("Saved X OAuth token has no scope metadata; read-only reauthorization is required")
+        raise SystemExit(0)
+    if not explicit_bearer_token and "dm.write" in saved_scopes:
+        run_full_configuration("Saved X OAuth token can write DMs and must be replaced with a read-only token")
+        raise SystemExit(0)
     missing_chat_scopes = REQUIRED_CHAT_SCOPES - saved_scopes if saved_scopes else set()
     if not explicit_bearer_token and missing_chat_scopes:
         run_full_configuration(
@@ -274,7 +284,7 @@ def main() -> None:
         if refresh_error or not api_configured(bearer_token):
             raise SystemExit("X API configuration did not produce a usable token. Re-run configuration and try again.")
     if refresh_error and not explicit_bearer_token:
-        raise SystemExit("Saved X OAuth token refresh failed. Re-run --configure or pass X_BEARER_TOKEN to use API source.")
+        raise SystemExit("Saved X OAuth token refresh failed. Re-run --configure.")
     chat_config = load_chat_config()
     if not chat_configured():
         run_full_configuration("X Chat configuration is required before a complete digest can be generated.")
@@ -307,7 +317,7 @@ def main() -> None:
             print(f"API collection failed: {summary}", file=sys.stderr, flush=True)
             raise SystemExit(exc.returncode) from exc
     out_dir = Path(args.out)
-    collect_chat(out_dir, child_env, args.public_window_hours)
+    collect_chat(out_dir, child_env, args.chat_window_hours)
     build_current_context_from_file(
         input_path=out_dir / "digest-input.json",
         markdown_path=out_dir / "digest-input.md",

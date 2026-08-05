@@ -19,6 +19,15 @@ from digest_io import write_digest_output
 
 
 API_BASE = "https://api.x.com/2"
+MAX_API_ATTEMPTS = 4
+RETRYABLE_HTTP_CODES = {408, 425, 429, 500, 502, 503, 504}
+
+
+def retry_delay(attempt: int, retry_after: str = "") -> float:
+    try:
+        return max(0.0, min(float(retry_after), 60.0))
+    except (TypeError, ValueError):
+        return min(2 ** (attempt - 1), 8)
 
 
 def parse_args() -> argparse.Namespace:
@@ -48,14 +57,20 @@ def api_get(args: argparse.Namespace, path: str, params: Optional[dict[str, Any]
     if query:
         url += "?" + query
     request = urllib.request.Request(url, headers=auth_headers(args))
-    try:
-        with urllib.request.urlopen(request, timeout=30) as response:
-            return json.loads(response.read().decode("utf-8"))
-    except urllib.error.HTTPError as exc:
-        body = exc.read().decode("utf-8", errors="replace")
-        raise RuntimeError(f"GET {path} failed with HTTP {exc.code}: {body[:1000]}") from exc
-    except urllib.error.URLError as exc:
-        raise RuntimeError(f"GET {path} failed: {exc}") from exc
+    for attempt in range(1, MAX_API_ATTEMPTS + 1):
+        try:
+            with urllib.request.urlopen(request, timeout=30) as response:
+                return json.loads(response.read().decode("utf-8"))
+        except urllib.error.HTTPError as exc:
+            body = exc.read().decode("utf-8", errors="replace")
+            if exc.code not in RETRYABLE_HTTP_CODES or attempt == MAX_API_ATTEMPTS:
+                raise RuntimeError(f"GET {path} failed with HTTP {exc.code}: {body[:1000]}") from exc
+            time.sleep(retry_delay(attempt, exc.headers.get("Retry-After", "")))
+        except (urllib.error.URLError, TimeoutError, ConnectionError) as exc:
+            if attempt == MAX_API_ATTEMPTS:
+                raise RuntimeError(f"GET {path} failed after {MAX_API_ATTEMPTS} attempts: {exc}") from exc
+            time.sleep(retry_delay(attempt))
+    raise AssertionError("unreachable")
 
 
 def resolve_user(args: argparse.Namespace, handle: Optional[str], user_id: Optional[str]) -> dict[str, str]:

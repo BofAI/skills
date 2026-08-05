@@ -6,13 +6,13 @@ import json
 from pathlib import Path
 from typing import Any
 
-from script_utils import ensure_private_dir
+from script_utils import ensure_private_dir, write_private_text
 
 
 def write_digest_output(out_dir: Path, data: dict[str, Any]) -> None:
     ensure_private_dir(out_dir)
-    (out_dir / "digest-input.json").write_text(json.dumps(data, ensure_ascii=False, indent=2), encoding="utf-8")
-    (out_dir / "digest-input.md").write_text(render_markdown(data), encoding="utf-8")
+    write_private_text(out_dir / "digest-input.json", json.dumps(data, ensure_ascii=False, indent=2))
+    write_private_text(out_dir / "digest-input.md", render_markdown(data))
 
 
 def render_markdown(data: dict[str, Any]) -> str:

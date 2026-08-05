@@ -16,6 +16,8 @@ ERROR_MARKERS = [
     "HTTP 429",
     "Too Many Requests",
     "Timed out",
+    "UNEXPECTED_EOF_WHILE_READING",
+    "EOF occurred in violation of protocol",
     "passcode",
 ]
 
@@ -26,7 +28,10 @@ def summarize_collector_error(text: str, returncode: Optional[int] = None) -> st
     matched = [marker for marker in ERROR_MARKERS if marker in text]
     if matched:
         return "; ".join(dict.fromkeys(matched))
-    return " ".join(text.split())[:500]
+    # Tracebacks put the useful exception at the end. Keep the tail so the
+    # actual network/API error is not replaced by an unhelpful urllib stack.
+    compact = " ".join(text.split())
+    return compact[-500:]
 
 
 def api_collector_command(

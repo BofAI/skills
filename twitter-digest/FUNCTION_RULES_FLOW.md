@@ -13,6 +13,10 @@ The wrapper uses API directly.
 ## Agent Rules
 
 - For "生成X日报", "日报", "要", "继续", or similar short confirmations, run the installed `run_daily_digest.py`.
+- Treat these requests as operator tasks, not coding tasks. The installed wrapper must be the first tool action.
+- Never inspect, create, edit, or patch code during a normal run, including after an error.
+- Never call `api_x_digest.py`, `chat_x_digest.py`, or other internal scripts directly.
+- Only enter development mode when the user explicitly asks to fix or develop this skill.
 - Do not infer another source from prior conversation.
 - Do not propose another collector as a fallback for missing DMs or API gaps.
 - If the user asks for a non-API source, say this skill only supports API collection.

@@ -8,6 +8,7 @@ import base64
 import datetime as dt
 import json
 import os
+import time
 import urllib.error
 import urllib.parse
 import urllib.request
@@ -15,6 +16,17 @@ from pathlib import Path
 from typing import Any
 
 from chat_config_store import load_chat_config
+
+
+MAX_API_ATTEMPTS = 4
+RETRYABLE_HTTP_CODES = {408, 425, 429, 500, 502, 503, 504}
+
+
+def retry_delay(attempt: int, retry_after: str = "") -> float:
+    try:
+        return max(0.0, min(float(retry_after), 60.0))
+    except (TypeError, ValueError):
+        return min(2 ** (attempt - 1), 8)
 
 
 def parse_args() -> argparse.Namespace:
@@ -30,12 +42,22 @@ def api_get(token: str, path: str, params: dict[str, Any] | None = None) -> dict
     query = urllib.parse.urlencode({key: value for key, value in (params or {}).items() if value not in (None, "")})
     url = "https://api.x.com/2" + path + (("?" + query) if query else "")
     request = urllib.request.Request(url, headers={"Authorization": f"Bearer {token}", "User-Agent": "twitter-digest-chat/1.0"})
-    try:
-        with urllib.request.urlopen(request, timeout=30) as response:
-            return json.loads(response.read().decode("utf-8"))
-    except urllib.error.HTTPError as exc:
-        detail = exc.read().decode("utf-8", errors="replace")
-        raise RuntimeError(f"GET {path} failed with HTTP {exc.code}: {detail[:800]}") from exc
+    for attempt in range(1, MAX_API_ATTEMPTS + 1):
+        try:
+            with urllib.request.urlopen(request, timeout=30) as response:
+                return json.loads(response.read().decode("utf-8"))
+        except urllib.error.HTTPError as exc:
+            detail = exc.read().decode("utf-8", errors="replace")
+            if exc.code not in RETRYABLE_HTTP_CODES or attempt == MAX_API_ATTEMPTS:
+                raise RuntimeError(f"GET {path} failed with HTTP {exc.code}: {detail[:800]}") from exc
+            time.sleep(retry_delay(attempt, exc.headers.get("Retry-After", "")))
+        except (urllib.error.URLError, TimeoutError, ConnectionError) as exc:
+            if attempt == MAX_API_ATTEMPTS:
+                raise RuntimeError(
+                    f"GET {path} failed after {MAX_API_ATTEMPTS} attempts: {exc}"
+                ) from exc
+            time.sleep(retry_delay(attempt))
+    raise AssertionError("unreachable")
 
 
 def parse_time(value: Any) -> dt.datetime | None:
@@ -308,7 +330,7 @@ def main() -> None:
     if conversations and fetched_event_count == 0:
         raise SystemExit(
             "X Chat history returned zero events for every listed conversation. "
-            "The OAuth token may be missing dm.write or the Chat history endpoint is not returning authorized data; "
+            "The read-only OAuth token may lack access to this X Chat history endpoint; "
             "refusing to report an empty inbox."
         )
     waiting = [thread for thread in threads if thread.get("reply_state") == "waiting_reply"]
@@ -318,6 +340,7 @@ def main() -> None:
         "url": "https://api.x.com/2/chat/conversations",
         "items": [],
         "dm_status": "x_chat_collected",
+        "dm_window_hours": max(1, args.hours),
         "dm_note": "X Chat messages were decrypted locally with Chat XDK. The X Chat passcode was not stored.",
         "dm_threads": threads,
         "dm_visible_thread_count": len(threads),
@@ -348,7 +371,9 @@ def main() -> None:
             else []
         ),
     }
-    Path(args.out).write_text(json.dumps(payload, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
+    output_path = Path(args.out)
+    output_path.write_text(json.dumps(payload, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
+    output_path.chmod(0o600)
 
 
 if __name__ == "__main__":

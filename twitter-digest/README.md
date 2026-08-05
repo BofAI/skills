@@ -7,13 +7,13 @@ Skill for generating a Chinese daily digest from a user's own X/Twitter account.
 Codex:
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/BofAI/skills/v1.5.14-beta.2/twitter-digest/install.sh | env TWITTER_DIGEST_INSTALL_CLIENT=codex sh
+curl -fsSL https://raw.githubusercontent.com/BofAI/skills/v1.5.14-beta.4/twitter-digest/install.sh | env TWITTER_DIGEST_INSTALL_CLIENT=codex sh
 ```
 
 Claude Code:
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/BofAI/skills/v1.5.14-beta.2/twitter-digest/install.sh | env TWITTER_DIGEST_INSTALL_CLIENT=claude TWITTER_DIGEST_ALLOW_CLAUDE_COMMANDS=1 TWITTER_DIGEST_ALLOW_CLAUDE_STATE_READ=1 sh
+curl -fsSL https://raw.githubusercontent.com/BofAI/skills/v1.5.14-beta.4/twitter-digest/install.sh | env TWITTER_DIGEST_INSTALL_CLIENT=claude TWITTER_DIGEST_ALLOW_CLAUDE_COMMANDS=1 TWITTER_DIGEST_ALLOW_CLAUDE_STATE_READ=1 sh
 ```
 
 From a checkout:
@@ -58,7 +58,7 @@ The setup flow is required for first use. It opens one Terminal window, asks for
 Scopes:
 
 ```text
-tweet.read users.read offline.access dm.read dm.write
+tweet.read users.read offline.access dm.read
 ```
 
 Verify:

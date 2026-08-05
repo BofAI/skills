@@ -10,11 +10,11 @@ import sys
 from pathlib import Path
 
 from api_config_store import load_api_config
-from chat_config_store import CHAT_RUNTIME_DIR, chat_configured, clear_chat_config, load_chat_config
+from chat_config_store import chat_configured, chat_runtime_status, clear_chat_config, load_chat_config
 from configure_api import verify_api_config
 from script_utils import open_script_in_terminal, rerun_from_installed_if_needed
 
-REQUIRED_CHAT_SCOPES = {"dm.read", "dm.write", "users.read", "tweet.read"}
+REQUIRED_CHAT_SCOPES = {"dm.read", "users.read", "tweet.read"}
 
 
 def parse_args() -> argparse.Namespace:
@@ -28,6 +28,10 @@ def api_status() -> tuple[bool, dict[str, object]]:
     if not config.get("bearer_token") and not config.get("refresh_token"):
         return False, {"verified": False, "error": "No saved API credentials."}
     saved_scopes = set(str(config.get("scopes") or "").split())
+    if not saved_scopes:
+        return False, {"verified": False, "error": "Saved OAuth token has no scope metadata; read-only reauthorization is required."}
+    if "dm.write" in saved_scopes:
+        return False, {"verified": False, "error": "Saved OAuth token has forbidden dm.write scope; read-only reauthorization is required."}
     if saved_scopes and not REQUIRED_CHAT_SCOPES.issubset(saved_scopes):
         missing = ", ".join(sorted(REQUIRED_CHAT_SCOPES - saved_scopes))
         return False, {"verified": False, "error": f"Saved OAuth token is missing required scopes: {missing}."}
@@ -41,9 +45,9 @@ def chat_status(user_id: str) -> tuple[bool, str]:
         return False, "X Chat keys are not configured."
     if str(config.get("user_id") or "") != user_id:
         return False, "Saved X Chat keys belong to a different X account."
-    runtime_python = CHAT_RUNTIME_DIR / "bin" / "python"
-    if not runtime_python.exists():
-        return False, "X Chat runtime is missing."
+    runtime_ready, runtime_error = chat_runtime_status()
+    if not runtime_ready:
+        return False, runtime_error
     return True, ""
 
 
@@ -76,7 +80,8 @@ def configure_all() -> None:
     if chat_ready:
         print("X Chat 已配置，跳过 passcode 输入。", flush=True)
     else:
-        if chat_configured():
+        existing_chat_user = str(load_chat_config().get("user_id") or "")
+        if chat_configured() and existing_chat_user != user_id:
             clear_chat_config()
         print(f"X Chat 需要配置：{chat_error}", flush=True)
         print("请输入 X Chat passcode。它只用于本次解锁，不会保存。", flush=True)

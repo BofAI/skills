@@ -1,8 +1,10 @@
 from __future__ import annotations
 
 import datetime as dt
+import io
 import sys
 import unittest
+import urllib.error
 from pathlib import Path
 from unittest import mock
 
@@ -14,6 +16,42 @@ import chat_x_digest  # noqa: E402
 
 
 class ChatCollectorTests(unittest.TestCase):
+    def test_api_get_retries_transient_url_error(self) -> None:
+        response = mock.MagicMock()
+        response.__enter__.return_value.read.return_value = b'{"data": []}'
+        with (
+            mock.patch.object(
+                chat_x_digest.urllib.request,
+                "urlopen",
+                side_effect=[urllib.error.URLError("TLS EOF"), response],
+            ) as urlopen,
+            mock.patch.object(chat_x_digest.time, "sleep") as sleep,
+        ):
+            payload = chat_x_digest.api_get("token", "/chat/conversations")
+
+        self.assertEqual(payload, {"data": []})
+        self.assertEqual(urlopen.call_count, 2)
+        sleep.assert_called_once_with(1)
+
+    def test_api_get_retries_429_and_honors_retry_after(self) -> None:
+        error = urllib.error.HTTPError(
+            "https://api.x.com/2/chat/conversations",
+            429,
+            "Too Many Requests",
+            {"Retry-After": "3"},
+            io.BytesIO(b"rate limited"),
+        )
+        response = mock.MagicMock()
+        response.__enter__.return_value.read.return_value = b'{"ok": true}'
+        with (
+            mock.patch.object(chat_x_digest.urllib.request, "urlopen", side_effect=[error, response]),
+            mock.patch.object(chat_x_digest.time, "sleep") as sleep,
+        ):
+            payload = chat_x_digest.api_get("token", "/chat/conversations")
+
+        self.assertTrue(payload["ok"])
+        sleep.assert_called_once_with(3.0)
+
     def test_collect_conversations_follows_pagination_and_keeps_request_flag(self) -> None:
         responses = [
             {

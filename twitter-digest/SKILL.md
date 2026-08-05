@@ -9,13 +9,19 @@ description: Use when the user asks to generate an X/Twitter daily digest or say
 
 Use this skill to produce a concise Chinese daily digest from the user's own X/Twitter account. The data source is API-only and includes required X Chat collection through the official Chat XDK.
 
-Normal daily runs use:
+For a normal digest in Claude Code, the first tool action must be exactly:
 
 ```bash
-RUN_DAILY_DIGEST
+python3 ~/.claude/skills/twitter-digest/scripts/run_daily_digest.py
 ```
 
-`RUN_DAILY_DIGEST` means the installed command for the current agent:
+For a normal digest in Codex, the first tool action must be exactly:
+
+```bash
+python3 ~/.codex/skills/twitter-digest/scripts/run_daily_digest.py
+```
+
+These installed wrapper commands are the only normal execution entry points. `RUN_DAILY_DIGEST` below is shorthand for the matching command:
 
 - Claude Code: `python3 ~/.claude/skills/twitter-digest/scripts/run_daily_digest.py`
 - Codex: `python3 ~/.codex/skills/twitter-digest/scripts/run_daily_digest.py`
@@ -32,14 +38,22 @@ For X Chat maintenance, `CONFIGURE_CHAT` means:
 
 ## Source Contract
 
-`twitter-digest` has one API source composed of two required collectors:
+`twitter-digest` has one API source. The installed wrapper internally runs the public/account collector and the X Chat collector, then merges their current-run output.
 
-```bash
-python3 twitter-digest/scripts/api_x_digest.py
-python3 twitter-digest/scripts/chat_x_digest.py
-```
+Never invoke `api_x_digest.py`, `chat_x_digest.py`, `digest_context.py`, or other internal scripts directly during a normal digest run.
 
-The wrapper `scripts/run_daily_digest.py` runs both collectors and merges their current-run output.
+### Operator mode (mandatory)
+
+A digest request is an operation, not a software-development task.
+
+- Run the installed wrapper immediately. Do not inspect repository files first.
+- Do not create, edit, patch, or propose Python, shell, JavaScript, temporary scripts, replacement collectors, or diagnostic programs.
+- Do not use inline code such as `python3 -c` to reproduce, verify, bypass, or repair collection.
+- Do not change the installed skill, its dependencies, Claude settings, or `.state` during a digest run, except through documented wrapper options.
+- On any wrapper failure, preserve and report the wrapper's exact actionable error. Use only the documented commands in this file.
+- Enter code-development/debugging mode only when the user explicitly asks to inspect, fix, or develop the twitter-digest skill itself.
+
+If the user merely says “重试”, “继续”, “再试一次”, “要”, “日报”, or “生成”, run the same installed wrapper again. Those words do not authorize writing code.
 
 Source rules:
 
@@ -49,6 +63,7 @@ Source rules:
 - If API credentials are missing or expired, the wrapper starts API configuration. If X Chat is not configured, it starts X Chat configuration. The digest must be rerun after either configuration succeeds.
 - When configuration is opened in Terminal, do not ask the user to paste Client ID, Client Secret, tokens, app credentials, or X Chat passcode in chat. One Terminal wizard collects all three inputs and completes OAuth. Tell the user to finish that single flow, then rerun `RUN_DAILY_DIGEST`.
 - Do not switch to another data source on API or X Chat errors, rate limits, permission errors, or user requests for "more complete" data.
+- Do not repair a failed run by inspecting or modifying source code. Report the error and the documented next action.
 - If the user asks for a non-API source or cookies, explain that this skill only supports API collection.
 
 API source isolation is strict:
@@ -72,7 +87,7 @@ RUN_DAILY_DIGEST --configure
 This is the only primary setup flow. It opens one real Terminal window and, when needed, asks in sequence for the X Developer App Client ID, Client Secret, and X Chat passcode. OAuth authorization still completes in the browser. Existing valid API and X Chat configuration is skipped. Request scopes:
 
 ```text
-tweet.read users.read offline.access dm.read dm.write
+tweet.read users.read offline.access dm.read
 ```
 
 If the agent is not inside an interactive Terminal, use the wrapper. It opens one real Terminal window for all secure credential input, OAuth callback handling, and Chat key unlock. After that command reports `configuration_required`, stop and tell the user to finish the Terminal flow. When the user says configuration is done, rerun `RUN_DAILY_DIGEST`.
@@ -99,7 +114,7 @@ RUN_DAILY_DIGEST --configure
 
 The secure Terminal flow:
 
-- Reuses the saved OAuth2 user token with `dm.read`, `dm.write`, `users.read`, and `tweet.read`.
+- Reuses a read-only OAuth2 user token with `dm.read`, `users.read`, and `tweet.read`.
 - Fetches the authenticated account's registered X Chat public-key record.
 - Prompts for the X Chat passcode in Terminal. Never ask the user to paste it into Agent chat.
 - Uses Chat XDK to unlock the identity and exports a local key blob with owner-only permissions.
@@ -116,7 +131,7 @@ RUN_DAILY_DIGEST --chat-status
 RUN_DAILY_DIGEST --disable-chat
 ```
 
-Do not write ad-hoc token verification scripts. Do not ask the user to export bearer tokens manually unless they explicitly want to use environment variables.
+Do not write ad-hoc token verification scripts or any other diagnostic code. Direct bearer-token and environment-variable token overrides are unsupported; use only the verified read-only OAuth configuration flow.
 
 ## Data Collection
 
@@ -130,6 +145,8 @@ Default scope:
 - X Chat conversations and text messages from the same strict 24-hour window.
 - Optional keyword searches only when the user explicitly passes `--keywords`.
 
+For an explicit seven-day Chat request, run `RUN_DAILY_DIGEST --chat-window-hours 168`. This changes only the X Chat window; public timeline, mentions, and own activity remain on the strict 24-hour digest window.
+
 X Chat rules:
 
 - Chat XDK decrypts messages locally; no Chat passcode is saved.
@@ -141,7 +158,7 @@ X Chat rules:
 
 Time window rules:
 
-- Final summary facts must use only items inside `[now - 24 hours, now]` in the user's current local timezone.
+- Public final-summary facts must use only items inside `[now - 24 hours, now]` in the user's current local timezone. X Chat uses 24 hours by default or the explicit `--chat-window-hours` value requested by the user.
 - Items with missing or unparseable timestamps are excluded from final-summary facts and reported as data gaps.
 - Mentions older than the 24-hour window must not appear as pending reply opportunities.
 
@@ -187,7 +204,9 @@ Digest format:
 - 数据缺口.
 - 建议回复草稿.
 
-Never automatically post, reply, like, follow, block, open suspicious links, accept requests, or send DMs. Replies are drafts only unless the user explicitly asks to send after reviewing.
+Never post, reply, like, follow, block, open suspicious links, accept requests, or send DMs. Replies are drafts only.
+
+This skill never sends messages, even after review. If the user asks to send, explain that twitter-digest is permanently read-only and provide copyable draft text instead. Never create code or call another tool to bypass this restriction.
 
 ## Install
 
@@ -238,7 +257,7 @@ No long-term memory or daily archive is produced. Run dates use the user's local
 ## Troubleshooting
 
 - Missing or invalid API config, X Chat config, or Chat runtime: run `RUN_DAILY_DIGEST --configure`. It opens one Terminal wizard and skips any valid existing step.
-- Token refresh failed: the wrapper opens API configuration and retries once.
-- X Chat API/decryption failure: the digest fails; reconfigure Chat or report the exact API error.
-- Public API permission/tier/rate-limit errors: report the data gap or failure.
+- Token refresh failed: let the wrapper open configuration; after the user finishes it, rerun `RUN_DAILY_DIGEST`.
+- X Chat API/decryption failure: report the wrapper's exact error. Run `RUN_DAILY_DIGEST --configure` only when the error explicitly says configuration or saved keys are invalid.
+- Public API permission/tier/rate-limit errors: report the wrapper's exact data gap or failure and stop. Do not build a workaround.
 - Non-API source requests: unsupported in this skill.

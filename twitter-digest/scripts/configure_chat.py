@@ -9,23 +9,26 @@ import getpass
 import json
 import subprocess
 import sys
+import time
+import urllib.error
+import urllib.request
 from pathlib import Path
 
 from api_config_store import load_api_config, refresh_oauth_token_if_needed
 from chat_config_store import (
     CHAT_CONFIG_PATH,
     CHAT_RUNTIME_DIR,
+    CHATXDK_VERSION,
+    chat_runtime_status,
     chat_configured,
     clear_chat_config,
+    load_chat_config,
     save_chat_config,
 )
 from script_utils import (
     open_script_in_terminal,
     rerun_from_installed_if_needed,
 )
-
-CHATXDK_VERSION = "0.4.3"
-
 
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description=__doc__)
@@ -40,21 +43,21 @@ def runtime_python() -> Path:
 
 def ensure_runtime() -> Path:
     python = runtime_python()
-    if python.exists():
-        probe = subprocess.run(
-            [str(python), "-c", "import chat_xdk; print('ready')"],
-            check=False,
-            capture_output=True,
-            text=True,
-        )
-        if probe.returncode == 0:
-            return python
+    ready, _error = chat_runtime_status()
+    if ready:
+        return python
     CHAT_RUNTIME_DIR.parent.mkdir(parents=True, exist_ok=True)
     subprocess.run([sys.executable, "-m", "venv", str(CHAT_RUNTIME_DIR)], check=True)
     subprocess.run(
-        [str(python), "-m", "pip", "install", "--disable-pip-version-check", f"chatxdk=={CHATXDK_VERSION}"],
+        [
+            str(python), "-m", "pip", "install", "--disable-pip-version-check",
+            "--retries", "5", "--timeout", "30", "--upgrade", "--force-reinstall", f"chatxdk=={CHATXDK_VERSION}",
+        ],
         check=True,
     )
+    ready, error = chat_runtime_status()
+    if not ready:
+        raise SystemExit(error)
     return python
 
 
@@ -84,19 +87,29 @@ def run_unlock_helper(python: Path, passcode: str, record: dict[str, object]) ->
 
 
 def api_get(token: str, path: str) -> dict[str, object]:
-    import urllib.error
-    import urllib.request
-
     request = urllib.request.Request(
         "https://api.x.com/2" + path,
         headers={"Authorization": f"Bearer {token}", "User-Agent": "twitter-digest-chat/1.0"},
     )
-    try:
-        with urllib.request.urlopen(request, timeout=30) as response:
-            return json.loads(response.read().decode("utf-8"))
-    except urllib.error.HTTPError as exc:
-        detail = exc.read().decode("utf-8", errors="replace")
-        raise SystemExit(f"X Chat API request failed with HTTP {exc.code}: {detail[:600]}") from exc
+    for attempt in range(1, 5):
+        try:
+            with urllib.request.urlopen(request, timeout=30) as response:
+                return json.loads(response.read().decode("utf-8"))
+        except urllib.error.HTTPError as exc:
+            detail = exc.read().decode("utf-8", errors="replace")
+            if exc.code not in {408, 425, 429, 500, 502, 503, 504} or attempt == 4:
+                raise SystemExit(f"X Chat API request failed with HTTP {exc.code}: {detail[:600]}") from exc
+            retry_after = exc.headers.get("Retry-After", "")
+            try:
+                delay = max(0.0, min(float(retry_after), 60.0))
+            except (TypeError, ValueError):
+                delay = min(2 ** (attempt - 1), 8)
+            time.sleep(delay)
+        except (urllib.error.URLError, TimeoutError, ConnectionError) as exc:
+            if attempt == 4:
+                raise SystemExit(f"X Chat API request failed after 4 attempts: {exc}") from exc
+            time.sleep(min(2 ** (attempt - 1), 8))
+    raise AssertionError("unreachable")
 
 
 def configure() -> None:
@@ -106,10 +119,20 @@ def configure() -> None:
     if not token or not user_id:
         raise SystemExit("Configure and verify the normal X API first; X Chat reuses that OAuth2 user token.")
     scopes = set(str(api_config.get("scopes") or "").split())
-    required = {"dm.read", "dm.write", "users.read", "tweet.read"}
+    if not scopes:
+        raise SystemExit("Saved OAuth token has no scope metadata. Re-run X API configuration for a verified read-only token.")
+    required = {"dm.read", "users.read", "tweet.read"}
     if scopes and not required.issubset(scopes):
         missing = ", ".join(sorted(required - scopes))
         raise SystemExit(f"Saved OAuth token is missing required X Chat scopes: {missing}. Re-run X API configuration.")
+    if "dm.write" in scopes:
+        raise SystemExit("Saved OAuth token can write DMs. Re-run X API configuration to replace it with a read-only token.")
+
+    existing = load_chat_config() if chat_configured() else {}
+    if str(existing.get("user_id") or "") == user_id:
+        ensure_runtime()
+        print(json.dumps({"configured": True, "runtime_repaired": True, "passcode_saved": False}, indent=2))
+        return
 
     payload = api_get(
         token,
@@ -120,10 +143,12 @@ def configure() -> None:
     if not usable:
         raise SystemExit("No passcode-backed X Chat public key was found for this account. Open X Chat in X and complete its key setup first.")
     record = usable[-1]
+    # Finish network installation and validate the native module before asking
+    # for a secret, so installation failures do not require passcode re-entry.
+    python = ensure_runtime()
     passcode = getpass.getpass("X Chat passcode (used only to unlock keys now; it will not be saved): ")
     if not passcode:
         raise SystemExit("No X Chat passcode entered. Configuration was not changed.")
-    python = ensure_runtime()
     private_blob = run_unlock_helper(python, passcode, record)
     save_chat_config(
         {

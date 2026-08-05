@@ -27,7 +27,7 @@ from script_utils import display_path, open_script_in_terminal, rerun_from_insta
 AUTHORIZE_URL = "https://x.com/i/oauth2/authorize"
 TOKEN_URL = "https://api.x.com/2/oauth2/token"
 DEFAULT_REDIRECT_URI = "http://127.0.0.1:8765/callback"
-DEFAULT_SCOPES = "dm.read dm.write tweet.read users.read offline.access"
+DEFAULT_SCOPES = "dm.read tweet.read users.read offline.access"
 
 
 def parse_args() -> argparse.Namespace:
@@ -173,6 +173,12 @@ def run_oauth_flow(args: argparse.Namespace, existing: dict[str, str]) -> dict[s
     )
     redirect_uri = args.redirect_uri or DEFAULT_REDIRECT_URI
     scopes = args.scopes or DEFAULT_SCOPES
+    requested_scopes = set(scopes.split())
+    forbidden = {scope for scope in requested_scopes if scope.endswith(".write")}
+    if forbidden:
+        raise SystemExit(
+            "twitter-digest is read-only and refuses OAuth write scopes: " + ", ".join(sorted(forbidden))
+        )
     code_verifier, code_challenge = pkce_pair()
     state = secrets.token_urlsafe(24)
     params = {

@@ -28,6 +28,14 @@ def ensure_private_dir(path: Path) -> None:
         pass
 
 
+def write_private_text(path: Path, text: str) -> None:
+    path.write_text(text, encoding="utf-8")
+    try:
+        path.chmod(0o600)
+    except PermissionError:
+        pass
+
+
 def now_iso() -> str:
     return dt.datetime.now().astimezone().isoformat()
 
@@ -70,13 +78,17 @@ def rerun_from_installed_if_needed(script_file: str, argv: Optional[list[str]] =
         return
     current_script = Path(script_file).resolve()
     current_root = current_script.parents[1]
-    for root in installed_skill_roots():
-        if not root.exists():
-            continue
+    roots = installed_skill_roots()
+    # Check every installed client before redirecting. In a Codex-launched
+    # shell, a script explicitly run from ~/.claude must stay in Claude state.
+    for root in roots:
         try:
-            if root.resolve() == current_root:
+            if root.exists() and root.resolve() == current_root:
                 return
         except OSError:
+            continue
+    for root in roots:
+        if not root.exists():
             continue
         installed_script = root / "scripts" / current_script.name
         if installed_script.exists():
@@ -97,8 +109,10 @@ def open_script_in_terminal(script: Path, args: list[str], cwd: Path, heading: s
             f"echo {shlex.quote(heading)}",
             f"echo {shlex.quote(description)}",
             "echo",
-            " ".join([shlex.quote(sys.executable), shlex.quote(str(script)), *[shlex.quote(arg) for arg in args]]),
-            "status=$?",
+            # Resolve python3 inside the user's Terminal instead of inheriting
+            # a possibly x86_64 or bundled Python from the Agent process.
+            " ".join(["python3", shlex.quote(str(script)), *[shlex.quote(arg) for arg in args]]),
+            "command_exit_code=$?",
             "echo",
             "echo '流程已结束。Terminal 将自动关闭。'",
             "{ sleep 1; osascript <<OSA >/dev/null 2>&1",
@@ -117,7 +131,7 @@ def open_script_in_terminal(script: Path, args: list[str], cwd: Path, heading: s
             "OSA",
             "} >/dev/null 2>&1 &",
             "disown",
-            "exit $status",
+            "exit $command_exit_code",
         ]
     )
     try:

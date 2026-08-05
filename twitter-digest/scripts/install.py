@@ -53,7 +53,7 @@ def parse_args() -> argparse.Namespace:
         "--allow-claude-state-read",
         action="store_true",
         help=(
-            "Opt in to adding the installed twitter-digest .state directory to Claude Code additionalDirectories "
+            "Opt in to adding only the installed twitter-digest .state/run output directory to Claude Code additionalDirectories "
             "so analysis can read digest-context.md without a file-access prompt."
         ),
     )
@@ -107,7 +107,10 @@ def restore_state_from_backup(backup: Optional[Path], target: Path) -> None:
     state_dir = backup / ".state"
     if not state_dir.exists() or not state_dir.is_dir():
         return
-    shutil.copytree(state_dir, target / ".state", dirs_exist_ok=True)
+    # State contains OAuth credentials and private Chat keys. Move it back to
+    # the active install instead of duplicating secrets into every upgrade
+    # backup.
+    shutil.move(str(state_dir), str(target / ".state"))
     print(f"Preserved existing state: {display_path(target / '.state')}", flush=True)
 
 
@@ -157,7 +160,7 @@ def claude_bash_allow_rule(target: Path) -> str:
 
 
 def claude_state_read_directory(target: Path) -> str:
-    state_dir = target.expanduser() / ".state"
+    state_dir = target.expanduser() / ".state" / "run"
     try:
         return "~/" + str(state_dir.relative_to(Path.home()))
     except ValueError:
@@ -198,6 +201,14 @@ def add_list_setting(settings: dict[str, object], key: str, value: str) -> bool:
     return True
 
 
+def remove_list_setting(settings: dict[str, object], key: str, value: str) -> bool:
+    existing = settings.get(key)
+    if not isinstance(existing, list) or value not in existing:
+        return False
+    existing.remove(value)
+    return True
+
+
 def add_claude_bash_allow_rule(settings: dict[str, object], rule: str) -> bool:
     permissions = settings.get("permissions")
     if not isinstance(permissions, dict):
@@ -219,6 +230,7 @@ def write_claude_settings(target: Path, dry_run: bool, allow_commands: bool, all
     settings_path = Path.home() / ".claude" / "settings.json"
     rule = claude_bash_allow_rule(target)
     state_dir = claude_state_read_directory(target)
+    legacy_state_dir = claude_state_read_directory(target).rsplit("/run", 1)[0]
     if dry_run:
         if allow_commands:
             print(f"Would add Claude Code Bash allow rule to {display_path(settings_path)}: {rule}", flush=True)
@@ -235,6 +247,9 @@ def write_claude_settings(target: Path, dry_run: bool, allow_commands: bool, all
         else:
             print(f"Claude Code Bash allow rule already present: {rule}", flush=True)
     if allow_state_read:
+        if remove_list_setting(settings, "additionalDirectories", legacy_state_dir):
+            changed = True
+            print(f"Removed broad Claude Code state access: {legacy_state_dir}", flush=True)
         if add_list_setting(settings, "additionalDirectories", state_dir):
             changed = True
             print(f"Added Claude Code additional directory: {state_dir}", flush=True)
