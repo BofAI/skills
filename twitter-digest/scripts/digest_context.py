@@ -122,6 +122,8 @@ def build_digest_facts(data: dict[str, Any], summary: dict[str, Any]) -> dict[st
                 "Count low-value waiting-reply DMs but do not expand spam, phishing, generic promotions, or repeated junk.",
                 "Public timeline/profile/mention items must be inside the local-time 24-hour window.",
                 "Do not present already-handled mentions as needing reply; if reply status is unclear, label it as unverified.",
+                "When requires_user_ui is true, clearly say the Agent/API cannot perform or verify the action, then give the exact X interface path and action_url.",
+                "Never render raw states such as pending message request or unknown without a plain-language user action. Unknown does not mean unread.",
             ],
         },
         "public": {"counts": {}, "loaded_counts": summary.get("post_counts") or {}, "items": []},
@@ -180,6 +182,9 @@ def build_digest_facts(data: dict[str, Any], summary: dict[str, Any]) -> dict[st
                             "source": str(todo.get("source") or kind),
                             "status": str(todo.get("status") or page.get("dm_status") or "todo"),
                             "detail": str(todo.get("detail") or page.get("dm_note") or ""),
+                            "requires_user_ui": bool(todo.get("requires_user_ui")),
+                            "user_action": str(todo.get("user_action") or ""),
+                            "action_url": str(todo.get("action_url") or ""),
                         }
                     )
             for gap in page.get("data_gaps") or []:
@@ -189,6 +194,9 @@ def build_digest_facts(data: dict[str, Any], summary: dict[str, Any]) -> dict[st
                             "source": str(gap.get("source") or kind),
                             "status": str(gap.get("status") or "incomplete"),
                             "detail": str(gap.get("detail") or ""),
+                            "requires_user_ui": bool(gap.get("requires_user_ui")),
+                            "user_action": str(gap.get("user_action") or ""),
+                            "action_url": str(gap.get("action_url") or ""),
                         }
                     )
             for thread in page.get("dm_threads") or []:
@@ -206,6 +214,8 @@ def build_digest_facts(data: dict[str, Any], summary: dict[str, Any]) -> dict[st
                         "reply_state": reply_state,
                         "collection_status": str(thread.get("collection_status") or "complete"),
                         "collection_detail": str(thread.get("collection_detail") or ""),
+                        "requires_user_ui": bool(thread.get("requires_user_ui")),
+                        "user_action": str(thread.get("user_action") or ""),
                         "message_count": int(thread.get("message_count") or 0),
                         "should_summarize": assessment["should_summarize"],
                         "noise_reason": assessment["noise_reason"],
@@ -674,6 +684,36 @@ def render_dm_facts_section(facts: dict[str, Any]) -> str:
                     "```",
                 ]
             )
+    manual_actions = []
+    for todo in facts.get("todo_items") or []:
+        if todo.get("requires_user_ui"):
+            manual_actions.append(
+                {
+                    "label": "X Chat 消息请求",
+                    "action": todo.get("user_action") or todo.get("detail") or "",
+                    "url": todo.get("action_url") or "https://x.com/messages",
+                }
+            )
+    for thread in dms.get("threads") or []:
+        if thread.get("reply_state") == "unknown" and thread.get("requires_user_ui"):
+            manual_actions.append(
+                {
+                    "label": f"状态未知会话 {thread.get('participant') or '[unknown]'}",
+                    "action": thread.get("user_action") or "请在 X 界面检查最新消息和未读状态。",
+                    "url": thread.get("url") or "https://x.com/messages",
+                }
+            )
+    if manual_actions:
+        lines.extend(
+            [
+                "",
+                "## 需要你在 X 界面操作",
+                "",
+                "The Agent and API cannot complete or verify these items. In the final digest, keep this Chinese heading and tell the user exactly what to do in X; do not present unexplained technical states or a raw status table.",
+            ]
+        )
+        for action in manual_actions:
+            lines.append(f"- **{action['label']}**: {action['action']} 入口: {action['url']}")
     return "\n".join(lines)
 
 
@@ -726,7 +766,7 @@ def public_kind_matches_slice(kind: str, slice_name: str) -> bool:
 def data_gap_matches_slice(gap: dict[str, Any], slice_name: str) -> bool:
     source = str(gap.get("source") or "").lower()
     if slice_name == "dm":
-        return source == "messages"
+        return source in {"messages", "x_chat"}
     if slice_name == "mentions":
         return "mention" in source
     if slice_name == "timeline":
@@ -755,7 +795,8 @@ def render_digest_facts(facts: dict[str, Any]) -> str:
 
     lines.extend(["", "## TODO List", ""])
     for todo in facts.get("todo_items") or []:
-        lines.append(f"- `{todo.get('source')}` `{todo.get('status')}`: {todo.get('detail')}")
+        action = f" 用户操作: {todo.get('user_action')} 入口: {todo.get('action_url')}" if todo.get("requires_user_ui") else ""
+        lines.append(f"- `{todo.get('source')}` `{todo.get('status')}`: {todo.get('detail')}{action}")
     if not facts.get("todo_items"):
         lines.append("- None")
 

@@ -105,6 +105,8 @@ class ChatCollectorTests(unittest.TestCase):
         self.assertEqual(thread["reply_state"], "unknown")
         self.assertFalse(thread["dm_load_complete"])
         self.assertEqual(thread["participant"], "@peer")
+        self.assertTrue(thread["requires_user_ui"])
+        self.assertIn("X 界面", thread["user_action"])
 
     def test_parse_time_normalizes_naive_values_to_utc(self) -> None:
         parsed = chat_x_digest.parse_time("2026-08-03T10:00:00")

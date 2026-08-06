@@ -192,6 +192,11 @@ def unavailable_thread(
         "latest_time": str(conversation.get("updated_at") or ""),
         "collection_status": status,
         "collection_detail": detail,
+        "requires_user_ui": True,
+        "user_action": (
+            "Agent/API 无法读取这段会话历史，这不代表存在未读消息。"
+            "如需确认，请打开该会话，在 X 界面查看最新消息和未读状态。"
+        ),
         "dm_load_complete": False,
         "dm_scrolls_used": 0,
         "dm_window_exceeded": False,
@@ -355,8 +360,12 @@ def main() -> None:
                 "status": "conversation_history_unavailable",
                 "detail": (
                     f"{unavailable_thread_count} listed X Chat conversation(s) had no readable messages in the requested {max(1, args.hours)}-hour window. "
-                    "Do not infer that these conversations are empty or already handled."
+                    "Do not infer that these conversations are empty, unread, or already handled. "
+                    "The user can verify them from the conversation links in X."
                 ),
+                "requires_user_ui": True,
+                "user_action": "如需确认，请在 X → 消息中逐个打开标为状态未知的会话，查看最新消息和未读状态。",
+                "action_url": "https://x.com/messages",
             }
         ] if unavailable_thread_count else [],
         "todo_items": (
@@ -364,7 +373,10 @@ def main() -> None:
                 {
                     "source": "x_chat",
                     "status": "message_request_pending",
-                    "detail": "X reports at least one pending Chat message request. Review Requests in X; the API does not identify which listed conversation is pending.",
+                    "detail": "X reports at least one pending Chat message request, but the API does not identify the sender or expose the request contents.",
+                    "requires_user_ui": True,
+                    "user_action": "需要你手动操作：打开 X → 消息 → 请求，查看发送者和内容后，自行选择接受、删除或忽略。Agent 不会代为接受或回复。",
+                    "action_url": "https://x.com/messages",
                 }
             ]
             if has_message_requests

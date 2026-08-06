@@ -153,6 +153,8 @@ X Chat rules:
 - A conversation needs a reply only when its latest in-window text message came from another participant.
 - Preserve every conversation returned by X. If its history is empty or unreadable, mark its reply state `unknown`; never classify it as handled or waiting for reply.
 - `has_message_requests=true` is a required todo. The current conversations endpoint does not identify the requester, so state that limitation instead of inventing a participant or claiming the request inbox is empty.
+- For a pending message request, explicitly say the Agent/API cannot inspect or accept it. Tell the user: open **X → 消息 → 请求**, review the sender and content, then choose accept, delete, or ignore. Link to `https://x.com/messages` when links are useful.
+- For an `unknown` conversation, say that unknown does not mean unread. If confirmation matters, tell the user to open the supplied conversation URL in X and inspect the latest message/unread state manually.
 - Exclude messages with missing/unparseable timestamps and all messages outside the exact 24-hour window.
 - If any required X Chat request or decryption fails, fail the run instead of claiming the inbox is empty.
 
@@ -204,9 +206,13 @@ Digest format:
 - 数据缺口.
 - 建议回复草稿.
 
+When manual actions exist, add a `需要你在 X 界面操作` section near `该处理`. Write plain Chinese instructions rather than exposing raw API fields or English states. Put required actions such as message requests first. Treat unknown conversations as optional verification—not proof of unread messages—and group them compactly when several have the same explanation.
+
 Never post, reply, like, follow, block, open suspicious links, accept requests, or send DMs. Replies are drafts only.
 
 This skill never sends messages, even after review. If the user asks to send, explain that twitter-digest is permanently read-only and provide copyable draft text instead. Never create code or call another tool to bypass this restriction.
+
+When the API cannot inspect or perform an item, do not stop at technical wording such as `pending request`, `unknown`, or “API does not return it.” Add a concrete **需要你在 X 界面操作** instruction with the exact navigation path, what the user should verify, and a safe choice. Never imply that the Agent clicked, accepted, deleted, or confirmed anything.
 
 ## Install
 
