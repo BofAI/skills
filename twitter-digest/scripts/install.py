@@ -141,7 +141,21 @@ def install_skill(root: Path, skills_dir: Path, copy: bool, dry_run: bool) -> Pa
             return target
         existing_backup = move_to_hidden_backup(target, skills_dir, dry_run=False)
     if copy:
-        shutil.copytree(root, target, ignore=shutil.ignore_patterns(".state", "__pycache__", "*.pyc"))
+        shutil.copytree(
+            root,
+            target,
+            ignore=shutil.ignore_patterns(
+                ".state",
+                ".gitignore",
+                "__pycache__",
+                "*.pyc",
+                "tests",
+                "README.md",
+                "RUNBOOK.md",
+                "DATA_COLLECTION.md",
+                "FUNCTION_RULES_FLOW.md",
+            ),
+        )
         restore_state_from_backup(existing_backup, target)
         print(f"Copied skill to: {display_path(target)}", flush=True)
     else:

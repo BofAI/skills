@@ -122,8 +122,8 @@ def build_digest_facts(data: dict[str, Any], summary: dict[str, Any]) -> dict[st
                 "Count low-value waiting-reply DMs but do not expand spam, phishing, generic promotions, or repeated junk.",
                 "Public timeline/profile/mention items must be inside the local-time 24-hour window.",
                 "Do not present already-handled mentions as needing reply; if reply status is unclear, label it as unverified.",
-                "When requires_user_ui is true, clearly say the Agent/API cannot perform or verify the action, then give the exact X interface path and action_url.",
-                "Never render raw states such as pending message request or unknown without a plain-language user action. Unknown does not mean unread.",
+                "When a message request requires_user_ui, give the exact X interface path and action_url.",
+                "For unknown DM threads, never expose the technical state or ask for verification. List known participants only as: 曾经收到过消息：@sender1、@sender2",
             ],
         },
         "public": {"counts": {}, "loaded_counts": summary.get("post_counts") or {}, "items": []},
@@ -694,15 +694,6 @@ def render_dm_facts_section(facts: dict[str, Any]) -> str:
                     "url": todo.get("action_url") or "https://x.com/messages",
                 }
             )
-    for thread in dms.get("threads") or []:
-        if thread.get("reply_state") == "unknown" and thread.get("requires_user_ui"):
-            manual_actions.append(
-                {
-                    "label": f"状态未知会话 {thread.get('participant') or '[unknown]'}",
-                    "action": thread.get("user_action") or "请在 X 界面检查最新消息和未读状态。",
-                    "url": thread.get("url") or "https://x.com/messages",
-                }
-            )
     if manual_actions:
         lines.extend(
             [
@@ -714,6 +705,24 @@ def render_dm_facts_section(facts: dict[str, Any]) -> str:
         )
         for action in manual_actions:
             lines.append(f"- **{action['label']}**: {action['action']} 入口: {action['url']}")
+    historical_senders = list(
+        dict.fromkeys(
+            str(thread.get("participant") or "").strip()
+            for thread in dms.get("threads") or []
+            if thread.get("reply_state") == "unknown" and str(thread.get("participant") or "").strip()
+        )
+    )
+    if historical_senders:
+        lines.extend(
+            [
+                "",
+                "## 历史消息",
+                "",
+                f"曾经收到过消息：{'、'.join(historical_senders)}",
+                "",
+                "In the final digest, reproduce only the Chinese sentence above. Do not add a status, explanation, warning, or action.",
+            ]
+        )
     return "\n".join(lines)
 
 

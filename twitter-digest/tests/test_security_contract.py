@@ -45,6 +45,30 @@ class SecurityContractTests(unittest.TestCase):
             with mock.patch.object(script_utils, "installed_skill_roots", return_value=[codex, claude]):
                 script_utils.rerun_from_installed_if_needed(str(script))
 
+    def test_saved_default_config_is_owner_only(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            config_path = Path(directory) / ".state" / "config.json"
+            with mock.patch.object(run_daily_digest, "CONFIG_PATH", config_path):
+                run_daily_digest.save_config("owner", "Owner")
+            self.assertEqual(config_path.stat().st_mode & 0o777, 0o600)
+            self.assertEqual(config_path.parent.stat().st_mode & 0o777, 0o700)
+
+    def test_copy_install_excludes_development_files(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            base = Path(directory)
+            source = base / "twitter-digest"
+            (source / "scripts").mkdir(parents=True)
+            (source / "tests").mkdir()
+            (source / "SKILL.md").write_text("skill", encoding="utf-8")
+            (source / "README.md").write_text("docs", encoding="utf-8")
+            (source / "tests" / "test_sample.py").write_text("", encoding="utf-8")
+            (source / "scripts" / "run.py").write_text("", encoding="utf-8")
+            target = install.install_skill(source, base / "installed", copy=True, dry_run=False)
+            self.assertTrue((target / "SKILL.md").exists())
+            self.assertTrue((target / "scripts" / "run.py").exists())
+            self.assertFalse((target / "README.md").exists())
+            self.assertFalse((target / "tests").exists())
+
 
 if __name__ == "__main__":
     unittest.main()

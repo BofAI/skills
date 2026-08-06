@@ -78,7 +78,9 @@ class DigestContextChatTests(unittest.TestCase):
         dm_context = digest_context.render_context_slice(summary, facts, "dm")
         self.assertIn("## 需要你在 X 界面操作", dm_context)
         self.assertIn("X → 消息 → 请求", dm_context)
-        self.assertIn("状态未知会话 @peer", dm_context)
+        self.assertIn("曾经收到过消息：@peer", dm_context)
+        self.assertNotIn("状态未知会话 @peer", dm_context)
+        self.assertNotIn("请打开 X 会话手动确认", dm_context)
         self.assertIn("One conversation was unreadable.", dm_context)
 
     def test_context_outputs_are_owner_only(self) -> None:
@@ -91,6 +93,21 @@ class DigestContextChatTests(unittest.TestCase):
             digest_context.build_current_context_from_file(input_path, root, markdown_path)
             for path in root.glob("digest-*"):
                 self.assertEqual(path.stat().st_mode & 0o777, 0o600, path.name)
+
+    def test_historical_senders_are_deduplicated_and_listed_without_actions(self) -> None:
+        facts = {
+            "dms": {
+                "threads": [
+                    {"participant": "@alice", "reply_state": "unknown", "requires_user_ui": True},
+                    {"participant": "@bob", "reply_state": "unknown", "requires_user_ui": True},
+                    {"participant": "@alice", "reply_state": "unknown", "requires_user_ui": True},
+                ]
+            }
+        }
+        rendered = digest_context.render_dm_facts_section(facts)
+        self.assertIn("曾经收到过消息：@alice、@bob", rendered)
+        self.assertNotIn("状态未知会话", rendered)
+        self.assertNotIn("请在 X 界面检查", rendered)
 
 
 if __name__ == "__main__":

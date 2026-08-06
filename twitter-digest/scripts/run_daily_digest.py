@@ -16,7 +16,7 @@ from chat_config_store import CHAT_RUNTIME_DIR, chat_configured, chat_runtime_st
 from collector_commands import api_collector_command, summarize_collector_error
 from digest_context import build_current_context_from_file
 from digest_io import write_digest_output
-from script_utils import open_script_in_terminal, rerun_from_installed_if_needed
+from script_utils import ensure_private_dir, open_script_in_terminal, rerun_from_installed_if_needed, write_private_text
 
 
 STATE_DIR = Path(__file__).resolve().parents[1] / ".state"
@@ -75,13 +75,13 @@ def load_config() -> dict:
 
 
 def save_config(handle: Optional[str], account_name: Optional[str]) -> None:
-    CONFIG_PATH.parent.mkdir(parents=True, exist_ok=True)
+    ensure_private_dir(CONFIG_PATH.parent)
     config = load_config()
     if handle:
         config["handle"] = handle.lstrip("@")
     if account_name:
         config["account_name"] = account_name
-    CONFIG_PATH.write_text(json.dumps(config, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
+    write_private_text(CONFIG_PATH, json.dumps(config, ensure_ascii=False, indent=2) + "\n")
 
 
 def open_required_config_in_terminal(reason: str) -> bool:
