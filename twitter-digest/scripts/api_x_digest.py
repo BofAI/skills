@@ -21,6 +21,7 @@ from digest_io import write_digest_output
 API_BASE = "https://api.x.com/2"
 MAX_API_ATTEMPTS = 4
 RETRYABLE_HTTP_CODES = {408, 425, 429, 500, 502, 503, 504}
+MAX_LIKE_LOOKUP_POSTS = 20
 
 
 def retry_delay(attempt: int, retry_after: str = "") -> float:
@@ -221,7 +222,13 @@ def normalize_tweets(raw: list[dict[str, Any]], includes: dict[str, Any], source
                 "time": tweet.get("created_at"),
                 "authorUrl": f"https://x.com/{username}" if username else "",
                 "referenced_tweets": [
-                    {"id": str(ref.get("id") or ""), "type": str(ref.get("type") or "")}
+                    {
+                        "id": str(ref.get("id") or ""),
+                        "type": str(ref.get("type") or ""),
+                        "author_username": str(
+                            (users.get(str((tweets.get(str(ref.get("id"))) or {}).get("author_id"))) or {}).get("username") or ""
+                        ),
+                    }
                     for ref in (tweet.get("referenced_tweets") or [])
                     if isinstance(ref, dict)
                 ],
@@ -238,6 +245,66 @@ def page(kind: str, url: str, items: list[dict[str, Any]], note: str = "", error
         result["collection_status"] = "error"
         result["collection_error"] = error
     return result
+
+
+def collect_recent_own_post_likes(
+    args: argparse.Namespace,
+    own_posts: list[dict[str, Any]],
+) -> tuple[list[dict[str, Any]], list[str]]:
+    """Return liking users for recent own posts that currently have likes.
+
+    X exposes current liking users, not a timestamped like-notification feed. Because
+    these posts are already constrained to the digest window, every current like on
+    them necessarily happened after publication and therefore inside that window.
+    """
+    interactions: list[dict[str, Any]] = []
+    errors: list[str] = []
+    candidates = [post for post in own_posts if int((post.get("metrics") or {}).get("like_count") or 0) > 0]
+    for post in candidates[:MAX_LIKE_LOOKUP_POSTS]:
+        post_id = str(post.get("id") or "")
+        if not post_id:
+            continue
+        try:
+            result = api_get(
+                args,
+                f"/tweets/{post_id}/liking_users",
+                {"max_results": 100, "user.fields": "username,name"},
+            )
+        except RuntimeError as exc:
+            errors.append(str(exc))
+            continue
+        users = result.get("data") if isinstance(result, dict) else None
+        if not isinstance(users, list):
+            continue
+        for user in users:
+            if not isinstance(user, dict):
+                continue
+            username = str(user.get("username") or "")
+            interactions.append(
+                {
+                    "api_source": "likes_on_own_posts",
+                    "id": f"{post_id}:{user.get('id') or username}",
+                    "interaction_type": "liked_your_post",
+                    "author_username": username,
+                    "text": f"@{username} liked your post" if username else "Someone liked your post",
+                    "time": post.get("time"),
+                    "time_basis": "own_post_created_at",
+                    "url": post.get("url") or "",
+                    "target_post_id": post_id,
+                    "target_post_text": post.get("text") or "",
+                }
+            )
+        expected_like_count = int((post.get("metrics") or {}).get("like_count") or 0)
+        if expected_like_count > 100:
+            errors.append(
+                f"Post {post_id} has {expected_like_count} likes, but X returns at most 100 liking users for a Post."
+            )
+    if len(candidates) > MAX_LIKE_LOOKUP_POSTS:
+        errors.append(
+            f"Like lookup was limited to {MAX_LIKE_LOOKUP_POSTS} recent own posts with likes; "
+            f"{len(candidates) - MAX_LIKE_LOOKUP_POSTS} post(s) were not expanded."
+        )
+    return interactions, errors
 
 
 def collect_api(args: argparse.Namespace) -> dict[str, Any]:
@@ -264,7 +331,19 @@ def collect_api(args: argparse.Namespace) -> dict[str, Any]:
         tweet_params(max_items, hours),
         max_items,
     )
-    pages.append(page("own_profile", f"{args.api_base}/users/{user_id}/tweets", normalize_tweets(tweets_raw, tweets_includes, "own_profile"), error="; ".join(tweets_errors)))
+    own_posts = normalize_tweets(tweets_raw, tweets_includes, "own_profile")
+    pages.append(page("own_profile", f"{args.api_base}/users/{user_id}/tweets", own_posts, error="; ".join(tweets_errors)))
+
+    like_items, like_errors = collect_recent_own_post_likes(args, own_posts)
+    pages.append(
+        page(
+            "likes_on_own_posts",
+            f"{args.api_base}/tweets/:id/liking_users",
+            like_items,
+            note="Current liking users for own posts published inside the digest window; X does not provide like-event timestamps here.",
+            error="; ".join(like_errors),
+        )
+    )
 
     search_query = f"@{handle} -from:{handle}" if handle else ""
     if search_query:

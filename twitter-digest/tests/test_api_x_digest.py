@@ -46,6 +46,28 @@ class ApiCollectorTests(unittest.TestCase):
         self.assertTrue(payload["ok"])
         sleep.assert_called_once_with(2.0)
 
+    def test_collects_liking_users_for_recent_own_posts_with_likes(self) -> None:
+        args = self.args()
+        posts = [
+            {"id": "10", "time": "2026-08-06T01:00:00Z", "url": "https://x.com/me/status/10", "text": "hello", "metrics": {"like_count": 2}},
+            {"id": "11", "time": "2026-08-06T02:00:00Z", "url": "https://x.com/me/status/11", "text": "quiet", "metrics": {"like_count": 0}},
+        ]
+        with mock.patch.object(
+            api_x_digest,
+            "api_get",
+            return_value={"data": [{"id": "1", "username": "alice"}, {"id": "2", "username": "bob"}]},
+        ) as api_get:
+            items, errors = api_x_digest.collect_recent_own_post_likes(args, posts)
+
+        self.assertEqual([item["author_username"] for item in items], ["alice", "bob"])
+        self.assertTrue(all(item["interaction_type"] == "liked_your_post" for item in items))
+        self.assertEqual(errors, [])
+        api_get.assert_called_once_with(
+            args,
+            "/tweets/10/liking_users",
+            {"max_results": 100, "user.fields": "username,name"},
+        )
+
 
 if __name__ == "__main__":
     unittest.main()

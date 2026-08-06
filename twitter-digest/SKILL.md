@@ -142,6 +142,7 @@ Default scope:
 - Mentions of the authenticated handle.
 - Home timeline hotspots.
 - Own profile activity.
+- People who currently like the user's own posts published inside the 24-hour window.
 - X Chat conversations and text messages from the same strict 24-hour window.
 - Optional keyword searches only when the user explicitly passes `--keywords`.
 
@@ -168,7 +169,15 @@ Mention handling:
 
 - Consider both direct mention/notification data and recent search results when available.
 - Do not present an already-replied mention as needing reply.
+- When a mention is a direct `replied_to` reference to one of the user's posts, say `@sender 回复了你的帖子`. Do not add `回复状态未确认`. Add `你已回复` only when current API data contains positive reply evidence.
 - If reply status cannot be verified from current API data, label it `回复状态未确认` instead of claiming the user must reply.
+
+Like handling:
+
+- X provides current liking users for a Post, but not a timestamped like-notification list through this lookup.
+- Query liking users only for the user's own posts published inside the digest window and having `like_count > 0`; this keeps the resulting likes within the same window.
+- Say `@sender 点赞了你的帖子` and identify the target post. Do not invent an exact like time.
+- If liking-user lookup is unavailable for the user's API tier, report that source as unavailable instead of claiming there were no likes.
 
 ## Writing The Digest
 
