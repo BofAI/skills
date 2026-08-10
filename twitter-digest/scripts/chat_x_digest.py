@@ -16,6 +16,7 @@ from pathlib import Path
 from typing import Any
 
 from chat_config_store import cached_signing_keys, load_chat_config
+from chat_rate_limit_store import active_rate_limit, record_rate_limit
 from collector_commands import endpoint_category, structured_api_error
 
 
@@ -104,11 +105,14 @@ def parse_args() -> argparse.Namespace:
 
 
 def api_get(token: str, path: str, params: dict[str, Any] | None = None) -> dict[str, Any]:
+    category = endpoint_category(path)
+    cooldown = active_rate_limit(category)
+    if cooldown is not None:
+        raise RateLimitError(structured_api_error("x_chat", category, 429, cooldown))
     query = urllib.parse.urlencode({key: value for key, value in (params or {}).items() if value not in (None, "")})
     url = "https://api.x.com/2" + path + (("?" + query) if query else "")
     request = urllib.request.Request(url, headers={"Authorization": f"Bearer {token}", "User-Agent": "twitter-digest-chat/1.0"})
     for attempt in range(1, MAX_API_ATTEMPTS + 1):
-        category = endpoint_category(path)
         HTTP_REQUEST_COUNTS[category] = int(HTTP_REQUEST_COUNTS.get(category) or 0) + 1
         try:
             with urllib.request.urlopen(request, timeout=30) as response:
@@ -120,6 +124,7 @@ def api_get(token: str, path: str, params: dict[str, Any] | None = None) -> dict
             detail = exc.read().decode("utf-8", errors="replace")
             if exc.code == 429:
                 retry_after = rate_limit_retry_after(exc.headers)
+                record_rate_limit(category, retry_after)
                 raise RateLimitError(
                     structured_api_error("x_chat", category, 429, retry_after)
                 ) from exc

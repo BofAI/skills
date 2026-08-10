@@ -23,6 +23,12 @@ class ChatCollectorTests(unittest.TestCase):
     def setUp(self) -> None:
         chat_x_digest.RATE_LIMIT_TRACKER.clear()
         chat_x_digest.HTTP_REQUEST_COUNTS.clear()
+        self.active_rate_limit = mock.patch.object(chat_x_digest, "active_rate_limit", return_value=None)
+        self.record_rate_limit = mock.patch.object(chat_x_digest, "record_rate_limit")
+        self.active_rate_limit.start()
+        self.record_rate_limit.start()
+        self.addCleanup(self.active_rate_limit.stop)
+        self.addCleanup(self.record_rate_limit.stop)
 
     def test_default_collector_profile_is_bounded_to_ten_recent_conversations(self) -> None:
         self.assertEqual(chat_x_digest.DEFAULT_MAX_CONVERSATIONS, 10)
@@ -72,6 +78,35 @@ class ChatCollectorTests(unittest.TestCase):
                 "retry_after_seconds": 3,
             },
         )
+
+    def test_api_get_skips_network_during_persisted_cooldown(self) -> None:
+        with (
+            mock.patch.object(chat_x_digest, "active_rate_limit", return_value=60),
+            mock.patch.object(chat_x_digest.urllib.request, "urlopen") as urlopen,
+        ):
+            with self.assertRaises(chat_x_digest.RateLimitError) as raised:
+                chat_x_digest.api_get("token", "/chat/conversations")
+
+        urlopen.assert_not_called()
+        self.assertEqual(parse_structured_api_error(str(raised.exception))["retry_after_seconds"], 60)
+
+    def test_api_get_persists_http_429_cooldown(self) -> None:
+        error = urllib.error.HTTPError(
+            "https://api.x.com/2/chat/conversations",
+            429,
+            "Too Many Requests",
+            {"Retry-After": "90"},
+            io.BytesIO(b"limited"),
+        )
+        with (
+            mock.patch.object(chat_x_digest, "active_rate_limit", return_value=None),
+            mock.patch.object(chat_x_digest, "record_rate_limit") as record,
+            mock.patch.object(chat_x_digest.urllib.request, "urlopen", side_effect=error),
+        ):
+            with self.assertRaises(chat_x_digest.RateLimitError):
+                chat_x_digest.api_get("token", "/chat/conversations")
+
+        record.assert_called_once_with("conversation_list", 90)
 
     def test_endpoint_categories_hide_resource_ids(self) -> None:
         self.assertEqual(chat_x_digest.endpoint_category("/chat/conversations"), "conversation_list")

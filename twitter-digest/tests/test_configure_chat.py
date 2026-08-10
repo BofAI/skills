@@ -16,6 +16,14 @@ from collector_commands import parse_structured_api_error  # noqa: E402
 
 
 class ConfigureChatTests(unittest.TestCase):
+    def setUp(self) -> None:
+        self.active_rate_limit = mock.patch.object(configure_chat, "active_rate_limit", return_value=None)
+        self.record_rate_limit = mock.patch.object(configure_chat, "record_rate_limit")
+        self.active_rate_limit.start()
+        self.record_rate_limit.start()
+        self.addCleanup(self.active_rate_limit.stop)
+        self.addCleanup(self.record_rate_limit.stop)
+
     def test_missing_passcode_key_guides_user_without_preparing_runtime(self) -> None:
         api_config = {
             "bearer_token": "token",
@@ -136,6 +144,17 @@ class ConfigureChatTests(unittest.TestCase):
                 "retry_after_seconds": 90,
             },
         )
+
+    def test_public_key_request_skips_network_during_persisted_cooldown(self) -> None:
+        with (
+            mock.patch.object(configure_chat, "active_rate_limit", return_value=45),
+            mock.patch.object(configure_chat.urllib.request, "urlopen") as urlopen,
+        ):
+            with self.assertRaises(SystemExit) as raised:
+                configure_chat.api_get("token", "/users/secret-user/public_keys")
+
+        urlopen.assert_not_called()
+        self.assertEqual(parse_structured_api_error(str(raised.exception))["retry_after_seconds"], 45)
 
     def test_api_get_still_retries_transient_503(self) -> None:
         error = urllib.error.HTTPError(

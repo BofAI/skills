@@ -12,6 +12,7 @@ SCRIPTS = Path(__file__).resolve().parents[1] / "scripts"
 sys.path.insert(0, str(SCRIPTS))
 
 import chat_config_store  # noqa: E402
+import chat_rate_limit_store  # noqa: E402
 
 
 class ChatConfigStoreTests(unittest.TestCase):
@@ -85,7 +86,7 @@ class ChatConfigStoreTests(unittest.TestCase):
                 chat_config_store.cached_signing_keys("owner-b", {"peer"}, fetch, now=1100)
                 self.assertEqual(fetch.call_count, 2)
 
-    def test_clearing_chat_config_also_clears_signing_key_cache(self) -> None:
+    def test_clearing_chat_config_also_clears_signing_key_cache_and_cooldown(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
             config_path = root / "config.json"
@@ -95,10 +96,12 @@ class ChatConfigStoreTests(unittest.TestCase):
             with (
                 mock.patch.object(chat_config_store, "CHAT_CONFIG_PATH", config_path),
                 mock.patch.object(chat_config_store, "CHAT_SIGNING_KEY_CACHE_PATH", cache_path),
+                mock.patch.object(chat_rate_limit_store, "clear_rate_limits") as clear_rate_limits,
             ):
                 chat_config_store.clear_chat_config()
             self.assertFalse(config_path.exists())
             self.assertFalse(cache_path.exists())
+            clear_rate_limits.assert_called_once_with()
 
 
 if __name__ == "__main__":

@@ -167,6 +167,7 @@ X Chat rules:
 - A remaining conversation-list pagination token or a listed conversation without an ID is also a safe-scan boundary. Mark the scan incomplete and use the same friendly checked-count sentence; never claim that later or unscannable conversations had no messages.
 - Cache participant signing public keys locally for 24 hours, keyed by X account and user ID. Query only missing or expired entries. If Chat XDK reports verification/decryption errors, refresh the affected conversation's keys once and retry; fail normally if verification still fails.
 - On HTTP 429, stop immediately in both normal collection and initial Chat configuration. Name only the friendly category: `X Chat 会话列表暂时受到限流`, `X Chat 消息读取暂时受到限流`, or `X Chat 公钥读取暂时受到限流`; include the estimated recovery time when available. Never expose a concrete conversation ID, user ID, raw API path, or response body. Do not repeatedly hit the same rate-limited endpoint inside one run.
+- When X returns a known retry interval for a Chat 429, cache only the sanitized endpoint category and expiry in owner-only local state. Until expiry, do not send another request to that endpoint; return the same friendly rate-limit message locally. Never cache an unknown reset time.
 - Per-endpoint HTTP attempt counts are internal diagnostics. Do not include them in a normal digest unless the user explicitly asks for API statistics.
 
 Time window rules:
@@ -270,6 +271,7 @@ Each run writes only current-run files:
 - `<installed-skill>/.state/api_config.json`
 - `<installed-skill>/.state/chat/config.json`
 - `<installed-skill>/.state/chat/signing_keys.json`
+- `<installed-skill>/.state/chat/rate_limits.json`
 - `<installed-skill>/.state/chat/runtime/`
 - `<installed-skill>/.state/run/digest-context.md`
 - `<installed-skill>/.state/run/digest-context.json`

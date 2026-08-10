@@ -26,6 +26,7 @@ from chat_config_store import (
     load_chat_config,
     save_chat_config,
 )
+from chat_rate_limit_store import active_rate_limit, record_rate_limit
 from collector_commands import endpoint_category, friendly_chat_collection_error, structured_api_error
 from script_utils import (
     open_script_in_terminal,
@@ -121,6 +122,11 @@ def unlock_with_passcode_retries(
 
 
 def api_get(token: str, path: str) -> dict[str, object]:
+    category = endpoint_category(path)
+    cooldown = active_rate_limit(category)
+    if cooldown is not None:
+        marker = structured_api_error("x_chat", category, 429, cooldown)
+        raise SystemExit(f"{friendly_chat_collection_error(marker)}\n{marker}")
     request = urllib.request.Request(
         "https://api.x.com/2" + path,
         headers={"Authorization": f"Bearer {token}", "User-Agent": "twitter-digest-chat/1.0"},
@@ -141,9 +147,10 @@ def api_get(token: str, path: str) -> dict[str, object]:
                         retry_seconds = max(0, int(float(reset) - time.time()))
                     except (TypeError, ValueError):
                         retry_seconds = None
+                record_rate_limit(category, retry_seconds)
                 marker = structured_api_error(
                     "x_chat",
-                    endpoint_category(path),
+                    category,
                     429,
                     retry_seconds,
                 )

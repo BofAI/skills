@@ -51,6 +51,9 @@ def clear_chat_config() -> None:
     if CHAT_CONFIG_PATH.exists():
         CHAT_CONFIG_PATH.unlink()
     clear_signing_key_cache()
+    from chat_rate_limit_store import clear_rate_limits
+
+    clear_rate_limits()
 
 
 def load_signing_key_cache(owner_user_id: str) -> dict[str, Any]:
