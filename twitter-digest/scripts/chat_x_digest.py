@@ -182,10 +182,14 @@ def message_time(decrypted_event: dict[str, Any], raw_event: dict[str, Any]) -> 
     return event_time(decrypted_event) or event_time(raw_event)
 
 
-def collect_conversations(token: str, maximum: int) -> tuple[list[dict[str, Any]], dict[str, dict[str, Any]], bool]:
+def collect_conversations(
+    token: str,
+    maximum: int,
+) -> tuple[list[dict[str, Any]], dict[str, dict[str, Any]], bool, dict[str, Any]]:
     conversations: list[dict[str, Any]] = []
     users: dict[str, dict[str, Any]] = {}
     has_message_requests = False
+    missing_id_count = 0
     next_token = ""
     while len(conversations) < maximum:
         payload = api_get(
@@ -199,7 +203,13 @@ def collect_conversations(token: str, maximum: int) -> tuple[list[dict[str, Any]
                 "user.fields": "id,username,name",
             },
         )
-        conversations.extend(item for item in payload.get("data") or [] if isinstance(item, dict))
+        for item in payload.get("data") or []:
+            if not isinstance(item, dict):
+                continue
+            if not item.get("id"):
+                missing_id_count += 1
+                continue
+            conversations.append(item)
         includes = payload.get("includes") if isinstance(payload.get("includes"), dict) else {}
         for user in includes.get("users") or []:
             if isinstance(user, dict) and user.get("id"):
@@ -209,7 +219,11 @@ def collect_conversations(token: str, maximum: int) -> tuple[list[dict[str, Any]
         next_token = str(meta.get("next_token") or "")
         if not next_token:
             break
-    return conversations[:maximum], users, has_message_requests
+    return conversations[:maximum], users, has_message_requests, {
+        "complete": not next_token and missing_id_count == 0,
+        "next_token": next_token,
+        "missing_id_count": missing_id_count,
+    }
 
 
 def collect_events(
@@ -370,7 +384,10 @@ def main() -> None:
     from chat_xdk import Chat
 
     cutoff = dt.datetime.now(dt.timezone.utc) - dt.timedelta(hours=max(1, args.hours))
-    conversations, users, has_message_requests = collect_conversations(args.bearer_token, max(1, args.max_conversations))
+    conversations, users, has_message_requests, conversation_scan = collect_conversations(
+        args.bearer_token,
+        max(1, args.max_conversations),
+    )
     chat = Chat()
     chat.import_keys(private_blob, version=key_version)
     chat.set_identity(user_id, key_version)
@@ -387,8 +404,13 @@ def main() -> None:
     old_conversation_count = 0
     truncated_conversation_count = 0
     missing_message_timestamp_count = 0
-    scan_complete = True
-    scan_stop_reason = ""
+    scan_complete = bool(conversation_scan.get("complete"))
+    if conversation_scan.get("next_token"):
+        scan_stop_reason = "conversation_list_limit"
+    elif conversation_scan.get("missing_id_count"):
+        scan_stop_reason = "conversation_id_missing"
+    else:
+        scan_stop_reason = ""
     for conversation in conversations:
         conversation_id = str(conversation.get("id") or "")
         if not conversation_id:
@@ -576,7 +598,7 @@ def main() -> None:
         "dm_unknown_thread_count": unavailable_thread_count,
         "dm_captured_message_count": sum(int(thread.get("message_count") or 0) for thread in threads),
         "dm_has_message_requests": has_message_requests,
-        "dm_listed_conversation_count": len(conversations),
+        "dm_listed_conversation_count": len(conversations) + int(conversation_scan.get("missing_id_count") or 0),
         "dm_scanned_conversation_count": scanned_conversation_count,
         "dm_old_conversation_count": old_conversation_count,
         "dm_event_request_count": event_budget.used,

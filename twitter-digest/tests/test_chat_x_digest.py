@@ -125,17 +125,40 @@ class ChatCollectorTests(unittest.TestCase):
             },
         ]
         with mock.patch.object(chat_x_digest, "api_get", side_effect=responses) as api_get:
-            conversations, users, has_requests = chat_x_digest.collect_conversations("token", 50)
+            conversations, users, has_requests, scan = chat_x_digest.collect_conversations("token", 50)
 
         self.assertEqual([item["id"] for item in conversations], ["one", "three"])
         self.assertEqual(users["2"]["username"], "two")
         self.assertTrue(has_requests)
+        self.assertEqual(scan, {"complete": True, "next_token": "", "missing_id_count": 0})
         self.assertEqual(api_get.call_count, 2)
         self.assertEqual(api_get.call_args_list[1].args[2]["pagination_token"], "next")
         self.assertEqual(
             api_get.call_args_list[0].args[2]["chat_conversation.fields"],
             "id,type,group_name,created_at",
         )
+
+    def test_collect_conversations_marks_remaining_page_incomplete_at_limit(self) -> None:
+        response = {
+            "data": [{"id": str(index)} for index in range(50)],
+            "meta": {"next_token": "more"},
+        }
+        with mock.patch.object(chat_x_digest, "api_get", return_value=response):
+            conversations, _users, _has_requests, scan = chat_x_digest.collect_conversations("token", 50)
+
+        self.assertEqual(len(conversations), 50)
+        self.assertEqual(scan, {"complete": False, "next_token": "more", "missing_id_count": 0})
+
+    def test_collect_conversations_counts_missing_ids_as_incomplete(self) -> None:
+        response = {
+            "data": [{"participant_ids": ["2"]}, {"id": "valid"}],
+            "meta": {},
+        }
+        with mock.patch.object(chat_x_digest, "api_get", return_value=response):
+            conversations, _users, _has_requests, scan = chat_x_digest.collect_conversations("token", 50)
+
+        self.assertEqual(conversations, [{"id": "valid"}])
+        self.assertEqual(scan, {"complete": False, "next_token": "", "missing_id_count": 1})
 
     def test_collect_events_stops_after_page_older_than_cutoff(self) -> None:
         cutoff = dt.datetime(2026, 8, 2, 12, tzinfo=dt.timezone.utc)
@@ -339,7 +362,12 @@ class ChatCollectorTests(unittest.TestCase):
                 mock.patch.object(
                     chat_x_digest,
                     "collect_conversations",
-                    return_value=([{"id": "chat", "participant_ids": ["me", "peer"]}], {}, False),
+                    return_value=(
+                        [{"id": "chat", "participant_ids": ["me", "peer"]}],
+                        {},
+                        False,
+                        {"complete": False, "next_token": "more", "missing_id_count": 0},
+                    ),
                 ),
                 mock.patch.object(
                     chat_x_digest,
@@ -356,6 +384,8 @@ class ChatCollectorTests(unittest.TestCase):
         self.assertEqual(FakeChat.decrypted_inputs, [["ciphertext"]])
         self.assertEqual(payload["dm_captured_message_count"], 1)
         self.assertEqual(payload["dm_threads"][0]["messages"][0]["text"], "hello")
+        self.assertFalse(payload["dm_scan_complete"])
+        self.assertEqual(payload["dm_scan_stop_reason"], "conversation_list_limit")
 
 
 if __name__ == "__main__":
