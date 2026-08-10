@@ -314,6 +314,16 @@ def participant_ids(conversation: dict[str, Any], current_user_id: str) -> set[s
     return {str(value) for value in values if value and str(value) != current_user_id}
 
 
+def signing_key_user_ids(
+    conversation: dict[str, Any],
+    raw_events: list[dict[str, Any]],
+    current_user_id: str,
+) -> set[str]:
+    user_ids = {current_user_id} | participant_ids(conversation, current_user_id)
+    user_ids.update(str(event["sender_id"]) for event in raw_events if event.get("sender_id"))
+    return user_ids
+
+
 def participant_label(conversation: dict[str, Any], users: dict[str, dict[str, Any]], current_user_id: str) -> str:
     if conversation.get("group_name"):
         return str(conversation["group_name"])
@@ -424,15 +434,6 @@ def main() -> None:
             )
             scanned_conversation_count += 1
             fetched_event_count += len(raw_events)
-            newest_event = max((stamp for stamp in (event_time(item) for item in raw_events) if stamp), default=None)
-            if newest_event and newest_event < cutoff:
-                old_conversation_count += 1
-                if old_stopper.observe(is_old=True):
-                    scan_complete = False
-                    scan_stop_reason = "consecutive_old_conversations"
-                    break
-                continue
-            old_stopper.observe(is_old=False)
             if not raw_events:
                 unavailable_thread_count += 1
                 threads.append(
@@ -446,7 +447,7 @@ def main() -> None:
                 )
                 continue
             decryptable_events = [event for event in raw_events if event.get("encoded_event")]
-            conversation_user_ids = {user_id} | participant_ids(conversation, user_id)
+            conversation_user_ids = signing_key_user_ids(conversation, raw_events, user_id)
             chat.set_signing_keys(signing_keys(args.bearer_token, user_id, conversation_user_ids))
             encoded_events = key_events + [str(event.get("encoded_event")) for event in reversed(decryptable_events)]
             decrypted = chat.decrypt_events(encoded_events)
@@ -472,6 +473,7 @@ def main() -> None:
             errors.append(f"{conversation_id}: {exc}")
             continue
         messages = []
+        newest_decrypted_message_time: dt.datetime | None = None
         raw_by_encoded = {str(event.get("encoded_event") or ""): event for event in decryptable_events}
         for row in decrypted.get("messages") or []:
             event = row.get("event") if isinstance(row, dict) else None
@@ -487,6 +489,8 @@ def main() -> None:
             if not created_at:
                 missing_message_timestamp_count += 1
                 continue
+            if newest_decrypted_message_time is None or created_at > newest_decrypted_message_time:
+                newest_decrypted_message_time = created_at
             if created_at < cutoff:
                 continue
             sender_id = str(event.get("sender_id") or raw_event.get("sender_id") or "")
@@ -502,6 +506,14 @@ def main() -> None:
             )
         messages.sort(key=lambda item: str(item.get("time") or ""))
         if not messages:
+            if newest_decrypted_message_time and newest_decrypted_message_time < cutoff:
+                old_conversation_count += 1
+                if old_stopper.observe(is_old=True):
+                    scan_complete = False
+                    scan_stop_reason = "consecutive_old_conversations"
+                    break
+                continue
+            old_stopper.observe(is_old=False)
             unavailable_thread_count += 1
             threads.append(
                 unavailable_thread(
@@ -513,6 +525,7 @@ def main() -> None:
                 )
             )
             continue
+        old_stopper.observe(is_old=False)
         replied = messages[-1].get("sender") == "me"
         label = participant_label(conversation, users, user_id)
         threads.append(

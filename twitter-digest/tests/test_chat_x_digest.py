@@ -215,6 +215,15 @@ class ChatCollectorTests(unittest.TestCase):
 
         self.assertEqual(api_get.call_args.args, ("token", "/users/42/public_keys"))
 
+    def test_signing_key_user_ids_include_raw_event_senders_when_members_are_missing(self) -> None:
+        user_ids = chat_x_digest.signing_key_user_ids(
+            {"id": "conversation"},
+            [{"encoded_event": "ciphertext", "sender_id": "peer"}],
+            "me",
+        )
+
+        self.assertEqual(user_ids, {"me", "peer"})
+
     def test_collect_events_caps_pages_for_busy_conversation(self) -> None:
         cutoff = dt.datetime(2026, 8, 2, 12, tzinfo=dt.timezone.utc)
         responses = [
@@ -311,7 +320,7 @@ class ChatCollectorTests(unittest.TestCase):
         value = chat_x_digest.message_time({}, {"created_at": "2026-08-10T00:00:00Z"})
         self.assertEqual(value, dt.datetime(2026, 8, 10, tzinfo=dt.timezone.utc))
 
-    def test_main_decrypts_event_when_timestamp_exists_only_in_decrypted_payload(self) -> None:
+    def test_main_does_not_skip_new_decrypted_message_when_raw_timestamp_is_old(self) -> None:
         now = dt.datetime.now(dt.timezone.utc)
         created_at_msec = int(now.timestamp() * 1000)
 
@@ -372,7 +381,17 @@ class ChatCollectorTests(unittest.TestCase):
                 mock.patch.object(
                     chat_x_digest,
                     "collect_events",
-                    return_value=([{"id": "event", "encoded_event": "ciphertext"}], [], {"pages_used": 1, "truncated": False}),
+                    return_value=(
+                        [
+                            {
+                                "id": "event",
+                                "encoded_event": "ciphertext",
+                                "created_at": "2020-01-01T00:00:00Z",
+                            }
+                        ],
+                        [],
+                        {"pages_used": 1, "truncated": False},
+                    ),
                 ),
                 mock.patch.object(chat_x_digest, "signing_keys", return_value=[]),
                 mock.patch.object(sys, "argv", ["chat_x_digest.py", "--bearer-token", "token", "--out", str(output)]),
