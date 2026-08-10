@@ -133,6 +133,66 @@ class SecurityContractTests(unittest.TestCase):
             self.assertFalse((target / "README.md").exists())
             self.assertFalse((target / "tests").exists())
 
+    def test_post_install_configuration_runs_the_installed_unified_wizard(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            target = Path(directory) / "twitter-digest"
+            script = target / "scripts" / "configure_all.py"
+            marker = target / "configured.marker"
+            script.parent.mkdir(parents=True)
+            script.write_text(
+                "from pathlib import Path\n"
+                "Path(__file__).resolve().parents[1].joinpath('configured.marker').write_text('configured')\n",
+                encoding="utf-8",
+            )
+
+            install.run_post_install_configuration(target, "codex", True, False, False)
+
+            self.assertEqual(marker.read_text(encoding="utf-8"), "configured")
+
+    def test_post_install_configuration_skips_nonstandard_installs(self) -> None:
+        for enabled, custom_skills_dir, dry_run in (
+            (False, False, False),
+            (True, True, False),
+            (True, False, True),
+        ):
+            with self.subTest(enabled=enabled, custom_skills_dir=custom_skills_dir, dry_run=dry_run):
+                with tempfile.TemporaryDirectory() as directory:
+                    target = Path(directory) / "twitter-digest"
+                    script = target / "scripts" / "configure_all.py"
+                    marker = target / "configured.marker"
+                    script.parent.mkdir(parents=True)
+                    script.write_text(
+                        "from pathlib import Path\n"
+                        "Path(__file__).resolve().parents[1].joinpath('configured.marker').write_text('configured')\n",
+                        encoding="utf-8",
+                    )
+
+                    install.run_post_install_configuration(
+                        target,
+                        "codex",
+                        enabled,
+                        custom_skills_dir,
+                        dry_run,
+                    )
+
+                    self.assertFalse(marker.exists())
+
+    def test_post_install_configuration_failure_keeps_installed_skill(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            target = Path(directory) / "twitter-digest"
+            script = target / "scripts" / "configure_all.py"
+            script.parent.mkdir(parents=True)
+            script.write_text("raise SystemExit(7)\n", encoding="utf-8")
+            (target / "SKILL.md").write_text("installed", encoding="utf-8")
+
+            with self.assertRaises(SystemExit) as raised:
+                install.run_post_install_configuration(target, "codex", True, False, False)
+
+            self.assertTrue((target / "SKILL.md").exists())
+            self.assertIn("The Skill remains installed", str(raised.exception))
+            self.assertIn("run_daily_digest.py --configure", str(raised.exception))
+            self.assertNotIn("Traceback", str(raised.exception))
+
     def test_failed_chat_retry_reuses_matching_recent_public_data(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
             out_dir = Path(directory)

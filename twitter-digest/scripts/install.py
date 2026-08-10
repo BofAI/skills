@@ -8,6 +8,7 @@ import datetime as dt
 import json
 import os
 import shutil
+import subprocess
 import sys
 from pathlib import Path
 from typing import Optional
@@ -56,6 +57,11 @@ def parse_args() -> argparse.Namespace:
             "Opt in to adding only the installed twitter-digest .state/run output directory to Claude Code additionalDirectories "
             "so analysis can read digest-context.md without a file-access prompt."
         ),
+    )
+    parser.add_argument(
+        "--configure-after-install",
+        action="store_true",
+        help="Run the installed unified X API and X Chat configuration wizard after a standard install.",
     )
     parser.add_argument("--dry-run", action="store_true")
     return parser.parse_args()
@@ -273,6 +279,28 @@ def write_claude_settings(target: Path, dry_run: bool, allow_commands: bool, all
         save_claude_settings(settings_path, settings)
 
 
+def run_post_install_configuration(
+    target: Path,
+    client: str,
+    enabled: bool,
+    custom_skills_dir: bool,
+    dry_run: bool,
+) -> None:
+    if not enabled or custom_skills_dir or dry_run:
+        return
+    script = target / "scripts" / "configure_all.py"
+    print("Checking required X API and X Chat configuration...", flush=True)
+    completed = subprocess.run([sys.executable, str(script)], check=False)
+    if completed.returncode == 0:
+        return
+    run_script = target / "scripts" / "run_daily_digest.py"
+    retry_command = f"python3 {display_path(run_script)} --configure"
+    raise SystemExit(
+        "X API and X Chat configuration did not complete. "
+        f"The Skill remains installed. Retry with: {retry_command}"
+    )
+
+
 def main() -> None:
     args = parse_args()
     check_runtime()
@@ -290,6 +318,13 @@ def main() -> None:
             write_claude_settings(target, args.dry_run, args.allow_claude_commands, args.allow_claude_state_read)
     if not args.dry_run:
         print(f"Installed skill path: {display_path(target)}", flush=True)
+    run_post_install_configuration(
+        target,
+        client,
+        args.configure_after_install,
+        bool(args.skills_dir),
+        args.dry_run,
+    )
 
 
 if __name__ == "__main__":
