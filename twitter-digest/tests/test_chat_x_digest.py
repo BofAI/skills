@@ -152,7 +152,7 @@ class ChatCollectorTests(unittest.TestCase):
             "conversation_events",
         )
 
-    def test_collect_conversations_follows_pagination_and_keeps_request_flag(self) -> None:
+    def test_collect_conversations_follows_pagination_and_ignores_request_flag(self) -> None:
         responses = [
             {
                 "data": [{"id": "one", "participant_ids": ["2"]}],
@@ -165,11 +165,12 @@ class ChatCollectorTests(unittest.TestCase):
             },
         ]
         with mock.patch.object(chat_x_digest, "api_get", side_effect=responses) as api_get:
-            conversations, users, has_requests, scan = chat_x_digest.collect_conversations("token", 50)
+            result = chat_x_digest.collect_conversations("token", 50)
 
+        self.assertEqual(len(result), 3)
+        conversations, users, scan = result
         self.assertEqual([item["id"] for item in conversations], ["one", "three"])
         self.assertEqual(users["2"]["username"], "two")
-        self.assertTrue(has_requests)
         self.assertTrue(scan["complete"])
         self.assertEqual(scan["next_token"], "")
         self.assertEqual(scan["missing_id_count"], 0)
@@ -181,7 +182,7 @@ class ChatCollectorTests(unittest.TestCase):
             "id,type,group_name,created_at",
         )
 
-    def test_message_request_meta_is_retained_only_as_diagnostic_signal(self) -> None:
+    def test_message_request_meta_is_not_written(self) -> None:
         class FakeChat:
             def import_keys(self, _private_blob: bytes, version: str) -> None:
                 return None
@@ -203,8 +204,8 @@ class ChatCollectorTests(unittest.TestCase):
                 ),
                 mock.patch.object(
                     chat_x_digest,
-                    "collect_conversations",
-                    return_value=([], {}, True, {"complete": True, "next_token": "", "missing_id_count": 0}),
+                    "api_get",
+                    return_value={"data": [], "meta": {"has_message_requests": True}},
                 ),
                 mock.patch.object(sys, "argv", ["chat_x_digest.py", "--bearer-token", "token", "--out", str(output)]),
             ):
@@ -212,7 +213,7 @@ class ChatCollectorTests(unittest.TestCase):
 
             payload = json.loads(output.read_text(encoding="utf-8"))
 
-        self.assertTrue(payload["dm_has_message_requests"])
+        self.assertNotIn("dm_has_message_requests", payload)
         self.assertEqual(payload["todo_items"], [])
 
     def test_collect_conversations_marks_remaining_page_incomplete_at_limit(self) -> None:
@@ -221,7 +222,7 @@ class ChatCollectorTests(unittest.TestCase):
             "meta": {"next_token": "more"},
         }
         with mock.patch.object(chat_x_digest, "api_get", return_value=response):
-            conversations, _users, _has_requests, scan = chat_x_digest.collect_conversations("token", 50)
+            conversations, _users, scan = chat_x_digest.collect_conversations("token", 50)
 
         self.assertEqual(len(conversations), 50)
         self.assertFalse(scan["complete"])
@@ -233,7 +234,7 @@ class ChatCollectorTests(unittest.TestCase):
             "meta": {},
         }
         with mock.patch.object(chat_x_digest, "api_get", return_value=response):
-            conversations, _users, _has_requests, scan = chat_x_digest.collect_conversations("token", 50)
+            conversations, _users, scan = chat_x_digest.collect_conversations("token", 50)
 
         self.assertEqual(conversations, [{"id": "valid"}])
         self.assertFalse(scan["complete"])
@@ -245,7 +246,7 @@ class ChatCollectorTests(unittest.TestCase):
             {"data": [{"id": "one"}], "meta": {"has_more": False}},
         ]
         with mock.patch.object(chat_x_digest, "api_get", side_effect=responses) as api_get:
-            conversations, _users, _requests, scan = chat_x_digest.collect_conversations("token", 10)
+            conversations, _users, scan = chat_x_digest.collect_conversations("token", 10)
 
         self.assertEqual(conversations, [{"id": "one"}])
         self.assertEqual(api_get.call_count, 2)
@@ -258,7 +259,7 @@ class ChatCollectorTests(unittest.TestCase):
             for index in range(3)
         ]
         with mock.patch.object(chat_x_digest, "api_get", side_effect=responses) as api_get:
-            conversations, _users, _requests, scan = chat_x_digest.collect_conversations("token", 10)
+            conversations, _users, scan = chat_x_digest.collect_conversations("token", 10)
 
         self.assertEqual(conversations, [])
         self.assertEqual(api_get.call_count, 3)
@@ -271,7 +272,7 @@ class ChatCollectorTests(unittest.TestCase):
             {"data": [{"id": "two"}], "meta": {"next_token": "same", "has_more": True}},
         ]
         with mock.patch.object(chat_x_digest, "api_get", side_effect=responses) as api_get:
-            conversations, _users, _requests, scan = chat_x_digest.collect_conversations("token", 10)
+            conversations, _users, scan = chat_x_digest.collect_conversations("token", 10)
 
         self.assertEqual([item["id"] for item in conversations], ["one", "two"])
         self.assertEqual(api_get.call_count, 2)
@@ -284,7 +285,7 @@ class ChatCollectorTests(unittest.TestCase):
             "api_get",
             return_value={"data": [{"id": "one"}], "meta": {"has_more": True}},
         ) as api_get:
-            conversations, _users, _requests, scan = chat_x_digest.collect_conversations("token", 10)
+            conversations, _users, scan = chat_x_digest.collect_conversations("token", 10)
 
         self.assertEqual(conversations, [{"id": "one"}])
         self.assertEqual(api_get.call_count, 1)
@@ -297,7 +298,7 @@ class ChatCollectorTests(unittest.TestCase):
             for index in range(5)
         ]
         with mock.patch.object(chat_x_digest, "api_get", side_effect=responses) as api_get:
-            conversations, _users, _requests, scan = chat_x_digest.collect_conversations("token", 10)
+            conversations, _users, scan = chat_x_digest.collect_conversations("token", 10)
 
         self.assertEqual(len(conversations), 5)
         self.assertEqual(api_get.call_count, 5)
@@ -464,7 +465,7 @@ class ChatCollectorTests(unittest.TestCase):
                 mock.patch.object(
                     chat_x_digest,
                     "collect_conversations",
-                    return_value=([{"id": "old"}, {"id": "new"}], {}, False, {"complete": True, "next_token": "", "missing_id_count": 0}),
+                    return_value=([{"id": "old"}, {"id": "new"}], {}, {"complete": True, "next_token": "", "missing_id_count": 0}),
                 ),
                 mock.patch.object(
                     chat_x_digest,
@@ -585,7 +586,6 @@ class ChatCollectorTests(unittest.TestCase):
                     return_value=(
                         [{"id": "chat", "participant_ids": ["me", "peer"]}],
                         {},
-                        False,
                         {"complete": False, "next_token": "more", "missing_id_count": 0},
                     ),
                 ),

@@ -203,10 +203,9 @@ def collect_conversations(
     maximum: int,
     max_requests: int = 5,
     max_empty_pages: int = 3,
-) -> tuple[list[dict[str, Any]], dict[str, dict[str, Any]], bool, dict[str, Any]]:
+) -> tuple[list[dict[str, Any]], dict[str, dict[str, Any]], dict[str, Any]]:
     conversations: list[dict[str, Any]] = []
     users: dict[str, dict[str, Any]] = {}
-    has_message_requests = False
     missing_id_count = 0
     next_token = ""
     pages_used = 0
@@ -245,7 +244,6 @@ def collect_conversations(
             if isinstance(user, dict) and user.get("id"):
                 users[str(user["id"])] = user
         meta = payload.get("meta") if isinstance(payload.get("meta"), dict) else {}
-        has_message_requests = has_message_requests or bool(meta.get("has_message_requests"))
         candidate_token = str(meta.get("next_token") or "")
         has_more = bool(meta.get("has_more"))
         next_token = candidate_token
@@ -270,7 +268,7 @@ def collect_conversations(
     if missing_id_count and not stop_reason:
         stop_reason = "conversation_id_missing"
     complete = not stop_reason and not next_token and missing_id_count == 0
-    return conversations[:maximum], users, has_message_requests, {
+    return conversations[:maximum], users, {
         "complete": complete,
         "next_token": next_token,
         "missing_id_count": missing_id_count,
@@ -448,7 +446,7 @@ def main() -> None:
     from chat_xdk import Chat
 
     cutoff = dt.datetime.now(dt.timezone.utc) - dt.timedelta(hours=max(1, args.hours))
-    conversations, users, has_message_requests, conversation_scan = collect_conversations(
+    conversations, users, conversation_scan = collect_conversations(
         args.bearer_token,
         max(1, args.max_conversations),
     )
@@ -659,7 +657,6 @@ def main() -> None:
         "dm_unreplied_thread_count": len(waiting),
         "dm_unknown_thread_count": unavailable_thread_count,
         "dm_captured_message_count": sum(int(thread.get("message_count") or 0) for thread in threads),
-        "dm_has_message_requests": has_message_requests,
         "dm_listed_conversation_count": len(conversations) + int(conversation_scan.get("missing_id_count") or 0),
         "dm_scanned_conversation_count": scanned_conversation_count,
         "dm_old_conversation_count": old_conversation_count,
