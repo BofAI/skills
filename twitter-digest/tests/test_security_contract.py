@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import os
 import sys
 import io
 import subprocess
@@ -20,6 +21,74 @@ import script_utils  # noqa: E402
 
 
 class SecurityContractTests(unittest.TestCase):
+    def run_shell_installer_args(self, configure_after_install: str | None = None) -> list[str]:
+        with tempfile.TemporaryDirectory() as directory:
+            base = Path(directory)
+            fake_bin = base / "bin"
+            fake_bin.mkdir()
+            capture = base / "python-args.txt"
+            fake_git = fake_bin / "git"
+            fake_git.write_text(
+                "#!/bin/sh\n"
+                "for argument in \"$@\"; do clone_dir=\"$argument\"; done\n"
+                "mkdir -p \"$clone_dir/twitter-digest/scripts\"\n"
+                ": > \"$clone_dir/twitter-digest/scripts/install.py\"\n",
+                encoding="utf-8",
+            )
+            fake_python = fake_bin / "python3"
+            fake_python.write_text(
+                "#!/bin/sh\n"
+                "printf '%s\\n' \"$@\" > \"$TWITTER_DIGEST_TEST_CAPTURE\"\n",
+                encoding="utf-8",
+            )
+            fake_git.chmod(0o700)
+            fake_python.chmod(0o700)
+            env = dict(os.environ)
+            env["PATH"] = f"{fake_bin}{os.pathsep}{os.defpath}"
+            env["TWITTER_DIGEST_OPEN_TERMINAL"] = "0"
+            env["TWITTER_DIGEST_TEST_CAPTURE"] = str(capture)
+            if configure_after_install is not None:
+                env["TWITTER_DIGEST_CONFIGURE_AFTER_INSTALL"] = configure_after_install
+
+            subprocess.run(
+                ["/bin/sh", str(SCRIPTS.parent / "install.sh")],
+                check=True,
+                env=env,
+                capture_output=True,
+                text=True,
+            )
+
+            return capture.read_text(encoding="utf-8").splitlines()
+
+    def capture_terminal_installer_command(self, configure_after_install: str) -> str:
+        with tempfile.TemporaryDirectory() as directory:
+            base = Path(directory)
+            fake_bin = base / "bin"
+            fake_bin.mkdir()
+            capture = base / "terminal-command.txt"
+            fake_osascript = fake_bin / "osascript"
+            fake_osascript.write_text(
+                "#!/bin/sh\n"
+                "cat > \"$TWITTER_DIGEST_TEST_CAPTURE\"\n",
+                encoding="utf-8",
+            )
+            fake_osascript.chmod(0o700)
+            env = dict(os.environ)
+            env["PATH"] = f"{fake_bin}{os.pathsep}{os.defpath}"
+            env["TWITTER_DIGEST_OPEN_TERMINAL"] = "1"
+            env["TWITTER_DIGEST_CONFIGURE_AFTER_INSTALL"] = configure_after_install
+            env["TWITTER_DIGEST_TEST_CAPTURE"] = str(capture)
+
+            subprocess.run(
+                ["/bin/sh", str(SCRIPTS.parent / "install.sh")],
+                check=True,
+                env=env,
+                capture_output=True,
+                text=True,
+            )
+
+            return capture.read_text(encoding="utf-8")
+
     def test_chat_scan_profiles_are_bounded_and_seven_days_expands(self) -> None:
         self.assertEqual(
             run_daily_digest.chat_scan_profile("recent", 24),
@@ -192,6 +261,21 @@ class SecurityContractTests(unittest.TestCase):
             self.assertIn("The Skill remains installed", str(raised.exception))
             self.assertIn("run_daily_digest.py --configure", str(raised.exception))
             self.assertNotIn("Traceback", str(raised.exception))
+
+    def test_shell_installer_enables_post_install_configuration_by_default(self) -> None:
+        args = self.run_shell_installer_args()
+
+        self.assertIn("--configure-after-install", args)
+
+    def test_shell_installer_allows_post_install_configuration_opt_out(self) -> None:
+        args = self.run_shell_installer_args("0")
+
+        self.assertNotIn("--configure-after-install", args)
+
+    def test_shell_installer_forwards_configuration_choice_to_terminal_child(self) -> None:
+        terminal_command = self.capture_terminal_installer_command("0")
+
+        self.assertIn("TWITTER_DIGEST_CONFIGURE_AFTER_INSTALL='0'", terminal_command)
 
     def test_failed_chat_retry_reuses_matching_recent_public_data(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
