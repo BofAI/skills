@@ -7,19 +7,13 @@ Skill for generating a Chinese daily digest from a user's own X/Twitter account.
 Codex:
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/BofAI/skills/v1.5.14-beta.12/twitter-digest/install.sh | env TWITTER_DIGEST_INSTALL_CLIENT=codex sh
+curl -fsSL https://raw.githubusercontent.com/BofAI/skills/v1.5.14-beta.13/twitter-digest/install.sh | env TWITTER_DIGEST_INSTALL_CLIENT=codex sh
 ```
 
 Claude Code:
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/BofAI/skills/v1.5.14-beta.12/twitter-digest/install.sh | env TWITTER_DIGEST_INSTALL_CLIENT=claude TWITTER_DIGEST_ALLOW_CLAUDE_COMMANDS=1 TWITTER_DIGEST_ALLOW_CLAUDE_STATE_READ=1 sh
-```
-
-From a checkout:
-
-```bash
-python3 twitter-digest/scripts/install.py
+curl -fsSL https://raw.githubusercontent.com/BofAI/skills/v1.5.14-beta.13/twitter-digest/install.sh | env TWITTER_DIGEST_INSTALL_CLIENT=claude TWITTER_DIGEST_ALLOW_CLAUDE_COMMANDS=1 TWITTER_DIGEST_ALLOW_CLAUDE_STATE_READ=1 sh
 ```
 
 The installer opens a real macOS Terminal when launched from Codex, Claude Code, or another non-interactive agent. Set `TWITTER_DIGEST_OPEN_TERMINAL=0` only when intentionally running inside an interactive Terminal or CI.
@@ -53,7 +47,7 @@ python3 ~/.claude/skills/twitter-digest/scripts/run_daily_digest.py --configure
 python3 ~/.codex/skills/twitter-digest/scripts/run_daily_digest.py --configure
 ```
 
-The setup flow is required for first use. It opens one Terminal window, asks for Client ID, Client Secret, and X Chat passcode in sequence, opens the X authorization page, and saves the API and Chat state. Existing valid configuration is skipped during reinstall or upgrade.
+The setup flow is required for first use. It opens one Terminal window, completes X OAuth, then checks X Chat. If the account has not set an X Chat passcode yet, the wizard explains what is missing and offers to open X Messages; after the user sets it in X, rerun configuration. Existing valid configuration is skipped during reinstall or upgrade.
 
 Scopes:
 
@@ -84,7 +78,27 @@ python3 ~/.claude/skills/twitter-digest/scripts/run_daily_digest.py --configure
 python3 ~/.codex/skills/twitter-digest/scripts/run_daily_digest.py --configure
 ```
 
-The Terminal flow installs Chat XDK into the skill's private state directory, asks for the X Chat passcode, unlocks the registered identity keys, and saves an owner-only local key blob. The passcode is never saved. The blob is unencrypted private identity material required for unattended runs; protect `.state` and use uninstall `--purge-state` to remove active and backed-up copies.
+The Terminal flow installs Chat XDK into the skill's private state directory, asks for the X Chat passcode up to three times locally, unlocks the registered identity keys, and saves an owner-only local key blob. Public keys and the runtime are prepared once before those local retries. The passcode is never saved. The blob is unencrypted private identity material required for unattended runs; protect `.state` and use uninstall `--purge-state` to remove active and backed-up copies.
+
+## X Chat Scan Modes
+
+Normal digests use the bounded `recent` mode: at most 10 conversations, 10 event requests, and one event page per conversation. The collector stops as soon as the first reliably decrypted conversation is older than the requested window.
+
+Use the larger mode only when the user asks to see more Chat content:
+
+```bash
+python3 ~/.codex/skills/twitter-digest/scripts/run_daily_digest.py --chat-scan more
+python3 ~/.claude/skills/twitter-digest/scripts/run_daily_digest.py --chat-scan more
+```
+
+An explicit seven-day Chat request uses the larger mode automatically; pass both options for clarity:
+
+```bash
+python3 ~/.codex/skills/twitter-digest/scripts/run_daily_digest.py --chat-window-hours 168 --chat-scan more
+python3 ~/.claude/skills/twitter-digest/scripts/run_daily_digest.py --chat-window-hours 168 --chat-scan more
+```
+
+Conversation-list loading is capped at five requests and stops on repeated cursors, three consecutive empty pages, or missing pagination cursors. A known X Chat 429 recovery time is cached by sanitized endpoint category, so retries during the cooldown do not call X again.
 
 ## Data Source
 

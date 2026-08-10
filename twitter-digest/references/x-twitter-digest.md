@@ -29,7 +29,7 @@ python3 ~/.codex/skills/twitter-digest/scripts/configure_api.py --verify
 
 The wrapper uses API directly.
 
-API and X Chat configuration are required. If either is missing or broken, the wrapper opens one Terminal wizard and the current command stops with `configuration_required`. The wizard asks for Client ID, Client Secret, and X Chat passcode as needed and skips valid existing state. After it finishes, rerun the digest command. It never switches to another collector.
+API and X Chat configuration are required. If either is missing or broken, the wrapper opens one Terminal wizard and the current command stops with `configuration_required`. If X Chat has no passcode-backed key yet, the wizard explains how to set it in X Messages and opens that page only after confirmation. Existing passcodes get up to three local unlock attempts without repeated public-key requests. After setup finishes, rerun the digest command. It never switches to another collector.
 
 ## Data Rules
 
@@ -43,16 +43,17 @@ API and X Chat configuration are required. If either is missing or broken, the w
 
 X Chat is required and uses the official API plus Chat XDK for local decryption. If Chat configuration, collection, signature verification, or decryption fails, do not generate a partial digest.
 
+Default scanning checks at most 10 conversations with one event page each. Use `--chat-scan more` only when the user explicitly asks to see more; an explicit seven-day request uses `--chat-window-hours 168 --chat-scan more`. Stop after the first reliably decrypted conversation whose newest message is outside the window. For incomplete coverage say `X Chat 已按 X 返回顺序检查 N 个会话。`
+
 ## Summary Rubric
 
 Produce a concise Chinese daily digest:
 
-- 今日总结.
-- 该处理.
-- 谁 @ 了你.
-- 时间线热点.
-- 你的动态.
+- 今日必须知道.
+- 今日必须处理.
+- Mentions.
+- Timeline.
+- 私信.
 - 数据缺口.
-- 建议回复草稿.
 
-Do not automatically send replies or take account actions.
+Do not generate, recommend, rewrite, or send reply content. Do not take account actions.

@@ -90,7 +90,12 @@ def configure_all() -> None:
         run_child("configure_chat.py")
         chat_ready, chat_error = chat_status(user_id)
         if not chat_ready:
-            raise SystemExit(f"X Chat configuration is incomplete: {chat_error}")
+            print(
+                "X Chat 还没有配置完成。请先在 X「消息」里设置 passcode，"
+                "然后重新运行安装或配置。",
+                flush=True,
+            )
+            return
 
     print(
         json.dumps(

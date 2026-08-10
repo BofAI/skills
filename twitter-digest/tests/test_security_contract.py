@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import sys
+import io
 import subprocess
 import tempfile
 import unittest
@@ -35,10 +36,10 @@ class SecurityContractTests(unittest.TestCase):
             Path("/python"), Path("/chat.py"), Path("/out.json"), 24, "recent"
         )
         self.assertEqual(command[-6:], ["--max-conversations", "10", "--max-event-requests", "10", "--max-event-pages", "1"])
-    def test_beta12_installer_and_docs_are_pinned(self) -> None:
+    def test_beta13_installer_and_docs_are_pinned(self) -> None:
         root = SCRIPTS.parent
-        self.assertIn("v1.5.14-beta.12", (root / "install.sh").read_text(encoding="utf-8"))
-        self.assertIn("v1.5.14-beta.12", (root / "README.md").read_text(encoding="utf-8"))
+        self.assertIn("v1.5.14-beta.13", (root / "install.sh").read_text(encoding="utf-8"))
+        self.assertIn("v1.5.14-beta.13", (root / "README.md").read_text(encoding="utf-8"))
 
     def test_skill_requires_friendly_private_rate_limit_messages(self) -> None:
         skill = (SCRIPTS.parent / "SKILL.md").read_text(encoding="utf-8")
@@ -46,9 +47,14 @@ class SecurityContractTests(unittest.TestCase):
         self.assertIn("Never expose a concrete conversation ID", skill)
 
     def test_skill_permanently_forbids_reply_content(self) -> None:
-        skill = (SCRIPTS.parent / "SKILL.md").read_text(encoding="utf-8")
+        root = SCRIPTS.parent
+        skill = (root / "SKILL.md").read_text(encoding="utf-8")
         self.assertIn("不得生成、推荐或改写任何回复内容", skill)
         self.assertNotIn("建议回复草稿", skill)
+        for path in (root / "agents" / "openai.yaml", root / "references" / "x-twitter-digest.md"):
+            guidance = path.read_text(encoding="utf-8")
+            self.assertNotIn("建议回复草稿", guidance)
+            self.assertNotIn("最近的 N 个会话", guidance)
 
     def test_default_oauth_scopes_are_read_only(self) -> None:
         scopes = set(configure_api.DEFAULT_SCOPES.split())
@@ -90,6 +96,26 @@ class SecurityContractTests(unittest.TestCase):
         with mock.patch.object(configure_all.subprocess, "run", return_value=failed):
             with self.assertRaisesRegex(SystemExit, "configure_chat.py failed"):
                 configure_all.run_child("configure_chat.py")
+
+    def test_unified_configuration_pauses_cleanly_when_passcode_must_be_set_in_x(self) -> None:
+        verification = {"verified": True, "user_id": "owner"}
+        output = io.StringIO()
+        with (
+            mock.patch.object(configure_all, "api_status", return_value=(True, verification)),
+            mock.patch.object(configure_all, "load_api_config", return_value={"user_id": "owner"}),
+            mock.patch.object(
+                configure_all,
+                "chat_status",
+                side_effect=[(False, "X Chat keys are not configured."), (False, "X Chat keys are not configured.")],
+            ),
+            mock.patch.object(configure_all, "chat_configured", return_value=False),
+            mock.patch.object(configure_all, "run_child"),
+            mock.patch("sys.stdout", output),
+        ):
+            configure_all.configure_all()
+
+        self.assertIn("请先在 X「消息」里设置 passcode", output.getvalue())
+        self.assertNotIn('"configured": true', output.getvalue().lower())
 
     def test_copy_install_excludes_development_files(self) -> None:
         with tempfile.TemporaryDirectory() as directory:

@@ -237,10 +237,16 @@ When a message request cannot be inspected or handled, add a concrete **需要�
 
 ## Install
 
-From a checked-out repository:
+Codex:
 
 ```bash
-python3 twitter-digest/scripts/install.py
+curl -fsSL https://raw.githubusercontent.com/BofAI/skills/v1.5.14-beta.13/twitter-digest/install.sh | env TWITTER_DIGEST_INSTALL_CLIENT=codex sh
+```
+
+Claude Code:
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/BofAI/skills/v1.5.14-beta.13/twitter-digest/install.sh | env TWITTER_DIGEST_INSTALL_CLIENT=claude TWITTER_DIGEST_ALLOW_CLAUDE_COMMANDS=1 TWITTER_DIGEST_ALLOW_CLAUDE_STATE_READ=1 sh
 ```
 
 The installer checks Python 3.10+ and installs the skill into the target agent skill directory.
