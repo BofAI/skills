@@ -8,6 +8,7 @@ import json
 import os
 import subprocess
 import sys
+import time
 from pathlib import Path
 from typing import Optional
 
@@ -25,6 +26,7 @@ DEFAULT_OUT_DIR = STATE_DIR / "run"
 DEFAULT_API_PUBLIC_ITEMS = 300
 UNSUPPORTED_OPTION_MESSAGE = "Source selection is no longer supported. twitter-digest uses API only."
 REQUIRED_CHAT_SCOPES = {"dm.read", "users.read", "tweet.read"}
+CHAT_RETRY_MAX_AGE_SECONDS = 15 * 60
 
 
 def parse_args() -> argparse.Namespace:
@@ -138,6 +140,48 @@ def clear_current_run(out_dir: Path) -> None:
     for path in out_dir.glob("digest-*"):
         if path.is_file():
             path.unlink()
+
+
+def chat_retry_path(out_dir: Path) -> Path:
+    return out_dir / "chat-retry.json"
+
+
+def public_collection_signature(args: argparse.Namespace, api_base: str, user_id: str, handle: str) -> dict[str, object]:
+    return {
+        "api_base": api_base,
+        "user_id": user_id,
+        "handle": handle,
+        "keywords": args.keywords,
+        "max_public_items": api_public_item_limit(args),
+        "public_window_hours": max(1, int(args.public_window_hours)),
+    }
+
+
+def mark_chat_retry(out_dir: Path, signature: dict[str, object]) -> None:
+    ensure_private_dir(out_dir)
+    write_private_text(
+        chat_retry_path(out_dir),
+        json.dumps({"created_at": time.time(), "public_signature": signature}, ensure_ascii=False, indent=2) + "\n",
+    )
+
+
+def can_resume_public_collection(out_dir: Path, signature: dict[str, object], now: float | None = None) -> bool:
+    marker = chat_retry_path(out_dir)
+    input_path = out_dir / "digest-input.json"
+    if not marker.exists() or not input_path.exists():
+        return False
+    try:
+        data = json.loads(marker.read_text(encoding="utf-8"))
+        age = (time.time() if now is None else now) - float(data.get("created_at") or 0)
+    except (OSError, ValueError, TypeError, json.JSONDecodeError):
+        return False
+    return 0 <= age <= CHAT_RETRY_MAX_AGE_SECONDS and data.get("public_signature") == signature
+
+
+def clear_chat_retry(out_dir: Path) -> None:
+    marker = chat_retry_path(out_dir)
+    if marker.exists():
+        marker.unlink()
 
 
 def api_command(args: argparse.Namespace, out_dir: str, api_base: str, user_id: str, handle: str) -> list[str]:
@@ -291,33 +335,41 @@ def main() -> None:
         raise SystemExit(0)
     if user_id and str(chat_config.get("user_id") or "") != user_id:
         raise SystemExit("Saved X Chat keys belong to a different X account. Run --disable-chat, then --configure for the current account.")
-    clear_current_run(Path(args.out))
+    out_dir = Path(args.out)
+    signature = public_collection_signature(args, api_base, user_id, handle)
+    resume_public = can_resume_public_collection(out_dir, signature)
     cmd = api_command(args, args.out, api_base, user_id, handle)
     child_env = os.environ.copy()
     if bearer_token:
         child_env["X_BEARER_TOKEN"] = bearer_token
-    print("Collecting X digest data via API.", flush=True)
-    retried_after_reconfigure = False
-    while True:
-        try:
-            run_api_command(cmd, child_env)
-            break
-        except subprocess.CalledProcessError as exc:
-            summary = summarize_child_error(exc)
-            if not explicit_bearer_token and not retried_after_reconfigure and api_auth_needs_reconfigure(summary):
-                retried_after_reconfigure = True
-                run_full_configuration(f"X API authentication failed: {summary}")
-                api_config, refresh_error, bearer_token, api_base, user_id, handle = load_fresh_api_state(args, config)
-                if refresh_error or not api_configured(bearer_token):
-                    raise SystemExit("X API reconfiguration did not produce a usable token.") from exc
-                cmd = api_command(args, args.out, api_base, user_id, handle)
-                child_env = os.environ.copy()
-                child_env["X_BEARER_TOKEN"] = bearer_token
-                continue
-            print(f"API collection failed: {summary}", file=sys.stderr, flush=True)
-            raise SystemExit(exc.returncode) from exc
-    out_dir = Path(args.out)
+    if resume_public:
+        print("Reusing public data from the immediately preceding failed X Chat run; retrying X Chat only.", flush=True)
+    else:
+        clear_chat_retry(out_dir)
+        clear_current_run(out_dir)
+        print("Collecting X digest data via API.", flush=True)
+        retried_after_reconfigure = False
+        while True:
+            try:
+                run_api_command(cmd, child_env)
+                break
+            except subprocess.CalledProcessError as exc:
+                summary = summarize_child_error(exc)
+                if not explicit_bearer_token and not retried_after_reconfigure and api_auth_needs_reconfigure(summary):
+                    retried_after_reconfigure = True
+                    run_full_configuration(f"X API authentication failed: {summary}")
+                    api_config, refresh_error, bearer_token, api_base, user_id, handle = load_fresh_api_state(args, config)
+                    if refresh_error or not api_configured(bearer_token):
+                        raise SystemExit("X API reconfiguration did not produce a usable token.") from exc
+                    cmd = api_command(args, args.out, api_base, user_id, handle)
+                    child_env = os.environ.copy()
+                    child_env["X_BEARER_TOKEN"] = bearer_token
+                    continue
+                print(f"API collection failed: {summary}", file=sys.stderr, flush=True)
+                raise SystemExit(exc.returncode) from exc
+        mark_chat_retry(out_dir, signature)
     collect_chat(out_dir, child_env, args.chat_window_hours)
+    clear_chat_retry(out_dir)
     build_current_context_from_file(
         input_path=out_dir / "digest-input.json",
         markdown_path=out_dir / "digest-input.md",

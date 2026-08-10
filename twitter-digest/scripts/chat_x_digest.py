@@ -22,6 +22,10 @@ MAX_API_ATTEMPTS = 4
 RETRYABLE_HTTP_CODES = {408, 425, 429, 500, 502, 503, 504}
 
 
+class RateLimitError(RuntimeError):
+    """Stop the entire Chat collection when X reports a shared rate limit."""
+
+
 def retry_delay(attempt: int, retry_after: str = "") -> float:
     try:
         return max(0.0, min(float(retry_after), 60.0))
@@ -48,6 +52,10 @@ def api_get(token: str, path: str, params: dict[str, Any] | None = None) -> dict
                 return json.loads(response.read().decode("utf-8"))
         except urllib.error.HTTPError as exc:
             detail = exc.read().decode("utf-8", errors="replace")
+            if exc.code == 429:
+                retry_after = rate_limit_retry_after(exc.headers)
+                suffix = f"; retry after about {retry_after} seconds" if retry_after is not None else ""
+                raise RateLimitError(f"GET {path} failed with HTTP 429 Too Many Requests{suffix}: {detail[:800]}") from exc
             if exc.code not in RETRYABLE_HTTP_CODES or attempt == MAX_API_ATTEMPTS:
                 raise RuntimeError(f"GET {path} failed with HTTP {exc.code}: {detail[:800]}") from exc
             time.sleep(retry_delay(attempt, exc.headers.get("Retry-After", "")))
@@ -58,6 +66,22 @@ def api_get(token: str, path: str, params: dict[str, Any] | None = None) -> dict
                 ) from exc
             time.sleep(retry_delay(attempt))
     raise AssertionError("unreachable")
+
+
+def rate_limit_retry_after(headers: Any) -> int | None:
+    retry_after = str(headers.get("Retry-After", "") or "").strip()
+    if retry_after:
+        try:
+            return max(0, int(float(retry_after)))
+        except ValueError:
+            pass
+    reset = str(headers.get("x-rate-limit-reset", "") or "").strip()
+    if reset:
+        try:
+            return max(0, int(float(reset) - time.time()))
+        except ValueError:
+            pass
+    return None
 
 
 def parse_time(value: Any) -> dt.datetime | None:
@@ -161,6 +185,15 @@ def participant_ids(conversation: dict[str, Any], current_user_id: str) -> set[s
     return {str(value) for value in values if value and str(value) != current_user_id}
 
 
+def active_conversations(conversations: list[dict[str, Any]], cutoff: dt.datetime) -> list[dict[str, Any]]:
+    """Keep recent conversations; retain missing timestamps to avoid false omissions."""
+    return [
+        conversation
+        for conversation in conversations
+        if parse_time(conversation.get("updated_at")) is None or parse_time(conversation.get("updated_at")) >= cutoff
+    ]
+
+
 def participant_label(conversation: dict[str, Any], users: dict[str, dict[str, Any]], current_user_id: str) -> str:
     if conversation.get("group_name"):
         return str(conversation["group_name"])
@@ -222,6 +255,7 @@ def main() -> None:
 
     cutoff = dt.datetime.now(dt.timezone.utc) - dt.timedelta(hours=max(1, args.hours))
     conversations, users, has_message_requests = collect_conversations(args.bearer_token, max(1, args.max_conversations))
+    conversations = active_conversations(conversations, cutoff)
     users_to_fetch = {user_id}
     for conversation in conversations:
         users_to_fetch.update(participant_ids(conversation, user_id))
@@ -236,9 +270,6 @@ def main() -> None:
     fetched_event_count = 0
     unavailable_thread_count = 0
     for conversation in conversations:
-        updated_at = parse_time(conversation.get("updated_at"))
-        if updated_at and updated_at < cutoff:
-            continue
         conversation_id = str(conversation.get("id") or "")
         if not conversation_id:
             continue
@@ -266,6 +297,8 @@ def main() -> None:
             decrypted = chat.decrypt_events(encoded_events)
             if decrypted.get("errors"):
                 raise RuntimeError(f"Chat XDK could not decrypt or verify {len(decrypted['errors'])} event(s)")
+        except RateLimitError as exc:
+            raise SystemExit(str(exc)) from exc
         except Exception as exc:  # noqa: BLE001 - preserve the conversation id for any SDK/API failure.
             errors.append(f"{conversation_id}: {exc}")
             continue

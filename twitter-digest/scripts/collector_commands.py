@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import re
 from pathlib import Path
 from typing import Optional
 
@@ -27,7 +28,11 @@ def summarize_collector_error(text: str, returncode: Optional[int] = None) -> st
         return f"collector exited with code {returncode}" if returncode is not None else ""
     matched = [marker for marker in ERROR_MARKERS if marker in text]
     if matched:
-        return "; ".join(dict.fromkeys(matched))
+        summary = "; ".join(dict.fromkeys(matched))
+        retry_match = re.search(r"retry after about (\d+) seconds", text, re.IGNORECASE)
+        if retry_match:
+            summary += f"; retry after about {retry_match.group(1)} seconds"
+        return summary
     # Tracebacks put the useful exception at the end. Keep the tail so the
     # actual network/API error is not replaced by an unhelpful urllib stack.
     compact = " ".join(text.split())

@@ -22,6 +22,10 @@ class CollectorErrorTests(unittest.TestCase):
         summary = summarize_collector_error("traceback [SSL: UNEXPECTED_EOF_WHILE_READING] failure")
         self.assertEqual(summary, "UNEXPECTED_EOF_WHILE_READING")
 
+    def test_429_summary_keeps_retry_wait(self) -> None:
+        summary = summarize_collector_error("HTTP 429 Too Many Requests; retry after about 317 seconds")
+        self.assertEqual(summary, "HTTP 429; Too Many Requests; retry after about 317 seconds")
+
 
 if __name__ == "__main__":
     unittest.main()

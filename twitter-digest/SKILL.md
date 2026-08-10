@@ -137,6 +137,8 @@ Do not write ad-hoc token verification scripts or any other diagnostic code. Dir
 
 For every new digest request, run collection again before reading `digest-context.*`. Do not reuse previous run files as if they were fresh.
 
+If public collection succeeds but required X Chat fails, the wrapper records a private retry marker. A matching retry within 15 minutes reuses only that fresh public result and reruns X Chat; it is still the same failed digest attempt, not historical-memory reuse. A normal new run or a changed account/window/query recollects public data.
+
 Default scope:
 
 - Mentions of the authenticated handle.
@@ -158,6 +160,8 @@ X Chat rules:
 - For an `unknown` conversation, do not expose the technical state or ask the user to verify it. Mention it only as historical context using the exact friendly pattern `曾经收到过消息：@sender1、@sender2`, listing the known participants and adding no explanation or action.
 - Exclude messages with missing/unparseable timestamps and all messages outside the exact 24-hour window.
 - If any required X Chat request or decryption fails, fail the run instead of claiming the inbox is empty.
+- Filter conversations by the requested Chat window before fetching participant signing keys or event history. Keep conversations with missing timestamps so the optimization never silently drops uncertain data.
+- On HTTP 429, stop immediately and report X's retry delay when available. Do not repeatedly hit the same rate-limited endpoint inside one run.
 
 Time window rules:
 

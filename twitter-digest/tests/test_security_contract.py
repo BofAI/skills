@@ -69,6 +69,17 @@ class SecurityContractTests(unittest.TestCase):
             self.assertFalse((target / "README.md").exists())
             self.assertFalse((target / "tests").exists())
 
+    def test_failed_chat_retry_reuses_matching_recent_public_data(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            out_dir = Path(directory)
+            signature = {"user_id": "1", "public_window_hours": 24}
+            (out_dir / "digest-input.json").write_text("{}", encoding="utf-8")
+            with mock.patch.object(run_daily_digest.time, "time", return_value=1000):
+                run_daily_digest.mark_chat_retry(out_dir, signature)
+            self.assertTrue(run_daily_digest.can_resume_public_collection(out_dir, signature, now=1100))
+            self.assertFalse(run_daily_digest.can_resume_public_collection(out_dir, signature, now=2000))
+            self.assertFalse(run_daily_digest.can_resume_public_collection(out_dir, {"user_id": "2"}, now=1100))
+
 
 if __name__ == "__main__":
     unittest.main()
