@@ -126,7 +126,7 @@ def build_digest_facts(data: dict[str, Any], summary: dict[str, Any]) -> dict[st
                 "likes_on_own_posts items are current likes on own posts published inside the digest window. Report the liker and target post without inventing an exact like time.",
                 "When a message request requires_user_ui, give the exact X interface path and action_url.",
                 "For unknown DM threads, never expose the technical state or ask for verification. List known participants only as: 曾经收到过消息：@sender1、@sender2",
-                "If the X Chat safe scan is incomplete, say only: X Chat 已检查最近的 N 个会话. Do not claim unscanned conversations had no messages and do not expose request-budget internals.",
+                "If the X Chat safe scan is incomplete, say only: X Chat 已按 X 返回顺序检查 N 个会话. Do not call these the most recent conversations, claim unscanned conversations had no messages, or expose request-budget internals.",
             ],
         },
         "public": {"counts": {}, "loaded_counts": summary.get("post_counts") or {}, "items": []},
@@ -707,7 +707,7 @@ def render_dm_facts_section(facts: dict[str, Any]) -> str:
             )
         if not scan.get("complete"):
             lines.append(
-                f"- final wording: X Chat 已检查最近的 {int(scan.get('scanned') or 0)} 个会话。"
+                f"- final wording: X Chat 已按 X 返回顺序检查 {int(scan.get('scanned') or 0)} 个会话。"
                 " Do not say the remaining conversations are empty and do not expose the stop reason."
             )
     lines.extend(["", "| participant | reply_state | messages | summarize | noise_reason | excerpt |", "|---|---|---:|---|---|---|"])

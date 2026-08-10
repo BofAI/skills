@@ -142,7 +142,8 @@ class DigestContextChatTests(unittest.TestCase):
         summary = digest_context.summarize_current_run(data)
         facts = digest_context.build_digest_facts(data, summary)
         rendered = digest_context.render_context_slice(summary, facts, "dm")
-        self.assertIn("X Chat 已检查最近的 4 个会话", rendered)
+        self.assertIn("X Chat 已按 X 返回顺序检查 4 个会话", rendered)
+        self.assertNotIn("最近的 4 个会话", rendered)
         self.assertIn("checked `4`", rendered)
         self.assertFalse(facts["dms"]["scan"]["complete"])
         self.assertEqual(

@@ -162,7 +162,7 @@ X Chat rules:
 - If a required attempted X Chat request or decryption fails, fail the run instead of claiming the inbox is empty. Reaching a deliberate safe-scan boundary is a reported data gap, not a network failure.
 - Use at most 20 Chat event requests per run, reserve the last 5 requests reported by X, load at most 3 event pages per conversation, and stop after 3 consecutive conversations whose newest event predates the requested window.
 - Fetch participant signing keys only after the first event page shows that a conversation may contain in-window events.
-- When safe scanning stops before the returned list is exhausted, say `X Chat 已检查最近的 N 个会话`. Do not expose request-budget internals or say the remaining conversations had no messages.
+- When safe scanning stops before the returned list is exhausted, say `X Chat 已按 X 返回顺序检查 N 个会话`. The conversations endpoint does not expose a reliable recency field, so never call this list “最近的会话”. Do not expose request-budget internals or say the remaining conversations had no messages.
 - A remaining conversation-list pagination token or a listed conversation without an ID is also a safe-scan boundary. Mark the scan incomplete and use the same friendly checked-count sentence; never claim that later or unscannable conversations had no messages.
 - Cache participant signing public keys locally for 24 hours, keyed by X account and user ID. Query only missing or expired entries. If Chat XDK reports verification/decryption errors, refresh the affected conversation's keys once and retry; fail normally if verification still fails.
 - On HTTP 429, stop immediately in both normal collection and initial Chat configuration. Name only the friendly category: `X Chat 会话列表暂时受到限流`, `X Chat 消息读取暂时受到限流`, or `X Chat 公钥读取暂时受到限流`; include the estimated recovery time when available. Never expose a concrete conversation ID, user ID, raw API path, or response body. Do not repeatedly hit the same rate-limited endpoint inside one run.
@@ -214,23 +214,22 @@ python3 ~/.codex/skills/twitter-digest/scripts/inspect_digest.py
 
 Adjust the path to the current agent.
 
-Digest format:
+Keep the digest compact and use these six sections only when they contain useful information:
 
-- 今日总结.
-- 该处理.
-- 谁 @ 了你.
-- 时间线热点.
-- 你的动态.
+- 今日必须知道.
+- 今日必须处理.
+- Mentions.
+- Timeline.
+- 私信.
 - 数据缺口.
-- 建议回复草稿.
 
 When manual actions exist, add a `需要你在 X 界面操作` section near `该处理`. Write plain Chinese instructions rather than exposing raw API fields or English states. Put required actions such as message requests first. Do not put unknown conversations in this action section. If unknown conversations have known participants, add one compact informational line elsewhere: `曾经收到过消息：@sender1、@sender2`. Add no technical explanation, warning, or instruction after it.
 
-If `dm_scan_complete=false`, add one quiet informational sentence: `X Chat 已检查最近的 N 个会话。` Do not present this as an error or ask the user to retry immediately.
+If `dm_scan_complete=false`, add one quiet informational sentence: `X Chat 已按 X 返回顺序检查 N 个会话。` Do not present this as an error or ask the user to retry immediately.
 
-Never post, reply, like, follow, block, open suspicious links, accept requests, or send DMs. Replies are drafts only.
+Never post, reply, like, follow, block, open suspicious links, accept requests, or send DMs. 不得生成、推荐或改写任何回复内容，也不要提供回复草稿、模板或可复制话术。
 
-This skill never sends messages, even after review. If the user asks to send, explain that twitter-digest is permanently read-only and provide copyable draft text instead. Never create code or call another tool to bypass this restriction.
+This skill never sends messages, even after review. If the user asks to send or asks what to reply, explain briefly that twitter-digest is permanently read-only and does not prepare reply content. Never create code or call another tool to bypass this restriction.
 
 When a message request cannot be inspected or handled, add a concrete **需要你在 X 界面操作** instruction with the exact navigation path and a safe choice. Never imply that the Agent clicked, accepted, deleted, or confirmed anything. Keep unknown historical conversations out of this section and list only their known senders as specified above.
 

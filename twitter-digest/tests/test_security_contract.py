@@ -29,6 +29,11 @@ class SecurityContractTests(unittest.TestCase):
         self.assertIn("X Chat 消息读取暂时受到限流", skill)
         self.assertIn("Never expose a concrete conversation ID", skill)
 
+    def test_skill_permanently_forbids_reply_content(self) -> None:
+        skill = (SCRIPTS.parent / "SKILL.md").read_text(encoding="utf-8")
+        self.assertIn("不得生成、推荐或改写任何回复内容", skill)
+        self.assertNotIn("建议回复草稿", skill)
+
     def test_default_oauth_scopes_are_read_only(self) -> None:
         scopes = set(configure_api.DEFAULT_SCOPES.split())
         self.assertIn("dm.read", scopes)
