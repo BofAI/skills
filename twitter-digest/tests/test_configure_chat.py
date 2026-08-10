@@ -16,6 +16,23 @@ from collector_commands import parse_structured_api_error  # noqa: E402
 
 
 class ConfigureChatTests(unittest.TestCase):
+    def test_configure_fetches_all_public_key_fields_without_selector(self) -> None:
+        api_config = {
+            "bearer_token": "token",
+            "user_id": "secret-user",
+            "scopes": "dm.read users.read tweet.read",
+        }
+        with (
+            mock.patch.object(configure_chat, "load_api_config", return_value=api_config),
+            mock.patch.object(configure_chat, "refresh_oauth_token_if_needed", return_value=api_config),
+            mock.patch.object(configure_chat, "chat_configured", return_value=False),
+            mock.patch.object(configure_chat, "api_get", return_value={"data": []}) as api_get,
+            self.assertRaisesRegex(SystemExit, "No passcode-backed X Chat public key"),
+        ):
+            configure_chat.configure()
+
+        api_get.assert_called_once_with("token", "/users/secret-user/public_keys")
+
     def test_api_get_stops_after_first_429_and_hides_user_id(self) -> None:
         error = urllib.error.HTTPError(
             "https://api.x.com/2/users/secret-user/public_keys",

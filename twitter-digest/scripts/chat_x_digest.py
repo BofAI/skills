@@ -189,7 +189,7 @@ def collect_conversations(token: str, maximum: int) -> tuple[list[dict[str, Any]
             {
                 "max_results": min(100, maximum - len(conversations)),
                 "pagination_token": next_token,
-                "chat_conversation.fields": "id,type,group_name,created_at,updated_at",
+                "chat_conversation.fields": "id,type,group_name,created_at",
                 "expansions": "participant_ids,member_ids",
                 "user.fields": "id,username,name",
             },
@@ -233,7 +233,6 @@ def collect_events(
             {
                 "max_results": 100,
                 "pagination_token": next_token,
-                "chat_message_event.fields": "conversation_id,conversation_token,created_at,encoded_event,id,is_trusted,message_event_signature,previous_id,sender_id",
             },
         )
         pages_used += 1
@@ -261,11 +260,7 @@ def collect_events(
 
 def fetch_user_signing_keys(token: str, user_id: str) -> list[dict[str, Any]]:
     result: list[dict[str, Any]] = []
-    payload = api_get(
-        token,
-        f"/users/{user_id}/public_keys",
-        {"public_key.fields": "public_key_version,public_key,signing_public_key,identity_public_key_signature"},
-    )
+    payload = api_get(token, f"/users/{user_id}/public_keys")
     for record in payload.get("data") or []:
         if not isinstance(record, dict):
             continue

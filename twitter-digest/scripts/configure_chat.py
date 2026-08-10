@@ -152,10 +152,7 @@ def configure() -> None:
         print(json.dumps({"configured": True, "runtime_repaired": True, "passcode_saved": False}, indent=2))
         return
 
-    payload = api_get(
-        token,
-        f"/users/{user_id}/public_keys?public_key.fields=public_key_version,public_key,signing_public_key,identity_public_key_signature,juicebox_config",
-    )
+    payload = api_get(token, f"/users/{user_id}/public_keys")
     records = payload.get("data") if isinstance(payload, dict) else None
     usable = [record for record in (records or []) if isinstance(record, dict) and record.get("juicebox_config")]
     if not usable:

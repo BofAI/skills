@@ -129,6 +129,10 @@ class ChatCollectorTests(unittest.TestCase):
         self.assertTrue(has_requests)
         self.assertEqual(api_get.call_count, 2)
         self.assertEqual(api_get.call_args_list[1].args[2]["pagination_token"], "next")
+        self.assertEqual(
+            api_get.call_args_list[0].args[2]["chat_conversation.fields"],
+            "id,type,group_name,created_at",
+        )
 
     def test_collect_events_stops_after_page_older_than_cutoff(self) -> None:
         cutoff = dt.datetime(2026, 8, 2, 12, tzinfo=dt.timezone.utc)
@@ -155,6 +159,35 @@ class ChatCollectorTests(unittest.TestCase):
         self.assertEqual(api_get.call_count, 2)
         self.assertEqual(scan["pages_used"], 2)
         self.assertFalse(scan["truncated"])
+
+    def test_collect_events_requests_only_pagination_controls(self) -> None:
+        cutoff = dt.datetime(2026, 8, 2, 12, tzinfo=dt.timezone.utc)
+        with mock.patch.object(
+            chat_x_digest,
+            "api_get",
+            return_value={"data": [], "meta": {}},
+        ) as api_get:
+            chat_x_digest.collect_events(
+                "token",
+                "conversation",
+                cutoff,
+                chat_x_digest.EventRequestBudget(max_requests=20),
+            )
+
+        self.assertEqual(
+            api_get.call_args.args,
+            (
+                "token",
+                "/chat/conversations/conversation/events",
+                {"max_results": 100, "pagination_token": ""},
+            ),
+        )
+
+    def test_fetch_signing_keys_does_not_send_unsupported_field_selector(self) -> None:
+        with mock.patch.object(chat_x_digest, "api_get", return_value={"data": []}) as api_get:
+            chat_x_digest.fetch_user_signing_keys("token", "42")
+
+        self.assertEqual(api_get.call_args.args, ("token", "/users/42/public_keys"))
 
     def test_collect_events_caps_pages_for_busy_conversation(self) -> None:
         cutoff = dt.datetime(2026, 8, 2, 12, tzinfo=dt.timezone.utc)
