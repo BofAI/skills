@@ -14,7 +14,12 @@ from typing import Optional
 
 from api_config_store import load_api_config, refresh_oauth_token_if_needed
 from chat_config_store import CHAT_RUNTIME_DIR, chat_configured, chat_runtime_status, load_chat_config
-from collector_commands import api_collector_command, summarize_collector_error
+from collector_commands import (
+    api_collector_command,
+    friendly_chat_collection_error,
+    parse_structured_api_error,
+    summarize_collector_error,
+)
 from digest_context import build_current_context_from_file
 from digest_io import write_digest_output
 from script_utils import ensure_private_dir, open_script_in_terminal, rerun_from_installed_if_needed, write_private_text
@@ -31,6 +36,12 @@ CHAT_RETRY_MAX_AGE_SECONDS = 15 * 60
 
 class ChatCollectionError(RuntimeError):
     """A sanitized X Chat child-process failure."""
+
+
+def format_chat_collection_failure(summary: str) -> str:
+    if parse_structured_api_error(summary):
+        return friendly_chat_collection_error(summary)
+    return f"X Chat collection failed; digest was not generated: {summary}"
 
 
 def parse_args() -> argparse.Namespace:
@@ -269,7 +280,7 @@ def collect_chat(out_dir: Path, env: dict[str, str], hours: int) -> None:
         write_digest_output(out_dir, data)
         print("Collected and decrypted required X Chat data.", flush=True)
     except (ChatCollectionError, OSError, json.JSONDecodeError) as exc:
-        raise SystemExit(f"X Chat collection failed; digest was not generated: {exc}") from exc
+        raise SystemExit(format_chat_collection_failure(str(exc))) from exc
     finally:
         if chat_page_path.exists():
             chat_page_path.unlink()

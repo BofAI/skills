@@ -13,11 +13,13 @@ SCRIPTS = Path(__file__).resolve().parents[1] / "scripts"
 sys.path.insert(0, str(SCRIPTS))
 
 import chat_x_digest  # noqa: E402
+from collector_commands import parse_structured_api_error  # noqa: E402
 
 
 class ChatCollectorTests(unittest.TestCase):
     def setUp(self) -> None:
         chat_x_digest.RATE_LIMIT_TRACKER.clear()
+        chat_x_digest.HTTP_REQUEST_COUNTS.clear()
 
     def test_api_get_retries_transient_url_error(self) -> None:
         response = mock.MagicMock()
@@ -48,11 +50,64 @@ class ChatCollectorTests(unittest.TestCase):
             mock.patch.object(chat_x_digest.urllib.request, "urlopen", side_effect=error) as urlopen,
             mock.patch.object(chat_x_digest.time, "sleep") as sleep,
         ):
-            with self.assertRaisesRegex(chat_x_digest.RateLimitError, "retry after about 3 seconds"):
+            with self.assertRaises(chat_x_digest.RateLimitError) as raised:
                 chat_x_digest.api_get("token", "/chat/conversations")
 
         self.assertEqual(urlopen.call_count, 1)
         sleep.assert_not_called()
+        self.assertEqual(
+            parse_structured_api_error(str(raised.exception)),
+            {
+                "source": "x_chat",
+                "endpoint": "conversation_list",
+                "status": 429,
+                "retry_after_seconds": 3,
+            },
+        )
+
+    def test_endpoint_categories_hide_resource_ids(self) -> None:
+        self.assertEqual(chat_x_digest.endpoint_category("/chat/conversations"), "conversation_list")
+        self.assertEqual(
+            chat_x_digest.endpoint_category("/chat/conversations/secret-id/events"),
+            "conversation_events",
+        )
+        self.assertEqual(chat_x_digest.endpoint_category("/users/secret-user/public_keys"), "public_keys")
+
+    def test_api_get_counts_every_http_attempt_by_endpoint(self) -> None:
+        response = mock.MagicMock()
+        response.__enter__.return_value.read.return_value = b'{"data": []}'
+        with (
+            mock.patch.object(
+                chat_x_digest.urllib.request,
+                "urlopen",
+                side_effect=[urllib.error.URLError("TLS EOF"), response],
+            ),
+            mock.patch.object(chat_x_digest.time, "sleep"),
+        ):
+            chat_x_digest.api_get("token", "/chat/conversations/secret-id/events")
+
+        self.assertEqual(
+            chat_x_digest.request_count_snapshot(),
+            {"conversation_list": 0, "conversation_events": 2, "public_keys": 0},
+        )
+
+    def test_429_diagnostic_never_contains_conversation_id(self) -> None:
+        error = urllib.error.HTTPError(
+            "https://api.x.com/2/chat/conversations/secret-id/events",
+            429,
+            "Too Many Requests",
+            {},
+            io.BytesIO(b"secret-id also appeared in the response body"),
+        )
+        with mock.patch.object(chat_x_digest.urllib.request, "urlopen", side_effect=error):
+            with self.assertRaises(chat_x_digest.RateLimitError) as raised:
+                chat_x_digest.api_get("token", "/chat/conversations/secret-id/events")
+
+        self.assertNotIn("secret-id", str(raised.exception))
+        self.assertEqual(
+            parse_structured_api_error(str(raised.exception))["endpoint"],
+            "conversation_events",
+        )
 
     def test_collect_conversations_follows_pagination_and_keeps_request_flag(self) -> None:
         responses = [

@@ -52,10 +52,12 @@ def chat_status(user_id: str) -> tuple[bool, str]:
 
 
 def run_child(script_name: str, *args: str) -> None:
-    subprocess.run(
+    completed = subprocess.run(
         [sys.executable, str(Path(__file__).with_name(script_name)), *args],
-        check=True,
+        check=False,
     )
+    if completed.returncode != 0:
+        raise SystemExit(f"Configuration step {script_name} failed. See the actionable message above.")
 
 
 def configure_all() -> None:

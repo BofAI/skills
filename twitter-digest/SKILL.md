@@ -164,7 +164,8 @@ X Chat rules:
 - Fetch participant signing keys only after the first event page shows that a conversation may contain in-window events.
 - When safe scanning stops before the returned list is exhausted, say `X Chat 已检查最近的 N 个会话`. Do not expose request-budget internals or say the remaining conversations had no messages.
 - Cache participant signing public keys locally for 24 hours, keyed by X account and user ID. Query only missing or expired entries. If Chat XDK reports verification/decryption errors, refresh the affected conversation's keys once and retry; fail normally if verification still fails.
-- On HTTP 429, stop immediately and report X's retry delay when available. Do not repeatedly hit the same rate-limited endpoint inside one run.
+- On HTTP 429, stop immediately in both normal collection and initial Chat configuration. Name only the friendly category: `X Chat 会话列表暂时受到限流`, `X Chat 消息读取暂时受到限流`, or `X Chat 公钥读取暂时受到限流`; include the estimated recovery time when available. Never expose a concrete conversation ID, user ID, raw API path, or response body. Do not repeatedly hit the same rate-limited endpoint inside one run.
+- Per-endpoint HTTP attempt counts are internal diagnostics. Do not include them in a normal digest unless the user explicitly asks for API statistics.
 
 Time window rules:
 

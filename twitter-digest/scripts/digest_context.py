@@ -165,6 +165,10 @@ def build_digest_facts(data: dict[str, Any], summary: dict[str, Any]) -> dict[st
                 "complete": bool(page.get("dm_scan_complete")),
                 "stop_reason": str(page.get("dm_scan_stop_reason") or ""),
                 "truncated_conversations": int(page.get("dm_truncated_conversation_count") or 0),
+                "api_request_counts": {
+                    category: int((page.get("dm_api_request_counts") or {}).get(category) or 0)
+                    for category in ("conversation_list", "conversation_events", "public_keys")
+                },
             }
             if page.get("dm_note"):
                 facts["dms"]["note"] = str(page.get("dm_note") or "")
@@ -693,6 +697,14 @@ def render_dm_facts_section(facts: dict[str, Any]) -> str:
             f"complete `{bool(scan.get('complete'))}`, "
             f"truncated conversations `{int(scan.get('truncated_conversations') or 0)}`"
         )
+        api_request_counts = scan.get("api_request_counts") if isinstance(scan.get("api_request_counts"), dict) else {}
+        if api_request_counts:
+            lines.append(
+                "- X Chat HTTP attempts (internal diagnostics only): "
+                f"conversation list `{int(api_request_counts.get('conversation_list') or 0)}`, "
+                f"conversation events `{int(api_request_counts.get('conversation_events') or 0)}`, "
+                f"public keys `{int(api_request_counts.get('public_keys') or 0)}`"
+            )
         if not scan.get("complete"):
             lines.append(
                 f"- final wording: X Chat 已检查最近的 {int(scan.get('scanned') or 0)} 个会话。"

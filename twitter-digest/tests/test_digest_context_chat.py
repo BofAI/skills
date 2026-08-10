@@ -121,6 +121,11 @@ class DigestContextChatTests(unittest.TestCase):
                     "dm_listed_conversation_count": 50,
                     "dm_scanned_conversation_count": 4,
                     "dm_event_request_count": 4,
+                    "dm_api_request_counts": {
+                        "conversation_list": 1,
+                        "conversation_events": 5,
+                        "public_keys": 2,
+                    },
                     "dm_scan_complete": False,
                     "dm_scan_stop_reason": "consecutive_old_conversations",
                     "dm_threads": [],
@@ -140,6 +145,11 @@ class DigestContextChatTests(unittest.TestCase):
         self.assertIn("X Chat 已检查最近的 4 个会话", rendered)
         self.assertIn("checked `4`", rendered)
         self.assertFalse(facts["dms"]["scan"]["complete"])
+        self.assertEqual(
+            facts["dms"]["scan"]["api_request_counts"],
+            {"conversation_list": 1, "conversation_events": 5, "public_keys": 2},
+        )
+        self.assertIn("HTTP attempts", rendered)
 
 
 if __name__ == "__main__":

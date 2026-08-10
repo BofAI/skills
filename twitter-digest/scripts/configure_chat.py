@@ -25,6 +25,7 @@ from chat_config_store import (
     load_chat_config,
     save_chat_config,
 )
+from collector_commands import endpoint_category, friendly_chat_collection_error, structured_api_error
 from script_utils import (
     open_script_in_terminal,
     rerun_from_installed_if_needed,
@@ -97,7 +98,24 @@ def api_get(token: str, path: str) -> dict[str, object]:
                 return json.loads(response.read().decode("utf-8"))
         except urllib.error.HTTPError as exc:
             detail = exc.read().decode("utf-8", errors="replace")
-            if exc.code not in {408, 425, 429, 500, 502, 503, 504} or attempt == 4:
+            if exc.code == 429:
+                retry_after = exc.headers.get("Retry-After", "")
+                try:
+                    retry_seconds = max(0, int(float(retry_after)))
+                except (TypeError, ValueError):
+                    reset = exc.headers.get("x-rate-limit-reset", "")
+                    try:
+                        retry_seconds = max(0, int(float(reset) - time.time()))
+                    except (TypeError, ValueError):
+                        retry_seconds = None
+                marker = structured_api_error(
+                    "x_chat",
+                    endpoint_category(path),
+                    429,
+                    retry_seconds,
+                )
+                raise SystemExit(f"{friendly_chat_collection_error(marker)}\n{marker}") from exc
+            if exc.code not in {408, 425, 500, 502, 503, 504} or attempt == 4:
                 raise SystemExit(f"X Chat API request failed with HTTP {exc.code}: {detail[:600]}") from exc
             retry_after = exc.headers.get("Retry-After", "")
             try:

@@ -16,6 +16,7 @@ from pathlib import Path
 from typing import Any
 
 from chat_config_store import cached_signing_keys, load_chat_config
+from collector_commands import endpoint_category, structured_api_error
 
 
 MAX_API_ATTEMPTS = 4
@@ -26,6 +27,7 @@ DEFAULT_MAX_EVENT_PAGES_PER_CONVERSATION = 3
 DEFAULT_MAX_CONSECUTIVE_OLD_CONVERSATIONS = 3
 EVENT_RATE_LIMIT_ROUTE = "/chat/conversations/:id/events"
 RATE_LIMIT_TRACKER: dict[str, dict[str, int]] = {}
+HTTP_REQUEST_COUNTS: dict[str, int] = {}
 
 
 class RateLimitError(RuntimeError):
@@ -72,6 +74,13 @@ def normalize_rate_limit_route(path: str) -> str:
     return path
 
 
+def request_count_snapshot() -> dict[str, int]:
+    return {
+        category: int(HTTP_REQUEST_COUNTS.get(category) or 0)
+        for category in ("conversation_list", "conversation_events", "public_keys")
+    }
+
+
 def observe_rate_limit(path: str, headers: Any) -> None:
     try:
         limit = int(str(headers.get("x-rate-limit-limit", "")))
@@ -107,6 +116,8 @@ def api_get(token: str, path: str, params: dict[str, Any] | None = None) -> dict
     url = "https://api.x.com/2" + path + (("?" + query) if query else "")
     request = urllib.request.Request(url, headers={"Authorization": f"Bearer {token}", "User-Agent": "twitter-digest-chat/1.0"})
     for attempt in range(1, MAX_API_ATTEMPTS + 1):
+        category = endpoint_category(path)
+        HTTP_REQUEST_COUNTS[category] = int(HTTP_REQUEST_COUNTS.get(category) or 0) + 1
         try:
             with urllib.request.urlopen(request, timeout=30) as response:
                 payload = json.loads(response.read().decode("utf-8"))
@@ -117,8 +128,9 @@ def api_get(token: str, path: str, params: dict[str, Any] | None = None) -> dict
             detail = exc.read().decode("utf-8", errors="replace")
             if exc.code == 429:
                 retry_after = rate_limit_retry_after(exc.headers)
-                suffix = f"; retry after about {retry_after} seconds" if retry_after is not None else ""
-                raise RateLimitError(f"GET {path} failed with HTTP 429 Too Many Requests{suffix}: {detail[:800]}") from exc
+                raise RateLimitError(
+                    structured_api_error("x_chat", category, 429, retry_after)
+                ) from exc
             if exc.code not in RETRYABLE_HTTP_CODES or attempt == MAX_API_ATTEMPTS:
                 raise RuntimeError(f"GET {path} failed with HTTP {exc.code}: {detail[:800]}") from exc
             time.sleep(retry_delay(attempt, exc.headers.get("Retry-After", "")))
@@ -557,6 +569,7 @@ def main() -> None:
         "dm_scanned_conversation_count": scanned_conversation_count,
         "dm_old_conversation_count": old_conversation_count,
         "dm_event_request_count": event_budget.used,
+        "dm_api_request_counts": request_count_snapshot(),
         "dm_scan_complete": scan_complete and truncated_conversation_count == 0,
         "dm_scan_stop_reason": scan_stop_reason,
         "dm_truncated_conversation_count": truncated_conversation_count,

@@ -19,6 +19,16 @@ import script_utils  # noqa: E402
 
 
 class SecurityContractTests(unittest.TestCase):
+    def test_beta11_installer_and_docs_are_pinned(self) -> None:
+        root = SCRIPTS.parent
+        self.assertIn("v1.5.14-beta.11", (root / "install.sh").read_text(encoding="utf-8"))
+        self.assertIn("v1.5.14-beta.11", (root / "README.md").read_text(encoding="utf-8"))
+
+    def test_skill_requires_friendly_private_rate_limit_messages(self) -> None:
+        skill = (SCRIPTS.parent / "SKILL.md").read_text(encoding="utf-8")
+        self.assertIn("X Chat 消息读取暂时受到限流", skill)
+        self.assertIn("Never expose a concrete conversation ID", skill)
+
     def test_default_oauth_scopes_are_read_only(self) -> None:
         scopes = set(configure_api.DEFAULT_SCOPES.split())
         self.assertIn("dm.read", scopes)
@@ -53,6 +63,12 @@ class SecurityContractTests(unittest.TestCase):
                 run_daily_digest.save_config("owner", "Owner")
             self.assertEqual(config_path.stat().st_mode & 0o777, 0o600)
             self.assertEqual(config_path.parent.stat().st_mode & 0o777, 0o700)
+
+    def test_unified_configuration_child_failure_has_no_python_traceback(self) -> None:
+        failed = mock.Mock(returncode=1)
+        with mock.patch.object(configure_all.subprocess, "run", return_value=failed):
+            with self.assertRaisesRegex(SystemExit, "configure_chat.py failed"):
+                configure_all.run_child("configure_chat.py")
 
     def test_copy_install_excludes_development_files(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
@@ -104,6 +120,54 @@ class SecurityContractTests(unittest.TestCase):
             with self.assertRaises(run_daily_digest.ChatCollectionError):
                 run_daily_digest.run_chat_command(["chat"], {})
         self.assertEqual(run.call_count, 1)
+
+    def test_friendly_chat_rate_limit_names_event_read_and_rounds_minutes(self) -> None:
+        summary = (
+            'TWITTER_DIGEST_API_ERROR '
+            '{"source":"x_chat","endpoint":"conversation_events","status":429,'
+            '"retry_after_seconds":317}'
+        )
+        message = run_daily_digest.friendly_chat_collection_error(summary)
+        self.assertEqual(
+            message,
+            "X Chat 消息读取暂时受到限流，预计约 6 分钟后恢复。请稍后再生成日报。",
+        )
+
+    def test_friendly_chat_rate_limit_maps_all_categories_without_paths(self) -> None:
+        expected = {
+            "conversation_list": "X Chat 会话列表暂时受到限流。请稍后再生成日报。",
+            "public_keys": "X Chat 公钥读取暂时受到限流。请稍后再生成日报。",
+            "x_chat_other": "X Chat 接口暂时受到限流。请稍后再生成日报。",
+        }
+        for endpoint, message in expected.items():
+            summary = (
+                'TWITTER_DIGEST_API_ERROR '
+                f'{{"source":"x_chat","endpoint":"{endpoint}","status":429}}'
+            )
+            self.assertEqual(run_daily_digest.friendly_chat_collection_error(summary), message)
+            self.assertNotIn("/", message)
+
+    def test_friendly_chat_error_keeps_legacy_summary(self) -> None:
+        self.assertEqual(
+            run_daily_digest.friendly_chat_collection_error("HTTP 403; Forbidden"),
+            "HTTP 403; Forbidden",
+        )
+
+    def test_structured_rate_limit_failure_has_no_english_wrapper_prefix(self) -> None:
+        summary = (
+            'TWITTER_DIGEST_API_ERROR '
+            '{"source":"x_chat","endpoint":"conversation_list","status":429}'
+        )
+        self.assertEqual(
+            run_daily_digest.format_chat_collection_failure(summary),
+            "X Chat 会话列表暂时受到限流。请稍后再生成日报。",
+        )
+
+    def test_legacy_failure_keeps_collection_context(self) -> None:
+        self.assertEqual(
+            run_daily_digest.format_chat_collection_failure("HTTP 403; Forbidden"),
+            "X Chat collection failed; digest was not generated: HTTP 403; Forbidden",
+        )
 
 
 if __name__ == "__main__":
