@@ -19,10 +19,10 @@ import script_utils  # noqa: E402
 
 
 class SecurityContractTests(unittest.TestCase):
-    def test_beta11_installer_and_docs_are_pinned(self) -> None:
+    def test_beta12_installer_and_docs_are_pinned(self) -> None:
         root = SCRIPTS.parent
-        self.assertIn("v1.5.14-beta.11", (root / "install.sh").read_text(encoding="utf-8"))
-        self.assertIn("v1.5.14-beta.11", (root / "README.md").read_text(encoding="utf-8"))
+        self.assertIn("v1.5.14-beta.12", (root / "install.sh").read_text(encoding="utf-8"))
+        self.assertIn("v1.5.14-beta.12", (root / "README.md").read_text(encoding="utf-8"))
 
     def test_skill_requires_friendly_private_rate_limit_messages(self) -> None:
         skill = (SCRIPTS.parent / "SKILL.md").read_text(encoding="utf-8")
