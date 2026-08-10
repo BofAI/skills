@@ -32,6 +32,7 @@ DEFAULT_API_PUBLIC_ITEMS = 300
 UNSUPPORTED_OPTION_MESSAGE = "Source selection is no longer supported. twitter-digest uses API only."
 REQUIRED_CHAT_SCOPES = {"dm.read", "users.read", "tweet.read"}
 CHAT_RETRY_MAX_AGE_SECONDS = 15 * 60
+CHAT_AUTH_FAILURE = "X Chat 授权已失效。请运行统一配置后重新生成日报。"
 CHAT_SCAN_PROFILES = {
     "recent": {"max_conversations": 10, "event_requests": 10, "event_pages": 1},
     "more": {"max_conversations": 50, "event_requests": 20, "event_pages": 3},
@@ -43,6 +44,8 @@ class ChatCollectionError(RuntimeError):
 
 
 def format_chat_collection_failure(summary: str) -> str:
+    if summary == CHAT_AUTH_FAILURE:
+        return summary
     if parse_structured_api_error(summary):
         return friendly_chat_collection_error(summary)
     return f"X Chat collection failed; digest was not generated: {summary}"
@@ -229,16 +232,13 @@ def run_api_command(cmd: list[str], env: dict[str, str]) -> None:
 
 
 def run_chat_command(cmd: list[str], env: dict[str, str]) -> None:
-    for attempt in range(2):
-        try:
-            subprocess.run(cmd, check=True, env=env, capture_output=True, text=True)
-            return
-        except subprocess.CalledProcessError as exc:
-            detail = summarize_collector_error("\n".join([exc.stdout or "", exc.stderr or ""]), exc.returncode)
-            if attempt == 0 and api_auth_needs_reconfigure(detail):
-                time.sleep(1)
-                continue
-            raise ChatCollectionError(detail or f"chat collector exited with code {exc.returncode}") from exc
+    try:
+        subprocess.run(cmd, check=True, env=env, capture_output=True, text=True)
+    except subprocess.CalledProcessError as exc:
+        detail = summarize_collector_error("\n".join([exc.stdout or "", exc.stderr or ""]), exc.returncode)
+        if api_auth_needs_reconfigure(detail):
+            raise ChatCollectionError(CHAT_AUTH_FAILURE) from exc
+        raise ChatCollectionError(detail or f"chat collector exited with code {exc.returncode}") from exc
 
 def run_full_configuration(reason: str) -> None:
     print(f"{reason} Starting unified X API and X Chat configuration...", flush=True)

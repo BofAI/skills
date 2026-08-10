@@ -144,22 +144,26 @@ class SecurityContractTests(unittest.TestCase):
             self.assertFalse(run_daily_digest.can_resume_public_collection(out_dir, signature, now=2000))
             self.assertFalse(run_daily_digest.can_resume_public_collection(out_dir, {"user_id": "2"}, now=1100))
 
-    def test_x_chat_401_is_retried_only_once(self) -> None:
+    def test_x_chat_401_fails_once_with_reconfiguration_guidance(self) -> None:
         error = subprocess.CalledProcessError(
             1,
             ["chat"],
             output="",
             stderr="GET /chat/conversations failed with HTTP 401: Unauthorized",
         )
-        success = mock.Mock(stdout="", stderr="")
         with (
-            mock.patch.object(run_daily_digest.subprocess, "run", side_effect=[error, success]) as run,
-            mock.patch.object(run_daily_digest.time, "sleep") as sleep,
+            mock.patch.object(run_daily_digest.subprocess, "run", side_effect=error) as run,
+            self.assertRaises(run_daily_digest.ChatCollectionError) as raised,
         ):
             run_daily_digest.run_chat_command(["chat"], {})
 
-        self.assertEqual(run.call_count, 2)
-        sleep.assert_called_once_with(1)
+        self.assertEqual(run.call_count, 1)
+        self.assertEqual(str(raised.exception), "X Chat 授权已失效。请运行统一配置后重新生成日报。")
+        self.assertNotIn("/chat/conversations", str(raised.exception))
+        self.assertEqual(
+            run_daily_digest.format_chat_collection_failure(str(raised.exception)),
+            "X Chat 授权已失效。请运行统一配置后重新生成日报。",
+        )
 
     def test_x_chat_non_auth_failure_is_not_retried(self) -> None:
         error = subprocess.CalledProcessError(1, ["chat"], output="", stderr="HTTP 429 Too Many Requests")
