@@ -20,10 +20,70 @@ from chat_config_store import cached_signing_keys, load_chat_config
 
 MAX_API_ATTEMPTS = 4
 RETRYABLE_HTTP_CODES = {408, 425, 429, 500, 502, 503, 504}
+DEFAULT_EVENT_REQUEST_BUDGET = 20
+DEFAULT_EVENT_RATE_LIMIT_RESERVE = 5
+DEFAULT_MAX_EVENT_PAGES_PER_CONVERSATION = 3
+DEFAULT_MAX_CONSECUTIVE_OLD_CONVERSATIONS = 3
+EVENT_RATE_LIMIT_ROUTE = "/chat/conversations/:id/events"
+RATE_LIMIT_TRACKER: dict[str, dict[str, int]] = {}
 
 
 class RateLimitError(RuntimeError):
     """Stop the entire Chat collection when X reports a shared rate limit."""
+
+
+class EventBudgetExhausted(RuntimeError):
+    """Stop safely before the X Chat events endpoint reaches its limit."""
+
+
+class EventRequestBudget:
+    def __init__(self, max_requests: int, reserve: int = DEFAULT_EVENT_RATE_LIMIT_RESERVE) -> None:
+        self.max_requests = max(1, max_requests)
+        self.reserve = max(0, reserve)
+        self.used = 0
+
+    def consume(self, now: float | None = None) -> None:
+        if self.used >= self.max_requests:
+            raise EventBudgetExhausted("safe_event_request_budget")
+        current_time = time.time() if now is None else now
+        state = RATE_LIMIT_TRACKER.get(EVENT_RATE_LIMIT_ROUTE) or {}
+        remaining = state.get("remaining")
+        reset = state.get("reset")
+        if remaining is not None and (reset is None or reset > current_time) and remaining <= self.reserve:
+            raise EventBudgetExhausted("reported_rate_limit_reserve")
+        self.used += 1
+
+
+class OldConversationStopper:
+    def __init__(self, max_consecutive: int) -> None:
+        self.max_consecutive = max(1, max_consecutive)
+        self.consecutive = 0
+
+    def observe(self, is_old: bool) -> bool:
+        self.consecutive = self.consecutive + 1 if is_old else 0
+        return self.consecutive >= self.max_consecutive
+
+
+def normalize_rate_limit_route(path: str) -> str:
+    if path.startswith("/chat/conversations/") and path.endswith("/events"):
+        return EVENT_RATE_LIMIT_ROUTE
+    if path.startswith("/users/") and path.endswith("/public_keys"):
+        return "/users/:id/public_keys"
+    return path
+
+
+def observe_rate_limit(path: str, headers: Any) -> None:
+    try:
+        limit = int(str(headers.get("x-rate-limit-limit", "")))
+        remaining = int(str(headers.get("x-rate-limit-remaining", "")))
+        reset = int(str(headers.get("x-rate-limit-reset", "")))
+    except (AttributeError, TypeError, ValueError):
+        return
+    RATE_LIMIT_TRACKER[normalize_rate_limit_route(path)] = {
+        "limit": limit,
+        "remaining": remaining,
+        "reset": reset,
+    }
 
 
 def retry_delay(attempt: int, retry_after: str = "") -> float:
@@ -49,8 +109,11 @@ def api_get(token: str, path: str, params: dict[str, Any] | None = None) -> dict
     for attempt in range(1, MAX_API_ATTEMPTS + 1):
         try:
             with urllib.request.urlopen(request, timeout=30) as response:
-                return json.loads(response.read().decode("utf-8"))
+                payload = json.loads(response.read().decode("utf-8"))
+                observe_rate_limit(path, response.headers)
+                return payload
         except urllib.error.HTTPError as exc:
+            observe_rate_limit(path, exc.headers)
             detail = exc.read().decode("utf-8", errors="replace")
             if exc.code == 429:
                 retry_after = rate_limit_retry_after(exc.headers)
@@ -132,11 +195,26 @@ def collect_conversations(token: str, maximum: int) -> tuple[list[dict[str, Any]
     return conversations[:maximum], users, has_message_requests
 
 
-def collect_events(token: str, conversation_id: str, cutoff: dt.datetime) -> tuple[list[dict[str, Any]], list[str]]:
+def collect_events(
+    token: str,
+    conversation_id: str,
+    cutoff: dt.datetime,
+    budget: EventRequestBudget,
+    max_pages: int = DEFAULT_MAX_EVENT_PAGES_PER_CONVERSATION,
+) -> tuple[list[dict[str, Any]], list[str], dict[str, Any]]:
     events: list[dict[str, Any]] = []
     key_events: list[str] = []
     next_token = ""
+    pages_used = 0
+    stop_reason = ""
     while True:
+        try:
+            budget.consume()
+        except EventBudgetExhausted:
+            if not events:
+                raise
+            stop_reason = "event_request_budget"
+            break
         payload = api_get(
             token,
             f"/chat/conversations/{urllib.parse.quote(conversation_id, safe='')}/events",
@@ -146,15 +224,27 @@ def collect_events(token: str, conversation_id: str, cutoff: dt.datetime) -> tup
                 "chat_message_event.fields": "conversation_id,conversation_token,created_at,encoded_event,id,is_trusted,message_event_signature,previous_id,sender_id",
             },
         )
+        pages_used += 1
         page = [item for item in payload.get("data") or [] if isinstance(item, dict)]
         events.extend(page)
         meta = payload.get("meta") if isinstance(payload.get("meta"), dict) else {}
         key_events.extend(str(item) for item in meta.get("conversation_key_events") or [] if item)
         next_token = str(meta.get("next_token") or "")
         oldest = min((stamp for stamp in (event_time(item) for item in page) if stamp), default=None)
-        if not next_token or (oldest and oldest < cutoff):
+        if not next_token:
             break
-    return events, list(dict.fromkeys(key_events))
+        if oldest and oldest < cutoff:
+            stop_reason = "window_complete"
+            break
+        if pages_used >= max(1, max_pages):
+            stop_reason = "conversation_page_limit"
+            break
+    truncated = bool(next_token and stop_reason not in {"", "window_complete"})
+    return events, list(dict.fromkeys(key_events)), {
+        "pages_used": pages_used,
+        "truncated": truncated,
+        "stop_reason": stop_reason,
+    }
 
 
 def fetch_user_signing_keys(token: str, user_id: str) -> list[dict[str, Any]]:
@@ -196,15 +286,6 @@ def signing_keys(
 def participant_ids(conversation: dict[str, Any], current_user_id: str) -> set[str]:
     values = conversation.get("participant_ids") or conversation.get("member_ids") or []
     return {str(value) for value in values if value and str(value) != current_user_id}
-
-
-def active_conversations(conversations: list[dict[str, Any]], cutoff: dt.datetime) -> list[dict[str, Any]]:
-    """Keep recent conversations; retain missing timestamps to avoid false omissions."""
-    return [
-        conversation
-        for conversation in conversations
-        if parse_time(conversation.get("updated_at")) is None or parse_time(conversation.get("updated_at")) >= cutoff
-    ]
 
 
 def participant_label(conversation: dict[str, Any], users: dict[str, dict[str, Any]], current_user_id: str) -> str:
@@ -250,6 +331,16 @@ def unavailable_thread(
     }
 
 
+def zero_event_history_is_failure(
+    conversations: list[dict[str, Any]],
+    fetched_event_count: int,
+    *,
+    scan_complete: bool,
+) -> bool:
+    """Treat an empty history as an error only after every listed chat was checked."""
+    return bool(conversations) and fetched_event_count == 0 and scan_complete
+
+
 def main() -> None:
     args = parse_args()
     if not args.bearer_token:
@@ -268,14 +359,9 @@ def main() -> None:
 
     cutoff = dt.datetime.now(dt.timezone.utc) - dt.timedelta(hours=max(1, args.hours))
     conversations, users, has_message_requests = collect_conversations(args.bearer_token, max(1, args.max_conversations))
-    conversations = active_conversations(conversations, cutoff)
-    users_to_fetch = {user_id}
-    for conversation in conversations:
-        users_to_fetch.update(participant_ids(conversation, user_id))
     chat = Chat()
     chat.import_keys(private_blob, version=key_version)
     chat.set_identity(user_id, key_version)
-    chat.set_signing_keys(signing_keys(args.bearer_token, user_id, users_to_fetch))
     chat.set_cache_keys(True)
 
     threads = []
@@ -283,13 +369,35 @@ def main() -> None:
     fetched_event_count = 0
     unavailable_thread_count = 0
     refreshed_user_ids: set[str] = set()
+    event_budget = EventRequestBudget(DEFAULT_EVENT_REQUEST_BUDGET)
+    old_stopper = OldConversationStopper(DEFAULT_MAX_CONSECUTIVE_OLD_CONVERSATIONS)
+    scanned_conversation_count = 0
+    old_conversation_count = 0
+    truncated_conversation_count = 0
+    scan_complete = True
+    scan_stop_reason = ""
     for conversation in conversations:
         conversation_id = str(conversation.get("id") or "")
         if not conversation_id:
             continue
         try:
-            raw_events, key_events = collect_events(args.bearer_token, conversation_id, cutoff)
+            raw_events, key_events, event_scan = collect_events(
+                args.bearer_token,
+                conversation_id,
+                cutoff,
+                event_budget,
+            )
+            scanned_conversation_count += 1
             fetched_event_count += len(raw_events)
+            newest_event = max((stamp for stamp in (event_time(item) for item in raw_events) if stamp), default=None)
+            if newest_event and newest_event < cutoff:
+                old_conversation_count += 1
+                if old_stopper.observe(is_old=True):
+                    scan_complete = False
+                    scan_stop_reason = "consecutive_old_conversations"
+                    break
+                continue
+            old_stopper.observe(is_old=False)
             if not raw_events:
                 unavailable_thread_count += 1
                 threads.append(
@@ -307,19 +415,26 @@ def main() -> None:
                 for event in raw_events
                 if event.get("encoded_event") and (event_time(event) or dt.datetime.min.replace(tzinfo=dt.timezone.utc)) >= cutoff
             ]
+            conversation_user_ids = {user_id} | participant_ids(conversation, user_id)
+            chat.set_signing_keys(signing_keys(args.bearer_token, user_id, conversation_user_ids))
             encoded_events = key_events + [str(event.get("encoded_event")) for event in reversed(window_events)]
             decrypted = chat.decrypt_events(encoded_events)
             if decrypted.get("errors"):
-                conversation_user_ids = {user_id} | participant_ids(conversation, user_id)
                 refresh_ids = conversation_user_ids - refreshed_user_ids
                 if refresh_ids:
                     chat.set_signing_keys(
-                        signing_keys(args.bearer_token, user_id, users_to_fetch, force_refresh_ids=refresh_ids)
+                        signing_keys(args.bearer_token, user_id, conversation_user_ids, force_refresh_ids=refresh_ids)
                     )
                     refreshed_user_ids.update(refresh_ids)
                     decrypted = chat.decrypt_events(encoded_events)
                 if decrypted.get("errors"):
                     raise RuntimeError(f"Chat XDK could not decrypt or verify {len(decrypted['errors'])} event(s)")
+            if event_scan.get("truncated"):
+                truncated_conversation_count += 1
+        except EventBudgetExhausted as exc:
+            scan_complete = False
+            scan_stop_reason = str(exc)
+            break
         except RateLimitError as exc:
             raise SystemExit(str(exc)) from exc
         except Exception as exc:  # noqa: BLE001 - preserve the conversation id for any SDK/API failure.
@@ -379,16 +494,20 @@ def main() -> None:
                 "reply_state": "last_from_me" if replied else "waiting_reply",
                 "collection_status": "complete",
                 "collection_detail": "",
-                "dm_load_complete": True,
-                "dm_scrolls_used": 0,
+                "dm_load_complete": not bool(event_scan.get("truncated")),
+                "dm_scrolls_used": int(event_scan.get("pages_used") or 0),
                 "dm_window_exceeded": False,
-                "dm_hit_message_cap": False,
+                "dm_hit_message_cap": bool(event_scan.get("truncated")),
             }
         )
     threads.sort(key=lambda item: str(item.get("latest_time") or ""), reverse=True)
     if errors:
         raise SystemExit("X Chat collection/decryption failed: " + "; ".join(errors)[:1800])
-    if conversations and fetched_event_count == 0:
+    if zero_event_history_is_failure(
+        conversations,
+        fetched_event_count,
+        scan_complete=scan_complete,
+    ):
         raise SystemExit(
             "X Chat history returned zero events for every listed conversation. "
             "The read-only OAuth token may lack access to this X Chat history endpoint; "
@@ -396,6 +515,30 @@ def main() -> None:
         )
     waiting = [thread for thread in threads if thread.get("reply_state") == "waiting_reply"]
     replied = [thread for thread in threads if thread.get("reply_state") == "last_from_me"]
+    data_gaps = []
+    if unavailable_thread_count:
+        data_gaps.append(
+            {
+                "source": "x_chat",
+                "status": "conversation_history_unavailable",
+                "detail": (
+                    f"{unavailable_thread_count} listed X Chat conversation(s) had no readable messages in the requested {max(1, args.hours)}-hour window. "
+                    "Do not infer that these conversations are empty, unread, or already handled."
+                ),
+            }
+        )
+    if not scan_complete or truncated_conversation_count:
+        data_gaps.append(
+            {
+                "source": "x_chat",
+                "status": "safe_scan_limited",
+                "detail": (
+                    f"X Chat safely checked {scanned_conversation_count} of {len(conversations)} listed conversations using "
+                    f"{event_budget.used} event request(s). stop_reason={scan_stop_reason or 'conversation_page_limit'}; "
+                    f"truncated_conversations={truncated_conversation_count}. Do not claim unscanned conversations had no messages."
+                ),
+            }
+        )
     payload = {
         "kind": "messages",
         "url": "https://api.x.com/2/chat/conversations",
@@ -410,20 +553,14 @@ def main() -> None:
         "dm_unknown_thread_count": unavailable_thread_count,
         "dm_captured_message_count": sum(int(thread.get("message_count") or 0) for thread in threads),
         "dm_has_message_requests": has_message_requests,
-        "data_gaps": [
-            {
-                "source": "x_chat",
-                "status": "conversation_history_unavailable",
-                "detail": (
-                    f"{unavailable_thread_count} listed X Chat conversation(s) had no readable messages in the requested {max(1, args.hours)}-hour window. "
-                    "Do not infer that these conversations are empty, unread, or already handled. "
-                    "The user can verify them from the conversation links in X."
-                ),
-                "requires_user_ui": True,
-                "user_action": "如需确认，请在 X → 消息中逐个打开标为状态未知的会话，查看最新消息和未读状态。",
-                "action_url": "https://x.com/messages",
-            }
-        ] if unavailable_thread_count else [],
+        "dm_listed_conversation_count": len(conversations),
+        "dm_scanned_conversation_count": scanned_conversation_count,
+        "dm_old_conversation_count": old_conversation_count,
+        "dm_event_request_count": event_budget.used,
+        "dm_scan_complete": scan_complete and truncated_conversation_count == 0,
+        "dm_scan_stop_reason": scan_stop_reason,
+        "dm_truncated_conversation_count": truncated_conversation_count,
+        "data_gaps": data_gaps,
         "todo_items": (
             [
                 {

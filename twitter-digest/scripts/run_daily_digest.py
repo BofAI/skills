@@ -29,6 +29,10 @@ REQUIRED_CHAT_SCOPES = {"dm.read", "users.read", "tweet.read"}
 CHAT_RETRY_MAX_AGE_SECONDS = 15 * 60
 
 
+class ChatCollectionError(RuntimeError):
+    """A sanitized X Chat child-process failure."""
+
+
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--handle")
@@ -202,6 +206,19 @@ def run_api_command(cmd: list[str], env: dict[str, str]) -> None:
     if completed.stdout:
         print(completed.stdout.strip(), flush=True)
 
+
+def run_chat_command(cmd: list[str], env: dict[str, str]) -> None:
+    for attempt in range(2):
+        try:
+            subprocess.run(cmd, check=True, env=env, capture_output=True, text=True)
+            return
+        except subprocess.CalledProcessError as exc:
+            detail = summarize_collector_error("\n".join([exc.stdout or "", exc.stderr or ""]), exc.returncode)
+            if attempt == 0 and api_auth_needs_reconfigure(detail):
+                time.sleep(1)
+                continue
+            raise ChatCollectionError(detail or f"chat collector exited with code {exc.returncode}") from exc
+
 def run_full_configuration(reason: str) -> None:
     print(f"{reason} Starting unified X API and X Chat configuration...", flush=True)
     if not sys.stdin.isatty():
@@ -242,7 +259,7 @@ def collect_chat(out_dir: Path, env: dict[str, str], hours: int) -> None:
         str(chat_page_path),
     ]
     try:
-        subprocess.run(cmd, check=True, env=env, capture_output=True, text=True)
+        run_chat_command(cmd, env)
         data = json.loads((out_dir / "digest-input.json").read_text(encoding="utf-8"))
         chat_page = json.loads(chat_page_path.read_text(encoding="utf-8"))
         pages = data.get("pages") if isinstance(data.get("pages"), list) else []
@@ -251,11 +268,8 @@ def collect_chat(out_dir: Path, env: dict[str, str], hours: int) -> None:
         data["chat_source"] = "x_chat_api_chatxdk"
         write_digest_output(out_dir, data)
         print("Collected and decrypted required X Chat data.", flush=True)
-    except (subprocess.CalledProcessError, OSError, json.JSONDecodeError) as exc:
-        detail = ""
-        if isinstance(exc, subprocess.CalledProcessError):
-            detail = summarize_collector_error("\n".join([exc.stdout or "", exc.stderr or ""]), exc.returncode)
-        raise SystemExit(f"X Chat collection failed; digest was not generated: {detail or exc}") from exc
+    except (ChatCollectionError, OSError, json.JSONDecodeError) as exc:
+        raise SystemExit(f"X Chat collection failed; digest was not generated: {exc}") from exc
     finally:
         if chat_page_path.exists():
             chat_page_path.unlink()

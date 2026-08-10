@@ -109,6 +109,38 @@ class DigestContextChatTests(unittest.TestCase):
         self.assertNotIn("状态未知会话", rendered)
         self.assertNotIn("请在 X 界面检查", rendered)
 
+    def test_safe_scan_limit_uses_friendly_checked_count(self) -> None:
+        data = {
+            "generated_at": "2026-08-10T12:00:00+08:00",
+            "source": "api",
+            "handle": "owner",
+            "pages": [
+                {
+                    "kind": "messages",
+                    "dm_status": "x_chat_collected",
+                    "dm_listed_conversation_count": 50,
+                    "dm_scanned_conversation_count": 4,
+                    "dm_event_request_count": 4,
+                    "dm_scan_complete": False,
+                    "dm_scan_stop_reason": "consecutive_old_conversations",
+                    "dm_threads": [],
+                    "data_gaps": [
+                        {
+                            "source": "x_chat",
+                            "status": "safe_scan_limited",
+                            "detail": "Stopped safely.",
+                        }
+                    ],
+                }
+            ],
+        }
+        summary = digest_context.summarize_current_run(data)
+        facts = digest_context.build_digest_facts(data, summary)
+        rendered = digest_context.render_context_slice(summary, facts, "dm")
+        self.assertIn("X Chat 已检查最近的 4 个会话", rendered)
+        self.assertIn("checked `4`", rendered)
+        self.assertFalse(facts["dms"]["scan"]["complete"])
+
 
 if __name__ == "__main__":
     unittest.main()

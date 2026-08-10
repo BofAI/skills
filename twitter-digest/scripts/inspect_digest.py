@@ -60,6 +60,7 @@ def summarize_context(data: dict[str, Any]) -> dict[str, Any]:
             "window_end": dms.get("window_end") or "",
             "window_hours": dms.get("window_hours") or summary.get("dm_window_hours") or 24,
             "counts": dms.get("counts") or summary.get("dm_counts") or {},
+            "scan": dms.get("scan") or {},
             "thread_count": len(dm_threads),
             "threads_without_body": [
                 {

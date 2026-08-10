@@ -154,13 +154,15 @@ X Chat rules:
 
 - Chat XDK decrypts messages locally; no Chat passcode is saved.
 - A conversation needs a reply only when its latest in-window text message came from another participant.
-- Preserve every conversation returned by X. If its history is empty or unreadable, mark its reply state `unknown`; never classify it as handled or waiting for reply.
+- Process the conversation list in X's returned order. Inspect the first event page before fetching signing keys. Do not classify an unscanned conversation as empty, handled, or waiting for reply.
 - `has_message_requests=true` is a required todo. The current conversations endpoint does not identify the requester, so state that limitation instead of inventing a participant or claiming the request inbox is empty.
 - For a pending message request, explicitly say the Agent/API cannot inspect or accept it. Tell the user: open **X → 消息 → 请求**, review the sender and content, then choose accept, delete, or ignore. Link to `https://x.com/messages` when links are useful.
 - For an `unknown` conversation, do not expose the technical state or ask the user to verify it. Mention it only as historical context using the exact friendly pattern `曾经收到过消息：@sender1、@sender2`, listing the known participants and adding no explanation or action.
 - Exclude messages with missing/unparseable timestamps and all messages outside the exact 24-hour window.
-- If any required X Chat request or decryption fails, fail the run instead of claiming the inbox is empty.
-- Filter conversations by the requested Chat window before fetching participant signing keys or event history. Keep conversations with missing timestamps so the optimization never silently drops uncertain data.
+- If a required attempted X Chat request or decryption fails, fail the run instead of claiming the inbox is empty. Reaching a deliberate safe-scan boundary is a reported data gap, not a network failure.
+- Use at most 20 Chat event requests per run, reserve the last 5 requests reported by X, load at most 3 event pages per conversation, and stop after 3 consecutive conversations whose newest event predates the requested window.
+- Fetch participant signing keys only after the first event page shows that a conversation may contain in-window events.
+- When safe scanning stops before the returned list is exhausted, say `X Chat 已检查最近的 N 个会话`. Do not expose request-budget internals or say the remaining conversations had no messages.
 - Cache participant signing public keys locally for 24 hours, keyed by X account and user ID. Query only missing or expired entries. If Chat XDK reports verification/decryption errors, refresh the affected conversation's keys once and retry; fail normally if verification still fails.
 - On HTTP 429, stop immediately and report X's retry delay when available. Do not repeatedly hit the same rate-limited endpoint inside one run.
 
@@ -221,6 +223,8 @@ Digest format:
 - 建议回复草稿.
 
 When manual actions exist, add a `需要你在 X 界面操作` section near `该处理`. Write plain Chinese instructions rather than exposing raw API fields or English states. Put required actions such as message requests first. Do not put unknown conversations in this action section. If unknown conversations have known participants, add one compact informational line elsewhere: `曾经收到过消息：@sender1、@sender2`. Add no technical explanation, warning, or instruction after it.
+
+If `dm_scan_complete=false`, add one quiet informational sentence: `X Chat 已检查最近的 N 个会话。` Do not present this as an error or ask the user to retry immediately.
 
 Never post, reply, like, follow, block, open suspicious links, accept requests, or send DMs. Replies are drafts only.
 

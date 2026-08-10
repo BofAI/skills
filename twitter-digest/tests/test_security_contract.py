@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import sys
+import subprocess
 import tempfile
 import unittest
 from pathlib import Path
@@ -79,6 +80,30 @@ class SecurityContractTests(unittest.TestCase):
             self.assertTrue(run_daily_digest.can_resume_public_collection(out_dir, signature, now=1100))
             self.assertFalse(run_daily_digest.can_resume_public_collection(out_dir, signature, now=2000))
             self.assertFalse(run_daily_digest.can_resume_public_collection(out_dir, {"user_id": "2"}, now=1100))
+
+    def test_x_chat_401_is_retried_only_once(self) -> None:
+        error = subprocess.CalledProcessError(
+            1,
+            ["chat"],
+            output="",
+            stderr="GET /chat/conversations failed with HTTP 401: Unauthorized",
+        )
+        success = mock.Mock(stdout="", stderr="")
+        with (
+            mock.patch.object(run_daily_digest.subprocess, "run", side_effect=[error, success]) as run,
+            mock.patch.object(run_daily_digest.time, "sleep") as sleep,
+        ):
+            run_daily_digest.run_chat_command(["chat"], {})
+
+        self.assertEqual(run.call_count, 2)
+        sleep.assert_called_once_with(1)
+
+    def test_x_chat_non_auth_failure_is_not_retried(self) -> None:
+        error = subprocess.CalledProcessError(1, ["chat"], output="", stderr="HTTP 429 Too Many Requests")
+        with mock.patch.object(run_daily_digest.subprocess, "run", side_effect=error) as run:
+            with self.assertRaises(run_daily_digest.ChatCollectionError):
+                run_daily_digest.run_chat_command(["chat"], {})
+        self.assertEqual(run.call_count, 1)
 
 
 if __name__ == "__main__":

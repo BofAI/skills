@@ -16,6 +16,9 @@ import chat_x_digest  # noqa: E402
 
 
 class ChatCollectorTests(unittest.TestCase):
+    def setUp(self) -> None:
+        chat_x_digest.RATE_LIMIT_TRACKER.clear()
+
     def test_api_get_retries_transient_url_error(self) -> None:
         response = mock.MagicMock()
         response.__enter__.return_value.read.return_value = b'{"data": []}'
@@ -51,16 +54,6 @@ class ChatCollectorTests(unittest.TestCase):
         self.assertEqual(urlopen.call_count, 1)
         sleep.assert_not_called()
 
-    def test_active_conversations_filters_old_threads_before_key_lookup(self) -> None:
-        cutoff = dt.datetime(2026, 8, 10, 0, tzinfo=dt.timezone.utc)
-        conversations = [
-            {"id": "new", "updated_at": "2026-08-10T01:00:00Z"},
-            {"id": "old", "updated_at": "2026-08-09T01:00:00Z"},
-            {"id": "unknown"},
-        ]
-        active = chat_x_digest.active_conversations(conversations, cutoff)
-        self.assertEqual([item["id"] for item in active], ["new", "unknown"])
-
     def test_collect_conversations_follows_pagination_and_keeps_request_flag(self) -> None:
         responses = [
             {
@@ -95,11 +88,86 @@ class ChatCollectorTests(unittest.TestCase):
             },
         ]
         with mock.patch.object(chat_x_digest, "api_get", side_effect=responses) as api_get:
-            events, keys = chat_x_digest.collect_events("token", "conversation", cutoff)
+            events, keys, scan = chat_x_digest.collect_events(
+                "token",
+                "conversation",
+                cutoff,
+                chat_x_digest.EventRequestBudget(max_requests=20),
+            )
 
         self.assertEqual([item["id"] for item in events], ["new", "old"])
         self.assertEqual(keys, ["key"])
         self.assertEqual(api_get.call_count, 2)
+        self.assertEqual(scan["pages_used"], 2)
+        self.assertFalse(scan["truncated"])
+
+    def test_collect_events_caps_pages_for_busy_conversation(self) -> None:
+        cutoff = dt.datetime(2026, 8, 2, 12, tzinfo=dt.timezone.utc)
+        responses = [
+            {
+                "data": [{"id": f"event-{index}", "created_at": "2026-08-03T01:00:00Z"}],
+                "meta": {"next_token": f"page-{index + 1}"},
+            }
+            for index in range(4)
+        ]
+        budget = chat_x_digest.EventRequestBudget(max_requests=20)
+        with mock.patch.object(chat_x_digest, "api_get", side_effect=responses) as api_get:
+            events, _keys, scan = chat_x_digest.collect_events(
+                "token", "conversation", cutoff, budget, max_pages=3
+            )
+
+        self.assertEqual([item["id"] for item in events], ["event-0", "event-1", "event-2"])
+        self.assertEqual(api_get.call_count, 3)
+        self.assertEqual(budget.used, 3)
+        self.assertTrue(scan["truncated"])
+        self.assertEqual(scan["stop_reason"], "conversation_page_limit")
+
+    def test_event_budget_stops_before_exceeding_safe_request_count(self) -> None:
+        budget = chat_x_digest.EventRequestBudget(max_requests=2)
+        budget.consume()
+        budget.consume()
+        with self.assertRaises(chat_x_digest.EventBudgetExhausted):
+            budget.consume()
+        self.assertEqual(budget.used, 2)
+
+    def test_event_budget_reserves_reported_rate_limit_capacity(self) -> None:
+        budget = chat_x_digest.EventRequestBudget(max_requests=20, reserve=5)
+        chat_x_digest.RATE_LIMIT_TRACKER["/chat/conversations/:id/events"] = {
+            "remaining": 5,
+            "reset": 2000,
+        }
+        with self.assertRaises(chat_x_digest.EventBudgetExhausted):
+            budget.consume(now=1000)
+        self.assertEqual(budget.used, 0)
+
+    def test_old_conversation_stopper_ends_scan_after_three_old_threads(self) -> None:
+        stopper = chat_x_digest.OldConversationStopper(max_consecutive=3)
+        self.assertFalse(stopper.observe(is_old=True))
+        self.assertFalse(stopper.observe(is_old=True))
+        self.assertTrue(stopper.observe(is_old=True))
+        self.assertFalse(stopper.observe(is_old=False))
+        self.assertEqual(stopper.consecutive, 0)
+
+    def test_zero_events_only_fail_after_complete_scan(self) -> None:
+        conversations = [{"id": "one"}]
+        self.assertTrue(chat_x_digest.zero_event_history_is_failure(conversations, 0, scan_complete=True))
+        self.assertFalse(chat_x_digest.zero_event_history_is_failure(conversations, 0, scan_complete=False))
+
+    def test_api_get_tracks_rate_limit_headers(self) -> None:
+        response = mock.MagicMock()
+        response.__enter__.return_value.read.return_value = b'{"data": []}'
+        response.__enter__.return_value.headers = {
+            "x-rate-limit-limit": "30",
+            "x-rate-limit-remaining": "17",
+            "x-rate-limit-reset": "2000",
+        }
+        with mock.patch.object(chat_x_digest.urllib.request, "urlopen", return_value=response):
+            chat_x_digest.api_get("token", "/chat/conversations/abc/events")
+
+        self.assertEqual(
+            chat_x_digest.RATE_LIMIT_TRACKER["/chat/conversations/:id/events"]["remaining"],
+            17,
+        )
 
     def test_unavailable_thread_never_claims_reply_state(self) -> None:
         thread = chat_x_digest.unavailable_thread(

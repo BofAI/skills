@@ -126,6 +126,7 @@ def build_digest_facts(data: dict[str, Any], summary: dict[str, Any]) -> dict[st
                 "likes_on_own_posts items are current likes on own posts published inside the digest window. Report the liker and target post without inventing an exact like time.",
                 "When a message request requires_user_ui, give the exact X interface path and action_url.",
                 "For unknown DM threads, never expose the technical state or ask for verification. List known participants only as: 曾经收到过消息：@sender1、@sender2",
+                "If the X Chat safe scan is incomplete, say only: X Chat 已检查最近的 N 个会话. Do not claim unscanned conversations had no messages and do not expose request-budget internals.",
             ],
         },
         "public": {"counts": {}, "loaded_counts": summary.get("post_counts") or {}, "items": []},
@@ -156,6 +157,15 @@ def build_digest_facts(data: dict[str, Any], summary: dict[str, Any]) -> dict[st
                 }
             )
         if kind == "messages":
+            facts["dms"]["scan"] = {
+                "listed": int(page.get("dm_listed_conversation_count") or 0),
+                "scanned": int(page.get("dm_scanned_conversation_count") or 0),
+                "old": int(page.get("dm_old_conversation_count") or 0),
+                "event_requests": int(page.get("dm_event_request_count") or 0),
+                "complete": bool(page.get("dm_scan_complete")),
+                "stop_reason": str(page.get("dm_scan_stop_reason") or ""),
+                "truncated_conversations": int(page.get("dm_truncated_conversation_count") or 0),
+            }
             if page.get("dm_note"):
                 facts["dms"]["note"] = str(page.get("dm_note") or "")
             if page.get("dm_list_scrolls_used") is not None:
@@ -673,6 +683,21 @@ def render_dm_facts_section(facts: dict[str, Any]) -> str:
         )
     if dms.get("note"):
         lines.append(f"- note: {dms.get('note')}")
+    scan = dms.get("scan") if isinstance(dms.get("scan"), dict) else {}
+    if scan:
+        lines.append(
+            "- safe scan: "
+            f"listed `{int(scan.get('listed') or 0)}`, "
+            f"checked `{int(scan.get('scanned') or 0)}`, "
+            f"event requests `{int(scan.get('event_requests') or 0)}`, "
+            f"complete `{bool(scan.get('complete'))}`, "
+            f"truncated conversations `{int(scan.get('truncated_conversations') or 0)}`"
+        )
+        if not scan.get("complete"):
+            lines.append(
+                f"- final wording: X Chat 已检查最近的 {int(scan.get('scanned') or 0)} 个会话。"
+                " Do not say the remaining conversations are empty and do not expose the stop reason."
+            )
     lines.extend(["", "| participant | reply_state | messages | summarize | noise_reason | excerpt |", "|---|---|---:|---|---|---|"])
     for thread in dms.get("threads") or []:
         lines.append(
