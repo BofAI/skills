@@ -164,7 +164,8 @@ class DigestContextChatTests(unittest.TestCase):
         self.assertEqual(facts["dms"]["threads"][0]["reply_state"], "unknown")
         self.assertFalse(facts["dms"]["threads"][0]["should_summarize"])
         self.assertEqual(facts["dms"]["threads"][0]["noise_reason"], "collection_state_unknown")
-        self.assertTrue(facts["dms"]["threads"][0]["requires_user_ui"])
+        self.assertFalse(facts["dms"]["threads"][0]["requires_user_ui"])
+        self.assertEqual(facts["dms"]["threads"][0]["user_action"], "")
         chat_gaps = [gap for gap in facts["data_gaps"] if gap.get("source") == "x_chat"]
         self.assertEqual(len(chat_gaps), 1)
         self.assertEqual(chat_gaps[0]["status"], "conversation_history_unavailable")

@@ -62,7 +62,7 @@ Public items are normalized into the current-run context. Final facts are filter
 
 ## X Chat Data
 
-X Chat is collected from `/2/chat/conversations` and conversation event history, then decrypted locally with Chat XDK. The exact 24-hour window is enforced from API event timestamps. Every listed conversation is retained: conversations without readable history are marked `unknown` and reported as a data gap. `has_message_requests` is retained only as an unverified internal diagnostic; it is never converted into a count, todo, or user-facing claim. A Chat API or decryption failure fails the whole digest.
+X Chat is collected from `/2/chat/conversations` and conversation event history, then decrypted locally with Chat XDK. The exact 24-hour window is enforced from API event timestamps. Every listed conversation is retained: conversations without readable history are marked `unknown` and reported as a data gap. A Chat API or decryption failure fails the whole digest.
 
 Rules:
 

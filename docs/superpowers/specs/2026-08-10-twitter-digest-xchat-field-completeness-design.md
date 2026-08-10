@@ -68,7 +68,7 @@ X Chat 已检查最近的 N 个会话。
 
 It does not expose budgets, internal field names, raw API paths, user IDs, conversation IDs, or response bodies.
 
-Pending message requests remain a true-only signal: `has_message_requests=true` creates the existing X-interface action. A missing or false field is not evidence that the request inbox is empty.
+The conversation-list message-request marker is ignored because it does not identify a sender, expose content, or prove that a request is currently visible in X. It never creates a count, todo, or X-interface action.
 
 The skill remains permanently read-only and never accepts requests, replies, sends messages, or creates a script to do so.
 

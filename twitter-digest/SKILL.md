@@ -155,7 +155,6 @@ X Chat rules:
 - Chat XDK decrypts messages locally; no Chat passcode is saved.
 - A conversation needs a reply only when its latest in-window text message came from another participant.
 - Process the conversation list in X's returned order. Inspect the first event page before fetching signing keys. Do not classify an unscanned conversation as empty, handled, or waiting for reply.
-- Treat `has_message_requests` only as an unverified internal API diagnostic. It is a boolean, not a request count, and does not identify a sender or prove that a request is currently visible in X. Never turn it into a todo, user-facing claim, or instruction to check the X interface.
 - For an `unknown` conversation, do not expose the technical state or ask the user to verify it. Mention it only as historical context using the exact friendly pattern `曾经收到过消息：@sender1、@sender2`, listing the known participants and adding no explanation or action.
 - Exclude messages with missing/unparseable timestamps and all messages outside the exact 24-hour window.
 - If a required attempted X Chat request or decryption fails, fail the run instead of claiming the inbox is empty. Reaching a deliberate safe-scan boundary is a reported data gap, not a network failure.
@@ -224,7 +223,7 @@ Keep the digest compact and use these six sections only when they contain useful
 - 私信.
 - 数据缺口.
 
-When a verified manual action exists, add a `需要你在 X 界面操作` section near `该处理`. Write plain Chinese instructions rather than exposing raw API fields or English states. The `has_message_requests` flag alone never qualifies as a verified manual action. Do not put unknown conversations in this action section. If unknown conversations have known participants, add one compact informational line elsewhere: `曾经收到过消息：@sender1、@sender2`. Add no technical explanation, warning, or instruction after it.
+When a verified manual action exists, add a `需要你在 X 界面操作` section near `该处理`. Write plain Chinese instructions rather than exposing raw API fields or English states. Do not put unknown conversations in this action section. If unknown conversations have known participants, add one compact informational line elsewhere: `曾经收到过消息：@sender1、@sender2`. Add no technical explanation, warning, or instruction after it.
 
 If `dm_scan_complete=false`, add one quiet informational sentence: `X Chat 已按 X 返回顺序检查 N 个会话。` Do not present this as an error or ask the user to retry immediately.
 
