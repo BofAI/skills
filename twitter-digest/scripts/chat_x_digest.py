@@ -196,13 +196,20 @@ def conversation_is_before_window(
 def collect_conversations(
     token: str,
     maximum: int,
+    max_requests: int = 5,
+    max_empty_pages: int = 3,
 ) -> tuple[list[dict[str, Any]], dict[str, dict[str, Any]], bool, dict[str, Any]]:
     conversations: list[dict[str, Any]] = []
     users: dict[str, dict[str, Any]] = {}
     has_message_requests = False
     missing_id_count = 0
     next_token = ""
-    while len(conversations) < maximum:
+    pages_used = 0
+    empty_pages = 0
+    consecutive_empty_pages = 0
+    seen_tokens: set[str] = set()
+    stop_reason = ""
+    while len(conversations) < maximum and pages_used < max(1, max_requests):
         payload = api_get(
             token,
             "/chat/conversations",
@@ -214,7 +221,14 @@ def collect_conversations(
                 "user.fields": "id,username,name",
             },
         )
-        for item in payload.get("data") or []:
+        pages_used += 1
+        page = [item for item in payload.get("data") or [] if isinstance(item, dict)]
+        if page:
+            consecutive_empty_pages = 0
+        else:
+            empty_pages += 1
+            consecutive_empty_pages += 1
+        for item in page:
             if not isinstance(item, dict):
                 continue
             if not item.get("id"):
@@ -227,13 +241,37 @@ def collect_conversations(
                 users[str(user["id"])] = user
         meta = payload.get("meta") if isinstance(payload.get("meta"), dict) else {}
         has_message_requests = has_message_requests or bool(meta.get("has_message_requests"))
-        next_token = str(meta.get("next_token") or "")
-        if not next_token:
+        candidate_token = str(meta.get("next_token") or "")
+        has_more = bool(meta.get("has_more"))
+        next_token = candidate_token
+        if consecutive_empty_pages >= max(1, max_empty_pages):
+            stop_reason = "empty_page_limit"
             break
+        if not candidate_token:
+            if has_more:
+                stop_reason = "missing_pagination_token"
+            break
+        if candidate_token in seen_tokens:
+            stop_reason = "repeated_pagination_token"
+            break
+        seen_tokens.add(candidate_token)
+        if len(conversations) >= maximum:
+            stop_reason = "conversation_limit"
+            break
+        if pages_used >= max(1, max_requests):
+            stop_reason = "conversation_list_request_limit"
+            break
+        next_token = candidate_token
+    if missing_id_count and not stop_reason:
+        stop_reason = "conversation_id_missing"
+    complete = not stop_reason and not next_token and missing_id_count == 0
     return conversations[:maximum], users, has_message_requests, {
-        "complete": not next_token and missing_id_count == 0,
+        "complete": complete,
         "next_token": next_token,
         "missing_id_count": missing_id_count,
+        "pages_used": pages_used,
+        "empty_pages": empty_pages,
+        "stop_reason": stop_reason,
     }
 
 
@@ -425,12 +463,11 @@ def main() -> None:
     truncated_conversation_count = 0
     missing_message_timestamp_count = 0
     scan_complete = bool(conversation_scan.get("complete"))
-    if conversation_scan.get("next_token"):
+    scan_stop_reason = str(conversation_scan.get("stop_reason") or "")
+    if not scan_stop_reason and conversation_scan.get("next_token"):
         scan_stop_reason = "conversation_list_limit"
-    elif conversation_scan.get("missing_id_count"):
+    elif not scan_stop_reason and conversation_scan.get("missing_id_count"):
         scan_stop_reason = "conversation_id_missing"
-    else:
-        scan_stop_reason = ""
     for conversation in conversations:
         conversation_id = str(conversation.get("id") or "")
         if not conversation_id:

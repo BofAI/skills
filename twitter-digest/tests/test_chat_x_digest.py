@@ -135,7 +135,10 @@ class ChatCollectorTests(unittest.TestCase):
         self.assertEqual([item["id"] for item in conversations], ["one", "three"])
         self.assertEqual(users["2"]["username"], "two")
         self.assertTrue(has_requests)
-        self.assertEqual(scan, {"complete": True, "next_token": "", "missing_id_count": 0})
+        self.assertTrue(scan["complete"])
+        self.assertEqual(scan["next_token"], "")
+        self.assertEqual(scan["missing_id_count"], 0)
+        self.assertEqual(scan["pages_used"], 2)
         self.assertEqual(api_get.call_count, 2)
         self.assertEqual(api_get.call_args_list[1].args[2]["pagination_token"], "next")
         self.assertEqual(
@@ -152,7 +155,8 @@ class ChatCollectorTests(unittest.TestCase):
             conversations, _users, _has_requests, scan = chat_x_digest.collect_conversations("token", 50)
 
         self.assertEqual(len(conversations), 50)
-        self.assertEqual(scan, {"complete": False, "next_token": "more", "missing_id_count": 0})
+        self.assertFalse(scan["complete"])
+        self.assertEqual(scan["next_token"], "more")
 
     def test_collect_conversations_counts_missing_ids_as_incomplete(self) -> None:
         response = {
@@ -163,7 +167,72 @@ class ChatCollectorTests(unittest.TestCase):
             conversations, _users, _has_requests, scan = chat_x_digest.collect_conversations("token", 50)
 
         self.assertEqual(conversations, [{"id": "valid"}])
-        self.assertEqual(scan, {"complete": False, "next_token": "", "missing_id_count": 1})
+        self.assertFalse(scan["complete"])
+        self.assertEqual(scan["missing_id_count"], 1)
+
+    def test_collect_conversations_continues_after_one_empty_page(self) -> None:
+        responses = [
+            {"meta": {"next_token": "next", "has_more": True}},
+            {"data": [{"id": "one"}], "meta": {"has_more": False}},
+        ]
+        with mock.patch.object(chat_x_digest, "api_get", side_effect=responses) as api_get:
+            conversations, _users, _requests, scan = chat_x_digest.collect_conversations("token", 10)
+
+        self.assertEqual(conversations, [{"id": "one"}])
+        self.assertEqual(api_get.call_count, 2)
+        self.assertTrue(scan["complete"])
+        self.assertEqual(scan["empty_pages"], 1)
+
+    def test_collect_conversations_stops_after_three_consecutive_empty_pages(self) -> None:
+        responses = [
+            {"meta": {"next_token": f"page-{index + 1}", "has_more": True}}
+            for index in range(3)
+        ]
+        with mock.patch.object(chat_x_digest, "api_get", side_effect=responses) as api_get:
+            conversations, _users, _requests, scan = chat_x_digest.collect_conversations("token", 10)
+
+        self.assertEqual(conversations, [])
+        self.assertEqual(api_get.call_count, 3)
+        self.assertFalse(scan["complete"])
+        self.assertEqual(scan["stop_reason"], "empty_page_limit")
+
+    def test_collect_conversations_stops_on_repeated_pagination_token(self) -> None:
+        responses = [
+            {"data": [{"id": "one"}], "meta": {"next_token": "same", "has_more": True}},
+            {"data": [{"id": "two"}], "meta": {"next_token": "same", "has_more": True}},
+        ]
+        with mock.patch.object(chat_x_digest, "api_get", side_effect=responses) as api_get:
+            conversations, _users, _requests, scan = chat_x_digest.collect_conversations("token", 10)
+
+        self.assertEqual([item["id"] for item in conversations], ["one", "two"])
+        self.assertEqual(api_get.call_count, 2)
+        self.assertFalse(scan["complete"])
+        self.assertEqual(scan["stop_reason"], "repeated_pagination_token")
+
+    def test_collect_conversations_stops_when_has_more_has_no_token(self) -> None:
+        with mock.patch.object(
+            chat_x_digest,
+            "api_get",
+            return_value={"data": [{"id": "one"}], "meta": {"has_more": True}},
+        ) as api_get:
+            conversations, _users, _requests, scan = chat_x_digest.collect_conversations("token", 10)
+
+        self.assertEqual(conversations, [{"id": "one"}])
+        self.assertEqual(api_get.call_count, 1)
+        self.assertFalse(scan["complete"])
+        self.assertEqual(scan["stop_reason"], "missing_pagination_token")
+
+    def test_collect_conversations_never_exceeds_five_list_requests(self) -> None:
+        responses = [
+            {"data": [{"id": str(index)}], "meta": {"next_token": f"page-{index + 1}", "has_more": True}}
+            for index in range(5)
+        ]
+        with mock.patch.object(chat_x_digest, "api_get", side_effect=responses) as api_get:
+            conversations, _users, _requests, scan = chat_x_digest.collect_conversations("token", 10)
+
+        self.assertEqual(len(conversations), 5)
+        self.assertEqual(api_get.call_count, 5)
+        self.assertEqual(scan["stop_reason"], "conversation_list_request_limit")
 
     def test_collect_events_stops_after_page_older_than_cutoff(self) -> None:
         cutoff = dt.datetime(2026, 8, 2, 12, tzinfo=dt.timezone.utc)
