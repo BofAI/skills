@@ -237,16 +237,18 @@ This skill never sends messages, even after review. If the user asks to send or 
 Codex:
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/BofAI/skills/v1.5.14-beta.13/twitter-digest/install.sh | env TWITTER_DIGEST_INSTALL_CLIENT=codex sh
+curl -fsSL https://raw.githubusercontent.com/BofAI/skills/v1.5.14-beta.14/twitter-digest/install.sh | env TWITTER_DIGEST_INSTALL_CLIENT=codex sh
 ```
 
 Claude Code:
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/BofAI/skills/v1.5.14-beta.13/twitter-digest/install.sh | env TWITTER_DIGEST_INSTALL_CLIENT=claude TWITTER_DIGEST_ALLOW_CLAUDE_COMMANDS=1 TWITTER_DIGEST_ALLOW_CLAUDE_STATE_READ=1 sh
+curl -fsSL https://raw.githubusercontent.com/BofAI/skills/v1.5.14-beta.14/twitter-digest/install.sh | env TWITTER_DIGEST_INSTALL_CLIENT=claude TWITTER_DIGEST_ALLOW_CLAUDE_COMMANDS=1 TWITTER_DIGEST_ALLOW_CLAUDE_STATE_READ=1 sh
 ```
 
 The installer checks Python 3.10+ and installs the skill into the target agent skill directory.
+
+After a standard install, immediately run the installed unified X API and X Chat configuration check. Reuse valid saved state and prompt only for missing or invalid setup. Custom `--skills-dir` installs and dry runs skip this step. Set `TWITTER_DIGEST_CONFIGURE_AFTER_INSTALL=0` only when the user intentionally wants installation without configuration.
 
 Default install targets the current agent client:
 

@@ -7,14 +7,16 @@
 Codex:
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/BofAI/skills/v1.5.14-beta.13/twitter-digest/install.sh | env TWITTER_DIGEST_INSTALL_CLIENT=codex sh
+curl -fsSL https://raw.githubusercontent.com/BofAI/skills/v1.5.14-beta.14/twitter-digest/install.sh | env TWITTER_DIGEST_INSTALL_CLIENT=codex sh
 ```
 
 Claude Code:
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/BofAI/skills/v1.5.14-beta.13/twitter-digest/install.sh | env TWITTER_DIGEST_INSTALL_CLIENT=claude TWITTER_DIGEST_ALLOW_CLAUDE_COMMANDS=1 TWITTER_DIGEST_ALLOW_CLAUDE_STATE_READ=1 sh
+curl -fsSL https://raw.githubusercontent.com/BofAI/skills/v1.5.14-beta.14/twitter-digest/install.sh | env TWITTER_DIGEST_INSTALL_CLIENT=claude TWITTER_DIGEST_ALLOW_CLAUDE_COMMANDS=1 TWITTER_DIGEST_ALLOW_CLAUDE_STATE_READ=1 sh
 ```
+
+Standard installs immediately run the unified X API and X Chat configuration check. Existing valid state is reused. Set `TWITTER_DIGEST_CONFIGURE_AFTER_INSTALL=0` to install without configuration; custom `--skills-dir` installs and dry runs also skip it.
 
 ## Entry Points
 
@@ -43,12 +45,13 @@ The wrapper uses API directly.
 
 ## Runtime Flow
 
-1. `run_daily_digest.py` loads saved `.state/api_config.json`.
-2. If an OAuth refresh token exists, it refreshes the access token when needed.
-3. If API or X Chat state is missing or invalid, it opens one configuration wizard in a real Terminal, then exits the current command with `configuration_required`.
-4. After the user finishes API configuration, run the digest command again.
-5. It requires saved X Chat keys, then runs `api_x_digest.py` and `chat_x_digest.py`.
-6. It builds current-run context files with `digest_context.py`.
+1. Standard installation checks X API and X Chat configuration before the first digest; the runtime wrapper repeats this check as a fallback.
+2. `run_daily_digest.py` loads saved `.state/api_config.json`.
+3. If an OAuth refresh token exists, it refreshes the access token when needed.
+4. If API or X Chat state is missing or invalid, it opens one configuration wizard in a real Terminal, then exits the current command with `configuration_required`.
+5. After the user finishes API configuration, run the digest command again.
+6. It requires saved X Chat keys, then runs `api_x_digest.py` and `chat_x_digest.py`.
+7. It builds current-run context files with `digest_context.py`.
 
 OAuth authorization may open the X authorization page, but that is not data collection.
 
