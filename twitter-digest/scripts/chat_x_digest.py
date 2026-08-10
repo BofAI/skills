@@ -21,9 +21,10 @@ from collector_commands import endpoint_category, structured_api_error
 
 MAX_API_ATTEMPTS = 4
 RETRYABLE_HTTP_CODES = {408, 425, 429, 500, 502, 503, 504}
-DEFAULT_EVENT_REQUEST_BUDGET = 20
+DEFAULT_MAX_CONVERSATIONS = 10
+DEFAULT_EVENT_REQUEST_BUDGET = 10
 DEFAULT_EVENT_RATE_LIMIT_RESERVE = 5
-DEFAULT_MAX_EVENT_PAGES_PER_CONVERSATION = 3
+DEFAULT_MAX_EVENT_PAGES_PER_CONVERSATION = 1
 DEFAULT_MAX_CONSECUTIVE_OLD_CONVERSATIONS = 3
 EVENT_RATE_LIMIT_ROUTE = "/chat/conversations/:id/events"
 RATE_LIMIT_TRACKER: dict[str, dict[str, int]] = {}
@@ -106,7 +107,9 @@ def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--bearer-token", default=os.environ.get("X_BEARER_TOKEN") or "")
     parser.add_argument("--hours", type=int, default=24)
-    parser.add_argument("--max-conversations", type=int, default=50)
+    parser.add_argument("--max-conversations", type=int, default=DEFAULT_MAX_CONVERSATIONS)
+    parser.add_argument("--max-event-requests", type=int, default=DEFAULT_EVENT_REQUEST_BUDGET)
+    parser.add_argument("--max-event-pages", type=int, default=DEFAULT_MAX_EVENT_PAGES_PER_CONVERSATION)
     parser.add_argument("--out", required=True)
     return parser.parse_args()
 
@@ -408,7 +411,7 @@ def main() -> None:
     fetched_event_count = 0
     unavailable_thread_count = 0
     refreshed_user_ids: set[str] = set()
-    event_budget = EventRequestBudget(DEFAULT_EVENT_REQUEST_BUDGET)
+    event_budget = EventRequestBudget(max(1, args.max_event_requests))
     old_stopper = OldConversationStopper(DEFAULT_MAX_CONSECUTIVE_OLD_CONVERSATIONS)
     scanned_conversation_count = 0
     old_conversation_count = 0
@@ -431,6 +434,7 @@ def main() -> None:
                 conversation_id,
                 cutoff,
                 event_budget,
+                max_pages=max(1, args.max_event_pages),
             )
             scanned_conversation_count += 1
             fetched_event_count += len(raw_events)

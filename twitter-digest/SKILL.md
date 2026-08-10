@@ -148,7 +148,7 @@ Default scope:
 - X Chat conversations and text messages from the same strict 24-hour window.
 - Optional keyword searches only when the user explicitly passes `--keywords`.
 
-For an explicit seven-day Chat request, run `RUN_DAILY_DIGEST --chat-window-hours 168`. This changes only the X Chat window; public timeline, mentions, and own activity remain on the strict 24-hour digest window.
+For an explicit seven-day Chat request, run `RUN_DAILY_DIGEST --chat-window-hours 168 --chat-scan more`. This changes only the X Chat window; public timeline, mentions, and own activity remain on the strict 24-hour digest window. If the user explicitly asks to “查看更多私信” or see more Chat conversations, run `RUN_DAILY_DIGEST --chat-scan more`.
 
 X Chat rules:
 
@@ -160,7 +160,7 @@ X Chat rules:
 - For an `unknown` conversation, do not expose the technical state or ask the user to verify it. Mention it only as historical context using the exact friendly pattern `曾经收到过消息：@sender1、@sender2`, listing the known participants and adding no explanation or action.
 - Exclude messages with missing/unparseable timestamps and all messages outside the exact 24-hour window.
 - If a required attempted X Chat request or decryption fails, fail the run instead of claiming the inbox is empty. Reaching a deliberate safe-scan boundary is a reported data gap, not a network failure.
-- Use at most 20 Chat event requests per run, reserve the last 5 requests reported by X, load at most 3 event pages per conversation, and stop after 3 consecutive conversations whose newest event predates the requested window.
+- In the default `recent` profile, inspect at most 10 conversations, use at most 10 Chat event requests, and load at most 1 event page per conversation. Use the `more` profile only on an explicit user request; it allows at most 50 conversations, 20 event requests, and 3 event pages per conversation. Always reserve the last 5 requests reported by X.
 - Fetch participant signing keys only after the first event page shows that a conversation may contain in-window events.
 - When safe scanning stops before the returned list is exhausted, say `X Chat 已按 X 返回顺序检查 N 个会话`. The conversations endpoint does not expose a reliable recency field, so never call this list “最近的会话”. Do not expose request-budget internals or say the remaining conversations had no messages.
 - A remaining conversation-list pagination token or a listed conversation without an ID is also a safe-scan boundary. Mark the scan incomplete and use the same friendly checked-count sentence; never claim that later or unscannable conversations had no messages.

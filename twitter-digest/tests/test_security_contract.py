@@ -19,6 +19,22 @@ import script_utils  # noqa: E402
 
 
 class SecurityContractTests(unittest.TestCase):
+    def test_chat_scan_profiles_are_bounded_and_seven_days_expands(self) -> None:
+        self.assertEqual(
+            run_daily_digest.chat_scan_profile("recent", 24),
+            {"max_conversations": 10, "event_requests": 10, "event_pages": 1},
+        )
+        self.assertEqual(
+            run_daily_digest.chat_scan_profile("more", 24),
+            {"max_conversations": 50, "event_requests": 20, "event_pages": 3},
+        )
+        self.assertEqual(run_daily_digest.chat_scan_profile("recent", 168)["max_conversations"], 50)
+
+    def test_chat_collector_command_passes_selected_profile(self) -> None:
+        command = run_daily_digest.chat_collector_command(
+            Path("/python"), Path("/chat.py"), Path("/out.json"), 24, "recent"
+        )
+        self.assertEqual(command[-6:], ["--max-conversations", "10", "--max-event-requests", "10", "--max-event-pages", "1"])
     def test_beta12_installer_and_docs_are_pinned(self) -> None:
         root = SCRIPTS.parent
         self.assertIn("v1.5.14-beta.12", (root / "install.sh").read_text(encoding="utf-8"))

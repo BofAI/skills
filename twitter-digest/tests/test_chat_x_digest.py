@@ -24,6 +24,11 @@ class ChatCollectorTests(unittest.TestCase):
         chat_x_digest.RATE_LIMIT_TRACKER.clear()
         chat_x_digest.HTTP_REQUEST_COUNTS.clear()
 
+    def test_default_collector_profile_is_bounded_to_ten_recent_conversations(self) -> None:
+        self.assertEqual(chat_x_digest.DEFAULT_MAX_CONVERSATIONS, 10)
+        self.assertEqual(chat_x_digest.DEFAULT_EVENT_REQUEST_BUDGET, 10)
+        self.assertEqual(chat_x_digest.DEFAULT_MAX_EVENT_PAGES_PER_CONVERSATION, 1)
+
     def test_api_get_retries_transient_url_error(self) -> None:
         response = mock.MagicMock()
         response.__enter__.return_value.read.return_value = b'{"data": []}'
@@ -178,6 +183,7 @@ class ChatCollectorTests(unittest.TestCase):
                 "conversation",
                 cutoff,
                 chat_x_digest.EventRequestBudget(max_requests=20),
+                max_pages=3,
             )
 
         self.assertEqual([item["id"] for item in events], ["new", "old"])

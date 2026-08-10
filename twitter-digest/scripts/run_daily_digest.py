@@ -32,6 +32,10 @@ DEFAULT_API_PUBLIC_ITEMS = 300
 UNSUPPORTED_OPTION_MESSAGE = "Source selection is no longer supported. twitter-digest uses API only."
 REQUIRED_CHAT_SCOPES = {"dm.read", "users.read", "tweet.read"}
 CHAT_RETRY_MAX_AGE_SECONDS = 15 * 60
+CHAT_SCAN_PROFILES = {
+    "recent": {"max_conversations": 10, "event_requests": 10, "event_pages": 1},
+    "more": {"max_conversations": 50, "event_requests": 20, "event_pages": 3},
+}
 
 
 class ChatCollectionError(RuntimeError):
@@ -68,6 +72,12 @@ def parse_args() -> argparse.Namespace:
     )
     parser.add_argument("--public-window-hours", type=int, default=24, help="Stop loading older public timeline items once posts beyond this window are detected.")
     parser.add_argument("--chat-window-hours", type=int, default=24, help="Collect X Chat messages from this many recent hours. Default: 24; use 168 for seven days.")
+    parser.add_argument(
+        "--chat-scan",
+        choices=("recent", "more"),
+        default="recent",
+        help="X Chat scan depth. Default: recent (10 conversations); use more only when explicitly requested.",
+    )
     parser.add_argument("--headless", action="store_true", help=argparse.SUPPRESS)
     parser.add_argument("--headed", action="store_true", help=argparse.SUPPRESS)
     parser.add_argument("--non-interactive", action="store_true", help=argparse.SUPPRESS)
@@ -255,20 +265,43 @@ def run_chat_configuration(extra_args: list[str]) -> None:
     subprocess.run([sys.executable, str(script), *extra_args], check=True)
 
 
-def collect_chat(out_dir: Path, env: dict[str, str], hours: int) -> None:
+def chat_scan_profile(scan: str, hours: int) -> dict[str, int]:
+    selected = "more" if int(hours) >= 168 else scan
+    return dict(CHAT_SCAN_PROFILES[selected])
+
+
+def chat_collector_command(
+    runtime_python: Path,
+    script: Path,
+    out_path: Path,
+    hours: int,
+    scan: str,
+) -> list[str]:
+    profile = chat_scan_profile(scan, hours)
+    return [
+        str(runtime_python),
+        str(script),
+        "--hours", str(max(1, hours)),
+        "--out", str(out_path),
+        "--max-conversations", str(profile["max_conversations"]),
+        "--max-event-requests", str(profile["event_requests"]),
+        "--max-event-pages", str(profile["event_pages"]),
+    ]
+
+
+def collect_chat(out_dir: Path, env: dict[str, str], hours: int, scan: str = "recent") -> None:
     runtime_python = CHAT_RUNTIME_DIR / "bin" / "python"
     runtime_ready, runtime_error = chat_runtime_status()
     if not runtime_ready:
         raise SystemExit(f"{runtime_error} Run --configure again.")
     chat_page_path = out_dir / "chat-page.json"
-    cmd = [
-        str(runtime_python),
-        str(Path(__file__).with_name("chat_x_digest.py")),
-        "--hours",
-        str(max(1, hours)),
-        "--out",
-        str(chat_page_path),
-    ]
+    cmd = chat_collector_command(
+        runtime_python,
+        Path(__file__).with_name("chat_x_digest.py"),
+        chat_page_path,
+        hours,
+        scan,
+    )
     try:
         run_chat_command(cmd, env)
         data = json.loads((out_dir / "digest-input.json").read_text(encoding="utf-8"))
@@ -393,7 +426,7 @@ def main() -> None:
                 print(f"API collection failed: {summary}", file=sys.stderr, flush=True)
                 raise SystemExit(exc.returncode) from exc
         mark_chat_retry(out_dir, signature)
-    collect_chat(out_dir, child_env, args.chat_window_hours)
+    collect_chat(out_dir, child_env, args.chat_window_hours, args.chat_scan)
     clear_chat_retry(out_dir)
     build_current_context_from_file(
         input_path=out_dir / "digest-input.json",
