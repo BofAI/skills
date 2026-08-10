@@ -407,25 +407,22 @@ def is_own_public_item(item: dict[str, Any], clean_self: str) -> bool:
 def find_reply_evidence(mention: dict[str, Any], own_items: list[dict[str, Any]]) -> str:
     mention_time = parse_item_time(mention.get("raw_time"))
     mention_id = compact_text(mention.get("id"))
-    conversation_id = compact_text(mention.get("conversation_id"))
-    mention_author = clean_handle(mention.get("author_username")).lower()
     for own in own_items:
         own_time = parse_item_time(own.get("raw_time"))
         if mention_time and own_time and own_time <= mention_time:
             continue
-        if mention_id and referenced_ids(own) and mention_id in referenced_ids(own):
+        if mention_id and mention_id in replied_to_ids(own):
             return f"own reply references mention tweet {mention_id}"
-        own_conversation_id = compact_text(own.get("conversation_id"))
-        if conversation_id and own_conversation_id and own_conversation_id == conversation_id and compact_text(own.get("id")) != mention_id:
-            return f"own post appears later in same conversation {conversation_id}"
-        if mention_author and f"@{mention_author}" in str(own.get("text_excerpt") or "").lower():
-            return f"own post mentions @{mention_author} after the mention"
     return ""
 
 
-def referenced_ids(item: dict[str, Any]) -> set[str]:
+def replied_to_ids(item: dict[str, Any]) -> set[str]:
     refs = item.get("referenced_tweets") if isinstance(item.get("referenced_tweets"), list) else []
-    return {compact_text(ref.get("id")) for ref in refs if isinstance(ref, dict) and ref.get("id")}
+    return {
+        compact_text(ref.get("id"))
+        for ref in refs
+        if isinstance(ref, dict) and ref.get("type") == "replied_to" and ref.get("id")
+    }
 
 
 def author_from_url(value: Any) -> str:

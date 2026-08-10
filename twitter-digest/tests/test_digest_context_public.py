@@ -12,6 +12,69 @@ import digest_context  # noqa: E402
 
 
 class DigestContextPublicTests(unittest.TestCase):
+    def test_later_post_in_same_conversation_is_not_reply_evidence(self) -> None:
+        mention = {
+            "kind": "mentions_notifications",
+            "id": "200",
+            "conversation_id": "thread",
+            "author_username": "alice",
+            "raw_time": "2026-08-06T02:00:00Z",
+            "referenced_tweets": [],
+        }
+        own = {
+            "kind": "own_profile",
+            "id": "201",
+            "conversation_id": "thread",
+            "author_username": "owner",
+            "raw_time": "2026-08-06T03:00:00Z",
+            "referenced_tweets": [],
+        }
+
+        result = digest_context.annotate_public_reply_states([mention, own], "owner")[0]
+
+        self.assertNotEqual(result.get("reply_state"), "already_replied")
+
+    def test_later_post_mentioning_same_author_is_not_reply_evidence(self) -> None:
+        mention = {
+            "kind": "mentions_search",
+            "id": "200",
+            "author_username": "alice",
+            "raw_time": "2026-08-06T02:00:00Z",
+            "referenced_tweets": [],
+        }
+        own = {
+            "kind": "own_profile",
+            "id": "201",
+            "author_username": "owner",
+            "raw_time": "2026-08-06T03:00:00Z",
+            "text_excerpt": "hello @alice",
+            "referenced_tweets": [],
+        }
+
+        result = digest_context.annotate_public_reply_states([mention, own], "owner")[0]
+
+        self.assertNotEqual(result.get("reply_state"), "already_replied")
+
+    def test_direct_later_reply_reference_is_reply_evidence(self) -> None:
+        mention = {
+            "kind": "mentions_notifications",
+            "id": "200",
+            "author_username": "alice",
+            "raw_time": "2026-08-06T02:00:00Z",
+            "referenced_tweets": [],
+        }
+        own = {
+            "kind": "own_profile",
+            "id": "201",
+            "author_username": "owner",
+            "raw_time": "2026-08-06T03:00:00Z",
+            "referenced_tweets": [{"id": "200", "type": "replied_to"}],
+        }
+
+        result = digest_context.annotate_public_reply_states([mention, own], "owner")[0]
+
+        self.assertEqual(result["reply_state"], "already_replied")
+
     def test_direct_reply_to_own_post_is_not_labeled_unverified(self) -> None:
         items = [
             {
