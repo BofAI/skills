@@ -86,7 +86,7 @@ def configure_all() -> None:
         if chat_configured() and existing_chat_user != user_id:
             clear_chat_config()
         print(f"X Chat 需要配置：{chat_error}", flush=True)
-        print("请输入 X Chat passcode。它只用于本次解锁，不会保存。", flush=True)
+        print("接下来检查 X Chat passcode；如果尚未设置，会引导你到 X「消息」页面完成设置。", flush=True)
         run_child("configure_chat.py")
         chat_ready, chat_error = chat_status(user_id)
         if not chat_ready:
@@ -134,7 +134,7 @@ def main() -> None:
             args=[],
             cwd=Path(__file__).resolve().parents[1],
             heading="X 日报统一配置向导",
-            description="请在此窗口依次输入 Client ID、Client Secret 和 X Chat passcode，并在浏览器完成 OAuth 授权。",
+            description="请在此窗口完成 X API 授权和 X Chat 配置；如果尚未设置 passcode，会引导你到 X「消息」页面。",
         )
         if opened:
             print("已打开一个 Terminal 窗口，用于一次性完成 X API 和 X Chat 配置。", flush=True)

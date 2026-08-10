@@ -107,7 +107,7 @@ def open_required_config_in_terminal(reason: str) -> bool:
         args=[],
         cwd=Path(__file__).resolve().parents[1],
         heading="X 日报统一配置向导",
-        description=f"{reason}。请在此窗口依次输入 Client ID、Client Secret 和 X Chat passcode。",
+        description=f"{reason}。请在此窗口完成 X API 授权和 X Chat 配置；如果尚未设置 passcode，会引导你到 X「消息」页面。",
     )
     if not opened:
         return False
@@ -247,7 +247,7 @@ def run_chat_configuration(extra_args: list[str]) -> None:
             args=[],
             cwd=Path(__file__).resolve().parents[1],
             heading="X Chat 配置向导",
-            description="请输入 X Chat passcode 解锁密钥。passcode 不会保存，也不要粘贴到 Agent 对话。",
+            description="如果 X Chat 尚未设置 passcode，会引导你先到 X「消息」页面完成设置；已有 passcode 则只在本机解锁，不会保存。",
         )
         if opened:
             print("已打开 Terminal 窗口用于配置 X Chat。", flush=True)

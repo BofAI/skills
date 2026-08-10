@@ -16,6 +16,78 @@ from collector_commands import parse_structured_api_error  # noqa: E402
 
 
 class ConfigureChatTests(unittest.TestCase):
+    def test_missing_passcode_key_guides_user_without_preparing_runtime(self) -> None:
+        api_config = {
+            "bearer_token": "token",
+            "user_id": "secret-user",
+            "scopes": "dm.read users.read tweet.read",
+        }
+        with (
+            mock.patch.object(configure_chat, "load_api_config", return_value=api_config),
+            mock.patch.object(configure_chat, "refresh_oauth_token_if_needed", return_value=api_config),
+            mock.patch.object(configure_chat, "chat_configured", return_value=False),
+            mock.patch.object(configure_chat, "api_get", return_value={"data": []}),
+            mock.patch.object(configure_chat, "choose_missing_passcode_action") as choose,
+            mock.patch.object(configure_chat, "ensure_runtime") as ensure_runtime,
+        ):
+            configure_chat.configure()
+
+        choose.assert_called_once_with()
+        ensure_runtime.assert_not_called()
+
+    def test_missing_passcode_action_opens_messages_only_on_enter(self) -> None:
+        opened: list[str] = []
+        configure_chat.choose_missing_passcode_action(input_fn=lambda _prompt: "", open_url=opened.append)
+        self.assertEqual(opened, ["https://x.com/messages"])
+
+        opened.clear()
+        configure_chat.choose_missing_passcode_action(input_fn=lambda _prompt: "q", open_url=opened.append)
+        self.assertEqual(opened, [])
+
+    def test_unlock_retries_locally_three_times(self) -> None:
+        record = {"juicebox_config": {"version": 1}}
+        with (
+            mock.patch.object(configure_chat.getpass, "getpass", side_effect=["bad-1", "bad-2", "good"]),
+            mock.patch.object(
+                configure_chat,
+                "run_unlock_helper",
+                side_effect=[SystemExit("secret traceback"), SystemExit("another traceback"), b"private"],
+            ) as unlock,
+            mock.patch("builtins.print"),
+        ):
+            result = configure_chat.unlock_with_passcode_retries(Path("/python"), record)
+
+        self.assertEqual(result, b"private")
+        self.assertEqual(unlock.call_count, 3)
+
+    def test_configure_reuses_one_key_fetch_and_runtime_across_passcode_retries(self) -> None:
+        api_config = {
+            "bearer_token": "token",
+            "user_id": "secret-user",
+            "scopes": "dm.read users.read tweet.read",
+        }
+        record = {"juicebox_config": {"version": 1}, "public_key_version": "2"}
+        with (
+            mock.patch.object(configure_chat, "load_api_config", return_value=api_config),
+            mock.patch.object(configure_chat, "refresh_oauth_token_if_needed", return_value=api_config),
+            mock.patch.object(configure_chat, "chat_configured", return_value=False),
+            mock.patch.object(configure_chat, "api_get", return_value={"data": [record]}) as api_get,
+            mock.patch.object(configure_chat, "ensure_runtime", return_value=Path("/python")) as runtime,
+            mock.patch.object(configure_chat.getpass, "getpass", side_effect=["bad", "bad", "good"]),
+            mock.patch.object(
+                configure_chat,
+                "run_unlock_helper",
+                side_effect=[SystemExit("hidden"), SystemExit("hidden"), b"private"],
+            ),
+            mock.patch.object(configure_chat, "save_chat_config") as save,
+            mock.patch("builtins.print"),
+        ):
+            configure_chat.configure()
+
+        api_get.assert_called_once_with("token", "/users/secret-user/public_keys")
+        runtime.assert_called_once_with()
+        save.assert_called_once()
+
     def test_configure_fetches_all_public_key_fields_without_selector(self) -> None:
         api_config = {
             "bearer_token": "token",
@@ -27,7 +99,7 @@ class ConfigureChatTests(unittest.TestCase):
             mock.patch.object(configure_chat, "refresh_oauth_token_if_needed", return_value=api_config),
             mock.patch.object(configure_chat, "chat_configured", return_value=False),
             mock.patch.object(configure_chat, "api_get", return_value={"data": []}) as api_get,
-            self.assertRaisesRegex(SystemExit, "No passcode-backed X Chat public key"),
+            mock.patch.object(configure_chat, "choose_missing_passcode_action"),
         ):
             configure_chat.configure()
 

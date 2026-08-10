@@ -12,6 +12,7 @@ import sys
 import time
 import urllib.error
 import urllib.request
+import webbrowser
 from pathlib import Path
 
 from api_config_store import load_api_config, refresh_oauth_token_if_needed
@@ -87,6 +88,38 @@ def run_unlock_helper(python: Path, passcode: str, record: dict[str, object]) ->
         raise SystemExit("X Chat key unlock returned an invalid key blob.") from exc
 
 
+def choose_missing_passcode_action(input_fn=input, open_url=webbrowser.open) -> None:
+    print(
+        "你的 X Chat 还没有设置 passcode，因此暂时无法读取加密消息。\n"
+        "请先在 X 中打开「消息」，按照 X 的提示开启 X Chat 并设置 passcode。\n"
+        "设置完成后，回到这里重新运行安装或配置即可。"
+    )
+    choice = input_fn("按 Enter 打开 X 消息页面，输入 q 暂时退出：").strip().lower()
+    if choice == "":
+        open_url("https://x.com/messages")
+
+
+def unlock_with_passcode_retries(
+    python: Path,
+    record: dict[str, object],
+    attempts: int = 3,
+) -> bytes | None:
+    for attempt in range(1, attempts + 1):
+        passcode = getpass.getpass("请输入 X Chat passcode（只在本机解锁，本工具不会保存）：")
+        if not passcode:
+            print(f"未输入 passcode。还可以重试 {attempts - attempt} 次。")
+            continue
+        try:
+            return run_unlock_helper(python, passcode, record)
+        except SystemExit:
+            remaining = attempts - attempt
+            if remaining:
+                print(f"passcode 不正确或暂时无法解锁，请再试一次（还可尝试 {remaining} 次）。")
+            else:
+                print("连续 3 次未能解锁。配置没有改动，请确认 passcode 后重新运行。")
+    return None
+
+
 def api_get(token: str, path: str) -> dict[str, object]:
     request = urllib.request.Request(
         "https://api.x.com/2" + path,
@@ -156,15 +189,15 @@ def configure() -> None:
     records = payload.get("data") if isinstance(payload, dict) else None
     usable = [record for record in (records or []) if isinstance(record, dict) and record.get("juicebox_config")]
     if not usable:
-        raise SystemExit("No passcode-backed X Chat public key was found for this account. Open X Chat in X and complete its key setup first.")
+        choose_missing_passcode_action()
+        return
     record = usable[-1]
     # Finish network installation and validate the native module before asking
     # for a secret, so installation failures do not require passcode re-entry.
     python = ensure_runtime()
-    passcode = getpass.getpass("X Chat passcode (used only to unlock keys now; it will not be saved): ")
-    if not passcode:
-        raise SystemExit("No X Chat passcode entered. Configuration was not changed.")
-    private_blob = run_unlock_helper(python, passcode, record)
+    private_blob = unlock_with_passcode_retries(python, record)
+    if private_blob is None:
+        raise SystemExit("X Chat 尚未配置。请确认 passcode 后重新运行配置。")
     save_chat_config(
         {
             "enabled": True,
@@ -205,7 +238,7 @@ def main() -> None:
             args=[],
             cwd=Path(__file__).resolve().parents[1],
             heading="X Chat 配置向导",
-            description="请输入 X Chat passcode 解锁密钥。passcode 不会保存，也不要粘贴到 Agent 对话。",
+            description="如果 X Chat 尚未设置 passcode，会引导你先到 X「消息」页面完成设置；已有 passcode 则只在本机解锁，不会保存。",
         )
         if opened:
             print("已打开 Terminal 窗口用于配置 X Chat。", flush=True)
