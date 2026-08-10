@@ -161,6 +161,7 @@ X Chat rules:
 - Exclude messages with missing/unparseable timestamps and all messages outside the exact 24-hour window.
 - If any required X Chat request or decryption fails, fail the run instead of claiming the inbox is empty.
 - Filter conversations by the requested Chat window before fetching participant signing keys or event history. Keep conversations with missing timestamps so the optimization never silently drops uncertain data.
+- Cache participant signing public keys locally for 24 hours, keyed by X account and user ID. Query only missing or expired entries. If Chat XDK reports verification/decryption errors, refresh the affected conversation's keys once and retry; fail normally if verification still fails.
 - On HTTP 429, stop immediately and report X's retry delay when available. Do not repeatedly hit the same rate-limited endpoint inside one run.
 
 Time window rules:
@@ -262,6 +263,7 @@ Each run writes only current-run files:
 - `<installed-skill>/.state/config.json`
 - `<installed-skill>/.state/api_config.json`
 - `<installed-skill>/.state/chat/config.json`
+- `<installed-skill>/.state/chat/signing_keys.json`
 - `<installed-skill>/.state/chat/runtime/`
 - `<installed-skill>/.state/run/digest-context.md`
 - `<installed-skill>/.state/run/digest-context.json`

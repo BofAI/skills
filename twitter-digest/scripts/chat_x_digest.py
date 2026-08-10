@@ -15,7 +15,7 @@ import urllib.request
 from pathlib import Path
 from typing import Any
 
-from chat_config_store import load_chat_config
+from chat_config_store import cached_signing_keys, load_chat_config
 
 
 MAX_API_ATTEMPTS = 4
@@ -157,27 +157,40 @@ def collect_events(token: str, conversation_id: str, cutoff: dt.datetime) -> tup
     return events, list(dict.fromkeys(key_events))
 
 
-def signing_keys(token: str, user_ids: set[str]) -> list[dict[str, Any]]:
+def fetch_user_signing_keys(token: str, user_id: str) -> list[dict[str, Any]]:
     result: list[dict[str, Any]] = []
-    for user_id in sorted(user_ids):
-        payload = api_get(
-            token,
-            f"/users/{user_id}/public_keys",
-            {"public_key.fields": "public_key_version,public_key,signing_public_key,identity_public_key_signature"},
+    payload = api_get(
+        token,
+        f"/users/{user_id}/public_keys",
+        {"public_key.fields": "public_key_version,public_key,signing_public_key,identity_public_key_signature"},
+    )
+    for record in payload.get("data") or []:
+        if not isinstance(record, dict):
+            continue
+        result.append(
+            {
+                "user_id": user_id,
+                "public_key_version": str(record.get("public_key_version") or ""),
+                "public_key": str(record.get("signing_public_key") or ""),
+                "identity_public_key": str(record.get("public_key") or ""),
+                "identity_public_key_signature": str(record.get("identity_public_key_signature") or ""),
+            }
         )
-        for record in payload.get("data") or []:
-            if not isinstance(record, dict):
-                continue
-            result.append(
-                {
-                    "user_id": user_id,
-                    "public_key_version": str(record.get("public_key_version") or ""),
-                    "public_key": str(record.get("signing_public_key") or ""),
-                    "identity_public_key": str(record.get("public_key") or ""),
-                    "identity_public_key_signature": str(record.get("identity_public_key_signature") or ""),
-                }
-            )
     return result
+
+
+def signing_keys(
+    token: str,
+    owner_user_id: str,
+    user_ids: set[str],
+    force_refresh_ids: set[str] | None = None,
+) -> list[dict[str, Any]]:
+    return cached_signing_keys(
+        owner_user_id,
+        user_ids,
+        lambda user_id: fetch_user_signing_keys(token, user_id),
+        force_refresh_ids=force_refresh_ids,
+    )
 
 
 def participant_ids(conversation: dict[str, Any], current_user_id: str) -> set[str]:
@@ -262,13 +275,14 @@ def main() -> None:
     chat = Chat()
     chat.import_keys(private_blob, version=key_version)
     chat.set_identity(user_id, key_version)
-    chat.set_signing_keys(signing_keys(args.bearer_token, users_to_fetch))
+    chat.set_signing_keys(signing_keys(args.bearer_token, user_id, users_to_fetch))
     chat.set_cache_keys(True)
 
     threads = []
     errors = []
     fetched_event_count = 0
     unavailable_thread_count = 0
+    refreshed_user_ids: set[str] = set()
     for conversation in conversations:
         conversation_id = str(conversation.get("id") or "")
         if not conversation_id:
@@ -296,7 +310,16 @@ def main() -> None:
             encoded_events = key_events + [str(event.get("encoded_event")) for event in reversed(window_events)]
             decrypted = chat.decrypt_events(encoded_events)
             if decrypted.get("errors"):
-                raise RuntimeError(f"Chat XDK could not decrypt or verify {len(decrypted['errors'])} event(s)")
+                conversation_user_ids = {user_id} | participant_ids(conversation, user_id)
+                refresh_ids = conversation_user_ids - refreshed_user_ids
+                if refresh_ids:
+                    chat.set_signing_keys(
+                        signing_keys(args.bearer_token, user_id, users_to_fetch, force_refresh_ids=refresh_ids)
+                    )
+                    refreshed_user_ids.update(refresh_ids)
+                    decrypted = chat.decrypt_events(encoded_events)
+                if decrypted.get("errors"):
+                    raise RuntimeError(f"Chat XDK could not decrypt or verify {len(decrypted['errors'])} event(s)")
         except RateLimitError as exc:
             raise SystemExit(str(exc)) from exc
         except Exception as exc:  # noqa: BLE001 - preserve the conversation id for any SDK/API failure.
