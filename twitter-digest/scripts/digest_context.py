@@ -54,7 +54,7 @@ def summarize_current_run(data: dict[str, Any]) -> dict[str, Any]:
     post_counts: dict[str, dict[str, int]] = {}
     dm_status = "not_requested"
     dm_window_hours = 24
-    dm_counts = {"visible": 0, "last_from_me": 0, "waiting_reply": 0, "unknown": 0, "captured_messages": 0, "message_requests": 0}
+    dm_counts = {"visible": 0, "last_from_me": 0, "waiting_reply": 0, "unknown": 0, "captured_messages": 0}
 
     for page in data.get("pages", []):
         if not isinstance(page, dict):
@@ -71,7 +71,6 @@ def summarize_current_run(data: dict[str, Any]) -> dict[str, Any]:
                 "waiting_reply": int(page.get("dm_unreplied_thread_count") or 0),
                 "unknown": int(page.get("dm_unknown_thread_count") or 0),
                 "captured_messages": int(page.get("dm_captured_message_count") or 0),
-                "message_requests": 1 if page.get("dm_has_message_requests") else 0,
             }
 
     return {
@@ -124,7 +123,7 @@ def build_digest_facts(data: dict[str, Any], summary: dict[str, Any]) -> dict[st
                 "Do not present already-handled mentions as needing reply; if reply status is unclear, label it as unverified.",
                 "A mention with a replied_to reference to an own post is an incoming reply. Say @sender 回复了你的帖子; do not label it 回复状态未确认.",
                 "likes_on_own_posts items are current likes on own posts published inside the digest window. Report the liker and target post without inventing an exact like time.",
-                "When a message request requires_user_ui, give the exact X interface path and action_url.",
+                "Treat dm_has_message_requests as an unverified internal API signal only. Never turn it into a count, todo, or user-facing claim.",
                 "For unknown DM threads, never expose the technical state or ask for verification. List known participants only as: 曾经收到过消息：@sender1、@sender2",
                 "If the X Chat safe scan is incomplete, say only: X Chat 已按 X 返回顺序检查 N 个会话. Do not call these the most recent conversations, claim unscanned conversations had no messages, or expose request-budget internals.",
             ],
@@ -193,6 +192,8 @@ def build_digest_facts(data: dict[str, Any], summary: dict[str, Any]) -> dict[st
                 )
             for todo in page.get("todo_items") or []:
                 if isinstance(todo, dict):
+                    if str(todo.get("status") or "") == "message_request_pending":
+                        continue
                     facts["todo_items"].append(
                         {
                             "source": str(todo.get("source") or kind),
@@ -561,7 +562,6 @@ def render_digest_input(data: dict[str, Any]) -> str:
             )
             lines.append(f"状态未知会话: `{int(page.get('dm_unknown_thread_count') or 0)}`")
             lines.append(f"DM 消息统计: 当前窗口内捕获消息 `{int(page.get('dm_captured_message_count') or 0)}`")
-            lines.append(f"Chat 请求: `{'有待处理请求' if page.get('dm_has_message_requests') else '无'}`")
             if page.get("dm_note"):
                 lines.append(str(page["dm_note"]))
         if page.get("collection_error"):
@@ -673,7 +673,6 @@ def render_dm_facts_section(facts: dict[str, Any]) -> str:
             f"waiting_reply `{dm_counts.get('waiting_reply', 0)}`, "
             f"unknown `{dm_counts.get('unknown', 0)}`, "
             f"captured messages `{dm_counts.get('captured_messages', 0)}`"
-            f", message requests `{dm_counts.get('message_requests', 0)}`"
         ),
         "- rule: summarize only `waiting_reply` threads with `should_summarize: true`; count noise but do not expand it.",
     ]
@@ -768,7 +767,7 @@ def render_dm_facts_section(facts: dict[str, Any]) -> str:
         if todo.get("requires_user_ui"):
             manual_actions.append(
                 {
-                    "label": "X Chat 消息请求",
+                    "label": "X 界面操作",
                     "action": todo.get("user_action") or todo.get("detail") or "",
                     "url": todo.get("action_url") or "https://x.com/messages",
                 }

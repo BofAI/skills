@@ -10,9 +10,66 @@ SCRIPTS = Path(__file__).resolve().parents[1] / "scripts"
 sys.path.insert(0, str(SCRIPTS))
 
 import digest_context  # noqa: E402
+import digest_io  # noqa: E402
 
 
 class DigestContextChatTests(unittest.TestCase):
+    def test_unverified_message_request_signal_is_not_shown_as_current_todo(self) -> None:
+        page = {
+            "kind": "messages",
+            "url": "https://api.x.com/2/chat/conversations",
+            "items": [],
+            "dm_status": "x_chat_collected",
+            "dm_has_message_requests": True,
+            "todo_items": [
+                {
+                    "source": "x_chat",
+                    "status": "message_request_pending",
+                    "detail": "Legacy collector claimed a current request.",
+                    "requires_user_ui": True,
+                    "user_action": "Open X to confirm.",
+                    "action_url": "https://x.com/messages",
+                }
+            ],
+        }
+        data = {
+            "generated_at": "2026-08-10T16:20:16+08:00",
+            "source": "api",
+            "handle": "owner",
+            "pages": [page],
+        }
+
+        summary = digest_context.summarize_current_run(data)
+        facts = digest_context.build_digest_facts(data, summary)
+        context = digest_context.render_context_slice(summary, facts, "dm")
+        raw_markdown = digest_io.render_markdown(data)
+
+        self.assertNotIn("message_requests", summary["dm_counts"])
+        self.assertEqual(facts["todo_items"], [])
+        self.assertNotIn("消息请求", context)
+        self.assertNotIn("message request", context.lower())
+        self.assertNotIn("Chat 请求", raw_markdown)
+
+    def test_verified_manual_action_uses_generic_label(self) -> None:
+        facts = {
+            "dms": {"counts": {}, "threads": []},
+            "todo_items": [
+                {
+                    "source": "x_chat",
+                    "status": "verified_manual_action",
+                    "detail": "A verified action needs the X interface.",
+                    "requires_user_ui": True,
+                    "user_action": "请在 X 中完成操作。",
+                    "action_url": "https://x.com/messages",
+                }
+            ],
+        }
+
+        context = digest_context.render_dm_facts_section(facts)
+
+        self.assertIn("**X 界面操作**", context)
+        self.assertNotIn("X Chat 消息请求", context)
+
     def test_unknown_chat_thread_remains_unknown_and_adds_gap(self) -> None:
         data = {
             "generated_at": "2026-08-03T12:00:00+08:00",
@@ -76,8 +133,8 @@ class DigestContextChatTests(unittest.TestCase):
         self.assertEqual(len(chat_gaps), 1)
         self.assertEqual(chat_gaps[0]["status"], "conversation_history_unavailable")
         dm_context = digest_context.render_context_slice(summary, facts, "dm")
-        self.assertIn("## 需要你在 X 界面操作", dm_context)
-        self.assertIn("X → 消息 → 请求", dm_context)
+        self.assertNotIn("## 需要你在 X 界面操作", dm_context)
+        self.assertNotIn("X → 消息 → 请求", dm_context)
         self.assertIn("曾经收到过消息：@peer", dm_context)
         self.assertNotIn("状态未知会话 @peer", dm_context)
         self.assertNotIn("请打开 X 会话手动确认", dm_context)

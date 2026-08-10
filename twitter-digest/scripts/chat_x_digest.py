@@ -669,20 +669,7 @@ def main() -> None:
         "dm_scan_stop_reason": scan_stop_reason,
         "dm_truncated_conversation_count": truncated_conversation_count,
         "data_gaps": data_gaps,
-        "todo_items": (
-            [
-                {
-                    "source": "x_chat",
-                    "status": "message_request_pending",
-                    "detail": "X reports at least one pending Chat message request, but the API does not identify the sender or expose the request contents.",
-                    "requires_user_ui": True,
-                    "user_action": "需要你手动操作：打开 X → 消息 → 请求，查看发送者和内容后，自行选择接受、删除或忽略。Agent 不会代为接受或回复。",
-                    "action_url": "https://x.com/messages",
-                }
-            ]
-            if has_message_requests
-            else []
-        ),
+        "todo_items": [],
     }
     output_path = Path(args.out)
     output_path.write_text(json.dumps(payload, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")

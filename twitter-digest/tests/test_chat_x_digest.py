@@ -181,6 +181,40 @@ class ChatCollectorTests(unittest.TestCase):
             "id,type,group_name,created_at",
         )
 
+    def test_message_request_meta_is_retained_only_as_diagnostic_signal(self) -> None:
+        class FakeChat:
+            def import_keys(self, _private_blob: bytes, version: str) -> None:
+                return None
+
+            def set_identity(self, _user_id: str, _key_version: str) -> None:
+                return None
+
+            def set_cache_keys(self, _enabled: bool) -> None:
+                return None
+
+        with tempfile.TemporaryDirectory() as directory:
+            output = Path(directory) / "chat.json"
+            with (
+                mock.patch.dict(sys.modules, {"chat_xdk": types.SimpleNamespace(Chat=FakeChat)}),
+                mock.patch.object(
+                    chat_x_digest,
+                    "load_chat_config",
+                    return_value={"user_id": "me", "key_version": "1", "private_key_blob": "a2V5"},
+                ),
+                mock.patch.object(
+                    chat_x_digest,
+                    "collect_conversations",
+                    return_value=([], {}, True, {"complete": True, "next_token": "", "missing_id_count": 0}),
+                ),
+                mock.patch.object(sys, "argv", ["chat_x_digest.py", "--bearer-token", "token", "--out", str(output)]),
+            ):
+                chat_x_digest.main()
+
+            payload = json.loads(output.read_text(encoding="utf-8"))
+
+        self.assertTrue(payload["dm_has_message_requests"])
+        self.assertEqual(payload["todo_items"], [])
+
     def test_collect_conversations_marks_remaining_page_incomplete_at_limit(self) -> None:
         response = {
             "data": [{"id": str(index)} for index in range(50)],

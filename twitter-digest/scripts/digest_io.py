@@ -46,7 +46,6 @@ def render_markdown(data: dict[str, Any]) -> str:
             )
             lines.append(f"状态未知会话: `{int(page.get('dm_unknown_thread_count') or 0)}`")
             lines.append(f"DM 消息统计: 当前窗口内捕获消息 `{int(page.get('dm_captured_message_count') or 0)}`")
-            lines.append(f"Chat 请求: `{'有待处理请求' if page.get('dm_has_message_requests') else '无'}`")
             if page.get("dm_note"):
                 lines.append(str(page["dm_note"]))
         if page.get("collection_error"):

@@ -155,8 +155,7 @@ X Chat rules:
 - Chat XDK decrypts messages locally; no Chat passcode is saved.
 - A conversation needs a reply only when its latest in-window text message came from another participant.
 - Process the conversation list in X's returned order. Inspect the first event page before fetching signing keys. Do not classify an unscanned conversation as empty, handled, or waiting for reply.
-- `has_message_requests=true` is a required todo. The current conversations endpoint does not identify the requester, so state that limitation instead of inventing a participant or claiming the request inbox is empty.
-- For a pending message request, explicitly say the Agent/API cannot inspect or accept it. Tell the user: open **X → 消息 → 请求**, review the sender and content, then choose accept, delete, or ignore. Link to `https://x.com/messages` when links are useful.
+- Treat `has_message_requests` only as an unverified internal API diagnostic. It is a boolean, not a request count, and does not identify a sender or prove that a request is currently visible in X. Never turn it into a todo, user-facing claim, or instruction to check the X interface.
 - For an `unknown` conversation, do not expose the technical state or ask the user to verify it. Mention it only as historical context using the exact friendly pattern `曾经收到过消息：@sender1、@sender2`, listing the known participants and adding no explanation or action.
 - Exclude messages with missing/unparseable timestamps and all messages outside the exact 24-hour window.
 - If a required attempted X Chat request or decryption fails, fail the run instead of claiming the inbox is empty. Reaching a deliberate safe-scan boundary is a reported data gap, not a network failure.
@@ -225,7 +224,7 @@ Keep the digest compact and use these six sections only when they contain useful
 - 私信.
 - 数据缺口.
 
-When manual actions exist, add a `需要你在 X 界面操作` section near `该处理`. Write plain Chinese instructions rather than exposing raw API fields or English states. Put required actions such as message requests first. Do not put unknown conversations in this action section. If unknown conversations have known participants, add one compact informational line elsewhere: `曾经收到过消息：@sender1、@sender2`. Add no technical explanation, warning, or instruction after it.
+When a verified manual action exists, add a `需要你在 X 界面操作` section near `该处理`. Write plain Chinese instructions rather than exposing raw API fields or English states. The `has_message_requests` flag alone never qualifies as a verified manual action. Do not put unknown conversations in this action section. If unknown conversations have known participants, add one compact informational line elsewhere: `曾经收到过消息：@sender1、@sender2`. Add no technical explanation, warning, or instruction after it.
 
 If `dm_scan_complete=false`, add one quiet informational sentence: `X Chat 已按 X 返回顺序检查 N 个会话。` Do not present this as an error or ask the user to retry immediately.
 
@@ -233,7 +232,6 @@ Never post, reply, like, follow, block, open suspicious links, accept requests, 
 
 This skill never sends messages, even after review. If the user asks to send or asks what to reply, explain briefly that twitter-digest is permanently read-only and does not prepare reply content. Never create code or call another tool to bypass this restriction.
 
-When a message request cannot be inspected or handled, add a concrete **需要你在 X 界面操作** instruction with the exact navigation path and a safe choice. Never imply that the Agent clicked, accepted, deleted, or confirmed anything. Keep unknown historical conversations out of this section and list only their known senders as specified above.
 
 ## Install
 
