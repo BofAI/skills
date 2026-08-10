@@ -25,7 +25,6 @@ DEFAULT_MAX_CONVERSATIONS = 10
 DEFAULT_EVENT_REQUEST_BUDGET = 10
 DEFAULT_EVENT_RATE_LIMIT_RESERVE = 5
 DEFAULT_MAX_EVENT_PAGES_PER_CONVERSATION = 1
-DEFAULT_MAX_CONSECUTIVE_OLD_CONVERSATIONS = 3
 EVENT_RATE_LIMIT_ROUTE = "/chat/conversations/:id/events"
 RATE_LIMIT_TRACKER: dict[str, dict[str, int]] = {}
 HTTP_REQUEST_COUNTS: dict[str, int] = {}
@@ -55,16 +54,6 @@ class EventRequestBudget:
         if remaining is not None and (reset is None or reset > current_time) and remaining <= self.reserve:
             raise EventBudgetExhausted("reported_rate_limit_reserve")
         self.used += 1
-
-
-class OldConversationStopper:
-    def __init__(self, max_consecutive: int) -> None:
-        self.max_consecutive = max(1, max_consecutive)
-        self.consecutive = 0
-
-    def observe(self, is_old: bool) -> bool:
-        self.consecutive = self.consecutive + 1 if is_old else 0
-        return self.consecutive >= self.max_consecutive
 
 
 def normalize_rate_limit_route(path: str) -> str:
@@ -183,6 +172,25 @@ def event_time(event: dict[str, Any]) -> dt.datetime | None:
 def message_time(decrypted_event: dict[str, Any], raw_event: dict[str, Any]) -> dt.datetime | None:
     """Prefer Chat XDK's decrypted timestamp; keep raw API time as a fallback."""
     return event_time(decrypted_event) or event_time(raw_event)
+
+
+def conversation_is_before_window(
+    decrypted_rows: list[dict[str, Any]],
+    raw_events: list[dict[str, Any]],
+    cutoff: dt.datetime,
+) -> bool:
+    """Return true only when the newest readable decrypted message is reliably old."""
+    raw_by_encoded = {str(event.get("encoded_event") or ""): event for event in raw_events}
+    timestamps: list[dt.datetime] = []
+    for row in decrypted_rows:
+        event = row.get("event") if isinstance(row, dict) else None
+        if not isinstance(event, dict) or str(event.get("type") or "").lower() != "message":
+            continue
+        raw_event = raw_by_encoded.get(str(row.get("original_b64") or "")) or {}
+        created_at = message_time(event, raw_event)
+        if created_at is not None:
+            timestamps.append(created_at)
+    return bool(timestamps and max(timestamps) < cutoff)
 
 
 def collect_conversations(
@@ -412,7 +420,6 @@ def main() -> None:
     unavailable_thread_count = 0
     refreshed_user_ids: set[str] = set()
     event_budget = EventRequestBudget(max(1, args.max_event_requests))
-    old_stopper = OldConversationStopper(DEFAULT_MAX_CONSECUTIVE_OLD_CONVERSATIONS)
     scanned_conversation_count = 0
     old_conversation_count = 0
     truncated_conversation_count = 0
@@ -467,6 +474,11 @@ def main() -> None:
                     raise RuntimeError(f"Chat XDK could not decrypt or verify {len(decrypted['errors'])} event(s)")
             if event_scan.get("truncated"):
                 truncated_conversation_count += 1
+            if conversation_is_before_window(decrypted.get("messages") or [], raw_events, cutoff):
+                old_conversation_count += 1
+                scan_complete = False
+                scan_stop_reason = "first_conversation_before_window"
+                break
         except EventBudgetExhausted as exc:
             scan_complete = False
             scan_stop_reason = str(exc)
@@ -510,14 +522,6 @@ def main() -> None:
             )
         messages.sort(key=lambda item: str(item.get("time") or ""))
         if not messages:
-            if newest_decrypted_message_time and newest_decrypted_message_time < cutoff:
-                old_conversation_count += 1
-                if old_stopper.observe(is_old=True):
-                    scan_complete = False
-                    scan_stop_reason = "consecutive_old_conversations"
-                    break
-                continue
-            old_stopper.observe(is_old=False)
             unavailable_thread_count += 1
             threads.append(
                 unavailable_thread(
@@ -529,7 +533,6 @@ def main() -> None:
                 )
             )
             continue
-        old_stopper.observe(is_old=False)
         replied = messages[-1].get("sender") == "me"
         label = participant_label(conversation, users, user_id)
         threads.append(

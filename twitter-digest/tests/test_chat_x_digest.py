@@ -269,13 +269,80 @@ class ChatCollectorTests(unittest.TestCase):
             budget.consume(now=1000)
         self.assertEqual(budget.used, 0)
 
-    def test_old_conversation_stopper_ends_scan_after_three_old_threads(self) -> None:
-        stopper = chat_x_digest.OldConversationStopper(max_consecutive=3)
-        self.assertFalse(stopper.observe(is_old=True))
-        self.assertFalse(stopper.observe(is_old=True))
-        self.assertTrue(stopper.observe(is_old=True))
-        self.assertFalse(stopper.observe(is_old=False))
-        self.assertEqual(stopper.consecutive, 0)
+    def test_conversation_is_before_window_requires_a_reliable_message_time(self) -> None:
+        cutoff = dt.datetime(2026, 8, 10, tzinfo=dt.timezone.utc)
+        old_rows = [
+            {
+                "original_b64": "old",
+                "event": {"type": "Message", "created_at": "2026-08-09T00:00:00Z"},
+            }
+        ]
+        self.assertTrue(chat_x_digest.conversation_is_before_window(old_rows, [], cutoff))
+        self.assertFalse(
+            chat_x_digest.conversation_is_before_window(
+                [{"original_b64": "missing", "event": {"type": "Message"}}], [], cutoff
+            )
+        )
+
+    def test_main_stops_after_first_confirmed_old_conversation(self) -> None:
+        class FakeChat:
+            def import_keys(self, _blob: bytes, version: str) -> None:
+                return None
+
+            def set_identity(self, _user_id: str, _key_version: str) -> None:
+                return None
+
+            def set_cache_keys(self, _enabled: bool) -> None:
+                return None
+
+            def set_signing_keys(self, _keys: list[dict[str, str]]) -> None:
+                return None
+
+            def decrypt_events(self, _encoded_events: list[str]) -> dict[str, object]:
+                return {
+                    "errors": [],
+                    "messages": [
+                        {
+                            "original_b64": "ciphertext",
+                            "event": {
+                                "type": "Message",
+                                "sender_id": "peer",
+                                "created_at": "2020-01-01T00:00:00Z",
+                                "content": {"content_type": "Text", "text": "old"},
+                            },
+                        }
+                    ],
+                }
+
+        with tempfile.TemporaryDirectory() as directory:
+            output = Path(directory) / "chat.json"
+            with (
+                mock.patch.dict(sys.modules, {"chat_xdk": types.SimpleNamespace(Chat=FakeChat)}),
+                mock.patch.object(
+                    chat_x_digest,
+                    "load_chat_config",
+                    return_value={"user_id": "me", "key_version": "1", "private_key_blob": "a2V5"},
+                ),
+                mock.patch.object(
+                    chat_x_digest,
+                    "collect_conversations",
+                    return_value=([{"id": "old"}, {"id": "new"}], {}, False, {"complete": True, "next_token": "", "missing_id_count": 0}),
+                ),
+                mock.patch.object(
+                    chat_x_digest,
+                    "collect_events",
+                    return_value=([{"encoded_event": "ciphertext"}], [], {"pages_used": 1, "truncated": False}),
+                ) as collect_events,
+                mock.patch.object(chat_x_digest, "signing_keys", return_value=[]),
+                mock.patch.object(sys, "argv", ["chat_x_digest.py", "--bearer-token", "token", "--out", str(output)]),
+            ):
+                chat_x_digest.main()
+
+            payload = json.loads(output.read_text(encoding="utf-8"))
+
+        self.assertEqual(collect_events.call_count, 1)
+        self.assertEqual(payload["dm_scan_stop_reason"], "first_conversation_before_window")
+        self.assertFalse(payload["dm_scan_complete"])
 
     def test_zero_events_only_fail_after_complete_scan(self) -> None:
         conversations = [{"id": "one"}]
