@@ -220,7 +220,7 @@ def build_digest_facts(data: dict[str, Any], summary: dict[str, Any]) -> dict[st
                 if not isinstance(thread, dict):
                     continue
                 assessment = assess_dm_thread(thread)
-                reply_state = str(thread.get("reply_state") or ("last_from_me" if thread.get("replied") else "waiting_reply"))
+                reply_state = normalize_dm_reply_state(thread)
                 if reply_state == "unknown":
                     assessment = {"should_summarize": False, "noise_reason": "collection_state_unknown"}
                 facts["dms"]["threads"].append(
@@ -444,12 +444,25 @@ def parse_item_time(value: Any) -> Optional[dt.datetime]:
     return parsed
 
 
+def normalize_dm_reply_state(thread: dict[str, Any]) -> str:
+    explicit = str(thread.get("reply_state") or "")
+    if explicit in {"last_from_me", "waiting_reply", "unknown"}:
+        return explicit
+    replied = thread.get("replied")
+    if isinstance(replied, bool):
+        return "last_from_me" if replied else "waiting_reply"
+    return "unknown"
+
+
 def assess_dm_thread(thread: dict[str, Any]) -> dict[str, Any]:
     text = compact_text(thread.get("text") or thread.get("label")).lower()
     if not text:
         return {"should_summarize": False, "noise_reason": "empty_thread_text"}
-    if bool(thread.get("replied")):
+    reply_state = normalize_dm_reply_state(thread)
+    if reply_state == "last_from_me":
         return {"should_summarize": False, "noise_reason": "last_message_from_me"}
+    if reply_state == "unknown":
+        return {"should_summarize": False, "noise_reason": "collection_state_unknown"}
     spam_patterns = [
         r"airdrop",
         r"giveaway",
@@ -569,7 +582,7 @@ def render_digest_input(data: dict[str, Any]) -> str:
             participant = thread.get("participant") or thread.get("label") or thread.get("url")
             lines.extend(["", f"### DM thread [current]: {participant}", ""])
             lines.append(f"会话对象: `{participant}`")
-            reply_state = str(thread.get("reply_state") or ("最后我发出" if thread.get("replied") else "等我回复"))
+            reply_state = normalize_dm_reply_state(thread)
             lines.append(f"会话状态: `{reply_state}`")
             if thread.get("collection_detail"):
                 lines.append(f"采集说明: {thread.get('collection_detail')}")

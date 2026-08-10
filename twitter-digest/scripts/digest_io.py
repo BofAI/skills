@@ -6,6 +6,7 @@ import json
 from pathlib import Path
 from typing import Any
 
+from digest_context import normalize_dm_reply_state
 from script_utils import ensure_private_dir, write_private_text
 
 
@@ -55,7 +56,7 @@ def render_markdown(data: dict[str, Any]) -> str:
             lines.extend(["", f"### DM thread: {participant}", ""])
             if participant:
                 lines.append(f"会话对象: `{participant}`")
-                reply_state = str(thread.get("reply_state") or ("最后我发出" if thread.get("replied") else "等我回复"))
+                reply_state = normalize_dm_reply_state(thread)
                 lines.append(f"会话状态: `{reply_state}`")
                 if thread.get("collection_detail"):
                     lines.append(f"采集说明: {thread.get('collection_detail')}")

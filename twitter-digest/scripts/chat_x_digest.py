@@ -407,11 +407,6 @@ def unavailable_thread(
         "latest_time": str(conversation.get("updated_at") or ""),
         "collection_status": status,
         "collection_detail": detail,
-        "requires_user_ui": True,
-        "user_action": (
-            "Agent/API 无法读取这段会话历史，这不代表存在未读消息。"
-            "如需确认，请打开该会话，在 X 界面查看最新消息和未读状态。"
-        ),
         "dm_load_complete": False,
         "dm_scrolls_used": 0,
         "dm_window_exceeded": False,

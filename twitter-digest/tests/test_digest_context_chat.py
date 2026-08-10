@@ -14,6 +14,42 @@ import digest_io  # noqa: E402
 
 
 class DigestContextChatTests(unittest.TestCase):
+    def test_missing_or_null_dm_reply_state_is_unknown(self) -> None:
+        normalizer = getattr(digest_context, "normalize_dm_reply_state", None)
+        self.assertIsNotNone(normalizer)
+        self.assertEqual(normalizer({}), "unknown")
+        self.assertEqual(normalizer({"replied": None}), "unknown")
+
+    def test_legacy_boolean_dm_reply_state_is_supported(self) -> None:
+        normalizer = getattr(digest_context, "normalize_dm_reply_state", None)
+        self.assertIsNotNone(normalizer)
+        self.assertEqual(normalizer({"replied": True}), "last_from_me")
+        self.assertEqual(normalizer({"replied": False}), "waiting_reply")
+
+    def test_raw_renderers_do_not_default_missing_dm_state_to_waiting(self) -> None:
+        data = {
+            "generated_at": "2026-08-10T16:20:16+08:00",
+            "source": "api",
+            "handle": "owner",
+            "pages": [
+                {
+                    "kind": "messages",
+                    "url": "https://api.x.com/2/chat/conversations",
+                    "items": [],
+                    "dm_status": "x_chat_collected",
+                    "dm_threads": [{"participant": "@peer", "text": "hello"}],
+                }
+            ],
+        }
+
+        context_markdown = digest_context.render_digest_input(data)
+        io_markdown = digest_io.render_markdown(data)
+
+        self.assertIn("会话状态: `unknown`", context_markdown)
+        self.assertIn("会话状态: `unknown`", io_markdown)
+        self.assertNotIn("会话状态: `等我回复`", context_markdown)
+        self.assertNotIn("会话状态: `等我回复`", io_markdown)
+
     def test_unverified_message_request_signal_is_not_shown_as_current_todo(self) -> None:
         page = {
             "kind": "messages",
