@@ -2,7 +2,10 @@ from __future__ import annotations
 
 import datetime as dt
 import io
+import json
 import sys
+import tempfile
+import types
 import unittest
 import urllib.error
 from pathlib import Path
@@ -276,6 +279,83 @@ class ChatCollectorTests(unittest.TestCase):
     def test_parse_time_normalizes_naive_values_to_utc(self) -> None:
         parsed = chat_x_digest.parse_time("2026-08-03T10:00:00")
         self.assertEqual(parsed, dt.datetime(2026, 8, 3, 10, tzinfo=dt.timezone.utc))
+
+    def test_message_time_uses_decrypted_created_at_msec_without_raw_timestamp(self) -> None:
+        value = chat_x_digest.message_time({"created_at_msec": 1786320000000}, {})
+        self.assertEqual(value, dt.datetime.fromtimestamp(1786320000, tz=dt.timezone.utc))
+
+    def test_message_time_falls_back_to_raw_event_timestamp(self) -> None:
+        value = chat_x_digest.message_time({}, {"created_at": "2026-08-10T00:00:00Z"})
+        self.assertEqual(value, dt.datetime(2026, 8, 10, tzinfo=dt.timezone.utc))
+
+    def test_main_decrypts_event_when_timestamp_exists_only_in_decrypted_payload(self) -> None:
+        now = dt.datetime.now(dt.timezone.utc)
+        created_at_msec = int(now.timestamp() * 1000)
+
+        class FakeChat:
+            decrypted_inputs: list[list[str]] = []
+
+            def import_keys(self, _blob: bytes, version: str) -> None:
+                self.version = version
+
+            def set_identity(self, _user_id: str, _key_version: str) -> None:
+                return None
+
+            def set_cache_keys(self, _enabled: bool) -> None:
+                return None
+
+            def set_signing_keys(self, _keys: list[dict[str, str]]) -> None:
+                return None
+
+            def decrypt_events(self, encoded_events: list[str]) -> dict[str, object]:
+                self.decrypted_inputs.append(encoded_events)
+                if "ciphertext" not in encoded_events:
+                    return {"messages": [], "errors": []}
+                return {
+                    "errors": [],
+                    "messages": [
+                        {
+                            "original_b64": "ciphertext",
+                            "event": {
+                                "type": "Message",
+                                "sender_id": "peer",
+                                "created_at_msec": created_at_msec,
+                                "verified": True,
+                                "content": {"content_type": "Text", "text": "hello"},
+                            },
+                        }
+                    ],
+                }
+
+        with tempfile.TemporaryDirectory() as directory:
+            output = Path(directory) / "chat.json"
+            with (
+                mock.patch.dict(sys.modules, {"chat_xdk": types.SimpleNamespace(Chat=FakeChat)}),
+                mock.patch.object(
+                    chat_x_digest,
+                    "load_chat_config",
+                    return_value={"user_id": "me", "key_version": "1", "private_key_blob": "a2V5"},
+                ),
+                mock.patch.object(
+                    chat_x_digest,
+                    "collect_conversations",
+                    return_value=([{"id": "chat", "participant_ids": ["me", "peer"]}], {}, False),
+                ),
+                mock.patch.object(
+                    chat_x_digest,
+                    "collect_events",
+                    return_value=([{"id": "event", "encoded_event": "ciphertext"}], [], {"pages_used": 1, "truncated": False}),
+                ),
+                mock.patch.object(chat_x_digest, "signing_keys", return_value=[]),
+                mock.patch.object(sys, "argv", ["chat_x_digest.py", "--bearer-token", "token", "--out", str(output)]),
+            ):
+                chat_x_digest.main()
+
+            payload = json.loads(output.read_text(encoding="utf-8"))
+
+        self.assertEqual(FakeChat.decrypted_inputs, [["ciphertext"]])
+        self.assertEqual(payload["dm_captured_message_count"], 1)
+        self.assertEqual(payload["dm_threads"][0]["messages"][0]["text"], "hello")
 
 
 if __name__ == "__main__":

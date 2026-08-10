@@ -177,6 +177,11 @@ def event_time(event: dict[str, Any]) -> dt.datetime | None:
     return parse_time(event.get("created_at"))
 
 
+def message_time(decrypted_event: dict[str, Any], raw_event: dict[str, Any]) -> dt.datetime | None:
+    """Prefer Chat XDK's decrypted timestamp; keep raw API time as a fallback."""
+    return event_time(decrypted_event) or event_time(raw_event)
+
+
 def collect_conversations(token: str, maximum: int) -> tuple[list[dict[str, Any]], dict[str, dict[str, Any]], bool]:
     conversations: list[dict[str, Any]] = []
     users: dict[str, dict[str, Any]] = {}
@@ -381,6 +386,7 @@ def main() -> None:
     scanned_conversation_count = 0
     old_conversation_count = 0
     truncated_conversation_count = 0
+    missing_message_timestamp_count = 0
     scan_complete = True
     scan_stop_reason = ""
     for conversation in conversations:
@@ -417,14 +423,10 @@ def main() -> None:
                     )
                 )
                 continue
-            window_events = [
-                event
-                for event in raw_events
-                if event.get("encoded_event") and (event_time(event) or dt.datetime.min.replace(tzinfo=dt.timezone.utc)) >= cutoff
-            ]
+            decryptable_events = [event for event in raw_events if event.get("encoded_event")]
             conversation_user_ids = {user_id} | participant_ids(conversation, user_id)
             chat.set_signing_keys(signing_keys(args.bearer_token, user_id, conversation_user_ids))
-            encoded_events = key_events + [str(event.get("encoded_event")) for event in reversed(window_events)]
+            encoded_events = key_events + [str(event.get("encoded_event")) for event in reversed(decryptable_events)]
             decrypted = chat.decrypt_events(encoded_events)
             if decrypted.get("errors"):
                 refresh_ids = conversation_user_ids - refreshed_user_ids
@@ -448,7 +450,7 @@ def main() -> None:
             errors.append(f"{conversation_id}: {exc}")
             continue
         messages = []
-        raw_by_encoded = {str(event.get("encoded_event") or ""): event for event in window_events}
+        raw_by_encoded = {str(event.get("encoded_event") or ""): event for event in decryptable_events}
         for row in decrypted.get("messages") or []:
             event = row.get("event") if isinstance(row, dict) else None
             if not isinstance(event, dict) or str(event.get("type") or "").lower() != "message":
@@ -459,8 +461,11 @@ def main() -> None:
             if content_type.lower() != "text":
                 text = f"[X Chat content type not supported by Chat XDK: {content_type}]"
             raw_event = raw_by_encoded.get(str(row.get("original_b64") or "")) or {}
-            created_at = event_time(raw_event)
-            if not created_at or created_at < cutoff:
+            created_at = message_time(event, raw_event)
+            if not created_at:
+                missing_message_timestamp_count += 1
+                continue
+            if created_at < cutoff:
                 continue
             sender_id = str(event.get("sender_id") or raw_event.get("sender_id") or "")
             messages.append(
@@ -543,6 +548,17 @@ def main() -> None:
                     f"X Chat safely checked {scanned_conversation_count} of {len(conversations)} listed conversations using "
                     f"{event_budget.used} event request(s). stop_reason={scan_stop_reason or 'conversation_page_limit'}; "
                     f"truncated_conversations={truncated_conversation_count}. Do not claim unscanned conversations had no messages."
+                ),
+            }
+        )
+    if missing_message_timestamp_count:
+        data_gaps.append(
+            {
+                "source": "x_chat",
+                "status": "message_timestamp_unavailable",
+                "detail": (
+                    f"{missing_message_timestamp_count} decrypted X Chat message(s) had no usable timestamp and were excluded "
+                    "from the requested time window. Do not infer that they were old or already handled."
                 ),
             }
         )
