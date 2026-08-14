@@ -7,7 +7,7 @@ description: Use when the user asks to generate an X/Twitter daily digest, says 
 
 ## Overview
 
-Generate a concise Chinese digest by invoking the bundled BofAI xurl directly. xurl owns OAuth, API requests, X Chat keys, signature verification, and local decryption. The skill never reads files under `~/.xurl` and creates no persistent run files.
+Generate a concise Chinese digest by invoking the bundled BofAI-patched xurl directly. This is the `@bankofai/xurl` fork with the per-user X Chat public-key fix, not the unmodified official xurl. It owns OAuth, API requests, X Chat keys, signature verification, and local decryption. The skill never reads files under `~/.xurl` and creates no persistent run files.
 
 ## Runtime
 
@@ -147,7 +147,7 @@ App registration containing credentials must be performed by the operator in a r
 
 ## Install
 
-The beta installer supports macOS Apple Silicon/Intel and Linux amd64. It uses Node.js plus npm only during installation to acquire `@bankofai/xurl@1.3.2-beta.1`, then copies the native binary into the skill without replacing a global xurl. Normal digest runs do not require Node.js or npm.
+The beta installer supports macOS Apple Silicon/Intel and Linux amd64. It uses Node.js plus npm only during installation to acquire `@bankofai/xurl@1.3.2-beta.1`, then copies that BofAI-patched compiled binary into the skill without replacing a global xurl. It never installs or falls back to `@xdevplatform/xurl`. Normal digest runs do not require Node.js or npm.
 
 Codex:
 

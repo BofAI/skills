@@ -38,9 +38,10 @@ usage() {
   cat <<'EOF'
 Usage: install.sh [options]
 
-Installs twitter-digest with a private bundled BofAI xurl binary. Node.js and
-npm are used only to acquire the pinned package. Normal runs invoke the
-native binary and the installer never replaces a global xurl or reads ~/.xurl.
+Installs twitter-digest with the BofAI-patched xurl binary from the pinned
+@bankofai/xurl package. This is not the unmodified official xurl. Node.js and
+npm are used only during installation; normal runs invoke the bundled binary.
+The installer never replaces a global xurl or reads ~/.xurl.
 
 Options:
   --client auto|codex|claude|all  Target client. Default: auto.
@@ -249,7 +250,7 @@ npm install \
   "$XURL_NPM_PACKAGE" || fail "Could not install $XURL_NPM_PACKAGE from npm"
 
 XURL_NPM_BINARY="$XURL_NPM_ROOT/node_modules/@bankofai/xurl/binary/xurl"
-[ -f "$XURL_NPM_BINARY" ] || fail "$XURL_NPM_PACKAGE did not install the expected native binary"
+[ -f "$XURL_NPM_BINARY" ] || fail "$XURL_NPM_PACKAGE did not install the expected BofAI-patched binary"
 cp "$XURL_NPM_BINARY" "$PACKAGE_DIR/bin/xurl"
 chmod 755 "$PACKAGE_DIR/bin/xurl" "$PACKAGE_DIR/install.sh" "$PACKAGE_DIR/uninstall.sh"
 
