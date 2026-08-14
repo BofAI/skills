@@ -198,9 +198,10 @@ prompt_value() {
 
 prompt_secret() {
   label=$1
-  if has_operator_tty && command_exists stty; then
+  if has_operator_tty; then
+    command_exists stty || fail "stty is required for hidden secret input"
     old_stty="$(stty -g </dev/tty)"
-    trap 'stty "$old_stty" </dev/tty 2>/dev/null || true' EXIT HUP INT TERM
+    trap 'stty "$old_stty" </dev/tty 2>/dev/null || true' 0 1 2 15
     printf '%s: ' "$label" >/dev/tty
     stty -echo </dev/tty
     IFS= read -r answer </dev/tty || {
@@ -209,7 +210,7 @@ prompt_secret() {
     }
     stty "$old_stty" </dev/tty
     printf '\n' >/dev/tty
-    trap - EXIT HUP INT TERM
+    trap - 0 1 2 15
   else
     printf '%s: ' "$label" >&2
     IFS= read -r answer || fail "Input cancelled"
