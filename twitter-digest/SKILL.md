@@ -166,20 +166,20 @@ App registration containing credentials must be performed interactively in a rea
 
 ## Install
 
-The beta installer supports macOS Apple Silicon/Intel and Linux amd64. It uses Node.js plus npm only during installation to acquire exactly `@bankofai/xurl@1.3.2-beta.3`, verifies the installed package identity and binary, then copies that BofAI-patched compiled binary into the skill without replacing a global xurl. It never installs or falls back to `@xdevplatform/xurl`. Normal digest runs do not require Node.js or npm.
+Twitter Digest and xurl use independent versions. This skill release is `v1.5.14-beta.16`; its installer pins the separate dependency `@bankofai/xurl@1.3.2-beta.3`. The beta installer supports macOS Apple Silicon/Intel and Linux amd64. It uses Node.js plus npm only during installation, verifies the installed Bank of AI package identity and binary, then copies that compiled binary into the skill without replacing a global xurl. It never installs or falls back to `@xdevplatform/xurl`. Normal digest runs do not require Node.js or npm.
 
 After installation, the installer reuses valid OAuth2 authorization. If no App is registered, it prompts only for the OAuth2 Client ID and Client Secret in the real Terminal; the xurl-local App name is fixed to `twitter-digest` and the callback is fixed to `http://localhost:8080/callback`. It then launches xurl's browser OAuth flow and sets the authorized account as default. It also checks X Chat keys and offers to restore an existing key. xurl cannot create or register a new X Chat key; when the account has no recoverable key, first enable X Chat in an official X client.
 
 Codex:
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/BofAI/skills/main/twitter-digest/install.sh | env TWITTER_DIGEST_INSTALL_CLIENT=codex sh
+curl -fsSL https://raw.githubusercontent.com/BofAI/skills/v1.5.14-beta.16/twitter-digest/install.sh | env TWITTER_DIGEST_INSTALL_REF=v1.5.14-beta.16 TWITTER_DIGEST_INSTALL_CLIENT=codex sh
 ```
 
 Claude Code:
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/BofAI/skills/main/twitter-digest/install.sh | env TWITTER_DIGEST_INSTALL_CLIENT=claude sh
+curl -fsSL https://raw.githubusercontent.com/BofAI/skills/v1.5.14-beta.16/twitter-digest/install.sh | env TWITTER_DIGEST_INSTALL_REF=v1.5.14-beta.16 TWITTER_DIGEST_INSTALL_CLIENT=claude sh
 ```
 
 From a checkout:

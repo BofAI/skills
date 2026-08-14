@@ -5,7 +5,9 @@ REF="${TWITTER_DIGEST_INSTALL_REF:-main}"
 CLIENT="${TWITTER_DIGEST_INSTALL_CLIENT:-auto}"
 OPEN_TERMINAL="${TWITTER_DIGEST_OPEN_TERMINAL:-auto}"
 SOURCE_DIR="${TWITTER_DIGEST_SOURCE_DIR:-}"
-XURL_VERSION="${TWITTER_DIGEST_XURL_VERSION:-1.3.2-beta.3}"
+SKILL_NAME="twitter-digest"
+SKILL_VERSION="1.5.14-beta.16"
+XURL_VERSION="1.3.2-beta.3"
 XURL_NPM_PACKAGE="@bankofai/xurl@${XURL_VERSION}"
 SKILLS_DIR=""
 SKIP_CONFIGURE=0
@@ -49,6 +51,7 @@ Options:
   --skills-dir DIR                Install into an explicit skills directory.
   --skip-configure                Skip post-install OAuth and X Chat key setup.
   --dry-run                       Print target actions without changing files.
+  --version                       Print the twitter-digest skill version.
   -h, --help                      Show this help.
 
 Environment overrides:
@@ -86,6 +89,10 @@ while [ "$#" -gt 0 ]; do
       DRY_RUN=1
       shift
       ;;
+    --version)
+      printf '%s %s\n' "$SKILL_NAME" "$SKILL_VERSION"
+      exit 0
+      ;;
     -h|--help)
       usage
       exit 0
@@ -100,9 +107,6 @@ case "$CLIENT" in
   auto|codex|claude|all) ;;
   *) fail "--client must be auto, codex, claude, or all" ;;
 esac
-
-[ -n "$XURL_VERSION" ] || fail "TWITTER_DIGEST_XURL_VERSION cannot be empty"
-[ "$XURL_VERSION" = "1.3.2-beta.3" ] || fail "This installer is pinned to xurl 1.3.2-beta.3"
 
 running_under_agent() {
   if [ -n "${CODEX_THREAD_ID:-}" ] || [ -n "${CODEX_CI:-}" ] || [ "${__CFBundleIdentifier:-}" = "com.openai.codex" ]; then
@@ -145,7 +149,7 @@ open_self_in_terminal_and_exit() {
     args_text="$args_text --skip-configure"
   fi
 
-  env_text="TWITTER_DIGEST_TERMINAL_CHILD=1 TWITTER_DIGEST_OPEN_TERMINAL=0 TWITTER_DIGEST_INSTALL_REF=$(shell_quote "$REF") TWITTER_DIGEST_INSTALL_CLIENT=$(shell_quote "$CLIENT") TWITTER_DIGEST_XURL_VERSION=$(shell_quote "$XURL_VERSION")"
+  env_text="TWITTER_DIGEST_TERMINAL_CHILD=1 TWITTER_DIGEST_OPEN_TERMINAL=0 TWITTER_DIGEST_INSTALL_REF=$(shell_quote "$REF") TWITTER_DIGEST_INSTALL_CLIENT=$(shell_quote "$CLIENT")"
   if [ -n "$SOURCE_DIR" ]; then
     installer_path="$SOURCE_DIR/install.sh"
     [ -f "$installer_path" ] || fail "Local installer not found: $installer_path"
@@ -485,14 +489,14 @@ fi
 
 if [ "$DRY_RUN" = "1" ]; then
   if [ -n "$SKILLS_DIR" ]; then
-    info "Would install twitter-digest and bundled $XURL_NPM_PACKAGE into $SKILLS_DIR/twitter-digest"
+    info "Would install $SKILL_NAME $SKILL_VERSION and bundled $XURL_NPM_PACKAGE into $SKILLS_DIR/twitter-digest"
   else
     case "$CLIENT" in
-      codex) info "Would install twitter-digest and bundled $XURL_NPM_PACKAGE into $HOME/.codex/skills/twitter-digest" ;;
-      claude) info "Would install twitter-digest and bundled $XURL_NPM_PACKAGE into $HOME/.claude/skills/twitter-digest" ;;
+      codex) info "Would install $SKILL_NAME $SKILL_VERSION and bundled $XURL_NPM_PACKAGE into $HOME/.codex/skills/twitter-digest" ;;
+      claude) info "Would install $SKILL_NAME $SKILL_VERSION and bundled $XURL_NPM_PACKAGE into $HOME/.claude/skills/twitter-digest" ;;
       all)
-        info "Would install twitter-digest and bundled $XURL_NPM_PACKAGE into $HOME/.codex/skills/twitter-digest"
-        info "Would install twitter-digest and bundled $XURL_NPM_PACKAGE into $HOME/.claude/skills/twitter-digest"
+        info "Would install $SKILL_NAME $SKILL_VERSION and bundled $XURL_NPM_PACKAGE into $HOME/.codex/skills/twitter-digest"
+        info "Would install $SKILL_NAME $SKILL_VERSION and bundled $XURL_NPM_PACKAGE into $HOME/.claude/skills/twitter-digest"
         ;;
     esac
   fi
@@ -590,7 +594,7 @@ install_target() {
   if [ -z "$CONFIGURE_XURL" ]; then
     CONFIGURE_XURL="$target/bin/xurl"
   fi
-  info "Installed twitter-digest at $target"
+  info "Installed $SKILL_NAME $SKILL_VERSION at $target"
   info "Bundled $($target/bin/xurl version)"
   info "Acquired from $XURL_NPM_PACKAGE"
 }
