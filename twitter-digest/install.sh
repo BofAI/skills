@@ -307,15 +307,20 @@ print_chat_key_recovery() {
     "$(shell_quote "$xurl_path")" >&2
 }
 
+chat_keys_present() {
+  keys_status=$1
+  normalized_keys_state="$(printf '%s\n' "$keys_status" |
+    sed -n 's/^[[:space:]]*local keys:[[:space:]]*present.*$/present/p')"
+  [ "$normalized_keys_state" = "present" ]
+}
+
 configure_xchat_keys() {
   xurl_path=$1
   keys_status="$("$xurl_path" chat keys status 2>/dev/null || true)"
-  case "$keys_status" in
-    *"local keys: present"*)
-      info "X Chat keys are ready"
-      return
-      ;;
-  esac
+  if chat_keys_present "$keys_status"; then
+    info "X Chat keys are ready"
+    return
+  fi
 
   restore_answer="$(prompt_value 'Restore existing X Chat keys now? (Y/n)' 'y')"
   case "$restore_answer" in
@@ -337,15 +342,12 @@ configure_xchat_keys() {
   fi
 
   keys_status="$("$xurl_path" chat keys status 2>/dev/null || true)"
-  case "$keys_status" in
-    *"local keys: present"*)
-      info "X Chat keys are ready"
-      ;;
-    *)
-      print_chat_key_recovery "$xurl_path"
-      return 1
-      ;;
-  esac
+  if chat_keys_present "$keys_status"; then
+    info "X Chat keys are ready"
+    return
+  fi
+  print_chat_key_recovery "$xurl_path"
+  return 1
 }
 
 configure_installed_xurl() {
