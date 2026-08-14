@@ -23,7 +23,7 @@ XURL="$HOME/.claude/skills/twitter-digest/bin/xurl"
 
 When the skill is loaded from another directory, use the `bin/xurl` next to that `SKILL.md`.
 
-Require `xurl 1.3.2-beta.1` or a later BofAI release containing the per-user X Chat public-key fix:
+Require `xurl 1.3.2-beta.2` or a later BofAI release containing the per-user X Chat public-key fix and empty-event normalization:
 
 ```bash
 "$XURL" version
@@ -147,7 +147,7 @@ App registration containing credentials must be performed by the operator in a r
 
 ## Install
 
-The beta installer supports macOS Apple Silicon/Intel and Linux amd64. It uses Node.js plus npm only during installation to acquire `@bankofai/xurl@1.3.2-beta.1`, then copies that BofAI-patched compiled binary into the skill without replacing a global xurl. It never installs or falls back to `@xdevplatform/xurl`. Normal digest runs do not require Node.js or npm.
+The beta installer supports macOS Apple Silicon/Intel and Linux amd64. It uses Node.js plus npm only during installation to acquire `@bankofai/xurl@1.3.2-beta.2`, then copies that BofAI-patched compiled binary into the skill without replacing a global xurl. It never installs or falls back to `@xdevplatform/xurl`. Normal digest runs do not require Node.js or npm.
 
 Codex:
 
