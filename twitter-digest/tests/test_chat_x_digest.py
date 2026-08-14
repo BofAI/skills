@@ -35,6 +35,22 @@ class ChatCollectorTests(unittest.TestCase):
         self.assertEqual(chat_x_digest.DEFAULT_EVENT_REQUEST_BUDGET, 10)
         self.assertEqual(chat_x_digest.DEFAULT_MAX_EVENT_PAGES_PER_CONVERSATION, 1)
 
+    def test_participant_label_matches_x_display_name_and_username(self) -> None:
+        conversation = {"id": "chat", "participant_ids": ["me", "peer"]}
+        users = {"peer": {"id": "peer", "name": "jerry", "username": "rose_sib_t"}}
+
+        label = chat_x_digest.participant_label(conversation, users, "me")
+
+        self.assertEqual(label, "jerry (@rose_sib_t)")
+
+    def test_participant_label_does_not_repeat_identical_name_and_username(self) -> None:
+        conversation = {"id": "chat", "participant_ids": ["me", "peer"]}
+        users = {"peer": {"id": "peer", "name": "alice", "username": "alice"}}
+
+        label = chat_x_digest.participant_label(conversation, users, "me")
+
+        self.assertEqual(label, "@alice")
+
     def test_api_get_retries_transient_url_error(self) -> None:
         response = mock.MagicMock()
         response.__enter__.return_value.read.return_value = b'{"data": []}'

@@ -105,10 +105,10 @@ class SecurityContractTests(unittest.TestCase):
             Path("/python"), Path("/chat.py"), Path("/out.json"), 24, "recent"
         )
         self.assertEqual(command[-6:], ["--max-conversations", "10", "--max-event-requests", "10", "--max-event-pages", "1"])
-    def test_beta14_installer_and_docs_are_pinned(self) -> None:
+    def test_beta15_installer_and_docs_are_pinned(self) -> None:
         root = SCRIPTS.parent
         for path in (root / "install.sh", root / "README.md", root / "RUNBOOK.md", root / "SKILL.md"):
-            self.assertIn("v1.5.14-beta.14", path.read_text(encoding="utf-8"))
+            self.assertIn("v1.5.14-beta.15", path.read_text(encoding="utf-8"))
 
     def test_skill_requires_friendly_private_rate_limit_messages(self) -> None:
         skill = (SCRIPTS.parent / "SKILL.md").read_text(encoding="utf-8")

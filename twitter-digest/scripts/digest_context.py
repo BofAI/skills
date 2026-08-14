@@ -115,16 +115,16 @@ def build_digest_facts(data: dict[str, Any], summary: dict[str, Any]) -> dict[st
             "rules": [
                 "Use only this run's digest context as content.",
                 "Do not use historical memory or older runs.",
-                "Use DM conversation counts and message counts as separate units.",
+                "DM conversation counts, message-event counts, scan counts, and request counts are internal diagnostics. Never quote numerical X Chat counts in the final digest; describe the participant, content, and action state instead.",
                 "Only threads whose latest preview is not from the user are opened for content.",
                 "Do not treat embedded post authors as DM senders.",
                 "Count low-value waiting-reply DMs but do not expand spam, phishing, generic promotions, or repeated junk.",
                 "Public timeline/profile/mention items must be inside the local-time 24-hour window.",
                 "Do not present already-handled mentions as needing reply; if reply status is unclear, label it as unverified.",
                 "A mention with a replied_to reference to an own post is an incoming reply. Say @sender 回复了你的帖子; do not label it 回复状态未确认.",
-                "likes_on_own_posts items are current likes on own posts published inside the digest window. Report the liker and target post without inventing an exact like time.",
+                "likes_on_own_posts items are current likes on own posts published inside the digest window. Report the liker and target post without inventing an exact like time. If there are no like items and no like collection error, omit likes entirely; do not explain that there were no posts or no likes to query.",
                 "For unknown DM threads, never expose the technical state or ask for verification. List known participants only as: 曾经收到过消息：@sender1、@sender2",
-                "If the X Chat safe scan is incomplete, say only: X Chat 已按 X 返回顺序检查 N 个会话. Do not call these the most recent conversations, claim unscanned conversations had no messages, or expose request-budget internals.",
+                "If the X Chat safe scan is incomplete, say only: 本次仅检查了部分 X Chat 会话. Do not include a number, call these the most recent conversations, claim unscanned conversations had no messages, or expose request-budget internals.",
             ],
         },
         "public": {"counts": {}, "loaded_counts": summary.get("post_counts") or {}, "items": []},
@@ -616,13 +616,6 @@ def render_digest_context(summary: dict[str, Any], facts: dict[str, Any]) -> str
             f"- source: `{summary.get('source') or 'api'}`",
             f"- context policy: {summary.get('context_policy')}",
             f"- DM status: `{summary.get('dm_status')}`",
-            (
-                "- DM counts: "
-                f"today visible `{(summary.get('dm_counts') or {}).get('visible', 0)}`, "
-                f"last_from_me `{(summary.get('dm_counts') or {}).get('last_from_me', 0)}`, "
-                f"waiting_reply `{(summary.get('dm_counts') or {}).get('waiting_reply', 0)}`, "
-                f"captured messages `{(summary.get('dm_counts') or {}).get('captured_messages', 0)}`"
-            ),
             "",
             "### Page Counts",
             "",
@@ -631,6 +624,8 @@ def render_digest_context(summary: dict[str, Any], facts: dict[str, Any]) -> str
         ]
     )
     for kind, counts in (summary.get("post_counts") or {}).items():
+        if kind == "likes_on_own_posts" and int(counts.get("total", 0)) == 0:
+            continue
         lines.append(f"| {kind} | {counts.get('total', 0)} |")
     return "\n".join(lines) + "\n"
 
@@ -659,10 +654,14 @@ def render_context_slice(summary: dict[str, Any], facts: dict[str, Any], slice_n
     else:
         lines.extend(render_public_slice_section(facts, slice_name).splitlines())
     lines.extend(["", "## Data Gaps", ""])
-    gaps = [gap for gap in facts.get("data_gaps") or [] if data_gap_matches_slice(gap, slice_name)]
+    gaps = [
+        gap
+        for gap in facts.get("data_gaps") or []
+        if data_gap_matches_slice(gap, slice_name) and digest_gap_is_user_facing(facts, gap)
+    ]
     if gaps:
         for gap in gaps:
-            lines.append(f"- `{gap.get('source')}` `{gap.get('status')}`: {gap.get('detail')}")
+            lines.append(f"- `{gap.get('source')}` `{gap.get('status')}`: {digest_gap_detail(gap)}")
     else:
         lines.append("- None")
     return "\n".join(lines) + "\n"
@@ -670,55 +669,22 @@ def render_context_slice(summary: dict[str, Any], facts: dict[str, Any], slice_n
 
 def render_dm_facts_section(facts: dict[str, Any]) -> str:
     dms = facts.get("dms") or {}
-    dm_counts = dms.get("counts") or {}
     lines = [
         "## DM Facts",
         "",
         f"- status: `{dms.get('status')}`",
-        (
-            "- counts: "
-            f"today visible `{dm_counts.get('visible', 0)}`, "
-            f"last_from_me `{dm_counts.get('last_from_me', 0)}`, "
-            f"waiting_reply `{dm_counts.get('waiting_reply', 0)}`, "
-            f"unknown `{dm_counts.get('unknown', 0)}`, "
-            f"captured messages `{dm_counts.get('captured_messages', 0)}`"
-        ),
-        "- rule: summarize only `waiting_reply` threads with `should_summarize: true`; count noise but do not expand it.",
+        "- final-output rule: never report numerical message, conversation, scan, or request counts. Describe participants, content, and action state instead.",
+        "- rule: summarize only `waiting_reply` threads with `should_summarize: true`; mention low-value or suspicious content briefly without expanding it.",
     ]
-    list_load = dms.get("list_load") if isinstance(dms.get("list_load"), dict) else {}
-    if list_load:
-        lines.append(
-            "- list load: "
-            f"scrolls_used `{int(list_load.get('scrolls_used') or 0)}`, "
-            f"load_complete `{bool(list_load.get('load_complete'))}`, "
-            f"targets_seen `{int(list_load.get('target_count') or 0)}`"
-        )
     if dms.get("note"):
         lines.append(f"- note: {dms.get('note')}")
     scan = dms.get("scan") if isinstance(dms.get("scan"), dict) else {}
-    if scan:
+    if scan and not scan.get("complete"):
         lines.append(
-            "- safe scan: "
-            f"listed `{int(scan.get('listed') or 0)}`, "
-            f"checked `{int(scan.get('scanned') or 0)}`, "
-            f"event requests `{int(scan.get('event_requests') or 0)}`, "
-            f"complete `{bool(scan.get('complete'))}`, "
-            f"truncated conversations `{int(scan.get('truncated_conversations') or 0)}`"
+            "- final wording: 本次仅检查了部分 X Chat 会话。"
+            " Do not include a count, say the remaining conversations are empty, or expose the stop reason."
         )
-        api_request_counts = scan.get("api_request_counts") if isinstance(scan.get("api_request_counts"), dict) else {}
-        if api_request_counts:
-            lines.append(
-                "- X Chat HTTP attempts (internal diagnostics only): "
-                f"conversation list `{int(api_request_counts.get('conversation_list') or 0)}`, "
-                f"conversation events `{int(api_request_counts.get('conversation_events') or 0)}`, "
-                f"public keys `{int(api_request_counts.get('public_keys') or 0)}`"
-            )
-        if not scan.get("complete"):
-            lines.append(
-                f"- final wording: X Chat 已按 X 返回顺序检查 {int(scan.get('scanned') or 0)} 个会话。"
-                " Do not say the remaining conversations are empty and do not expose the stop reason."
-            )
-    lines.extend(["", "| participant | reply_state | messages | summarize | noise_reason | excerpt |", "|---|---|---:|---|---|---|"])
+    lines.extend(["", "| participant | reply_state | summarize | noise_reason | excerpt |", "|---|---|---|---|---|"])
     for thread in dms.get("threads") or []:
         lines.append(
             "| "
@@ -726,7 +692,6 @@ def render_dm_facts_section(facts: dict[str, Any]) -> str:
                 [
                     md_cell(thread.get("participant") or ""),
                     md_cell(thread.get("reply_state") or ""),
-                    str(int(thread.get("message_count") or 0)),
                     "yes" if thread.get("should_summarize") else "no",
                     md_cell(thread.get("noise_reason") or ""),
                     md_cell(thread.get("text_excerpt") or ""),
@@ -735,7 +700,7 @@ def render_dm_facts_section(facts: dict[str, Any]) -> str:
             + " |"
         )
     if not dms.get("threads"):
-        lines.append("| none | - | 0 | no | no_opened_unreplied_threads | |")
+        lines.append("| none | - | no | no_opened_unreplied_threads | |")
 
     context_threads = [
         thread
@@ -751,20 +716,22 @@ def render_dm_facts_section(facts: dict[str, Any]) -> str:
                 "Use this recent loaded history to understand waiting-reply DMs. Sender is based on message bubble direction; quoted-post authors are not DM senders.",
             ]
         )
-        for index, thread in enumerate(context_threads, start=1):
-            messages = thread.get("messages") if isinstance(thread.get("messages"), list) else []
-            shown_messages = len(messages[-2000:]) if messages else int(thread.get("message_count") or 0)
+        for thread in context_threads:
             load = thread.get("load") if isinstance(thread.get("load"), dict) else {}
             lines.extend(
                 [
                     "",
-                    f"### DM {index}: {thread.get('participant') or '[unknown]'}",
+                    f"### DM: {thread.get('participant') or '[unknown]'}",
                     "",
                     f"- reply_state: `{thread.get('reply_state')}`",
                     f"- raw_label: `{md_inline(thread.get('label') or '')}`",
                     f"- url: `{md_inline(thread.get('url') or '')}`",
-                    f"- loaded message bubbles in context: `{shown_messages}` of `{int(thread.get('message_count') or 0)}`",
-                    f"- load: scrolls_used `{int(load.get('scrolls_used') or 0)}`, load_complete `{bool(load.get('load_complete'))}`, window_exceeded `{bool(load.get('window_exceeded'))}`, hit_message_cap `{bool(load.get('hit_message_cap'))}`",
+                ]
+            )
+            if load and not load.get("load_complete"):
+                lines.append("- context note: 会话内容可能未完整读取。")
+            lines.extend(
+                [
                     "",
                     "```text",
                     str(thread.get("conversation_context") or "")[:120000],
@@ -820,6 +787,8 @@ def render_public_slice_section(facts: dict[str, Any], slice_name: str) -> str:
     lines = ["## Public Counts", "", "| page | total |", "|---|---:|"]
     any_counts = False
     for kind, page_counts in counts.items():
+        if kind == "likes_on_own_posts" and int(page_counts.get("total", 0)) == 0:
+            continue
         if public_kind_matches_slice(str(kind), slice_name):
             any_counts = True
             lines.append(f"| {md_cell(kind)} | {page_counts.get('total', 0)} |")
@@ -902,6 +871,8 @@ def render_digest_facts(facts: dict[str, Any]) -> str:
 
     lines.extend(["", "## Public Counts", "", "| page | total |", "|---|---:|"])
     for kind, counts in ((facts.get("public") or {}).get("counts") or {}).items():
+        if kind == "likes_on_own_posts" and int(counts.get("total", 0)) == 0:
+            continue
         lines.append(f"| {md_cell(kind)} | {counts.get('total', 0)} |")
 
     lines.extend(["", "## Public Items", ""])
@@ -929,10 +900,39 @@ def render_digest_facts(facts: dict[str, Any]) -> str:
 
     lines.extend(["", "## Data Gaps", ""])
     for gap in facts.get("data_gaps") or []:
-        lines.append(f"- `{gap.get('source')}` `{gap.get('status')}`: {gap.get('detail')}")
-    if not facts.get("data_gaps"):
+        if not digest_gap_is_user_facing(facts, gap):
+            continue
+        lines.append(f"- `{gap.get('source')}` `{gap.get('status')}`: {digest_gap_detail(gap)}")
+    if not any(digest_gap_is_user_facing(facts, gap) for gap in facts.get("data_gaps") or []):
         lines.append("- None")
     return "\n".join(lines) + "\n"
+
+
+def digest_gap_is_user_facing(facts: dict[str, Any], gap: dict[str, Any]) -> bool:
+    source = str(gap.get("source") or "").lower()
+    status = str(gap.get("status") or "").lower()
+    if source not in {"messages", "x_chat"}:
+        return True
+    if status == "conversation_history_unavailable":
+        return False
+    if status in {"safe_scan_limited", "dm_list_incomplete"}:
+        scan = (facts.get("dms") or {}).get("scan")
+        if isinstance(scan, dict) and not scan.get("complete"):
+            return False
+    return True
+
+
+def digest_gap_detail(gap: dict[str, Any]) -> str:
+    source = str(gap.get("source") or "").lower()
+    status = str(gap.get("status") or "").lower()
+    if source in {"messages", "x_chat"}:
+        if status in {"safe_scan_limited", "dm_list_incomplete"}:
+            return "本次仅检查了部分 X Chat 会话。"
+        if status in {"conversation_history_unavailable", "dm_thread_incomplete"}:
+            return "部分 X Chat 会话内容未能完整确认。"
+        if status == "message_timestamp_unavailable":
+            return "部分 X Chat 消息时间无法确认，未纳入日报。"
+    return str(gap.get("detail") or "")
 
 
 def compact_text(value: Any) -> str:

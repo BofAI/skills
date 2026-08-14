@@ -156,6 +156,36 @@ class DigestContextPublicTests(unittest.TestCase):
         self.assertIn("interaction_type=`liked_your_post`", rendered)
         self.assertIn("target post: my post", rendered)
 
+    def test_zero_like_source_is_not_exposed_to_digest_writer(self) -> None:
+        facts = {
+            "run": {},
+            "account": {},
+            "public": {
+                "counts": {
+                    "own_profile": {"total": 0},
+                    "likes_on_own_posts": {"total": 0},
+                },
+                "items": [],
+            },
+            "dms": {},
+            "todo_items": [],
+            "data_gaps": [],
+        }
+
+        summary = {
+            "post_counts": {
+                "own_profile": {"total": 0},
+                "likes_on_own_posts": {"total": 0},
+            }
+        }
+        rendered = digest_context.render_digest_context(summary, facts)
+        timeline_slice = digest_context.render_context_slice(summary, facts, "timeline")
+
+        self.assertIn("own_profile", rendered)
+        self.assertNotIn("likes_on_own_posts", rendered)
+        self.assertIn("own_profile", timeline_slice)
+        self.assertNotIn("likes_on_own_posts", timeline_slice)
+
 
 if __name__ == "__main__":
     unittest.main()

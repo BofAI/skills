@@ -382,7 +382,14 @@ def participant_label(conversation: dict[str, Any], users: dict[str, dict[str, A
     labels = []
     for user_id in sorted(participant_ids(conversation, current_user_id)):
         user = users.get(user_id) or {}
-        labels.append("@" + str(user["username"]) if user.get("username") else str(user.get("name") or user_id))
+        username = str(user.get("username") or "").strip()
+        name = str(user.get("name") or "").strip()
+        if username and name and name.casefold() != username.casefold():
+            labels.append(f"{name} (@{username})")
+        elif username:
+            labels.append(f"@{username}")
+        else:
+            labels.append(name or user_id)
     return ", ".join(labels) or str(conversation.get("id") or "")
 
 

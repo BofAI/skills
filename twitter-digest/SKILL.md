@@ -161,8 +161,8 @@ X Chat rules:
 - In the default `recent` profile, inspect at most 10 conversations, use at most 10 Chat event requests, and load at most 1 event page per conversation. Use the `more` profile only on an explicit user request; it allows at most 50 conversations, 20 event requests, and 3 event pages per conversation. Always reserve the last 5 requests reported by X.
 - For conversation-list pagination, use at most 5 requests, stop after 3 consecutive empty pages, stop on a repeated pagination token, and stop when X says more results exist without returning a token. Preserve already collected conversations and mark coverage incomplete.
 - Fetch participant signing keys only after the first event page shows that a conversation may contain in-window events.
-- When safe scanning stops before the returned list is exhausted, say `X Chat 已按 X 返回顺序检查 N 个会话`. The conversations endpoint does not expose a reliable recency field, so never call this list “最近的会话”. Do not expose request-budget internals or say the remaining conversations had no messages.
-- A remaining conversation-list pagination token or a listed conversation without an ID is also a safe-scan boundary. Mark the scan incomplete and use the same friendly checked-count sentence; never claim that later or unscannable conversations had no messages.
+- When safe scanning stops before the returned list is exhausted, say `本次仅检查了部分 X Chat 会话`. The conversations endpoint does not expose a reliable recency field, so never call this list “最近的会话”. Do not include a count, expose request-budget internals, or say the remaining conversations had no messages.
+- A remaining conversation-list pagination token or a listed conversation without an ID is also a safe-scan boundary. Mark the scan incomplete and use the same friendly non-numeric sentence; never claim that later or unscannable conversations had no messages.
 - Cache participant signing public keys locally for 24 hours, keyed by X account and user ID. Query only missing or expired entries. If Chat XDK reports verification/decryption errors, refresh the affected conversation's keys once and retry; fail normally if verification still fails.
 - On HTTP 429, stop immediately in both normal collection and initial Chat configuration. Name only the friendly category: `X Chat 会话列表暂时受到限流`, `X Chat 消息读取暂时受到限流`, or `X Chat 公钥读取暂时受到限流`; include the estimated recovery time when available. Never expose a concrete conversation ID, user ID, raw API path, or response body. Do not repeatedly hit the same rate-limited endpoint inside one run.
 - When X returns a known retry interval for a Chat 429, cache only the sanitized endpoint category and expiry in owner-only local state. Until expiry, do not send another request to that endpoint; return the same friendly rate-limit message locally. Never cache an unknown reset time.
@@ -186,6 +186,7 @@ Like handling:
 - X provides current liking users for a Post, but not a timestamped like-notification list through this lookup.
 - Query liking users only for the user's own posts published inside the digest window and having `like_count > 0`; this keeps the resulting likes within the same window.
 - Say `@sender 点赞了你的帖子` and identify the target post. Do not invent an exact like time.
+- If there are no like items and no like collection error, say nothing about likes. No recent own Post, no likes, or no eligible lookup candidate is normal and must not be explained to the user.
 - If liking-user lookup is unavailable for the user's API tier, report that source as unavailable instead of claiming there were no likes.
 
 ## Writing The Digest
@@ -223,9 +224,11 @@ Keep the digest compact and use these six sections only when they contain useful
 - 私信.
 - 数据缺口.
 
+X Chat counts are internal diagnostics, not user-facing facts. Never report numerical message-event counts, conversation counts, checked-conversation counts, captured-message counts, or request counts in a normal digest. X can render one API message event as several bubbles, cards, or previews, so those numbers may not match the page. Describe who sent the Chat, what it is about, and whether the user needs to handle it. Display a one-to-one participant as `显示名称（@username）` when both values are available. If there is no useful Chat information, omit the private-message section or say only `没有需要处理的私信`.
+
 When a verified manual action exists, add a `需要你在 X 界面操作` section near `该处理`. Write plain Chinese instructions rather than exposing raw API fields or English states. Do not put unknown conversations in this action section. If unknown conversations have known participants, add one compact informational line elsewhere: `曾经收到过消息：@sender1、@sender2`. Add no technical explanation, warning, or instruction after it.
 
-If `dm_scan_complete=false`, add one quiet informational sentence: `X Chat 已按 X 返回顺序检查 N 个会话。` Do not present this as an error or ask the user to retry immediately.
+If `dm_scan_complete=false`, add one quiet informational sentence: `本次仅检查了部分 X Chat 会话。` Do not include a count, present this as an error, or ask the user to retry immediately.
 
 Never post, reply, like, follow, block, open suspicious links, accept requests, or send DMs. 不得生成、推荐或改写任何回复内容，也不要提供回复草稿、模板或可复制话术。
 
@@ -237,13 +240,13 @@ This skill never sends messages, even after review. If the user asks to send or 
 Codex:
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/BofAI/skills/v1.5.14-beta.14/twitter-digest/install.sh | env TWITTER_DIGEST_INSTALL_CLIENT=codex sh
+curl -fsSL https://raw.githubusercontent.com/BofAI/skills/v1.5.14-beta.15/twitter-digest/install.sh | env TWITTER_DIGEST_INSTALL_CLIENT=codex sh
 ```
 
 Claude Code:
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/BofAI/skills/v1.5.14-beta.14/twitter-digest/install.sh | env TWITTER_DIGEST_INSTALL_CLIENT=claude TWITTER_DIGEST_ALLOW_CLAUDE_COMMANDS=1 TWITTER_DIGEST_ALLOW_CLAUDE_STATE_READ=1 sh
+curl -fsSL https://raw.githubusercontent.com/BofAI/skills/v1.5.14-beta.15/twitter-digest/install.sh | env TWITTER_DIGEST_INSTALL_CLIENT=claude TWITTER_DIGEST_ALLOW_CLAUDE_COMMANDS=1 TWITTER_DIGEST_ALLOW_CLAUDE_STATE_READ=1 sh
 ```
 
 The installer checks Python 3.10+ and installs the skill into the target agent skill directory.

@@ -175,7 +175,8 @@ class DigestContextChatTests(unittest.TestCase):
         self.assertIn("曾经收到过消息：@peer", dm_context)
         self.assertNotIn("状态未知会话 @peer", dm_context)
         self.assertNotIn("请打开 X 会话手动确认", dm_context)
-        self.assertIn("One conversation was unreadable.", dm_context)
+        self.assertNotIn("One conversation was unreadable.", dm_context)
+        self.assertNotIn("部分 X Chat 会话内容未能完整确认", dm_context)
 
     def test_context_outputs_are_owner_only(self) -> None:
         data = {"generated_at": "2026-08-03T12:00:00+08:00", "source": "api", "pages": []}
@@ -203,7 +204,42 @@ class DigestContextChatTests(unittest.TestCase):
         self.assertNotIn("状态未知会话", rendered)
         self.assertNotIn("请在 X 界面检查", rendered)
 
-    def test_safe_scan_limit_uses_friendly_checked_count(self) -> None:
+    def test_dm_thread_load_counts_stay_internal(self) -> None:
+        facts = {
+            "dms": {
+                "threads": [
+                    {
+                        "participant": "jerry (@rose_sib_t)",
+                        "reply_state": "waiting_reply",
+                        "should_summarize": True,
+                        "conversation_context": "other 16:11: suspicious link",
+                        "message_count": 5,
+                        "messages": [
+                            {
+                                "sender": "other",
+                                "time": "2026-08-13T16:11:00+08:00",
+                                "text": "suspicious link",
+                            }
+                        ],
+                        "load": {
+                            "scrolls_used": 3,
+                            "load_complete": False,
+                            "window_exceeded": False,
+                            "hit_message_cap": True,
+                        },
+                    }
+                ]
+            }
+        }
+
+        rendered = digest_context.render_dm_facts_section(facts)
+
+        self.assertNotIn("loaded message bubbles", rendered)
+        self.assertNotIn("scrolls_used", rendered)
+        self.assertNotIn("hit_message_cap", rendered)
+        self.assertIn("会话内容可能未完整读取", rendered)
+
+    def test_safe_scan_limit_uses_friendly_non_numeric_wording(self) -> None:
         data = {
             "generated_at": "2026-08-10T12:00:00+08:00",
             "source": "api",
@@ -227,7 +263,7 @@ class DigestContextChatTests(unittest.TestCase):
                         {
                             "source": "x_chat",
                             "status": "safe_scan_limited",
-                            "detail": "Stopped safely.",
+                            "detail": "Checked 4 of 50 conversations using 4 event requests.",
                         }
                     ],
                 }
@@ -236,15 +272,26 @@ class DigestContextChatTests(unittest.TestCase):
         summary = digest_context.summarize_current_run(data)
         facts = digest_context.build_digest_facts(data, summary)
         rendered = digest_context.render_context_slice(summary, facts, "dm")
-        self.assertIn("X Chat 已按 X 返回顺序检查 4 个会话", rendered)
+        full_context = digest_context.render_digest_context(summary, facts)
+        self.assertIn("本次仅检查了部分 X Chat 会话", rendered)
+        self.assertEqual(rendered.count("本次仅检查了部分 X Chat 会话"), 1)
+        self.assertEqual(full_context.count("本次仅检查了部分 X Chat 会话"), 1)
+        self.assertNotIn("X Chat 已按 X 返回顺序检查 4 个会话", rendered)
         self.assertNotIn("最近的 4 个会话", rendered)
-        self.assertIn("checked `4`", rendered)
+        self.assertNotIn("checked `4`", rendered)
+        self.assertNotIn("4 of 50", rendered)
+        self.assertNotIn("4 event requests", rendered)
+        self.assertNotIn("captured messages", rendered)
+        self.assertNotIn("| participant | reply_state | messages |", rendered)
+        self.assertNotIn("DM counts", full_context)
+        self.assertNotIn("captured messages", full_context)
         self.assertFalse(facts["dms"]["scan"]["complete"])
+        self.assertEqual(facts["dms"]["scan"]["scanned"], 4)
         self.assertEqual(
             facts["dms"]["scan"]["api_request_counts"],
             {"conversation_list": 1, "conversation_events": 5, "public_keys": 2},
         )
-        self.assertIn("HTTP attempts", rendered)
+        self.assertNotIn("HTTP attempts", rendered)
 
 
 if __name__ == "__main__":
