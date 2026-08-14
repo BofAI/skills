@@ -125,6 +125,9 @@ should_open_terminal() {
     *) fail "TWITTER_DIGEST_OPEN_TERMINAL must be auto, 1, or 0" ;;
   esac
   [ "$(uname -s)" = "Darwin" ] || return 1
+  if [ -n "${SSH_CONNECTION:-}" ] || [ -n "${SSH_CLIENT:-}" ] || [ -n "${SSH_TTY:-}" ]; then
+    return 1
+  fi
   if running_under_agent || [ ! -t 0 ]; then
     return 0
   fi
