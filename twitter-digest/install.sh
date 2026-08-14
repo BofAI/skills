@@ -224,12 +224,21 @@ configured_apps() {
     sed -n 's/^[^[:alnum:]]*\([^[:space:](][^[:space:](]*\).* \[app config\]$/\1/p'
 }
 
-oauth_username() {
+whoami_username() {
   xurl_path=$1
   app_name=$2
-  "$xurl_path" auth status --app "$app_name" 2>/dev/null |
-    sed -n 's/.*oauth2: \([^[:space:]]*\).*/\1/p' |
-    sed -n '/(none)/d;1p'
+  identity_json="$("$xurl_path" whoami --app "$app_name" 2>/dev/null)" || return 1
+  printf '%s' "$identity_json" | node -e '
+    const fs = require("fs");
+    try {
+      const value = JSON.parse(fs.readFileSync(0, "utf8"));
+      const username = value && value.data && value.data.username;
+      if (typeof username !== "string" || username.length === 0) process.exit(1);
+      process.stdout.write(username);
+    } catch (_) {
+      process.exit(1);
+    }
+  '
 }
 
 select_or_register_app() {
@@ -343,9 +352,10 @@ configure_installed_xurl() {
   fi
 
   app_name="$(select_or_register_app "$xurl_path")"
-  username="$(oauth_username "$xurl_path" "$app_name" || true)"
+  "$xurl_path" auth default "$app_name" >/dev/null || fail "Could not select X App $app_name"
+  username="$(whoami_username "$xurl_path" "$app_name" || true)"
   if [ -n "$username" ]; then
-    "$xurl_path" auth default "$app_name" "$username" >/dev/null
+    "$xurl_path" auth default "$app_name" "$username" >/dev/null || fail "Could not select @$username for X App $app_name"
     if "$xurl_path" whoami >/dev/null 2>&1; then
       info "Reused OAuth2 authorization for @$username"
       configure_xchat_keys "$xurl_path"
@@ -360,7 +370,7 @@ configure_installed_xurl() {
     return 1
   fi
 
-  username="$(oauth_username "$xurl_path" "$app_name" || true)"
+  username="$(whoami_username "$xurl_path" "$app_name" || true)"
   [ -n "$username" ] || fail "OAuth2 completed but xurl did not report an authorized username"
   "$xurl_path" auth default "$app_name" "$username" >/dev/null || fail "Could not set the default X account"
   "$xurl_path" whoami >/dev/null 2>&1 || fail "OAuth2 verification failed for @$username"
