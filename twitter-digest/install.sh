@@ -10,6 +10,7 @@ XURL_NPM_PACKAGE="@bankofai/xurl@${XURL_VERSION}"
 SKILLS_DIR=""
 SKIP_CONFIGURE=0
 DRY_RUN=0
+CONFIGURE_XURL=""
 
 info() {
   printf '==> %s\n' "$1"
@@ -167,6 +168,152 @@ if should_open_terminal; then
   open_self_in_terminal_and_exit
 fi
 
+has_operator_tty() {
+  [ -r /dev/tty ] && [ -w /dev/tty ] && ( : </dev/tty ) 2>/dev/null
+}
+
+prompt_value() {
+  label=$1
+  default_value=${2:-}
+  if [ -n "$default_value" ]; then
+    prompt_text="$label [$default_value]: "
+  else
+    prompt_text="$label: "
+  fi
+
+  if has_operator_tty; then
+    printf '%s' "$prompt_text" >/dev/tty
+    IFS= read -r answer </dev/tty || fail "Input cancelled"
+  else
+    printf '%s' "$prompt_text" >&2
+    IFS= read -r answer || fail "Input cancelled"
+  fi
+
+  if [ -z "$answer" ]; then
+    answer=$default_value
+  fi
+  [ -n "$answer" ] || fail "$label is required"
+  printf '%s\n' "$answer"
+}
+
+prompt_secret() {
+  label=$1
+  if has_operator_tty && command_exists stty; then
+    old_stty="$(stty -g </dev/tty)"
+    trap 'stty "$old_stty" </dev/tty 2>/dev/null || true' EXIT HUP INT TERM
+    printf '%s: ' "$label" >/dev/tty
+    stty -echo </dev/tty
+    IFS= read -r answer </dev/tty || {
+      stty "$old_stty" </dev/tty
+      fail "Input cancelled"
+    }
+    stty "$old_stty" </dev/tty
+    printf '\n' >/dev/tty
+    trap - EXIT HUP INT TERM
+  else
+    printf '%s: ' "$label" >&2
+    IFS= read -r answer || fail "Input cancelled"
+  fi
+  [ -n "$answer" ] || fail "$label is required"
+  printf '%s\n' "$answer"
+}
+
+configured_apps() {
+  xurl_path=$1
+  "$xurl_path" auth apps list 2>/dev/null |
+    sed -n 's/^[^[:alnum:]]*\([^[:space:](][^[:space:](]*\).* \[app config\]$/\1/p'
+}
+
+oauth_username() {
+  xurl_path=$1
+  app_name=$2
+  "$xurl_path" auth status --app "$app_name" 2>/dev/null |
+    sed -n 's/.*oauth2: \([^[:space:]]*\).*/\1/p' |
+    sed -n '/(none)/d;1p'
+}
+
+select_or_register_app() {
+  xurl_path=$1
+  apps_file="$WORKDIR/configured-apps"
+  configured_apps "$xurl_path" >"$apps_file"
+  app_count="$(sed -n '$=' "$apps_file")"
+  app_count=${app_count:-0}
+
+  if [ "$app_count" -eq 1 ]; then
+    sed -n '1p' "$apps_file"
+    return
+  fi
+
+  if [ "$app_count" -gt 1 ]; then
+    printf '\nRegistered X Apps:\n' >&2
+    item=1
+    while IFS= read -r app_name; do
+      printf '  %s) %s\n' "$item" "$app_name" >&2
+      item=$((item + 1))
+    done <"$apps_file"
+    selection="$(prompt_value 'Select App number' '1')"
+    case "$selection" in
+      *[!0-9]*|0) fail "Invalid App selection" ;;
+    esac
+    selected_app="$(sed -n "${selection}p" "$apps_file")"
+    [ -n "$selected_app" ] || fail "Invalid App selection"
+    printf '%s\n' "$selected_app"
+    return
+  fi
+
+  printf '\nNo X App is registered in xurl. Enter the X Developer App credentials.\n' >&2
+  app_name="$(prompt_value 'App name' '')"
+  client_id="$(prompt_value 'OAuth2 Client ID' '')"
+  client_secret="$(prompt_secret 'OAuth2 Client Secret')"
+  redirect_uri="$(prompt_value 'Callback / Redirect URI' 'http://localhost:8080/callback')"
+  "$xurl_path" auth apps add "$app_name" \
+    --client-id "$client_id" \
+    --client-secret "$client_secret" \
+    --redirect-uri "$redirect_uri" >/dev/null || fail "Could not register X App $app_name"
+  printf '%s\n' "$app_name"
+}
+
+run_oauth2() {
+  xurl_path=$1
+  app_name=$2
+  if [ "$(uname -s)" != "Darwin" ] && [ -z "${DISPLAY:-}" ] && [ -z "${WAYLAND_DISPLAY:-}" ]; then
+    "$xurl_path" auth oauth2 --headless --app "$app_name"
+  else
+    "$xurl_path" auth oauth2 --app "$app_name"
+  fi
+}
+
+configure_installed_xurl() {
+  xurl_path=$1
+  if "$xurl_path" whoami >/dev/null 2>&1; then
+    info "Existing X OAuth2 authorization is ready"
+    return
+  fi
+
+  app_name="$(select_or_register_app "$xurl_path")"
+  username="$(oauth_username "$xurl_path" "$app_name" || true)"
+  if [ -n "$username" ]; then
+    "$xurl_path" auth default "$app_name" "$username" >/dev/null
+    if "$xurl_path" whoami >/dev/null 2>&1; then
+      info "Reused OAuth2 authorization for @$username"
+      return
+    fi
+  fi
+
+  info "Opening X OAuth2 authorization for App $app_name"
+  if ! run_oauth2 "$xurl_path" "$app_name"; then
+    printf 'Authorization was not completed. Retry in Terminal:\n  %s auth oauth2 --app %s\n' \
+      "$(shell_quote "$xurl_path")" "$(shell_quote "$app_name")" >&2
+    return 1
+  fi
+
+  username="$(oauth_username "$xurl_path" "$app_name" || true)"
+  [ -n "$username" ] || fail "OAuth2 completed but xurl did not report an authorized username"
+  "$xurl_path" auth default "$app_name" "$username" >/dev/null || fail "Could not set the default X account"
+  "$xurl_path" whoami >/dev/null 2>&1 || fail "OAuth2 verification failed for @$username"
+  info "Authorized X account @$username"
+}
+
 detect_client() {
   if [ -n "${CODEX_THREAD_ID:-}" ] || [ "${__CFBundleIdentifier:-}" = "com.openai.codex" ]; then
     printf 'codex'
@@ -295,18 +442,12 @@ install_target() {
   fi
 
   mv "$staging" "$target"
+  if [ -z "$CONFIGURE_XURL" ]; then
+    CONFIGURE_XURL="$target/bin/xurl"
+  fi
   info "Installed twitter-digest at $target"
   info "Bundled $($target/bin/xurl version)"
   info "Acquired from $XURL_NPM_PACKAGE"
-
-  if [ "$SKIP_CONFIGURE" = "0" ]; then
-    printf '\nRun these commands in a real Terminal when authorization is needed:\n'
-    printf '  %s auth status\n' "$(shell_quote "$target/bin/xurl")"
-    printf '  %s auth oauth2 --app <app-name>\n' "$(shell_quote "$target/bin/xurl")"
-    printf '  %s auth default <app-name> <username>\n' "$(shell_quote "$target/bin/xurl")"
-    printf '  %s chat keys status\n' "$(shell_quote "$target/bin/xurl")"
-    printf '  %s chat keys restore\n' "$(shell_quote "$target/bin/xurl")"
-  fi
 }
 
 if [ -n "$SKILLS_DIR" ]; then
@@ -320,6 +461,10 @@ else
       install_target "$HOME/.claude/skills"
       ;;
   esac
+fi
+
+if [ "$SKIP_CONFIGURE" = "0" ]; then
+  configure_installed_xurl "$CONFIGURE_XURL"
 fi
 
 printf '\nExisting xurl authorization and Chat keys in ~/.xurl were preserved.\n'
