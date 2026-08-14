@@ -5,10 +5,9 @@ REF="${TWITTER_DIGEST_INSTALL_REF:-main}"
 CLIENT="${TWITTER_DIGEST_INSTALL_CLIENT:-auto}"
 OPEN_TERMINAL="${TWITTER_DIGEST_OPEN_TERMINAL:-auto}"
 SOURCE_DIR="${TWITTER_DIGEST_SOURCE_DIR:-}"
-XURL_ARCHIVE="${TWITTER_DIGEST_XURL_ARCHIVE:-}"
 XURL_VERSION="${TWITTER_DIGEST_XURL_VERSION:-1.3.2-beta.1}"
-XURL_SHA256="b15bd655818cdca60af77d9a575abd53962bb55ed49ccb62e0130ce2f0262864"
-XURL_REPOSITORY="https://github.com/BofAI/xurl"
+XURL_NPM_PACKAGE="@bankofai/xurl@${XURL_VERSION}"
+NPM_CLI_VERSION="11.6.2"
 SKILLS_DIR=""
 SKIP_CONFIGURE=0
 DRY_RUN=0
@@ -40,8 +39,9 @@ usage() {
   cat <<'EOF'
 Usage: install.sh [options]
 
-Installs twitter-digest with a private bundled BofAI xurl binary. The installer
-does not install language runtimes, replace a global xurl, or read ~/.xurl.
+Installs twitter-digest with a private bundled BofAI xurl binary. Node.js and
+npx are used only to acquire the pinned npm package. Normal runs invoke the
+native binary and the installer never replaces a global xurl or reads ~/.xurl.
 
 Options:
   --client auto|codex|claude|all  Target client. Default: auto.
@@ -53,7 +53,6 @@ Options:
 Environment overrides:
   TWITTER_DIGEST_INSTALL_REF      BofAI/skills Git ref. Default: main.
   TWITTER_DIGEST_SOURCE_DIR       Local twitter-digest source directory.
-  TWITTER_DIGEST_XURL_ARCHIVE     Local xurl release archive.
   TWITTER_DIGEST_OPEN_TERMINAL    auto, 1, or 0. Default: auto.
 EOF
 }
@@ -147,9 +146,6 @@ open_self_in_terminal_and_exit() {
     installer_path="$SOURCE_DIR/install.sh"
     [ -f "$installer_path" ] || fail "Local installer not found: $installer_path"
     env_text="$env_text TWITTER_DIGEST_SOURCE_DIR=$(shell_quote "$SOURCE_DIR")"
-    if [ -n "$XURL_ARCHIVE" ]; then
-      env_text="$env_text TWITTER_DIGEST_XURL_ARCHIVE=$(shell_quote "$XURL_ARCHIVE")"
-    fi
     command_text="cd ~ && env $env_text /bin/sh $(shell_quote "$installer_path")${args_text}; printf '\\nPress Enter to close this window...'; IFS= read -r _"
   else
     command_exists curl || fail "curl is required to open the installer in Terminal"
@@ -197,24 +193,26 @@ fi
 
 if [ "$DRY_RUN" = "1" ]; then
   if [ -n "$SKILLS_DIR" ]; then
-    info "Would install twitter-digest and bundled xurl $XURL_VERSION into $SKILLS_DIR/twitter-digest"
+    info "Would install twitter-digest and bundled $XURL_NPM_PACKAGE into $SKILLS_DIR/twitter-digest"
   else
     case "$CLIENT" in
-      codex) info "Would install twitter-digest and bundled xurl $XURL_VERSION into $HOME/.codex/skills/twitter-digest" ;;
-      claude) info "Would install twitter-digest and bundled xurl $XURL_VERSION into $HOME/.claude/skills/twitter-digest" ;;
+      codex) info "Would install twitter-digest and bundled $XURL_NPM_PACKAGE into $HOME/.codex/skills/twitter-digest" ;;
+      claude) info "Would install twitter-digest and bundled $XURL_NPM_PACKAGE into $HOME/.claude/skills/twitter-digest" ;;
       all)
-        info "Would install twitter-digest and bundled xurl $XURL_VERSION into $HOME/.codex/skills/twitter-digest"
-        info "Would install twitter-digest and bundled xurl $XURL_VERSION into $HOME/.claude/skills/twitter-digest"
+        info "Would install twitter-digest and bundled $XURL_NPM_PACKAGE into $HOME/.codex/skills/twitter-digest"
+        info "Would install twitter-digest and bundled $XURL_NPM_PACKAGE into $HOME/.claude/skills/twitter-digest"
         ;;
     esac
   fi
   exit 0
 fi
 
-[ "$(uname -s)" = "Darwin" ] || fail "This beta package currently supports macOS only"
-[ "$(uname -m)" = "arm64" ] || fail "This beta package currently supports Apple Silicon only"
+case "$(uname -s)/$(uname -m)" in
+  Darwin/arm64|Darwin/x86_64|Linux/x86_64|Linux/amd64) ;;
+  *) fail "twitter-digest requires full X Chat support: macOS arm64/amd64 or Linux amd64" ;;
+esac
 
-for required_command in mktemp tar shasum sed cp mv mkdir chmod date; do
+for required_command in mktemp tar sed cp mv mkdir chmod date npx; do
   command_exists "$required_command" || fail "$required_command is required"
 done
 
@@ -241,29 +239,27 @@ copy_source_file "agents/openai.yaml"
 copy_source_file "install.sh"
 copy_source_file "uninstall.sh"
 
-if [ -n "$XURL_ARCHIVE" ]; then
-  [ -f "$XURL_ARCHIVE" ] || fail "xurl archive not found: $XURL_ARCHIVE"
-  ARCHIVE_PATH="$XURL_ARCHIVE"
-else
-  command_exists curl || fail "curl is required to download xurl"
-  ARCHIVE_PATH="$WORKDIR/xurl_Darwin_arm64.tar.gz"
-  XURL_URL="$XURL_REPOSITORY/releases/download/v${XURL_VERSION}/xurl_Darwin_arm64.tar.gz"
-  info "Downloading BofAI xurl $XURL_VERSION"
-  curl -fsSL "$XURL_URL" -o "$ARCHIVE_PATH" || fail "Could not download xurl $XURL_VERSION"
-fi
+XURL_NPM_ROOT="$WORKDIR/xurl-npm"
+mkdir -p "$XURL_NPM_ROOT"
+info "Installing $XURL_NPM_PACKAGE from npm"
+npx -y "npm@$NPM_CLI_VERSION" install \
+  --prefix "$XURL_NPM_ROOT" \
+  --no-save \
+  --omit=dev \
+  --prefer-online \
+  "$XURL_NPM_PACKAGE" || fail "Could not install $XURL_NPM_PACKAGE from npm"
 
-actual_sha256="$(shasum -a 256 "$ARCHIVE_PATH" | sed 's/[[:space:]].*$//')"
-[ "$actual_sha256" = "$XURL_SHA256" ] || fail "xurl archive checksum verification failed"
-
-XURL_EXTRACT_DIR="$WORKDIR/xurl-release"
-mkdir -p "$XURL_EXTRACT_DIR"
-tar -xzf "$ARCHIVE_PATH" -C "$XURL_EXTRACT_DIR"
-[ -f "$XURL_EXTRACT_DIR/xurl" ] || fail "xurl archive does not contain the expected binary"
-cp "$XURL_EXTRACT_DIR/xurl" "$PACKAGE_DIR/bin/xurl"
+XURL_NPM_BINARY="$XURL_NPM_ROOT/node_modules/@bankofai/xurl/binary/xurl"
+[ -f "$XURL_NPM_BINARY" ] || fail "$XURL_NPM_PACKAGE did not install the expected native binary"
+cp "$XURL_NPM_BINARY" "$PACKAGE_DIR/bin/xurl"
 chmod 755 "$PACKAGE_DIR/bin/xurl" "$PACKAGE_DIR/install.sh" "$PACKAGE_DIR/uninstall.sh"
 
 version_output="$($PACKAGE_DIR/bin/xurl version 2>/dev/null || true)"
 [ "$version_output" = "xurl $XURL_VERSION" ] || fail "Bundled binary version check failed"
+chat_help="$($PACKAGE_DIR/bin/xurl chat --help 2>&1 || true)"
+case "$chat_help" in
+  *"not available in this build"*) fail "$XURL_NPM_PACKAGE does not include X Chat on this platform" ;;
+esac
 
 install_target() {
   skills_root="$1"
@@ -293,6 +289,7 @@ install_target() {
   mv "$staging" "$target"
   info "Installed twitter-digest at $target"
   info "Bundled $($target/bin/xurl version)"
+  info "Acquired from $XURL_NPM_PACKAGE"
 
   if [ "$SKIP_CONFIGURE" = "0" ]; then
     printf '\nRun these commands in a real Terminal when authorization is needed:\n'
