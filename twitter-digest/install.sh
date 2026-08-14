@@ -7,7 +7,6 @@ OPEN_TERMINAL="${TWITTER_DIGEST_OPEN_TERMINAL:-auto}"
 SOURCE_DIR="${TWITTER_DIGEST_SOURCE_DIR:-}"
 XURL_VERSION="${TWITTER_DIGEST_XURL_VERSION:-1.3.2-beta.1}"
 XURL_NPM_PACKAGE="@bankofai/xurl@${XURL_VERSION}"
-NPM_CLI_VERSION="11.6.2"
 SKILLS_DIR=""
 SKIP_CONFIGURE=0
 DRY_RUN=0
@@ -40,7 +39,7 @@ usage() {
 Usage: install.sh [options]
 
 Installs twitter-digest with a private bundled BofAI xurl binary. Node.js and
-npx are used only to acquire the pinned npm package. Normal runs invoke the
+npm are used only to acquire the pinned package. Normal runs invoke the
 native binary and the installer never replaces a global xurl or reads ~/.xurl.
 
 Options:
@@ -212,7 +211,7 @@ case "$(uname -s)/$(uname -m)" in
   *) fail "twitter-digest requires full X Chat support: macOS arm64/amd64 or Linux amd64" ;;
 esac
 
-for required_command in mktemp tar sed cp mv mkdir chmod date npx; do
+for required_command in mktemp tar sed cp mv mkdir chmod date npm; do
   command_exists "$required_command" || fail "$required_command is required"
 done
 
@@ -242,7 +241,7 @@ copy_source_file "uninstall.sh"
 XURL_NPM_ROOT="$WORKDIR/xurl-npm"
 mkdir -p "$XURL_NPM_ROOT"
 info "Installing $XURL_NPM_PACKAGE from npm"
-npx -y "npm@$NPM_CLI_VERSION" install \
+npm install \
   --prefix "$XURL_NPM_ROOT" \
   --no-save \
   --omit=dev \

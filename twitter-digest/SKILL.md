@@ -147,7 +147,7 @@ App registration containing credentials must be performed by the operator in a r
 
 ## Install
 
-The beta installer supports macOS Apple Silicon/Intel and Linux amd64. It uses Node.js plus npx only during installation to acquire `@bankofai/xurl@1.3.2-beta.1`, then copies the native binary into the skill without replacing a global xurl. Normal digest runs do not require Node.js or npm.
+The beta installer supports macOS Apple Silicon/Intel and Linux amd64. It uses Node.js plus npm only during installation to acquire `@bankofai/xurl@1.3.2-beta.1`, then copies the native binary into the skill without replacing a global xurl. Normal digest runs do not require Node.js or npm.
 
 Codex:
 
