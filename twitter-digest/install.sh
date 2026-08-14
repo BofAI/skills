@@ -229,22 +229,30 @@ configured_apps() {
     }'
 }
 
-whoami_username() {
+oauth_usernames_for_selected_app() {
+  xurl_path=$1
+  "$xurl_path" auth status 2>/dev/null |
+    sed -n '/^▸ /,/^$/ {
+      s/.*oauth2: \([^[:space:]]*\).*/\1/p
+    }'
+}
+
+verified_oauth_username() {
   xurl_path=$1
   app_name=$2
-  "$xurl_path" token --app "$app_name" >/dev/null 2>&1 || return 1
-  identity_json="$("$xurl_path" whoami --auth oauth2 --app "$app_name" 2>/dev/null)" || return 1
-  printf '%s' "$identity_json" | node -e '
-    const fs = require("fs");
-    try {
-      const value = JSON.parse(fs.readFileSync(0, "utf8"));
-      const username = value && value.data && value.data.username;
-      if (typeof username !== "string" || username.length === 0) process.exit(1);
-      process.stdout.write(username);
-    } catch (_) {
-      process.exit(1);
-    }
-  '
+  users_file="$WORKDIR/oauth-users"
+  oauth_usernames_for_selected_app "$xurl_path" >"$users_file"
+  while IFS= read -r username; do
+    case "$username" in
+      ''|'(none)'|'(unnamed)') continue ;;
+    esac
+    if "$xurl_path" token --app "$app_name" -u "$username" >/dev/null 2>&1 &&
+      "$xurl_path" whoami --auth oauth2 --app "$app_name" -u "$username" >/dev/null 2>&1; then
+      printf '%s\n' "$username"
+      return
+    fi
+  done <"$users_file"
+  return 1
 }
 
 select_or_register_app() {
@@ -422,7 +430,7 @@ configure_installed_xurl() {
 
   app_name="$(select_or_register_app "$xurl_path")"
   "$xurl_path" auth default "$app_name" >/dev/null || fail "Could not select X App $app_name"
-  username="$(whoami_username "$xurl_path" "$app_name" || true)"
+  username="$(verified_oauth_username "$xurl_path" "$app_name" || true)"
   if [ -n "$username" ]; then
     "$xurl_path" auth default "$app_name" "$username" >/dev/null || fail "Could not select @$username for X App $app_name"
     if "$xurl_path" token >/dev/null 2>&1 && "$xurl_path" whoami --auth oauth2 >/dev/null 2>&1; then
@@ -438,7 +446,7 @@ configure_installed_xurl() {
     return 1
   fi
 
-  username="$(whoami_username "$xurl_path" "$app_name" || true)"
+  username="$(verified_oauth_username "$xurl_path" "$app_name" || true)"
   [ -n "$username" ] || fail "OAuth2 completed but xurl did not report an authorized username"
   "$xurl_path" auth default "$app_name" "$username" >/dev/null || fail "Could not set the default X account"
   "$xurl_path" token >/dev/null 2>&1 || fail "OAuth2 token verification failed for @$username"
