@@ -47,7 +47,7 @@ The installer never replaces a global xurl or reads ~/.xurl.
 Options:
   --client auto|codex|claude|all  Target client. Default: auto.
   --skills-dir DIR                Install into an explicit skills directory.
-  --skip-configure                Do not print post-install authorization commands.
+  --skip-configure                Skip post-install OAuth and X Chat key setup.
   --dry-run                       Print target actions without changing files.
   -h, --help                      Show this help.
 
@@ -277,16 +277,68 @@ run_oauth2() {
   xurl_path=$1
   app_name=$2
   if [ "$(uname -s)" != "Darwin" ] && [ -z "${DISPLAY:-}" ] && [ -z "${WAYLAND_DISPLAY:-}" ]; then
-    "$xurl_path" auth oauth2 --headless --app "$app_name"
+    if has_operator_tty; then
+      "$xurl_path" auth oauth2 --headless --app "$app_name" </dev/tty
+    else
+      "$xurl_path" auth oauth2 --headless --app "$app_name"
+    fi
   else
     "$xurl_path" auth oauth2 --app "$app_name"
   fi
+}
+
+print_chat_key_recovery() {
+  xurl_path=$1
+  printf 'X Chat keys could not be restored. Enable X Chat in an official X client first, then retry:\n  %s chat keys restore\n' \
+    "$(shell_quote "$xurl_path")" >&2
+}
+
+configure_xchat_keys() {
+  xurl_path=$1
+  keys_status="$("$xurl_path" chat keys status 2>/dev/null || true)"
+  case "$keys_status" in
+    *"local keys: present"*)
+      info "X Chat keys are ready"
+      return
+      ;;
+  esac
+
+  restore_answer="$(prompt_value 'Restore existing X Chat keys now? (Y/n)' 'y')"
+  case "$restore_answer" in
+    y|Y|yes|YES|Yes) ;;
+    *)
+      print_chat_key_recovery "$xurl_path"
+      return 1
+      ;;
+  esac
+
+  if has_operator_tty; then
+    if ! "$xurl_path" chat keys restore </dev/tty; then
+      print_chat_key_recovery "$xurl_path"
+      return 1
+    fi
+  elif ! "$xurl_path" chat keys restore; then
+    print_chat_key_recovery "$xurl_path"
+    return 1
+  fi
+
+  keys_status="$("$xurl_path" chat keys status 2>/dev/null || true)"
+  case "$keys_status" in
+    *"local keys: present"*)
+      info "X Chat keys are ready"
+      ;;
+    *)
+      print_chat_key_recovery "$xurl_path"
+      return 1
+      ;;
+  esac
 }
 
 configure_installed_xurl() {
   xurl_path=$1
   if "$xurl_path" whoami >/dev/null 2>&1; then
     info "Existing X OAuth2 authorization is ready"
+    configure_xchat_keys "$xurl_path"
     return
   fi
 
@@ -296,6 +348,7 @@ configure_installed_xurl() {
     "$xurl_path" auth default "$app_name" "$username" >/dev/null
     if "$xurl_path" whoami >/dev/null 2>&1; then
       info "Reused OAuth2 authorization for @$username"
+      configure_xchat_keys "$xurl_path"
       return
     fi
   fi
@@ -312,6 +365,7 @@ configure_installed_xurl() {
   "$xurl_path" auth default "$app_name" "$username" >/dev/null || fail "Could not set the default X account"
   "$xurl_path" whoami >/dev/null 2>&1 || fail "OAuth2 verification failed for @$username"
   info "Authorized X account @$username"
+  configure_xchat_keys "$xurl_path"
 }
 
 detect_client() {
