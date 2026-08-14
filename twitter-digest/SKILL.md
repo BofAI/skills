@@ -1,6 +1,6 @@
 ---
 name: twitter-digest
-description: Use when the user asks to generate an X/Twitter daily digest, says “生成X日报”, “X日报”, “推特日报”, or “Twitter digest”, or wants analysis of their mentions, home timeline, own posts, and encrypted X Chat.
+description: Use when the user asks to generate an X/Twitter daily digest, says “生成X日报”, “X日报”, “推特日报”, or “Twitter digest”, wants analysis of their mentions, home timeline, own posts, and encrypted X Chat, or asks to switch the active X/Twitter account with phrases such as “切换X账号”, “切换Twitter账户”, or “把日报切到 @username”.
 ---
 
 # X/Twitter Digest
@@ -31,6 +31,48 @@ Require `xurl 1.3.2-beta.3` or a later BofAI release containing the per-user X C
 ```
 
 Invoke xurl directly. Do not create or run a digest wrapper, collector, or separate crypto tool.
+
+## Switch Account
+
+Treat one natural-language account-switch request as a single workflow with up to two secure user interactions: browser OAuth first, then X Chat key recovery only when the selected account has no usable local key. Do not require the user to send a second Agent message between the two steps.
+
+Use only the `XURL` binary bundled beside this skill. Never invoke a global or unmodified xurl. Resolve the registered App from `"$XURL" auth status`; prefer the current credentialed App. New installations use the fixed local App name `twitter-digest`. If no credentialed App exists, run the installer setup instead of asking for credentials in Agent chat.
+
+When the user supplies a target handle, strip the leading `@` and preserve it as the expected username. First test whether that user's existing OAuth2 token is still valid:
+
+```bash
+"$XURL" token --app <app-name> -u <username>
+"$XURL" whoami --auth oauth2 --app <app-name> -u <username>
+```
+
+Reuse the token only when `whoami` returns the expected username. Otherwise open a real Terminal and run the browser flow; omit `<username>` only when the user did not name a target account:
+
+```bash
+"$XURL" auth oauth2 <username> --app <app-name>
+```
+
+Use `--headless` only on a remote machine without a reachable local callback. Never assume that changing accounts in an existing browser session changed xurl. After OAuth, resolve the authorized username with xurl and require an exact match when the user named a target. If it does not match, keep the previous default and ask the user to authorize the intended X account.
+
+After identity verification, select and recheck the account explicitly:
+
+```bash
+"$XURL" auth default <app-name> <username>
+"$XURL" whoami --auth oauth2 --app <app-name> -u <username>
+```
+
+Then check X Chat keys for that same App and username:
+
+```bash
+"$XURL" chat keys status --auth oauth2 --app <app-name> -u <username>
+```
+
+If the status identifies a usable key on this machine, finish without prompting for a Passcode. Otherwise automatically open a real Terminal for the second secure interaction:
+
+```bash
+"$XURL" chat keys restore --auth oauth2 --app <app-name> -u <username>
+```
+
+Do not pass `--pin`, request the Passcode in Agent chat, or place it in a command. Let xurl prompt without echo; it may first ask the user to select one of the account's registered keys. After recovery, run `chat keys status` again with the same explicit App and username. Report the switch complete only after `whoami` verifies the selected account and Chat status identifies its usable local key. If no recoverable key exists, state that public account access is authorized and ask the user to enable X Chat in an official X client before retrying key recovery.
 
 ## Normal Run
 
@@ -172,20 +214,20 @@ App registration containing credentials must be performed interactively in a rea
 
 ## Install
 
-Twitter Digest and xurl use independent versions. This skill release is `v1.5.14-beta.17`; its installer pins the separate dependency `@bankofai/xurl@1.3.2-beta.3`. The beta installer supports macOS Apple Silicon/Intel and Linux amd64. It uses Node.js plus npm only during installation, verifies the installed Bank of AI package identity and binary, then copies that compiled binary into the skill without replacing a global xurl. It never installs or falls back to `@xdevplatform/xurl`. Normal digest runs do not require Node.js or npm.
+Twitter Digest and xurl use independent versions. This skill release is `v1.5.14-beta.18`; its installer pins the separate dependency `@bankofai/xurl@1.3.2-beta.3`. The beta installer supports macOS Apple Silicon/Intel and Linux amd64. It uses Node.js plus npm only during installation, verifies the installed Bank of AI package identity and binary, then copies that compiled binary into the skill without replacing a global xurl. It never installs or falls back to `@xdevplatform/xurl`. Normal digest runs do not require Node.js or npm.
 
 After installation, the installer reuses valid OAuth2 authorization. If no App is registered, it prompts only for the OAuth2 Client ID and Client Secret in the real Terminal; the xurl-local App name is fixed to `twitter-digest` and the callback is fixed to `http://localhost:8080/callback`. It then launches xurl's browser OAuth flow and sets the authorized account as default. It also checks X Chat keys and offers to restore an existing key. xurl cannot create or register a new X Chat key; when the account has no recoverable key, first enable X Chat in an official X client.
 
 Codex:
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/BofAI/skills/v1.5.14-beta.17/twitter-digest/install.sh | env TWITTER_DIGEST_INSTALL_REF=v1.5.14-beta.17 TWITTER_DIGEST_INSTALL_CLIENT=codex sh
+curl -fsSL https://raw.githubusercontent.com/BofAI/skills/v1.5.14-beta.18/twitter-digest/install.sh | env TWITTER_DIGEST_INSTALL_REF=v1.5.14-beta.18 TWITTER_DIGEST_INSTALL_CLIENT=codex sh
 ```
 
 Claude Code:
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/BofAI/skills/v1.5.14-beta.17/twitter-digest/install.sh | env TWITTER_DIGEST_INSTALL_REF=v1.5.14-beta.17 TWITTER_DIGEST_INSTALL_CLIENT=claude sh
+curl -fsSL https://raw.githubusercontent.com/BofAI/skills/v1.5.14-beta.18/twitter-digest/install.sh | env TWITTER_DIGEST_INSTALL_REF=v1.5.14-beta.18 TWITTER_DIGEST_INSTALL_CLIENT=claude sh
 ```
 
 From a checkout:

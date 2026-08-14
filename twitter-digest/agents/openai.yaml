@@ -1,4 +1,4 @@
 interface:
   display_name: "Twitter Digest"
-  short_description: "Generate read-only X and encrypted Chat daily digests with xurl"
-  default_prompt: "Use $twitter-digest to generate my concise Chinese X daily digest with the bundled BofAI xurl, an exact local 24-hour window, ID-based Chat direction, both sides preserved chronologically, no public engagement metrics, no drafted or suggested replies, no collection diagnostics, no exposed secrets, and no X write actions."
+  short_description: "Generate X digests and switch authorized accounts"
+  default_prompt: "Use $twitter-digest to generate my read-only Chinese X daily digest or securely switch its active X account with verified OAuth and account-specific Chat key recovery."
