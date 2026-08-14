@@ -22,7 +22,7 @@ Unless `--skip-configure` is supplied, run configuration after installing the se
 4. If no configured app exists, prompt in the real Terminal for app name, Client ID, Client Secret, and redirect URI. Do not echo the Client Secret. Register the app with the installed BofAI xurl.
 5. Run `auth oauth2 --app <app>` so xurl opens the browser and handles the local callback.
 6. Determine the authorized username from xurl, set the selected app and user as default, and verify `whoami` succeeds.
-7. Check X Chat keys. If local keys are present and registered, finish. Otherwise offer the xurl key initialization or restore flow in the same Terminal; PIN input remains owned by xurl and is not echoed by the installer.
+7. Check X Chat keys. If local keys are present and registered, finish. Otherwise offer xurl's restore flow in the same Terminal; PIN input remains owned by xurl and is not echoed by the installer. Because xurl cannot create or register a new X Chat key, an account with no existing key must first enable X Chat in an official X client.
 
 ## Runtime and failure behavior
 
