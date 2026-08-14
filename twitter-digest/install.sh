@@ -221,7 +221,7 @@ prompt_secret() {
 configured_apps() {
   xurl_path=$1
   "$xurl_path" auth apps list 2>/dev/null |
-    sed -n '/\[app config\]$/ {
+    sed -n '/ (client_id:/ {
       s/^  //
       s/^▸ //
       s/ (client_id:.*$//
