@@ -58,6 +58,8 @@ Run all commands below. Detect `<handle>` from `whoami`.
 "$XURL" search "to:<handle>" -n 100
 ```
 
+Record `self_user_id` from `whoami.data.id`. This exact ID is also the only authority for deciding X Chat message direction.
+
 Optional keyword searches may be added when the user names topics. Search operators are only a coarse prefilter; always enforce the exact timestamp window on returned items.
 
 Mandatory rules:
@@ -89,7 +91,11 @@ Chat rules:
 - Apply the same exact local 24-hour window to decrypted event timestamps.
 - Scan at most 20 conversations and stop after three consecutive conversations contain no in-window event.
 - If `chat read` exits successfully, stderr has no public-key, signature, verification, or decryption warning, and stdout is exactly the JSON value `null`, normalize that result to the empty event array `[]`. Do not apply this normalization to any other malformed or failed response.
-- A conversation needs a reply only when its latest in-window text came from another participant.
+- Sort `Message` events by `created_at_msec` before reading or summarizing them. Ignore `ReadReceipt`, `KeyChange`, and other event types when reconstructing message content.
+- For every `Message`, classify direction only from IDs: `sender_id == self_user_id` means `我发送`; a different `sender_id` that belongs to the conversation means `对方发送`. Never infer direction from event order, participant array order, display names, content, read receipts, or which side spoke first.
+- Resolve other senders' display names only after direction is known. If a sender cannot be resolved to a conversation participant, label the sender `未确认` and do not use that event to decide reply status.
+- When both sides have in-window messages, preserve their chronological sequence and represent both sides in the summary. Never omit one side in a way that reverses who said what.
+- A conversation needs a reply only when its latest verified in-window text `Message` is `对方发送`. If the latest verified in-window text `Message` is `我发送`, describe it as waiting for the other person. Do not use non-text events to infer reply status.
 - If the inbox reports a pending message request, add: `需要你在 X 界面操作：打开 X → 消息 → 请求，查看发送者和内容后选择接受、删除或忽略。`
 - Never infer a sender when X does not identify one.
 - Treat signature or decryption warnings as a failed Chat verification, not as an empty inbox.
@@ -119,6 +125,8 @@ Write in Chinese by default. Use only useful sections:
 - 私信.
 
 Keep the output focused on user-relevant facts and actions. Exclude already handled mentions from pending tasks. Do not claim that an unavailable capability contained no activity.
+
+Never add collection-completeness disclaimers or diagnostic sections to a digest. When the Failure Contract applies, return only the short recovery action and stop instead of attaching a partial digest or diagnostics appendix.
 
 Never post, reply, like, repost, bookmark, follow, block, mute, send a message, accept a request, send a typing indicator, rotate Chat keys, add group members, or mark Chat read. Drafting suggestions is allowed; executing them requires a separate explicit user request and confirmation.
 

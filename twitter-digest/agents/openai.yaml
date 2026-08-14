@@ -1,4 +1,4 @@
 interface:
   display_name: "Twitter Digest"
   short_description: "Generate read-only X and encrypted Chat daily digests with xurl"
-  default_prompt: "Use $twitter-digest to generate my concise Chinese X daily digest. Run the bundled BofAI xurl directly for account data and encrypted Chat, always pass --no-mark-read when reading Chat, apply the exact local 24-hour window, and never expose credentials, keys, API diagnostics, or perform X write actions."
+  default_prompt: "Use $twitter-digest to generate my concise Chinese X daily digest. Run the bundled BofAI xurl directly for account data and encrypted Chat, always pass --no-mark-read when reading Chat, apply the exact local 24-hour window, classify every Chat message direction only by comparing sender_id with whoami.data.id, preserve both sides in chronological order, never add data-gap or collection-diagnostics sections, and never expose credentials, keys, API diagnostics, or perform X write actions."
