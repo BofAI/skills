@@ -288,11 +288,11 @@ select_or_register_app() {
     return
   fi
 
-  printf '\nNo X App is registered in xurl. Enter the X Developer App credentials.\n' >&2
-  app_name="$(prompt_value 'App name' '')"
+  app_name="twitter-digest"
+  redirect_uri="http://localhost:8080/callback"
+  printf '\nNo X App is registered in xurl. Enter the OAuth2 credentials from the X Developer Portal.\n' >&2
   client_id="$(prompt_value 'OAuth2 Client ID' '')"
   client_secret="$(prompt_secret 'OAuth2 Client Secret')"
-  redirect_uri="$(prompt_value 'Callback / Redirect URI' 'http://localhost:8080/callback')"
   "$xurl_path" auth apps add "$app_name" \
     --client-id "$client_id" \
     --client-secret "$client_secret" \
