@@ -95,7 +95,7 @@ Chat rules:
 - For every `Message`, classify direction only from IDs: `sender_id == self_user_id` means `我发送`; a different `sender_id` that belongs to the conversation means `对方发送`. Never infer direction from event order, participant array order, display names, content, read receipts, or which side spoke first.
 - Resolve other senders' display names only after direction is known. If a sender cannot be resolved to a conversation participant, label the sender `未确认` and do not use that event to decide reply status.
 - When both sides have in-window messages, preserve their chronological sequence and represent both sides in the summary. Never omit one side in a way that reverses who said what.
-- A conversation needs a reply only when its latest verified in-window text `Message` is `对方发送`. If the latest verified in-window text `Message` is `我发送`, describe it as waiting for the other person. Do not use non-text events to infer reply status.
+- A conversation needs a reply only when its latest verified in-window text `Message` is `对方发送`. If the latest verified in-window text `Message` is `我发送`, state when the user last replied and say `可以先等对方回复`. Do not use non-text events to infer reply status.
 - If the inbox reports a pending message request, add: `需要你在 X 界面操作：打开 X → 消息 → 请求，查看发送者和内容后选择接受、删除或忽略。`
 - Never infer a sender when X does not identify one.
 - Treat signature or decryption warnings as a failed Chat verification, not as an empty inbox.
@@ -125,6 +125,16 @@ Write in Chinese by default. Use only useful sections:
 - 私信.
 
 Keep the output focused on user-relevant facts and actions. Exclude already handled mentions from pending tasks. Do not claim that an unavailable capability contained no activity.
+
+Use a natural, restrained, executive-friendly editorial voice:
+
+- Lead with what happened and why it matters; separate observed facts from recommendations.
+- Phrase uncertainty as uncertainty. Do not label a message as a scam, template, or manipulation tactic without explicit evidence.
+- For promotional content containing an unfamiliar link, prefer: `消息包含推广内容和外部短链；如需打开，建议先核验链接来源。`
+- For a conversation whose latest message is the user's, prefer: `你在 <time> 已回复，可以先等对方回复。`
+- Avoid internal or mechanical wording such as `窗口内`, `命中`, `见第 N 项`, `零产出`, `无实质信息`, `无需你动作`, `球在你这边`, or `会话性质建议你自己确认`. Translate collection results into reader-facing prose.
+- Include counts only when they help the user understand activity or priority. Do not narrate repeated runs, elapsed time since another digest, or suggest `/loop` or scheduling in a digest postscript.
+- End after the last useful section; do not add process commentary or an unsolicited follow-up pitch.
 
 Never add collection-completeness disclaimers or diagnostic sections to a digest. When the Failure Contract applies, return only the short recovery action and stop instead of attaching a partial digest or diagnostics appendix.
 
