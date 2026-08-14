@@ -5,7 +5,7 @@ REF="${TWITTER_DIGEST_INSTALL_REF:-main}"
 CLIENT="${TWITTER_DIGEST_INSTALL_CLIENT:-auto}"
 OPEN_TERMINAL="${TWITTER_DIGEST_OPEN_TERMINAL:-auto}"
 SOURCE_DIR="${TWITTER_DIGEST_SOURCE_DIR:-}"
-XURL_VERSION="${TWITTER_DIGEST_XURL_VERSION:-1.3.2-beta.2}"
+XURL_VERSION="${TWITTER_DIGEST_XURL_VERSION:-1.3.2-beta.3}"
 XURL_NPM_PACKAGE="@bankofai/xurl@${XURL_VERSION}"
 SKILLS_DIR=""
 SKIP_CONFIGURE=0
@@ -101,7 +101,7 @@ case "$CLIENT" in
 esac
 
 [ -n "$XURL_VERSION" ] || fail "TWITTER_DIGEST_XURL_VERSION cannot be empty"
-[ "$XURL_VERSION" = "1.3.2-beta.2" ] || fail "This installer is pinned to xurl 1.3.2-beta.2"
+[ "$XURL_VERSION" = "1.3.2-beta.3" ] || fail "This installer is pinned to xurl 1.3.2-beta.3"
 
 running_under_agent() {
   if [ -n "${CODEX_THREAD_ID:-}" ] || [ -n "${CODEX_CI:-}" ] || [ "${__CFBundleIdentifier:-}" = "com.openai.codex" ]; then

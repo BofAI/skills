@@ -23,7 +23,7 @@ XURL="$HOME/.claude/skills/twitter-digest/bin/xurl"
 
 When the skill is loaded from another directory, use the `bin/xurl` next to that `SKILL.md`.
 
-Require `xurl 1.3.2-beta.2` or a later BofAI release containing the per-user X Chat public-key fix and empty-event normalization:
+Require `xurl 1.3.2-beta.3` or a later BofAI release containing the per-user X Chat public-key fix and empty-event normalization:
 
 ```bash
 "$XURL" version
@@ -88,6 +88,7 @@ Chat rules:
 
 - Apply the same exact local 24-hour window to decrypted event timestamps.
 - Scan at most 20 conversations and stop after three consecutive conversations contain no in-window event.
+- If `chat read` exits successfully, stderr has no public-key, signature, verification, or decryption warning, and stdout is exactly the JSON value `null`, normalize that result to the empty event array `[]`. Do not apply this normalization to any other malformed or failed response.
 - A conversation needs a reply only when its latest in-window text came from another participant.
 - If the inbox reports a pending message request, add: `需要你在 X 界面操作：打开 X → 消息 → 请求，查看发送者和内容后选择接受、删除或忽略。`
 - Never infer a sender when X does not identify one.
@@ -147,7 +148,7 @@ App registration containing credentials must be performed by the operator in a r
 
 ## Install
 
-The beta installer supports macOS Apple Silicon/Intel and Linux amd64. It uses Node.js plus npm only during installation to acquire `@bankofai/xurl@1.3.2-beta.2`, then copies that BofAI-patched compiled binary into the skill without replacing a global xurl. It never installs or falls back to `@xdevplatform/xurl`. Normal digest runs do not require Node.js or npm.
+The beta installer supports macOS Apple Silicon/Intel and Linux amd64. It uses Node.js plus npm only during installation to acquire `@bankofai/xurl@1.3.2-beta.3`, then copies that BofAI-patched compiled binary into the skill without replacing a global xurl. It never installs or falls back to `@xdevplatform/xurl`. Normal digest runs do not require Node.js or npm.
 
 Codex:
 
