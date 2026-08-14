@@ -212,7 +212,7 @@ case "$(uname -s)/$(uname -m)" in
   *) fail "twitter-digest requires full X Chat support: macOS arm64/amd64 or Linux amd64" ;;
 esac
 
-for required_command in mktemp tar sed cp mv mkdir chmod date npm; do
+for required_command in mktemp tar sed cp mv mkdir chmod date node npm; do
   command_exists "$required_command" || fail "$required_command is required"
 done
 
@@ -249,7 +249,15 @@ npm install \
   --prefer-online \
   "$XURL_NPM_PACKAGE" || fail "Could not install $XURL_NPM_PACKAGE from npm"
 
-XURL_NPM_BINARY="$XURL_NPM_ROOT/node_modules/@bankofai/xurl/binary/xurl"
+XURL_NPM_PACKAGE_DIR="$XURL_NPM_ROOT/node_modules/@bankofai/xurl"
+XURL_NPM_MANIFEST="$XURL_NPM_PACKAGE_DIR/package.json"
+[ -f "$XURL_NPM_MANIFEST" ] || fail "$XURL_NPM_PACKAGE did not install the expected package manifest"
+installed_package_name="$(node -e 'process.stdout.write(require(process.argv[1]).name || "")' "$XURL_NPM_MANIFEST")"
+installed_package_version="$(node -e 'process.stdout.write(require(process.argv[1]).version || "")' "$XURL_NPM_MANIFEST")"
+[ "$installed_package_name" = "@bankofai/xurl" ] || fail "Installed npm package identity is not @bankofai/xurl"
+[ "$installed_package_version" = "$XURL_VERSION" ] || fail "Installed @bankofai/xurl version is not $XURL_VERSION"
+
+XURL_NPM_BINARY="$XURL_NPM_PACKAGE_DIR/binary/xurl"
 [ -f "$XURL_NPM_BINARY" ] || fail "$XURL_NPM_PACKAGE did not install the expected BofAI-patched binary"
 cp "$XURL_NPM_BINARY" "$PACKAGE_DIR/bin/xurl"
 chmod 755 "$PACKAGE_DIR/bin/xurl" "$PACKAGE_DIR/install.sh" "$PACKAGE_DIR/uninstall.sh"
