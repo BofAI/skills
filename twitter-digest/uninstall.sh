@@ -2,7 +2,6 @@
 set -eu
 
 CLIENT="${TWITTER_DIGEST_UNINSTALL_CLIENT:-auto}"
-PURGE_STATE="${TWITTER_DIGEST_PURGE_STATE:-0}"
 DRY_RUN=0
 
 info() {
@@ -14,25 +13,18 @@ fail() {
   exit 1
 }
 
-truthy() {
-  case "${1:-}" in
-    1|true|yes) return 0 ;;
-    *) return 1 ;;
-  esac
-}
-
 usage() {
   cat <<'EOF'
-Usage: uninstall.sh [--client auto|codex|claude|all] [--purge-state] [--dry-run]
+Usage: uninstall.sh [--client auto|codex|claude|all] [--dry-run]
 
-Default uninstall moves installed twitter-digest skill directories to .backups/
-and disables SKILL.md, preserving .state in the backup. With --purge-state,
-the active install and existing twitter-digest backups are permanently removed.
+Moves the installed twitter-digest skill and its bundled xurl binary into the
+client's .backups directory. Existing authorization and Chat keys in ~/.xurl
+are always preserved.
 
 Options:
-  --client        Target client. Default: auto.
-  --purge-state   Permanently remove the installed skill directory, .state, and matching backups.
-  --dry-run       Print actions without changing files.
+  --client auto|codex|claude|all  Target client. Default: auto.
+  --dry-run                       Print actions without changing files.
+  -h, --help                      Show this help.
 EOF
 }
 
@@ -45,10 +37,6 @@ while [ "$#" -gt 0 ]; do
       ;;
     --client=*)
       CLIENT="${1#--client=}"
-      shift
-      ;;
-    --purge-state)
-      PURGE_STATE=1
       shift
       ;;
     --dry-run)
@@ -71,11 +59,11 @@ case "$CLIENT" in
 esac
 
 detect_client() {
-  if env | grep -q '^CODEX_'; then
+  if [ -n "${CODEX_THREAD_ID:-}" ] || [ "${__CFBundleIdentifier:-}" = "com.openai.codex" ]; then
     printf 'codex'
     return
   fi
-  if env | grep -q '^CLAUDE'; then
+  if env | grep -Eq '^(CLAUDE|ANTHROPIC)'; then
     printf 'claude'
     return
   fi
@@ -90,67 +78,49 @@ detect_client() {
   printf 'all'
 }
 
-backup_target() {
-  skills_dir="$1"
-  target="$skills_dir/twitter-digest"
-
-  if truthy "$PURGE_STATE"; then
-    if [ "$DRY_RUN" = "1" ]; then
-      info "Would permanently remove $target"
-      info "Would permanently remove $skills_dir/.backups/twitter-digest*"
-    else
-      rm -rf "$target"
-      if [ -d "$skills_dir/.backups" ]; then
-        find "$skills_dir/.backups" -mindepth 1 -maxdepth 1 \( -name 'twitter-digest*' -o -name 'twitter-briefing*' \) -exec rm -rf {} +
-      fi
-      info "Removed $target"
-      info "Removed matching twitter-digest backups from $skills_dir/.backups"
-    fi
-    return 0
-  fi
+uninstall_target() {
+  skills_root="$1"
+  target="$skills_root/twitter-digest"
 
   if [ ! -e "$target" ] && [ ! -L "$target" ]; then
     info "twitter-digest is not installed at $target"
-    return 0
+    return
   fi
 
-  backup_dir="$skills_dir/.backups"
+  backup_root="$skills_root/.backups"
   stamp="$(date +%Y%m%d-%H%M%S)"
-  backup="$backup_dir/twitter-digest-uninstalled-$stamp"
+  backup="$backup_root/twitter-digest-uninstalled-$stamp"
   suffix=1
   while [ -e "$backup" ] || [ -L "$backup" ]; do
     suffix=$((suffix + 1))
-    backup="$backup_dir/twitter-digest-uninstalled-$stamp-$suffix"
+    backup="$backup_root/twitter-digest-uninstalled-$stamp-$suffix"
   done
 
   if [ "$DRY_RUN" = "1" ]; then
     info "Would move $target to $backup"
-    return 0
+    return
   fi
 
-  mkdir -p "$backup_dir"
+  mkdir -p "$backup_root"
   mv "$target" "$backup"
   if [ -f "$backup/SKILL.md" ]; then
     mv "$backup/SKILL.md" "$backup/SKILL.md.disabled"
   fi
   info "Uninstalled twitter-digest from $target"
-  info "Preserved previous install and .state at $backup"
+  info "Preserved the previous installation at $backup"
 }
 
-targets="$CLIENT"
 if [ "$CLIENT" = "auto" ]; then
-  targets="$(detect_client)"
+  CLIENT="$(detect_client)"
 fi
 
-case "$targets" in
-  codex)
-    backup_target "$HOME/.codex/skills"
-    ;;
-  claude)
-    backup_target "$HOME/.claude/skills"
-    ;;
+case "$CLIENT" in
+  codex) uninstall_target "$HOME/.codex/skills" ;;
+  claude) uninstall_target "$HOME/.claude/skills" ;;
   all)
-    backup_target "$HOME/.codex/skills"
-    backup_target "$HOME/.claude/skills"
+    uninstall_target "$HOME/.codex/skills"
+    uninstall_target "$HOME/.claude/skills"
     ;;
 esac
+
+printf 'Existing xurl authorization and Chat keys in ~/.xurl were preserved.\n'

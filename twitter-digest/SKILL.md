@@ -1,209 +1,179 @@
 ---
 name: twitter-digest
-description: Use when the user asks to generate an X/Twitter daily digest or says phrases such as "生成X日报", "生成 x 日报", "X日报", "推特日报", "Twitter digest", or wants an agent to analyze their own X/Twitter mentions, home timeline, reply opportunities, and daily social-media summaries. This skill is API-only.
+description: Use when the user asks to generate an X/Twitter daily digest, says “生成X日报”, “X日报”, “推特日报”, or “Twitter digest”, or wants analysis of their mentions, home timeline, reply opportunities, and encrypted X Chat.
 ---
 
 # X/Twitter Digest
 
 ## Overview
 
-Use this skill to produce a concise Chinese daily digest from the user's own X/Twitter account. The data source is API-only.
+Generate a concise Chinese digest by invoking the bundled BofAI xurl directly. xurl owns OAuth, API requests, X Chat keys, signature verification, and local decryption. The skill never reads files under `~/.xurl` and creates no persistent run files.
 
-Normal daily runs use:
+## Runtime
 
-```bash
-RUN_DAILY_DIGEST
-```
-
-`RUN_DAILY_DIGEST` means the installed command for the current agent:
-
-- Claude Code: `python3 ~/.claude/skills/twitter-digest/scripts/run_daily_digest.py`
-- Codex: `python3 ~/.codex/skills/twitter-digest/scripts/run_daily_digest.py`
-
-For API maintenance, `CONFIGURE_API` means:
-
-- Claude Code: `python3 ~/.claude/skills/twitter-digest/scripts/configure_api.py`
-- Codex: `python3 ~/.codex/skills/twitter-digest/scripts/configure_api.py`
-
-## Source Contract
-
-`twitter-digest` has only one supported collector:
+Resolve `XURL` to the binary installed beside this skill:
 
 ```bash
-python3 twitter-digest/scripts/api_x_digest.py
+# Codex
+XURL="$HOME/.codex/skills/twitter-digest/bin/xurl"
+
+# Claude Code
+XURL="$HOME/.claude/skills/twitter-digest/bin/xurl"
 ```
 
-The wrapper `scripts/run_daily_digest.py` uses API directly.
+When the skill is loaded from another directory, use the `bin/xurl` next to that `SKILL.md`.
 
-Source rules:
-
-- A normal "生成日报" / "日报" / "要" request always runs `RUN_DAILY_DIGEST`.
-- API credentials are required before a digest can be generated.
-- If API credentials are already saved, the run uses API and refreshes OAuth tokens when possible.
-- If API credentials are missing or expired, the wrapper starts API configuration. The digest must be rerun after configuration succeeds.
-- When configuration is opened in Terminal, do not ask the user to paste Client ID, Client Secret, tokens, or app credentials in chat. Tell the user to finish the Terminal flow, then rerun `RUN_DAILY_DIGEST`.
-- Do not switch to another data source on API errors, missing DM coverage, rate limits, permission errors, or user requests for "more complete" data.
-- If the user asks for a non-API source, visible DMs, X Chat, or cookies, explain that this skill only supports API collection and continue only if they still want an API digest.
-
-API source isolation is strict:
-
-- It runs only `api_x_digest.py`.
-- It never reads a local profile or cookies.
-- It never supplements missing API data with another collector.
-- It never asks the user to copy cookies.
-
-OAuth setup may open the X authorization page. That is only for authorization and is not data collection.
-
-## Required API Configuration
-
-API access is required. If the user asks to configure API access, run:
+Require `xurl 1.3.2-beta.1` or a later BofAI release containing the per-user X Chat public-key fix:
 
 ```bash
-RUN_DAILY_DIGEST --configure-api
+"$XURL" version
+"$XURL" auth status
 ```
 
-This is the primary setup flow. It uses OAuth2 PKCE with an X Developer App Client ID and local callback URL. Request scopes:
+Invoke xurl directly. Do not create or run a digest wrapper, collector, or separate crypto tool.
 
-```text
-tweet.read users.read offline.access dm.read
-```
+## Normal Run
 
-If the user already has an OAuth2 user access token, run:
+Treat a digest request as a read-only operation. Start collecting immediately unless xurl is missing or unauthenticated.
+
+First record the user's exact local time:
 
 ```bash
-RUN_DAILY_DIGEST --configure-api-token
+date '+%Y-%m-%d %H:%M:%S %Z %z'
 ```
 
-If the agent is not inside an interactive Terminal, use the wrapper. It opens a real Terminal window for secure credential input and OAuth callback handling. After that command reports `api_configuration_required`, stop and tell the user to finish the Terminal flow. When the user says configuration is done, rerun `RUN_DAILY_DIGEST`.
+Set `now` to that instant and `cutoff = now - 24 hours`. Every public or Chat fact in the digest must have a parseable timestamp inside `[cutoff, now]` after conversion to the user's local timezone.
 
-Verify saved API configuration with:
+### Account and public collection
+
+Run all commands below. Detect `<handle>` from `whoami`.
 
 ```bash
-CONFIGURE_API --verify
+"$XURL" whoami
+"$XURL" timeline -n 100
+"$XURL" mentions -n 100
+"$XURL" posts <handle> -n 100
+"$XURL" search "from:<handle>" -n 100
+"$XURL" search "@<handle>" -n 100
+"$XURL" search "to:<handle>" -n 100
 ```
 
-Clear saved API configuration with:
+Optional keyword searches may be added when the user names topics. Search operators are only a coarse prefilter; always enforce the exact timestamp window on returned items.
+
+Mandatory rules:
+
+- Attempt every command above before drafting.
+- Exclude out-of-window and unparseable items from time-bound claims.
+- Never use result ordering or a “recent” label as timestamp proof.
+- A mention is pending only after checking later posts and relevant `from:<handle> to:<author>` search results.
+- Classify each actionable mention as `already_replied`, `not_replied_found`, or `reply_unverified` before summarizing it.
+- Only `not_replied_found` may be presented as a reply task. Describe `reply_unverified` as `回复状态未确认`.
+
+### Encrypted X Chat
+
+Check local key availability and list the inbox:
 
 ```bash
-CONFIGURE_API --clear
+"$XURL" chat keys status
+"$XURL" chat conversations -n 100 --json
 ```
 
-Do not write ad-hoc token verification scripts. Do not ask the user to export bearer tokens manually unless they explicitly want to use environment variables.
-
-## Data Collection
-
-For every new digest request, run collection again before reading `digest-context.*`. Do not reuse previous run files as if they were fresh.
-
-Default scope:
-
-- Mentions of the authenticated handle.
-- Home timeline hotspots.
-- Own profile activity.
-- Optional keyword searches only when the user explicitly passes `--keywords`.
-
-DM / X Chat caveat:
-
-- API DM access is incomplete for many accounts and may return zero events even when the user has X Chat messages.
-- Do not say "没有私信" based only on API DM results.
-- If API DM results are unavailable, report a data gap. Do not suggest another collector as a fallback inside this skill.
-
-Time window rules:
-
-- Final summary facts must use only items inside `[now - 24 hours, now]` in the user's current local timezone.
-- Items with missing or unparseable timestamps are excluded from final-summary facts and reported as data gaps.
-- Mentions older than the 24-hour window must not appear as pending reply opportunities.
-
-Mention handling:
-
-- Consider both direct mention/notification data and recent search results when available.
-- Do not present an already-replied mention as needing reply.
-- If reply status cannot be verified from current API data, label it `回复状态未确认` instead of claiming the user must reply.
-
-## Writing The Digest
-
-After collection, read the installed current-run context with the agent's file Read tool, not shell text commands.
-
-Normal context paths:
-
-- Claude Code: `~/.claude/skills/twitter-digest/.state/run/digest-context.md`
-- Codex: `~/.codex/skills/twitter-digest/.state/run/digest-context.md`
-
-Focused slices:
-
-- `digest-context-timeline.md`
-- `digest-context-mentions.md`
-- `digest-context-dm.md`
-
-Use `digest-context.md` and its `Final Summary Facts` as the content source for the Chinese digest. Use `digest-input.*` only for debugging collection issues.
-
-Do not use `cat`, `head`, `tail`, `grep`, `sed`, `python3 -c`, or temporary scripts to inspect private context during normal summarization. If counts or structure must be checked, run:
+Read at most 20 relevant conversations and always suppress the read receipt:
 
 ```bash
-python3 ~/.claude/skills/twitter-digest/scripts/inspect_digest.py
-python3 ~/.codex/skills/twitter-digest/scripts/inspect_digest.py
+"$XURL" chat read <conversation-id> -n 100 --json --no-mark-read
 ```
 
-Adjust the path to the current agent.
+Chat rules:
 
-Digest format:
+- Apply the same exact local 24-hour window to decrypted event timestamps.
+- Scan at most 20 conversations and stop after three consecutive conversations contain no in-window event.
+- A conversation needs a reply only when its latest in-window text came from another participant.
+- If the inbox reports a pending message request, add: `需要你在 X 界面操作：打开 X → 消息 → 请求，查看发送者和内容后选择接受、删除或忽略。`
+- Never infer a sender when X does not identify one.
+- Treat signature or decryption warnings as a failed Chat verification, not as an empty inbox.
+
+## Failure Contract
+
+If a mandatory command, Chat key check, signature verification, or decryption fails, stop before writing a normal digest. Return one short capability-specific recovery action, without implementation diagnostics.
+
+Examples:
+
+- Missing authorization: `请先在终端完成 xurl 授权，然后重新生成日报。`
+- Missing Chat keys: `请先在终端运行 xurl chat keys restore，然后重新生成日报。`
+- Chat verification failure: `X Chat 验证未完成，请更新 xurl 或重新授权后再试。`
+- Rate limit: state the affected capability and when to retry, then stop.
+
+Do not expose source names, API paths, HTTP codes, app tiers, enrollment details, tokens, keys, conversation IDs, or collector internals. Do not add a collection-diagnostics appendix.
+
+## Writing the Digest
+
+Write in Chinese by default. Use only useful sections:
 
 - 今日总结.
 - 该处理.
 - 谁 @ 了你.
 - 时间线热点.
 - 你的动态.
-- 数据缺口.
-- 建议回复草稿.
+- 私信.
 
-Never automatically post, reply, like, follow, block, open suspicious links, accept requests, or send DMs. Replies are drafts only unless the user explicitly asks to send after reviewing.
+Keep the output focused on user-relevant facts and actions. Exclude already handled mentions from pending tasks. Do not claim that an unavailable capability contained no activity.
+
+Never post, reply, like, repost, bookmark, follow, block, mute, send a message, accept a request, send a typing indicator, rotate Chat keys, add group members, or mark Chat read. Drafting suggestions is allowed; executing them requires a separate explicit user request and confirmation.
+
+## X App Setup
+
+Use these X Developer settings:
+
+- Project access: Pay Per Use, Production.
+- App permissions: **Read and write and Direct message**.
+- Type of App: **Web App, Automated App or Bot**.
+- Callback URI: `http://localhost:8080/callback`.
+- Email permission: off.
+
+After changing permissions, authorize again in a real Terminal. Never ask the user to paste Client ID, Client Secret, tokens, private keys, exported key blobs, or the Chat recovery PIN into Agent chat.
+
+Use the installed binary directly:
+
+```bash
+"$XURL" auth status
+"$XURL" auth oauth2 --app <app-name>
+"$XURL" auth default <app-name> <username>
+"$XURL" chat keys status
+"$XURL" chat keys restore
+```
+
+App registration containing credentials must be performed by the operator in a real Terminal. `chat keys restore` prompts for the PIN without echo.
 
 ## Install
 
-From a checked-out repository:
+The beta installer currently supports macOS Apple Silicon and bundles `BofAI/xurl v1.3.2-beta.1` inside the installed skill without replacing a global xurl.
+
+Codex:
 
 ```bash
-python3 twitter-digest/scripts/install.py
+curl -fsSL https://raw.githubusercontent.com/BofAI/skills/main/twitter-digest/install.sh | env TWITTER_DIGEST_INSTALL_CLIENT=codex sh
 ```
 
-The installer checks Python 3.9+ and installs the skill into the target agent skill directory.
+Claude Code:
 
-Default install targets the current agent client:
+```bash
+curl -fsSL https://raw.githubusercontent.com/BofAI/skills/main/twitter-digest/install.sh | env TWITTER_DIGEST_INSTALL_CLIENT=claude sh
+```
 
-- Codex: `~/.codex/skills/twitter-digest`
-- Claude Code: `~/.claude/skills/twitter-digest`
+From a checkout:
 
-Use `--client codex`, `--client claude`, or `--skills-dir` to override. Local development can use `--symlink`.
+```bash
+env TWITTER_DIGEST_SOURCE_DIR="$PWD/twitter-digest" /bin/sh twitter-digest/install.sh --client codex --skip-configure
+```
 
-Reinstalling is upgrading. The installer moves the existing installed skill to `.backups/`, disables backup `SKILL.md` files so agents do not load old duplicate skills, and preserves the active installed `.state` directory.
+Existing authorization and Chat keys remain managed by xurl and are reused after reinstall.
 
-Uninstall:
+## Uninstall
+
+Uninstall moves the installed skill, including its bundled xurl binary, into the client's `.backups` directory. It always preserves `~/.xurl`.
 
 ```bash
 ~/.codex/skills/twitter-digest/uninstall.sh --client codex
 ~/.claude/skills/twitter-digest/uninstall.sh --client claude
 ```
-
-Use `--purge-state` only when the user explicitly wants API config and current-run files removed permanently.
-
-## Run Outputs
-
-Each run writes only current-run files:
-
-- `<installed-skill>/.state/config.json`
-- `<installed-skill>/.state/api_config.json`
-- `<installed-skill>/.state/run/digest-context.md`
-- `<installed-skill>/.state/run/digest-context.json`
-- `<installed-skill>/.state/run/digest-context-timeline.md`
-- `<installed-skill>/.state/run/digest-context-mentions.md`
-- `<installed-skill>/.state/run/digest-context-dm.md`
-- `<installed-skill>/.state/run/digest-input.md`
-- `<installed-skill>/.state/run/digest-input.json`
-
-No long-term memory or daily archive is produced. Run dates use the user's local timezone.
-
-## Troubleshooting
-
-- Missing API config: run `RUN_DAILY_DIGEST --configure-api`.
-- Token refresh failed: the wrapper opens API configuration and retries once.
-- API permission/tier/rate-limit errors: report the data gap or failure.
-- Non-API source requests: unsupported in this skill.

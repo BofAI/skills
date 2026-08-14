@@ -1,12 +1,17 @@
 #!/bin/sh
 set -eu
 
-TAG="${TWITTER_DIGEST_INSTALL_TAG:-v1.5.13}"
-REPO="${TWITTER_DIGEST_INSTALL_REPO:-https://github.com/BofAI/skills.git}"
+REF="${TWITTER_DIGEST_INSTALL_REF:-main}"
 CLIENT="${TWITTER_DIGEST_INSTALL_CLIENT:-auto}"
-ALLOW_CLAUDE_COMMANDS="${TWITTER_DIGEST_ALLOW_CLAUDE_COMMANDS:-0}"
-ALLOW_CLAUDE_STATE_READ="${TWITTER_DIGEST_ALLOW_CLAUDE_STATE_READ:-0}"
 OPEN_TERMINAL="${TWITTER_DIGEST_OPEN_TERMINAL:-auto}"
+SOURCE_DIR="${TWITTER_DIGEST_SOURCE_DIR:-}"
+XURL_ARCHIVE="${TWITTER_DIGEST_XURL_ARCHIVE:-}"
+XURL_VERSION="${TWITTER_DIGEST_XURL_VERSION:-1.3.2-beta.1}"
+XURL_SHA256="b15bd655818cdca60af77d9a575abd53962bb55ed49ccb62e0130ce2f0262864"
+XURL_REPOSITORY="https://github.com/BofAI/xurl"
+SKILLS_DIR=""
+SKIP_CONFIGURE=0
+DRY_RUN=0
 
 info() {
   printf '==> %s\n' "$1"
@@ -31,12 +36,73 @@ applescript_quote() {
   printf '%s' "$value" | sed 's/\\/\\\\/g; s/"/\\"/g'
 }
 
-truthy() {
-  case "${1:-}" in
-    1|true|yes) return 0 ;;
-    *) return 1 ;;
-  esac
+usage() {
+  cat <<'EOF'
+Usage: install.sh [options]
+
+Installs twitter-digest with a private bundled BofAI xurl binary. The installer
+does not install language runtimes, replace a global xurl, or read ~/.xurl.
+
+Options:
+  --client auto|codex|claude|all  Target client. Default: auto.
+  --skills-dir DIR                Install into an explicit skills directory.
+  --skip-configure                Do not print post-install authorization commands.
+  --dry-run                       Print target actions without changing files.
+  -h, --help                      Show this help.
+
+Environment overrides:
+  TWITTER_DIGEST_INSTALL_REF      BofAI/skills Git ref. Default: main.
+  TWITTER_DIGEST_SOURCE_DIR       Local twitter-digest source directory.
+  TWITTER_DIGEST_XURL_ARCHIVE     Local xurl release archive.
+  TWITTER_DIGEST_OPEN_TERMINAL    auto, 1, or 0. Default: auto.
+EOF
 }
+
+while [ "$#" -gt 0 ]; do
+  case "$1" in
+    --client)
+      [ "$#" -ge 2 ] || fail "--client requires a value"
+      CLIENT="$2"
+      shift 2
+      ;;
+    --client=*)
+      CLIENT="${1#--client=}"
+      shift
+      ;;
+    --skills-dir)
+      [ "$#" -ge 2 ] || fail "--skills-dir requires a value"
+      SKILLS_DIR="$2"
+      shift 2
+      ;;
+    --skills-dir=*)
+      SKILLS_DIR="${1#--skills-dir=}"
+      shift
+      ;;
+    --skip-configure)
+      SKIP_CONFIGURE=1
+      shift
+      ;;
+    --dry-run)
+      DRY_RUN=1
+      shift
+      ;;
+    -h|--help)
+      usage
+      exit 0
+      ;;
+    *)
+      fail "Unknown argument: $1"
+      ;;
+  esac
+done
+
+case "$CLIENT" in
+  auto|codex|claude|all) ;;
+  *) fail "--client must be auto, codex, claude, or all" ;;
+esac
+
+[ -n "$XURL_VERSION" ] || fail "TWITTER_DIGEST_XURL_VERSION cannot be empty"
+[ "$XURL_VERSION" = "1.3.2-beta.1" ] || fail "This installer is pinned to xurl 1.3.2-beta.1"
 
 running_under_agent() {
   if [ -n "${CODEX_THREAD_ID:-}" ] || [ -n "${CODEX_CI:-}" ] || [ "${__CFBundleIdentifier:-}" = "com.openai.codex" ]; then
@@ -49,35 +115,48 @@ running_under_agent() {
 }
 
 should_open_terminal() {
-  if [ "${TWITTER_DIGEST_TERMINAL_CHILD:-}" = "1" ]; then
+  if [ "${TWITTER_DIGEST_TERMINAL_CHILD:-}" = "1" ] || [ "$DRY_RUN" = "1" ]; then
     return 1
   fi
   case "$OPEN_TERMINAL" in
     1|true|yes) return 0 ;;
     0|false|no) return 1 ;;
+    auto) ;;
+    *) fail "TWITTER_DIGEST_OPEN_TERMINAL must be auto, 1, or 0" ;;
   esac
-  if [ "$(uname -s)" != "Darwin" ]; then
-    return 1
-  fi
-  if running_under_agent; then
-    return 0
-  fi
-  if [ ! -t 0 ]; then
+  [ "$(uname -s)" = "Darwin" ] || return 1
+  if running_under_agent || [ ! -t 0 ]; then
     return 0
   fi
   return 1
 }
 
 open_self_in_terminal_and_exit() {
-  command_exists osascript || fail "Cannot open macOS Terminal because osascript is unavailable."
-  command_exists curl || fail "curl is required to open the installer in Terminal."
-
-  installer_url="https://raw.githubusercontent.com/BofAI/skills/${TAG}/twitter-digest/install.sh"
+  command_exists osascript || fail "Cannot open macOS Terminal because osascript is unavailable"
   args_text=""
-  for arg in "$@"; do
-    args_text="${args_text} $(shell_quote "$arg")"
-  done
-  command_text="cd ~ && TMPDIR=\"\$(mktemp -d)\" && INSTALL_SH=\"\$TMPDIR/twitter-digest-install.sh\" && curl -fsSL $(shell_quote "$installer_url") -o \"\$INSTALL_SH\" && chmod 700 \"\$INSTALL_SH\" && env TWITTER_DIGEST_TERMINAL_CHILD=1 TWITTER_DIGEST_OPEN_TERMINAL=0 TWITTER_DIGEST_INSTALL_TAG=$(shell_quote "$TAG") TWITTER_DIGEST_INSTALL_REPO=$(shell_quote "$REPO") TWITTER_DIGEST_INSTALL_CLIENT=$(shell_quote "$CLIENT") TWITTER_DIGEST_ALLOW_CLAUDE_COMMANDS=$(shell_quote "$ALLOW_CLAUDE_COMMANDS") TWITTER_DIGEST_ALLOW_CLAUDE_STATE_READ=$(shell_quote "$ALLOW_CLAUDE_STATE_READ") /bin/sh \"\$INSTALL_SH\"${args_text}; printf '\\nPress Enter to close this window...'; IFS= read -r _"
+  args_text="$args_text --client $(shell_quote "$CLIENT")"
+  if [ -n "$SKILLS_DIR" ]; then
+    args_text="$args_text --skills-dir $(shell_quote "$SKILLS_DIR")"
+  fi
+  if [ "$SKIP_CONFIGURE" = "1" ]; then
+    args_text="$args_text --skip-configure"
+  fi
+
+  env_text="TWITTER_DIGEST_TERMINAL_CHILD=1 TWITTER_DIGEST_OPEN_TERMINAL=0 TWITTER_DIGEST_INSTALL_REF=$(shell_quote "$REF") TWITTER_DIGEST_INSTALL_CLIENT=$(shell_quote "$CLIENT") TWITTER_DIGEST_XURL_VERSION=$(shell_quote "$XURL_VERSION")"
+  if [ -n "$SOURCE_DIR" ]; then
+    installer_path="$SOURCE_DIR/install.sh"
+    [ -f "$installer_path" ] || fail "Local installer not found: $installer_path"
+    env_text="$env_text TWITTER_DIGEST_SOURCE_DIR=$(shell_quote "$SOURCE_DIR")"
+    if [ -n "$XURL_ARCHIVE" ]; then
+      env_text="$env_text TWITTER_DIGEST_XURL_ARCHIVE=$(shell_quote "$XURL_ARCHIVE")"
+    fi
+    command_text="cd ~ && env $env_text /bin/sh $(shell_quote "$installer_path")${args_text}; printf '\\nPress Enter to close this window...'; IFS= read -r _"
+  else
+    command_exists curl || fail "curl is required to open the installer in Terminal"
+    installer_url="https://raw.githubusercontent.com/BofAI/skills/${REF}/twitter-digest/install.sh"
+    command_text="cd ~ && INSTALL_TMP=\"\$(mktemp -d)\" && INSTALL_SH=\"\$INSTALL_TMP/twitter-digest-install.sh\" && curl -fsSL $(shell_quote "$installer_url") -o \"\$INSTALL_SH\" && chmod 700 \"\$INSTALL_SH\" && env $env_text /bin/sh \"\$INSTALL_SH\"${args_text}; printf '\\nPress Enter to close this window...'; IFS= read -r _"
+  fi
+
   osascript >/dev/null <<OSA
 tell application "Terminal"
   activate
@@ -89,44 +168,153 @@ OSA
 }
 
 if should_open_terminal; then
-  open_self_in_terminal_and_exit "$@"
+  open_self_in_terminal_and_exit
 fi
 
-if ! command -v git >/dev/null 2>&1; then
-  printf 'Error: git is required to install twitter-digest.\n' >&2
-  exit 1
+detect_client() {
+  if [ -n "${CODEX_THREAD_ID:-}" ] || [ "${__CFBundleIdentifier:-}" = "com.openai.codex" ]; then
+    printf 'codex'
+    return
+  fi
+  if env | grep -Eq '^(CLAUDE|ANTHROPIC)'; then
+    printf 'claude'
+    return
+  fi
+  if [ -d "$HOME/.codex/skills" ] && [ ! -d "$HOME/.claude/skills" ]; then
+    printf 'codex'
+    return
+  fi
+  if [ -d "$HOME/.claude/skills" ] && [ ! -d "$HOME/.codex/skills" ]; then
+    printf 'claude'
+    return
+  fi
+  printf 'codex'
+}
+
+if [ -z "$SKILLS_DIR" ] && [ "$CLIENT" = "auto" ]; then
+  CLIENT="$(detect_client)"
 fi
 
-if ! command -v python3 >/dev/null 2>&1; then
-  printf 'Error: python3 is required to install twitter-digest.\n' >&2
-  exit 1
+if [ "$DRY_RUN" = "1" ]; then
+  if [ -n "$SKILLS_DIR" ]; then
+    info "Would install twitter-digest and bundled xurl $XURL_VERSION into $SKILLS_DIR/twitter-digest"
+  else
+    case "$CLIENT" in
+      codex) info "Would install twitter-digest and bundled xurl $XURL_VERSION into $HOME/.codex/skills/twitter-digest" ;;
+      claude) info "Would install twitter-digest and bundled xurl $XURL_VERSION into $HOME/.claude/skills/twitter-digest" ;;
+      all)
+        info "Would install twitter-digest and bundled xurl $XURL_VERSION into $HOME/.codex/skills/twitter-digest"
+        info "Would install twitter-digest and bundled xurl $XURL_VERSION into $HOME/.claude/skills/twitter-digest"
+        ;;
+    esac
+  fi
+  exit 0
 fi
 
-if command -v mktemp >/dev/null 2>&1; then
-  WORKDIR="$(mktemp -d 2>/dev/null || mktemp -d -t twitter-digest)"
+[ "$(uname -s)" = "Darwin" ] || fail "This beta package currently supports macOS only"
+[ "$(uname -m)" = "arm64" ] || fail "This beta package currently supports Apple Silicon only"
+
+for required_command in mktemp tar shasum sed cp mv mkdir chmod date; do
+  command_exists "$required_command" || fail "$required_command is required"
+done
+
+WORKDIR="$(mktemp -d 2>/dev/null || mktemp -d -t twitter-digest)"
+PACKAGE_DIR="$WORKDIR/twitter-digest"
+mkdir -p "$PACKAGE_DIR/agents" "$PACKAGE_DIR/bin"
+
+copy_source_file() {
+  relative_path="$1"
+  destination="$PACKAGE_DIR/$relative_path"
+  if [ -n "$SOURCE_DIR" ]; then
+    source_path="$SOURCE_DIR/$relative_path"
+    [ -f "$source_path" ] || fail "Missing source file: $source_path"
+    cp "$source_path" "$destination"
+  else
+    command_exists curl || fail "curl is required for a remote install"
+    source_url="https://raw.githubusercontent.com/BofAI/skills/${REF}/twitter-digest/${relative_path}"
+    curl -fsSL "$source_url" -o "$destination" || fail "Could not download $relative_path"
+  fi
+}
+
+copy_source_file "SKILL.md"
+copy_source_file "agents/openai.yaml"
+copy_source_file "install.sh"
+copy_source_file "uninstall.sh"
+
+if [ -n "$XURL_ARCHIVE" ]; then
+  [ -f "$XURL_ARCHIVE" ] || fail "xurl archive not found: $XURL_ARCHIVE"
+  ARCHIVE_PATH="$XURL_ARCHIVE"
 else
-  WORKDIR="${TMPDIR:-/tmp}/twitter-digest-install.$$"
-  mkdir -p "$WORKDIR"
+  command_exists curl || fail "curl is required to download xurl"
+  ARCHIVE_PATH="$WORKDIR/xurl_Darwin_arm64.tar.gz"
+  XURL_URL="$XURL_REPOSITORY/releases/download/v${XURL_VERSION}/xurl_Darwin_arm64.tar.gz"
+  info "Downloading BofAI xurl $XURL_VERSION"
+  curl -fsSL "$XURL_URL" -o "$ARCHIVE_PATH" || fail "Could not download xurl $XURL_VERSION"
 fi
 
-CLONE_DIR="$WORKDIR/skills"
-info "Cloning ${REPO} at ${TAG}"
-git clone --depth 1 --branch "$TAG" "$REPO" "$CLONE_DIR"
+actual_sha256="$(shasum -a 256 "$ARCHIVE_PATH" | sed 's/[[:space:]].*$//')"
+[ "$actual_sha256" = "$XURL_SHA256" ] || fail "xurl archive checksum verification failed"
 
-args=""
-case "$CLIENT" in
-  auto|codex|claude) args="$args --client $CLIENT" ;;
-  *) printf 'Error: TWITTER_DIGEST_INSTALL_CLIENT must be auto, codex, or claude.\n' >&2; exit 1 ;;
-esac
+XURL_EXTRACT_DIR="$WORKDIR/xurl-release"
+mkdir -p "$XURL_EXTRACT_DIR"
+tar -xzf "$ARCHIVE_PATH" -C "$XURL_EXTRACT_DIR"
+[ -f "$XURL_EXTRACT_DIR/xurl" ] || fail "xurl archive does not contain the expected binary"
+cp "$XURL_EXTRACT_DIR/xurl" "$PACKAGE_DIR/bin/xurl"
+chmod 755 "$PACKAGE_DIR/bin/xurl" "$PACKAGE_DIR/install.sh" "$PACKAGE_DIR/uninstall.sh"
 
-if truthy "$ALLOW_CLAUDE_COMMANDS"; then
-  args="$args --allow-claude-commands"
+version_output="$($PACKAGE_DIR/bin/xurl version 2>/dev/null || true)"
+[ "$version_output" = "xurl $XURL_VERSION" ] || fail "Bundled binary version check failed"
+
+install_target() {
+  skills_root="$1"
+  target="$skills_root/twitter-digest"
+  stamp="$(date +%Y%m%d-%H%M%S)"
+  staging="$skills_root/.twitter-digest-install-$stamp-$$"
+
+  mkdir -p "$skills_root"
+  cp -R "$PACKAGE_DIR" "$staging"
+
+  if [ -e "$target" ] || [ -L "$target" ]; then
+    backup_root="$skills_root/.backups"
+    backup="$backup_root/twitter-digest-$stamp"
+    suffix=1
+    while [ -e "$backup" ] || [ -L "$backup" ]; do
+      suffix=$((suffix + 1))
+      backup="$backup_root/twitter-digest-$stamp-$suffix"
+    done
+    mkdir -p "$backup_root"
+    mv "$target" "$backup"
+    if [ -f "$backup/SKILL.md" ]; then
+      mv "$backup/SKILL.md" "$backup/SKILL.md.disabled"
+    fi
+    info "Preserved the previous installation at $backup"
+  fi
+
+  mv "$staging" "$target"
+  info "Installed twitter-digest at $target"
+  info "Bundled $($target/bin/xurl version)"
+
+  if [ "$SKIP_CONFIGURE" = "0" ]; then
+    printf '\nRun these commands in a real Terminal when authorization is needed:\n'
+    printf '  %s auth status\n' "$(shell_quote "$target/bin/xurl")"
+    printf '  %s auth oauth2 --app <app-name>\n' "$(shell_quote "$target/bin/xurl")"
+    printf '  %s auth default <app-name> <username>\n' "$(shell_quote "$target/bin/xurl")"
+    printf '  %s chat keys status\n' "$(shell_quote "$target/bin/xurl")"
+    printf '  %s chat keys restore\n' "$(shell_quote "$target/bin/xurl")"
+  fi
+}
+
+if [ -n "$SKILLS_DIR" ]; then
+  install_target "$SKILLS_DIR"
+else
+  case "$CLIENT" in
+    codex) install_target "$HOME/.codex/skills" ;;
+    claude) install_target "$HOME/.claude/skills" ;;
+    all)
+      install_target "$HOME/.codex/skills"
+      install_target "$HOME/.claude/skills"
+      ;;
+  esac
 fi
 
-if truthy "$ALLOW_CLAUDE_STATE_READ"; then
-  args="$args --allow-claude-state-read"
-fi
-
-info "Running twitter-digest installer"
-# shellcheck disable=SC2086
-exec python3 "$CLONE_DIR/twitter-digest/scripts/install.py" $args "$@"
+printf '\nExisting xurl authorization and Chat keys in ~/.xurl were preserved.\n'
