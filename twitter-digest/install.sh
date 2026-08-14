@@ -288,10 +288,20 @@ select_or_register_app() {
   printf '%s\n' "$app_name"
 }
 
+oauth_is_headless() {
+  if [ -n "${SSH_CONNECTION:-}" ] || [ -n "${SSH_CLIENT:-}" ] || [ -n "${SSH_TTY:-}" ]; then
+    return 0
+  fi
+  if [ "$(uname -s)" = Darwin ]; then
+    return 1
+  fi
+  [ -z "${DISPLAY:-}" ] && [ -z "${WAYLAND_DISPLAY:-}" ]
+}
+
 run_oauth2() {
   xurl_path=$1
   app_name=$2
-  if [ "$(uname -s)" != "Darwin" ] && [ -z "${DISPLAY:-}" ] && [ -z "${WAYLAND_DISPLAY:-}" ]; then
+  if oauth_is_headless; then
     if has_operator_tty; then
       "$xurl_path" auth oauth2 --headless --app "$app_name" </dev/tty
     else
@@ -299,6 +309,18 @@ run_oauth2() {
     fi
   else
     "$xurl_path" auth oauth2 --app "$app_name"
+  fi
+}
+
+print_oauth_retry() {
+  xurl_path=$1
+  app_name=$2
+  if oauth_is_headless; then
+    printf 'Authorization was not completed. Retry in Terminal:\n  %s auth oauth2 --headless --app %s\n' \
+      "$(shell_quote "$xurl_path")" "$(shell_quote "$app_name")" >&2
+  else
+    printf 'Authorization was not completed. Retry in Terminal:\n  %s auth oauth2 --app %s\n' \
+      "$(shell_quote "$xurl_path")" "$(shell_quote "$app_name")" >&2
   fi
 }
 
@@ -412,8 +434,7 @@ configure_installed_xurl() {
 
   info "Opening X OAuth2 authorization for App $app_name"
   if ! run_oauth2 "$xurl_path" "$app_name"; then
-    printf 'Authorization was not completed. Retry in Terminal:\n  %s auth oauth2 --app %s\n' \
-      "$(shell_quote "$xurl_path")" "$(shell_quote "$app_name")" >&2
+    print_oauth_retry "$xurl_path" "$app_name"
     return 1
   fi
 
