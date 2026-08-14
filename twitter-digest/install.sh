@@ -308,19 +308,50 @@ print_chat_key_recovery() {
     "$(shell_quote "$xurl_path")" >&2
 }
 
-chat_keys_present() {
+print_chat_status_retry() {
+  xurl_path=$1
+  printf 'X Chat key status could not be verified. Retry in Terminal:\n  %s chat keys status --auth oauth2\n' \
+    "$(shell_quote "$xurl_path")" >&2
+}
+
+print_unregistered_chat_key() {
+  xurl_path=$1
+  printf 'The local X Chat key is not registered for this account. Use an official X client to establish the account key, then retry:\n  %s chat keys status --auth oauth2\n' \
+    "$(shell_quote "$xurl_path")" >&2
+}
+
+chat_keys_ready() {
   keys_status=$1
-  normalized_keys_state="$(printf '%s\n' "$keys_status" |
-    sed -n 's/^[[:space:]]*local keys:[[:space:]]*present.*$/present/p')"
-  [ "$normalized_keys_state" = "present" ]
+  case "$keys_status" in
+    *"← this machine"*) return 0 ;;
+    *) return 1 ;;
+  esac
+}
+
+local_chat_keys_present() {
+  keys_status=$1
+  normalized_keys_state="$(printf '%s\n' "$keys_status" | sed -n 's/^[[:space:]]*local keys:[[:space:]]*present.*$/present/p')"
+  [ "$normalized_keys_state" = present ]
 }
 
 configure_xchat_keys() {
   xurl_path=$1
-  keys_status="$("$xurl_path" chat keys status 2>/dev/null || true)"
-  if chat_keys_present "$keys_status"; then
+  if keys_status="$("$xurl_path" chat keys status --auth oauth2 2>/dev/null)"; then
+    keys_status_ok=1
+  else
+    keys_status_ok=0
+  fi
+  if [ "$keys_status_ok" -ne 1 ]; then
+    print_chat_status_retry "$xurl_path"
+    return 1
+  fi
+  if chat_keys_ready "$keys_status"; then
     info "X Chat keys are ready"
     return
+  fi
+  if local_chat_keys_present "$keys_status"; then
+    print_unregistered_chat_key "$xurl_path"
+    return 1
   fi
 
   restore_answer="$(prompt_value 'Restore existing X Chat keys now? (Y/n)' 'y')"
@@ -333,21 +364,29 @@ configure_xchat_keys() {
   esac
 
   if has_operator_tty; then
-    if ! "$xurl_path" chat keys restore </dev/tty; then
+    if ! "$xurl_path" chat keys restore --auth oauth2 </dev/tty; then
       print_chat_key_recovery "$xurl_path"
       return 1
     fi
-  elif ! "$xurl_path" chat keys restore; then
+  elif ! "$xurl_path" chat keys restore --auth oauth2; then
     print_chat_key_recovery "$xurl_path"
     return 1
   fi
 
-  keys_status="$("$xurl_path" chat keys status 2>/dev/null || true)"
-  if chat_keys_present "$keys_status"; then
+  if keys_status="$("$xurl_path" chat keys status --auth oauth2 2>/dev/null)"; then
+    keys_status_ok=1
+  else
+    keys_status_ok=0
+  fi
+  if [ "$keys_status_ok" -eq 1 ] && chat_keys_ready "$keys_status"; then
     info "X Chat keys are ready"
     return
   fi
-  print_chat_key_recovery "$xurl_path"
+  if [ "$keys_status_ok" -ne 1 ]; then
+    print_chat_status_retry "$xurl_path"
+  else
+    print_chat_key_recovery "$xurl_path"
+  fi
   return 1
 }
 
