@@ -22,12 +22,12 @@ explicit `--network tron:mainnet|tron:nile|tron:shasta`.
 | Goal | Command family | Notes |
 |---|---|---|
 | Create an HD wallet | `create` | Hidden password prompt or supported stdin channel |
-| Import an account | `import mnemonic|private-key|keystore|ledger|watch` | Mnemonic/private-key import is interactive-only |
+| Import an account | `import mnemonic|private-key|keystore|ledger|watch` | Human-only; the Agent must not invoke any import subcommand |
 | List/select accounts | `list`, `use`, `current` | `--account` can select without changing the active account |
 | Derive or rename | `derive`, `rename` | Local wallet-state changes |
-| Back up | `backup` | Writes secret material; high-risk confirmation required |
-| Delete | `delete` | HD-root deletion can cascade; high-risk confirmation required |
-| Change password | `change-password` | Interactive-only |
+| Back up | `backup` | Human-only; writes secret recovery material |
+| Delete | `delete` | Human-only; HD-root deletion can cascade |
+| Change password | `change-password` | Human-only; hidden interactive TTY operation |
 | Generate an unstored keypair | `address generate` | `--print-secret` exposes a private key to stdout |
 
 ## Read-only chain operations

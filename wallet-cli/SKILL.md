@@ -82,10 +82,20 @@ multi-step wallet workflow.
   documentation.
 - Use only a CLI-supported `*-stdin` flag connected to an approved, non-logging secret source.
   Only one `*-stdin` consumer may be used in a single invocation.
-- Mnemonic/private-key import and `change-password` require hidden interactive TTY input. Ask the
-  user to perform those prompts; do not automate them through visible input.
 - Do not read, summarize, or transmit keystores, backup files, configuration credentials, or other
   wallet secret material.
+
+## Human-only wallet administration
+
+Never invoke `wallet-cli import`, `wallet-cli backup`, `wallet-cli delete`, or
+`wallet-cli change-password`, including any `wallet-cli import` subcommand. These root wallet
+administration commands are reserved for a human operating wallet-cli locally, even when the user
+asks the agent to run them, supplies confirmation, or provides a secret source.
+
+Explain the consequences and required precautions, then return control to the user. Do not automate
+their prompts, pipe input to them, read their output files, or treat confirmation as authorization
+to execute them. After the user reports completion, continue only with non-secret public results
+such as an account id, label, or address.
 
 ## Authorization and confirmation
 
@@ -101,6 +111,7 @@ Apply these confirmed rules:
   funds-moving or externally visible write.
 - On every network, high-risk operations require explicit confirmation. `permission update` also
   requires a successful `--dry-run` and review of the complete rendered permission structure.
+- Confirmation never authorizes a human-only command listed above.
 - Never use authorization for one transaction as permission for another transaction, retry, batch,
   recipient, amount, token, account, or network.
 

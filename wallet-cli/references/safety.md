@@ -25,6 +25,22 @@ address because TRON addresses are identical across networks.
 A confirmation is scoped to the displayed network, account, target, command, amount, asset,
 parameters, and one execution. Any change requires a new confirmation.
 
+## Human-only wallet administration
+
+The Agent must never invoke `wallet-cli import`, `wallet-cli backup`, `wallet-cli delete`, or
+`wallet-cli change-password`, including any `wallet-cli import` subcommand. This prohibition applies
+on every network and cannot be overridden by user confirmation, a test environment, an approved
+password source, or the CLI's technical ability to run non-interactively.
+
+- `import` introduces an external account or key source into the wallet store.
+- `backup` creates secret recovery material outside the wallet store.
+- `delete` can remove an HD seed root and all derived accounts.
+- `change-password` handles both the current and replacement master passwords.
+
+Explain the operation and its consequences, then return control to the user to complete it locally.
+Do not automate prompts, provide secrets, read generated files, or inspect secret-bearing output.
+Afterward, accept only non-secret public results such as an account id, label, or address.
+
 ## High-risk operations on every network
 
 ### `permission update`
@@ -41,16 +57,6 @@ This replaces the entire permission structure. A wrong owner group can lock the 
 7. Execute once, preferably with `--wait`, and inspect `data.stage` plus warnings.
 
 Never reconstruct a permission bitmap from memory when the CLI can export or decode it.
-
-### `delete`
-
-Confirm the exact account id/label and cascade impact. Deleting an HD seed root can remove its
-derived accounts. Do not infer that a usable backup exists unless the user verifies it.
-
-### `backup`
-
-Confirm the exact account, export format, and destination path. The output is secret material.
-Never read the created file, overwrite an existing path, or include its contents in model context.
 
 ### `address generate --print-secret`
 
@@ -104,8 +110,9 @@ approved secret source is available, stop and return control to the user instead
 
 Standard input can have only one consumer. Do not combine `--password-stdin` with `--tx-stdin` or
 `--message-stdin` in the same invocation; provide the non-secret payload through a supported file
-or inline option, or split the workflow. Mnemonic/private-key imports and `change-password` remain
-hidden interactive TTY operations and do not accept `--password-stdin`.
+or inline option, or split the workflow. The human-only command policy above remains absolute even
+where wallet-cli technically supports `--password-stdin`; `change-password` and secret-bearing
+imports remain hidden interactive TTY operations.
 
 ## Secret and file safety
 
