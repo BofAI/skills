@@ -19,8 +19,10 @@ A curated collection of practical, DeFi-focused utility skills developed by the 
 
 - [What are BANK OF AI Skills?](#what-are-bank-of-ai-skills)
 - [Installation](#installation)
+  - [Optional wallet-cli installer](#optional-wallet-cli-installer)
   - [Agent Wallet (Required for Signing Skills)](#agent-wallet-required-for-signing-skills)
 - [Available Skills](#available-skills)
+  - [Wallet & TRON](#wallet--tron)
   - [DeFi & DEX](#defi--dex)
   - [Payments & x402](#payments--x402)
   - [AI & Account Recharge](#ai--account-recharge)
@@ -43,10 +45,24 @@ BANK OF AI Skills are reusable, task-oriented capabilities that teach AI agents 
 
 ## Installation
 
-Use the unified installer and follow the `npx` prompts to select the skills you want and the agentic platform you use. The installer will complete the setup automatically.
+Use the standard installer and follow the `npx` prompts to select the skills you want and the agentic platform you use. This installs the selected Skill definitions; external CLI dependencies are never installed globally without explicit user approval.
 
 ```bash
 npx skills add https://github.com/BofAI/skills.git
+```
+
+### Optional wallet-cli installer
+
+The standard installer above remains the recommended path. To install only the `wallet-cli` Skill and optionally install its pinned CLI dependency in one flow, use:
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/BofAI/skills/main/wallet-cli/install.sh | sh
+```
+
+The script displays the exact npm package and version, then asks for confirmation before running a global `npm install`. Declining the prompt installs the Skill only. Preview all actions without changing the system with:
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/BofAI/skills/main/wallet-cli/install.sh | sh -s -- --dry-run
 ```
 
 ### Agent Wallet (Required for Signing Skills)
@@ -56,6 +72,10 @@ Some skills require wallet signature operations and are built on Agent Wallet. B
 ---
 
 ## Available Skills
+
+### Wallet & TRON
+
+- [**wallet-cli**](./wallet-cli) - Safe, machine-readable TRON wallet operations through `@tron-walletcli/wallet-cli@4.12.0`, including accounts, transfers, staking, governance, contracts, signing, and chain queries. See [README](./wallet-cli/README.md).
 
 ### DeFi & DEX
 
@@ -100,6 +120,7 @@ Each current skill now has its own README for quick discovery:
 - [tronscan-skill/README.md](./tronscan-skill/README.md)
 - [trx-staking-skill/README.md](./trx-staking-skill/README.md)
 - [usdd-skill/README.md](./usdd-skill/README.md)
+- [wallet-cli/README.md](./wallet-cli/README.md)
 - [x402-payment/README.md](./x402-payment/README.md)
 
 ---
