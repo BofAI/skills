@@ -83,6 +83,30 @@ Before a mainnet confirmation, show all fields available for the operation:
 
 Do not ask for confirmation using only an opaque command string when the values can be explained.
 
+## Password input: `--password-stdin` only
+
+For agent-driven or other non-interactive execution, `--password-stdin` is the only permitted way
+to pass the wallet master password. The flag reads one password from standard input; never invent
+or use a `--password` argument, literal password, environment variable, command substitution,
+temporary file, or visible chat message.
+
+Pipe the password directly from an approved, non-logging password manager. For example, with the
+1Password CLI already configured by the user:
+
+```bash
+op read "op://Private/wallet-cli/password" |
+  wallet-cli create --label main --password-stdin -o json
+```
+
+Replace only the password-manager item locator; never replace it with the password itself. If no
+approved secret source is available, stop and return control to the user instead of using
+`echo`, placing the password in an environment variable, or asking for it in chat.
+
+Standard input can have only one consumer. Do not combine `--password-stdin` with `--tx-stdin` or
+`--message-stdin` in the same invocation; provide the non-secret payload through a supported file
+or inline option, or split the workflow. Mnemonic/private-key imports and `change-password` remain
+hidden interactive TTY operations and do not accept `--password-stdin`.
+
 ## Secret and file safety
 
 - Never request or display passwords, mnemonics, private keys, signing material, or service
