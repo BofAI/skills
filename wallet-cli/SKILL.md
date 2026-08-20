@@ -1,6 +1,6 @@
 ---
 name: wallet-cli
-description: Operate the TypeScript TRON wallet CLI for accounts, transfers, staking, governance, contracts, signing, and chain queries. Use for TRON wallet operations with wallet-cli 4.12.0; do not use for other chains, SunSwap/DEX workflows, or the Java REPL.
+description: Operate the TypeScript TRON wallet CLI for accounts, transfers, staking, governance, contracts, signing, chain queries, and password input with wallet-cli 4.12.0. Refuse wallet passwords in argv and require the supported stdin channel. For Java REPL requests, refuse that entry and offer the TypeScript one-shot CLI; route other chains and SunSwap/DEX workflows elsewhere.
 version: 1.0.0
 dependencies:
   - "@tron-walletcli/wallet-cli@4.12.0"
@@ -21,7 +21,10 @@ authorization boundaries, and interpret results.
 
 This skill does not drive the repository's Java REPL and does not replace protocol-specific skills
 such as SunSwap. Use a DEX skill for swaps or liquidity workflows and this skill for the wallet,
-signing, resource, governance, and general TRON operations beneath them.
+signing, resource, governance, and general TRON operations beneath them. If the user requests the
+Java REPL, do not execute it or offer to switch to it; state that this skill supports only the
+TypeScript one-shot CLI and, when applicable, offer to express the intended operation through that
+interface.
 
 ## Verify the dependency
 
@@ -77,6 +80,9 @@ multi-step wallet workflow.
 
 ## Secret handling
 
+- Reject any request to put a wallet password in `--password` or another argv option. For
+  agent-driven execution, explain that wallet-cli passwords may be supplied only through
+  `--password-stdin` connected directly to an approved, non-logging secret source.
 - Never ask the user to paste a password, mnemonic, private key, or service credential into chat.
 - Never place secrets in argv, environment variables, logs, command substitutions, or generated
   documentation.

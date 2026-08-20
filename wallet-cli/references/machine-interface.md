@@ -56,8 +56,11 @@ Failure:
 - `data` exists on success; `error` exists on failure.
 - `chain` is present only for chain operations.
 - `error.code` is machine-readable. `error.message` is unstable and must not be parsed.
-- Big integers and on-chain quantities are decimal strings. Keep them as strings or arbitrary-
-  precision integers; never use floating point.
+- `bigint` values and on-chain amounts are decimal strings. Keep those fields as strings or
+  arbitrary-precision integers; never use floating point for them.
+- Other counters and configuration values follow the command-specific documentation and schema and
+  may be JSON numbers. For example, `chain params.data.value` is a number in wallet-cli 4.12.0; do
+  not coerce a field based only on it coming from the chain.
 
 ## Warnings
 
