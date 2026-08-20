@@ -21,6 +21,10 @@ For an optional wallet-cli-specific installation flow:
 curl -fsSL https://raw.githubusercontent.com/BofAI/skills/main/wallet-cli/install.sh | sh
 ```
 
+The optional script requires a POSIX shell and standard utilities such as `mktemp`, `cp`, `mv`, and
+`mkdir`. On Windows, run it only from Git Bash or WSL with those tools available on `PATH`; from
+native PowerShell, use the standard `npx skills add` installation above.
+
 The script installs the Skill and asks for explicit confirmation before running:
 
 ```bash
@@ -45,7 +49,7 @@ curl -fsSL https://raw.githubusercontent.com/BofAI/skills/main/wallet-cli/instal
 ## Requirements
 
 - Node.js 20 or newer when installing the npm CLI
-- Git for the optional installer
+- Git, a POSIX shell, and standard POSIX utilities for the optional installer
 - Explicit network selection for chain operations
 
 The Skill never authorizes an installer or Agent to collect wallet passwords, mnemonics, or private

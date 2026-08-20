@@ -26,6 +26,23 @@ command_exists() {
   command -v "$1" >/dev/null 2>&1
 }
 
+require_posix_tools() {
+  missing=""
+  for tool in mktemp mkdir cp mv rm date dirname; do
+    if ! command_exists "$tool"; then
+      missing="${missing}${missing:+, }${tool}"
+    fi
+  done
+  if [ "$CLIENT" = "auto" ]; then
+    for tool in env grep; do
+      if ! command_exists "$tool"; then
+        missing="${missing}${missing:+, }${tool}"
+      fi
+    done
+  fi
+  [ -z "$missing" ] || fail "Required POSIX tools are missing from PATH: ${missing}. On Windows, use the standard 'npx skills add' installation or run this script from Git Bash/WSL with a complete POSIX PATH."
+}
+
 truthy() {
   case "${1:-}" in
     1|true|yes) return 0 ;;
@@ -93,6 +110,9 @@ case "$CLIENT" in
 esac
 
 command_exists git || fail "git is required to install ${SKILL_NAME}."
+if [ "$DRY_RUN" != "1" ]; then
+  require_posix_tools
+fi
 
 check_node_and_npm() {
   command_exists node || fail "Node.js 20+ is required to install ${CLI_PACKAGE}."

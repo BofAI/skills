@@ -53,7 +53,9 @@ The required version is exactly `4.12.0`.
 3. Branch on the process exit code first: `0` success, `1` execution failure, `2` malformed call.
    Then branch on stable fields such as `error.code`, `data.stage`, or `data.state`. Never parse
    `error.message` text.
-4. Treat all on-chain amounts as decimal strings, not JavaScript numbers or floating-point values.
+4. Treat `bigint` values and command-defined on-chain amount fields as decimal strings. Preserve
+   every field according to the leaf schema; other counters and configuration values may be JSON
+   numbers. Never use floating point for string amounts.
 5. Set `--timeout <ms>` when the surrounding task has a tighter deadline than the CLI's 60-second
    default.
 6. Never infer that exit code `0` means a transaction confirmed. A submitted or reverted
