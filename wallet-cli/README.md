@@ -6,42 +6,51 @@ chain queries and is pinned to `@tron-walletcli/wallet-cli@4.12.0`.
 
 ## Installation
 
-The recommended installation path is the repository's standard interactive installer:
+Choose either method below. Both install Skill version `1.0.0` and use
+`@tron-walletcli/wallet-cli@4.12.0`.
+
+### Method 1: Install the CLI, then the Skill
+
+Install the pinned npm CLI first, then install the Skill through the standard Skills CLI:
 
 ```bash
-npx skills add https://github.com/BofAI/skills.git
+npm install --global --no-fund --no-audit @tron-walletcli/wallet-cli@4.12.0
+npx skills add BofAI/skills --skill wallet-cli --global --yes
 ```
 
-Select `wallet-cli` and the target agent platform when prompted. This installs the Skill but does
-not silently modify global npm packages.
+The `npx skills` command installs only the Skill; it does not install or update the `wallet-cli`
+npm package.
 
-For an optional wallet-cli-specific installation flow:
+### Method 2: Install both with one script
+
+On macOS, Linux, Git Bash, or WSL, run the repository installer:
 
 ```bash
 curl -fsSL https://raw.githubusercontent.com/BofAI/skills/main/wallet-cli/install.sh | sh
 ```
 
-The optional script requires a POSIX shell and standard utilities such as `mktemp`, `cp`, `mv`, and
-`mkdir`. On Windows, run it only from Git Bash or WSL with those tools available on `PATH`; from
-native PowerShell, use the standard `npx skills add` installation above.
+The script installs or verifies the pinned CLI and installs the Skill without prompting by default.
+It requires a POSIX shell and standard utilities such as `mktemp`, `cp`, `mv`, and `mkdir`.
 
-The script installs the Skill and asks for explicit confirmation before running:
+Use `--ask` to show the complete plan and require one confirmation, `--skill-only` to leave npm
+packages unchanged, or `--dry-run` to preview the operation:
 
 ```bash
-npm install --global --no-fund --no-audit @tron-walletcli/wallet-cli@4.12.0
+curl -fsSL https://raw.githubusercontent.com/BofAI/skills/main/wallet-cli/install.sh | sh -s -- --ask
+curl -fsSL https://raw.githubusercontent.com/BofAI/skills/main/wallet-cli/install.sh | sh -s -- --skill-only
+curl -fsSL https://raw.githubusercontent.com/BofAI/skills/main/wallet-cli/install.sh | sh -s -- --dry-run
 ```
 
-Declining the prompt or passing `--skip-cli-install` installs only the Skill. Use `--dry-run` to
-preview the operation:
+After either method, verify the CLI version:
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/BofAI/skills/main/wallet-cli/install.sh | sh -s -- --dry-run
+wallet-cli --version
 ```
 
 ## Contents
 
 - [SKILL.md](SKILL.md) — operational rules and version boundary
-- [install.sh](install.sh) — optional confirmed installation flow
+- [install.sh](install.sh) — one-command Skill and pinned CLI setup
 - [references/commands.md](references/commands.md) — command-family routing
 - [references/machine-interface.md](references/machine-interface.md) — JSON, exit-code, and transaction-state contract
 - [references/safety.md](references/safety.md) — authorization, confirmation, secret, and retry rules
@@ -49,7 +58,7 @@ curl -fsSL https://raw.githubusercontent.com/BofAI/skills/main/wallet-cli/instal
 ## Requirements
 
 - Node.js 20 or newer when installing the npm CLI
-- Git, a POSIX shell, and standard POSIX utilities for the optional installer
+- Git, a POSIX shell, and standard POSIX utilities for the one-command installer
 - Explicit network selection for chain operations
 
 The Skill never authorizes an installer or Agent to collect wallet passwords, mnemonics, or private

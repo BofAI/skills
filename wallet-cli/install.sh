@@ -10,8 +10,12 @@ REPO="${WALLET_CLI_SKILL_REPO:-https://github.com/BofAI/skills.git}"
 CLIENT="${WALLET_CLI_SKILL_CLIENT:-auto}"
 SKILLS_DIR_OVERRIDE="${WALLET_CLI_SKILLS_DIR:-}"
 SKIP_CLI_INSTALL="${WALLET_CLI_SKIP_CLI_INSTALL:-0}"
+ASSUME_YES="${WALLET_CLI_INSTALL_YES:-1}"
 DRY_RUN=0
 WORKDIR=""
+SOURCE_DIR=""
+CLI_ACTION="skip"
+CURRENT_CLI_VERSION=""
 
 info() {
   printf '==> %s\n' "$1"
@@ -52,15 +56,20 @@ truthy() {
 
 usage() {
   cat <<EOF
-Usage: install.sh [--client auto|codex|claude|all] [--skills-dir <dir>] [--skip-cli-install] [--dry-run]
+Usage: install.sh [--client auto|codex|claude|all] [--skills-dir <dir>] [--tag <ref>] [--yes|--ask] [--skill-only] [--dry-run]
 
-Install the ${SKILL_NAME} Skill. Unless --skip-cli-install is used, the script
-asks for confirmation before installing ${CLI_PACKAGE}@${CLI_VERSION} globally.
+Install the ${SKILL_NAME} Skill and ${CLI_PACKAGE}@${CLI_VERSION}. Installation
+is non-interactive by default; use --ask to require one confirmation for the
+complete plan, or --skill-only to leave global npm packages unchanged.
 
 Options:
   --client            Target client. Default: auto.
   --skills-dir        Override the target Skills directory.
-  --skip-cli-install  Install the Skill without offering to install the npm CLI.
+  --tag               Git branch or tag to install. Default: ${TAG}.
+  --yes               Install without prompting. This is the default.
+  --ask               Show the complete plan and ask once before installation.
+  --skill-only        Install only the Skill; do not install or change the npm CLI.
+  --skip-cli-install  Alias for --skill-only.
   --dry-run           Preview actions without changing files or packages.
   -h, --help          Show this help.
 EOF
@@ -86,7 +95,24 @@ while [ "$#" -gt 0 ]; do
       SKILLS_DIR_OVERRIDE="${1#--skills-dir=}"
       shift
       ;;
-    --skip-cli-install)
+    --tag)
+      [ "$#" -ge 2 ] || fail "--tag requires a value"
+      TAG="$2"
+      shift 2
+      ;;
+    --tag=*)
+      TAG="${1#--tag=}"
+      shift
+      ;;
+    --yes)
+      ASSUME_YES=1
+      shift
+      ;;
+    --ask)
+      ASSUME_YES=0
+      shift
+      ;;
+    --skill-only|--skip-cli-install)
       SKIP_CLI_INSTALL=1
       shift
       ;;
@@ -128,50 +154,92 @@ installed_cli_version() {
   wallet-cli --version 2>/dev/null
 }
 
-confirm_cli_install() {
-  if [ ! -r /dev/tty ]; then
-    info "No interactive terminal is available; skipping global npm installation."
-    return 1
+prepare_cli_install() {
+  if truthy "$SKIP_CLI_INSTALL"; then
+    CLI_ACTION="skip"
+    return
   fi
 
-  printf '\nInstall %s@%s globally with npm? [y/N] ' "$CLI_PACKAGE" "$CLI_VERSION" >/dev/tty
+  CURRENT_CLI_VERSION="$(installed_cli_version || true)"
+  if [ "$CURRENT_CLI_VERSION" = "$CLI_VERSION" ]; then
+    CLI_ACTION="keep"
+    return
+  fi
+
+  CLI_ACTION="install"
+  if [ "$DRY_RUN" != "1" ]; then
+    check_node_and_npm
+  fi
+}
+
+show_plan() {
+  printf '\nInstallation plan:\n'
+  printf '  Skill source: %s @ %s\n' "$REPO" "$TAG"
+  if [ -n "$SKILLS_DIR_OVERRIDE" ]; then
+    printf '  Skill target: %s/%s\n' "$SKILLS_DIR_OVERRIDE" "$SKILL_NAME"
+  elif [ "$targets" = "all" ]; then
+    printf '  Skill targets: %s/%s and %s/%s\n' \
+      "$(default_skills_dir codex)" "$SKILL_NAME" \
+      "$(default_skills_dir claude)" "$SKILL_NAME"
+  else
+    printf '  Skill target: %s/%s\n' "$(default_skills_dir "$targets")" "$SKILL_NAME"
+  fi
+
+  case "$CLI_ACTION" in
+    skip)
+      printf '  npm CLI: unchanged (--skill-only)\n'
+      ;;
+    keep)
+      printf '  npm CLI: %s@%s already installed\n' "$CLI_PACKAGE" "$CLI_VERSION"
+      ;;
+    install)
+      if [ -n "$CURRENT_CLI_VERSION" ]; then
+        printf '  npm CLI: replace wallet-cli %s with %s@%s globally\n' \
+          "$CURRENT_CLI_VERSION" "$CLI_PACKAGE" "$CLI_VERSION"
+      else
+        printf '  npm CLI: install %s@%s globally\n' "$CLI_PACKAGE" "$CLI_VERSION"
+      fi
+      ;;
+  esac
+
+  if truthy "$ASSUME_YES"; then
+    printf '  Confirmation: skipped (--yes is the default)\n'
+  else
+    printf '  Confirmation: required (--ask)\n'
+  fi
+}
+
+confirm_plan() {
+  if truthy "$ASSUME_YES"; then
+    return
+  fi
+
+  if ! { exec 3<>/dev/tty; } 2>/dev/null; then
+    fail "--ask requires an interactive terminal; rerun with --yes or --dry-run."
+  fi
+
+  printf '\nProceed with this installation? [y/N] ' >&3
   answer=""
-  IFS= read -r answer </dev/tty || return 1
+  IFS= read -r answer <&3 || fail "Unable to read confirmation from the terminal."
+  exec 3>&-
   case "$answer" in
-    y|Y|yes|YES|Yes) return 0 ;;
-    *) return 1 ;;
+    y|Y|yes|YES|Yes) ;;
+    *) fail "Installation canceled." ;;
   esac
 }
 
-install_cli_if_approved() {
-  if truthy "$SKIP_CLI_INSTALL"; then
-    info "Skipped npm CLI installation by request."
-    return
-  fi
+install_cli() {
+  case "$CLI_ACTION" in
+    skip)
+      info "Left global npm packages unchanged."
+      return
+      ;;
+    keep)
+      info "${CLI_PACKAGE}@${CLI_VERSION} is already available."
+      return
+      ;;
+  esac
 
-  current_version="$(installed_cli_version || true)"
-  if [ "$current_version" = "$CLI_VERSION" ]; then
-    info "${CLI_PACKAGE}@${CLI_VERSION} is already available."
-    return
-  fi
-
-  if [ -n "$current_version" ]; then
-    info "Detected wallet-cli ${current_version}; this Skill requires ${CLI_VERSION}."
-  else
-    info "wallet-cli is not currently available on PATH."
-  fi
-
-  if [ "$DRY_RUN" = "1" ]; then
-    info "Would ask before running: npm install --global --no-fund --no-audit ${CLI_PACKAGE}@${CLI_VERSION}"
-    return
-  fi
-
-  if ! confirm_cli_install; then
-    info "Global npm installation was not approved; continuing with Skill-only installation."
-    return
-  fi
-
-  check_node_and_npm
   npm install --global --no-fund --no-audit "${CLI_PACKAGE}@${CLI_VERSION}"
   installed_version="$(installed_cli_version || true)"
   [ "$installed_version" = "$CLI_VERSION" ] || fail "Expected wallet-cli ${CLI_VERSION}, found ${installed_version:-unknown}."
@@ -257,11 +325,8 @@ install_skill() {
   info "Installed Skill at $target"
 }
 
-install_cli_if_approved
-
 if [ "$DRY_RUN" = "1" ]; then
   SOURCE_DIR="<temporary-clone>/${SKILL_NAME}"
-  info "Would clone ${REPO} at ${TAG} into a temporary directory"
 else
   WORKDIR="$(mktemp -d 2>/dev/null || mktemp -d -t "${SKILL_NAME}-install")"
   clone_dir="$WORKDIR/skills"
@@ -276,6 +341,17 @@ if [ "$CLIENT" = "auto" ]; then
   targets="$(detect_client)"
 fi
 
+prepare_cli_install
+show_plan
+
+if [ "$DRY_RUN" = "1" ]; then
+  printf '\nDry run complete; no Skill files or npm packages were changed.\n'
+  exit 0
+fi
+
+confirm_plan
+install_cli
+
 if [ -n "$SKILLS_DIR_OVERRIDE" ]; then
   install_skill "$SKILLS_DIR_OVERRIDE"
 elif [ "$targets" = "all" ]; then
@@ -285,12 +361,10 @@ else
   install_skill "$(default_skills_dir "$targets")"
 fi
 
-if [ "$DRY_RUN" = "1" ]; then
-  printf '\nDry run complete; no Skill files or npm packages were changed.\n'
+printf '\n%s installed.\n' "$SKILL_NAME"
+if [ "$CLI_ACTION" = "skip" ]; then
+  printf 'The npm CLI was left unchanged; install %s@%s before using the Skill.\n' \
+    "$CLI_PACKAGE" "$CLI_VERSION"
 else
-  printf '\n%s installed.\n' "$SKILL_NAME"
-  printf 'Verify the CLI with: wallet-cli --version\n'
-  if [ "$(installed_cli_version || true)" != "$CLI_VERSION" ]; then
-    printf 'The npm CLI is not pinned to %s; install it explicitly before using the Skill.\n' "$CLI_VERSION"
-  fi
+  printf 'Verified CLI: wallet-cli %s\n' "$(installed_cli_version)"
 fi

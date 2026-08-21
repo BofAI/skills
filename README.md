@@ -19,7 +19,6 @@ A curated collection of practical, DeFi-focused utility skills developed by the 
 
 - [What are BANK OF AI Skills?](#what-are-bank-of-ai-skills)
 - [Installation](#installation)
-  - [Optional wallet-cli installer](#optional-wallet-cli-installer)
   - [Agent Wallet (Required for Signing Skills)](#agent-wallet-required-for-signing-skills)
 - [Available Skills](#available-skills)
   - [Wallet & TRON](#wallet--tron)
@@ -45,24 +44,10 @@ BANK OF AI Skills are reusable, task-oriented capabilities that teach AI agents 
 
 ## Installation
 
-Use the standard installer and follow the `npx` prompts to select the skills you want and the agentic platform you use. This installs the selected Skill definitions; external CLI dependencies are never installed globally without explicit user approval.
+Use the standard installer and follow the `npx` prompts to select the skills you want and the agentic platform you use. This installs the selected Skill definitions but does not install their external CLI dependencies.
 
 ```bash
 npx skills add https://github.com/BofAI/skills.git
-```
-
-### Optional wallet-cli installer
-
-The standard installer above remains the recommended path. To install only the `wallet-cli` Skill and optionally install its pinned CLI dependency in one flow, use:
-
-```bash
-curl -fsSL https://raw.githubusercontent.com/BofAI/skills/main/wallet-cli/install.sh | sh
-```
-
-The script displays the exact npm package and version, then asks for confirmation before running a global `npm install`. Declining the prompt installs the Skill only. Preview all actions without changing the system with:
-
-```bash
-curl -fsSL https://raw.githubusercontent.com/BofAI/skills/main/wallet-cli/install.sh | sh -s -- --dry-run
 ```
 
 ### Agent Wallet (Required for Signing Skills)
