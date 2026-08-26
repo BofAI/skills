@@ -1,6 +1,7 @@
 ---
 name: twitter-mcp
 description: Use when the user wants to install or authorize xurl for X/Twitter, generate "生成X日报", "X日报", "推特日报", or "Twitter digest" from the local xurl CLI, or optionally register/troubleshoot the hosted X MCP bridge.
+version: 2.0.0
 ---
 
 # X/Twitter xurl Digest

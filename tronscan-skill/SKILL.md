@@ -1,7 +1,7 @@
 ---
 name: TronScan Data Lookup
 description: Query TRON blockchain data via the TronScan API — accounts, transactions, tokens, blocks, contracts, transfers, and chain statistics.
-version: 1.0.0
+version: 2.0.0
 dependencies:
   - axios
 tags:

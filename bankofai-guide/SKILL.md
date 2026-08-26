@@ -1,7 +1,7 @@
 ---
 name: bankofai-guide
 description: "Onboarding guide for BofAI skills — handles post-install setup, AgentWallet creation, and wallet guard when no wallet is configured."
-version: 1.0.0
+version: 2.0.0
 tags:
   - bankofai
   - onboarding

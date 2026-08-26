@@ -42,6 +42,9 @@ A curated collection of practical, DeFi-focused utility skills developed by the 
 
 BANK OF AI Skills are reusable, task-oriented capabilities that teach AI agents how to perform specific blockchain workflows. Each skill encapsulates domain knowledge (like SunSwap pathfinding) and provides step-by-step instructions for the agent to follow.
 
+All skills share the repository release version in [`VERSION`](./VERSION). External CLI and SDK
+versions remain independent dependencies. See [`VERSIONING.md`](./VERSIONING.md) for the policy.
+
 ## Installation
 
 Use the standard installer and follow the `npx` prompts to select the skills you want and the agentic platform you use. This installs the selected Skill definitions but does not install their external CLI dependencies.
@@ -78,13 +81,10 @@ Some skills require wallet signature operations and are built on Agent Wallet. B
 ### Security & Permissions
 
 - [**agent-wallet**](./agent-wallet) - Wallet management and signing skill for creating wallets, switching active wallets, resolving addresses, and signing transactions or messages on EVM and TRON. See [README](./agent-wallet/README.md).
-- [**multisig-permissions**](./multisig-permissions) - TRON native account permission and multi-signature workflow skill. Supports permission inspection, template-based updates, proposal creation, co-signing, review, and execution. See [README](./multisig-permissions/README.md).
 
 ### Data & Analytics
 
 - [**tronscan-skill**](./tronscan-skill) - Comprehensive TRON blockchain data lookup via TronScan API. Supports accounts, transactions, tokens, blocks, and network-wide statistics. See [README](./tronscan-skill/README.md).
-- [**trc20-toolkit-skill**](./trc20-toolkit-skill) - Universal TRC20 token toolkit for TRON. Supports metadata lookup, balance checks, transfers, and allowance management. See [README](./trc20-toolkit-skill/README.md).
-- [**trx-staking-skill**](./trx-staking-skill) - TRX staking workflow skill for Tron Power, vote delegation, reward queries, and SR operations. See [README](./trx-staking-skill/README.md).
 - [**usdd-skill**](./usdd-skill) - USDD toolkit for balance checks, PSM inspection, swaps, and vault information. See [README](./usdd-skill/README.md).
 
 ### Guides & Onboarding
@@ -97,13 +97,10 @@ Each current skill now has its own README for quick discovery:
 
 - [agent-wallet/README.md](./agent-wallet/README.md)
 - [bankofai-guide/README.md](./bankofai-guide/README.md)
-- [multisig-permissions/README.md](./multisig-permissions/README.md)
 - [recharge-skill/README.md](./recharge-skill/README.md)
 - [sunperp-skill/README.md](./sunperp-skill/README.md)
 - [sunswap/README.md](./sunswap/README.md)
-- [trc20-toolkit-skill/README.md](./trc20-toolkit-skill/README.md)
 - [tronscan-skill/README.md](./tronscan-skill/README.md)
-- [trx-staking-skill/README.md](./trx-staking-skill/README.md)
 - [usdd-skill/README.md](./usdd-skill/README.md)
 - [wallet-cli/README.md](./wallet-cli/README.md)
 - [x402-payment/README.md](./x402-payment/README.md)

@@ -1,9 +1,0 @@
-{
-  "name": "@bankofai/trc20-toolkit-skill",
-  "version": "1.0.0",
-  "description": "Universal TRC20 token operations skill for AI agents on TRON",
-  "license": "MIT",
-  "private": true,
-  "engines": { "node": ">=18.0.0" },
-  "dependencies": { "tronweb": "^6.0.0" }
-}

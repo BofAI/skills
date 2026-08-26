@@ -1,6 +1,7 @@
 ---
 name: twitter-digest
 description: Use when the user asks to generate an X/Twitter daily digest or says phrases such as "生成X日报", "生成 x 日报", "X日报", "推特日报", "Twitter digest", or wants an agent to analyze their own X/Twitter mentions, home timeline, reply opportunities, and daily social-media summaries. This skill is API-only.
+version: 2.0.0
 ---
 
 # X/Twitter Digest
