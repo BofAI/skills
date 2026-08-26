@@ -69,6 +69,20 @@ For `message sign`, `typed-data sign`, transaction signing, and contract writes,
 human-meaningful payload, domain, network, account, permission id, and destination before signing.
 Treat opaque or untrusted payloads as high risk. Never sign a challenge whose purpose is unclear.
 
+### Token approvals
+
+For a TRC20 `approve(address,uint256)` contract write, verify the token contract and spender,
+inspect the current allowance, and approve only the amount required for the intended operation.
+Reject unlimited approvals. Treat an approval as permission for the spender to move the owner's
+tokens, not as a harmless preparatory transaction.
+
+### Staking and voting
+
+Before unfreezing TRX, surface the current unbonding delay and explain that the user must withdraw
+the expired unfreeze separately. Warn that reducing TRON Power can invalidate votes that depend on
+it. Before `vote cast`, show the complete resulting vote slate because a vote transaction replaces
+the account's previous votes rather than incrementally adding one choice.
+
 ### One-shot account operations
 
 `account activate` charges the active payer. On-chain account name and id settings are effectively

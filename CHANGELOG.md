@@ -8,6 +8,25 @@
 - Added pull-request branch routing checks and a repository pull-request template.
 - Pinned stable installation documentation to the `main` branch.
 
+## [2.0.0] - 2026-08-26
+
+### Breaking Changes
+
+- Removed `multisig-permissions`, `trc20-toolkit-skill`, and `trx-staking-skill`; their generic
+  TRON workflows are now handled by `wallet-cli`.
+- Unified every retained Skill version with the repository release version.
+
+### Features
+
+- Added the `wallet-cli` skill for machine-readable TRON wallet, transfer, staking, governance,
+  contract, signing, permission, and chain-query operations.
+- Added a root version source, repository versioning policy, and CI consistency check.
+
+### Security
+
+- Preserved exact-token-approval, staking/unfreezing, voting, and permission-lockout guidance in
+  the consolidated `wallet-cli` safety reference.
+
 ## [1.5.9] - 2026-07-09
 
 ### Improvements
