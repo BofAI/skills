@@ -1,0 +1,6 @@
+interface:
+  display_name: "TRON Wallet CLI"
+  short_description: "Operate TRON wallets safely with wallet-cli"
+
+policy:
+  allow_implicit_invocation: true
