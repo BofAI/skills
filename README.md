@@ -44,11 +44,19 @@ BANK OF AI Skills are reusable, task-oriented capabilities that teach AI agents 
 
 ## Installation
 
-Use the standard installer and follow the `npx` prompts to select the skills you want and the agentic platform you use. This installs the selected Skill definitions but does not install their external CLI dependencies.
+Use the stable `main` branch and follow the `npx` prompts to select the skills you want and the agentic platform you use. This installs the selected Skill definitions but does not install their external CLI dependencies.
 
 ```bash
-npx skills add https://github.com/BofAI/skills.git
+npx skills add https://github.com/BofAI/skills/tree/main
 ```
+
+The default development branch may contain unreleased changes. Use it only for intentional testing:
+
+```bash
+npx skills add https://github.com/BofAI/skills/tree/develop
+```
+
+See [BRANCHING.md](./BRANCHING.md) for the development, release, and hotfix workflow.
 
 ### Agent Wallet (Required for Signing Skills)
 

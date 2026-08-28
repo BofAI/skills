@@ -1,5 +1,13 @@
 # Changelog
 
+## [Unreleased]
+
+### Improvements
+
+- Added the `develop`, `main`, `release_*`, `feature/*`, and `hotfix/*` branch workflow.
+- Added pull-request branch routing checks and a repository pull-request template.
+- Pinned stable installation documentation to the `main` branch.
+
 ## [1.5.9] - 2026-07-09
 
 ### Improvements

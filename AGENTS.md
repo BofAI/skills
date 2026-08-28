@@ -305,12 +305,15 @@ Always include:
 
 ### Contribution Workflow
 
-1. **Create skill directory** under `skills/`
-2. **Write SKILL.md** following the format
-3. **Add examples** in `examples/`
+1. **Synchronize `develop`** with the upstream repository
+2. **Create `feature/<short_description>`** from `develop`
+3. **Create or update the Skill** following this guide
 4. **Test thoroughly** with AI agents
 5. **Document dependencies** clearly
-6. **Submit for review**
+6. **Submit a pull request to `develop`**
+
+Do not push directly to `develop` or `main`. Release and hotfix work follows
+[BRANCHING.md](./BRANCHING.md).
 
 ### Review Criteria
 
@@ -327,6 +330,7 @@ Always include:
 
 | Resource | Description |
 |----------|-------------|
+| [BRANCHING.md](./BRANCHING.md) | Development, release, and hotfix workflow |
 | [mcp-server-tron](../mcp-server-tron/) | TRON blockchain MCP server |
 | [DEVELOPER_GUIDE.md](../DEVELOPER_GUIDE.md) | Project-wide development guide |
 | [agents.md](../agents.md) | Agent architecture documentation |
