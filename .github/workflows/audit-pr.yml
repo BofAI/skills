@@ -24,20 +24,25 @@ jobs:
     name: Audit on pull request
     # Disabled by default while the self-hosted audit runner is unavailable.
     # Set the repository variable AUDIT_AUTO_ENABLED=true to restore automatic audits.
-    if: >
-      github.event_name == 'pull_request' &&
-      vars.AUDIT_AUTO_ENABLED == 'true' &&
-      github.event.pull_request.head.repo.full_name == github.repository
-    runs-on: [self-hosted, Linux, ARM64, audit-linux]
+    if: github.event_name == 'pull_request'
+    runs-on: ${{ fromJSON(vars.AUDIT_AUTO_ENABLED == 'true' && github.event.pull_request.head.repo.full_name == github.repository && '["self-hosted","Linux","ARM64","audit-linux"]' || '["ubuntu-latest"]') }}
+    env:
+      AUTO_AUDIT_ENABLED: ${{ vars.AUDIT_AUTO_ENABLED == 'true' && github.event.pull_request.head.repo.full_name == github.repository }}
 
     steps:
+      - name: Automatic audit disabled
+        if: env.AUTO_AUDIT_ENABLED != 'true'
+        run: echo "Automatic audit is disabled"
+
       - name: Checkout PR head
+        if: env.AUTO_AUDIT_ENABLED == 'true'
         uses: actions/checkout@v4
         with:
           ref: ${{ github.event.pull_request.head.sha }}
           fetch-depth: 0
 
       - name: Check required tools
+        if: env.AUTO_AUDIT_ENABLED == 'true'
         run: |
           which git
           which zip
@@ -45,6 +50,7 @@ jobs:
           which python3
 
       - name: Create source archive
+        if: env.AUTO_AUDIT_ENABLED == 'true'
         id: archive
         shell: bash
         run: |
@@ -59,6 +65,7 @@ jobs:
           echo "archive_name=${ARCHIVE_NAME}" >> "$GITHUB_OUTPUT"
 
       - name: Submit audit job
+        if: env.AUTO_AUDIT_ENABLED == 'true'
         id: submit
         shell: bash
         run: |
@@ -81,6 +88,7 @@ jobs:
           echo "report_url=$REPORT_URL" >> "$GITHUB_OUTPUT"
 
       - name: Poll report until ready
+        if: env.AUTO_AUDIT_ENABLED == 'true'
         id: poll
         shell: bash
         run: |
@@ -108,6 +116,7 @@ jobs:
           exit 1
 
       - name: Fetch markdown report
+        if: env.AUTO_AUDIT_ENABLED == 'true'
         shell: bash
         run: |
           REPORT_PATH="${{ steps.submit.outputs.report_url }}"
@@ -123,6 +132,7 @@ jobs:
           fi
 
       - name: Normalize markdown for GitHub comment
+        if: env.AUTO_AUDIT_ENABLED == 'true'
         shell: bash
         run: |
           python3 <<'PY'
@@ -140,6 +150,7 @@ jobs:
           PY
 
       - name: Comment markdown report to PR
+        if: env.AUTO_AUDIT_ENABLED == 'true'
         uses: actions/github-script@v7
         with:
           script: |
