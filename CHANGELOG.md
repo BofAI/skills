@@ -12,8 +12,9 @@
 
 ### Breaking Changes
 
-- Removed `multisig-permissions`, `trc20-toolkit-skill`, and `trx-staking-skill`; their generic
-  TRON workflows are now handled by `wallet-cli`.
+- Removed `multisig-permissions`, `trc20-toolkit-skill`, `trx-staking-skill`, `twitter-digest`, and
+  `twitter-mcp`. Generic TRON workflows are now handled by `wallet-cli`; X/Twitter workflows no
+  longer belong to this DeFi-focused Skills collection.
 - Unified every retained Skill version with the repository release version.
 
 ### Features
