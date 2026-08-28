@@ -1,0 +1,19 @@
+name: Validate branch policy
+
+on:
+  pull_request:
+    branches:
+      - develop
+      - main
+    types: [opened, synchronize, reopened, edited]
+
+permissions:
+  contents: read
+
+jobs:
+  source-and-target:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Validate pull request route
+        run: sh scripts/check_branch_policy.sh "${{ github.base_ref }}" "${{ github.head_ref }}"

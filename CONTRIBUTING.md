@@ -1,55 +1,86 @@
-# Contributing to Skills Repository
+# Contributing to BofAI Skills
 
-Thank you for your interest in contributing to the Skills Repository!
+Thank you for contributing. Read [AGENTS.md](./AGENTS.md) for Skill authoring requirements and
+[BRANCHING.md](./BRANCHING.md) for the repository's branch and release model.
 
-## How to Contribute
+## Key branches
 
-### 1. Fork and Clone
+- `develop` is the default development and integration branch.
+- `main` contains stable, released Skills collections.
+- `release_*` branches are release snapshots created from `develop` and merged into `main` after
+  regression testing.
+- `feature/*` branches contain ordinary work created from `develop`.
+- `hotfix/*` branches contain urgent released-version fixes created from `main`.
+
+Do not push directly to `develop` or `main`.
+
+## Fork and clone
+
+Fork `BofAI/skills`, then configure the official repository as `upstream`:
 
 ```bash
-git fork https://github.com/open-aibank/skills-tron
-git clone https://github.com/your-username/skills-tron
-cd skills-tron
+git clone https://github.com/<your-account>/skills.git
+cd skills
+git remote add upstream https://github.com/BofAI/skills.git
 ```
 
-### 2. Create a New Skill
+## Synchronize and develop
 
-Follow the [AGENTS.md](AGENTS.md) guide to create your skill:
+Synchronize your fork's development branch:
 
 ```bash
-mkdir -p my-skill/{examples,resources,scripts}
+git fetch upstream
+git switch develop
+git merge upstream/develop --no-ff
+git push origin develop
 ```
 
-### 3. Test Your Skill
+Create an ordinary work branch from `develop`:
 
-- Ensure SKILL.md has valid YAML frontmatter
-- Test with an AI agent
-- Verify all examples work
-- Check JSON files are valid
+```bash
+git switch -c feature/<short_description> develop
+```
 
-### 4. Submit Pull Request
+Use the `feature/*` prefix for features, fixes, documentation, tests, refactors, build changes, and
+CI changes. Describe the change type in the commit and pull-request title.
 
-- Create a descriptive PR title
-- Explain what the skill does
-- Include testing instructions
-- Reference any related issues
+## Validate the change
 
-## Skill Quality Guidelines
+- Ensure every changed `SKILL.md` has valid YAML frontmatter.
+- Test the Skill with realistic agent requests.
+- Verify examples and scripts work as documented.
+- Validate JSON and other resource files.
+- Document exact external CLI versions when deterministic behavior matters.
+- Review security, secrets, confirmation, network, slippage, and fee behavior.
 
-- ✅ Clear, step-by-step instructions
-- ✅ Complete examples
-- ✅ Proper error handling
-- ✅ Security considerations documented
-- ✅ All dependencies listed
+Follow any repository validation commands documented in `AGENTS.md` or the affected Skill.
 
-## Code of Conduct
+## Submit a pull request
 
-Be respectful and constructive in all interactions.
+Push the branch to your fork and open a pull request targeting `develop`:
 
-## Questions?
+```bash
+git push origin feature/<short_description>
+```
 
-Open an issue or reach out to maintainers.
+The title must use Conventional Commits, for example:
 
----
+```text
+feat(wallet-cli): add resource delegation guidance
+fix(sunswap): validate the configured network
+docs: clarify stable installation
+```
 
-Thank you for contributing! 🎉
+Keep one pull request focused on one concern. Explain what changed, why it changed, and how it was
+verified. Address review feedback and keep the branch synchronized with `develop`.
+
+## Release and hotfix contributions
+
+Maintainers create `release_*` and `hotfix/*` branches. Release branches accept only release
+preparation and regression fixes. Hotfix branches accept only urgent corrections for code already
+published from `main`. Both must be merged back into `develop`.
+
+## Code of conduct
+
+Be respectful and constructive in all interactions. Open an issue when a substantial new workflow
+needs design discussion before implementation.
