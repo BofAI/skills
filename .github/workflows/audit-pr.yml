@@ -22,8 +22,11 @@ concurrency:
 jobs:
   audit-on-pr:
     name: Audit on pull request
+    # Disabled by default while the self-hosted audit runner is unavailable.
+    # Set the repository variable AUDIT_AUTO_ENABLED=true to restore automatic audits.
     if: >
       github.event_name == 'pull_request' &&
+      vars.AUDIT_AUTO_ENABLED == 'true' &&
       github.event.pull_request.head.repo.full_name == github.repository
     runs-on: [self-hosted, Linux, ARM64, audit-linux]
 
