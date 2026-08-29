@@ -1,13 +1,5 @@
 # Changelog
 
-## [Unreleased]
-
-### Improvements
-
-- Added the `develop`, `main`, `release_*`, `feature/*`, and `hotfix/*` branch workflow.
-- Added pull-request branch routing checks and a repository pull-request template.
-- Pinned stable installation documentation to the `main` branch.
-
 ## [2.0.0] - 2026-08-26
 
 ### Breaking Changes
@@ -22,6 +14,12 @@
 - Added the `wallet-cli` skill for machine-readable TRON wallet, transfer, staking, governance,
   contract, signing, permission, and chain-query operations.
 - Added a root version source, repository versioning policy, and CI consistency check.
+
+### Improvements
+
+- Added the `develop`, `main`, `release_*`, `feature/*`, and `hotfix/*` branch workflow.
+- Added pull-request branch routing checks and a repository pull-request template.
+- Pinned stable installation documentation to the `main` branch.
 
 ### Security
 
