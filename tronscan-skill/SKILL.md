@@ -1,6 +1,6 @@
 ---
 name: TronScan Data Lookup
-description: Query TRON blockchain data via the TronScan API — accounts, transactions, tokens, blocks, contracts, transfers, and chain statistics.
+description: Query TRON blockchain data and read-only security signals via the TronScan API — accounts, transactions, tokens, blocks, contracts, transfers, chain statistics, permissions, approvals, and phishing indicators.
 version: 1.0.0
 dependencies:
   - axios
@@ -17,13 +17,14 @@ tags:
   - contract
   - transfer
   - analytics
+  - security
 ---
 
 # TronScan Data Lookup Skill
 
 ## Overview
 
-This skill enables AI agents to query the TRON blockchain through the TronScan API. It provides eight Node.js scripts that cover all major data lookup operations: universal search, account details, transactions, token info, blocks, smart contracts, transfer history, and chain-level statistics.
+This skill enables AI agents to query the TRON blockchain through the TronScan API. It provides nine Node.js scripts that cover universal search, account details, transactions, token info, blocks, smart contracts, transfer history, chain-level statistics, and read-only security checks.
 
 All scripts output structured JSON to stdout and log progress to stderr, following the bankofai skill conventions.
 
@@ -187,8 +188,8 @@ Query TRX, TRC10, and TRC20 transfer history for addresses and contracts.
 
 ```bash
 node scripts/transfer.js --trx <address>                             # TRX transfers
-node scripts/transfer.js --trc20 <address> [--token <contract>]      # TRC20 transfers
-node scripts/transfer.js --trc10 <address> [--token <token_id>]      # TRC10 transfers
+node scripts/transfer.js --trc20 <address> --token <contract>        # TRC20 transfers
+node scripts/transfer.js --trc10 <address> --token <token_id>        # TRC10 transfers
 node scripts/transfer.js --trc20-contract <contract> [--addr <addr>] # By contract
 node scripts/transfer.js --internal <address>                        # Internal txns
 ```
@@ -196,6 +197,7 @@ node scripts/transfer.js --internal <address>                        # Internal 
 **Common options:**
 | Param | Description |
 |-------|-------------|
+| `--token` | Required contract address for `--trc20`, or token ID for `--trc10` |
 | `--direction` | `0`=all, `1`=incoming, `2`=outgoing |
 | `--start_timestamp` | Start time (ms) |
 | `--end_timestamp` | End time (ms) |
@@ -222,6 +224,53 @@ node scripts/overview.js --nodes                  # Network node map
 ```
 
 **When to use:** When a user asks about TRON network health, TPS, super representatives, governance, TRX supply, or market data.
+
+---
+
+### 9. Security Checks
+
+Query TronScan security signals without signing or broadcasting a transaction:
+
+```bash
+node scripts/security.js account <address>
+node scripts/security.js token <token-id-or-contract>
+node scripts/security.js url <public-url>
+node scripts/security.js transaction <hash> [hash ...]
+node scripts/security.js multisig <address>
+node scripts/security.js approvals <address>
+```
+
+| Mode | Checks |
+|------|--------|
+| `account` | Fraud history, spam memos, fraudulent token creation, stablecoin blacklist signal |
+| `token` | Token level, blacklist/supply capabilities, URL-like names, source visibility, proxy use |
+| `url` | TronScan phishing, scam, or malicious-link signal |
+| `transaction` | Risky tokens/addresses, zero-value transfers, same-tail impersonation, overall risk |
+| `multisig` | Owner/active permission structure and locally derived threshold observations |
+| `approvals` | Risky token approvals and unlimited risky allowances |
+
+Endpoint paths are defined in `resources/api_config.json`.
+
+The script validates Base58Check addresses and 64-character transaction hashes before querying.
+This is required because several TronScan security endpoints return default `false` values or omit
+invalid inputs instead of reporting an error. URL query parameters and fragments are removed before
+transmission so credentials or private query values are not sent to the API.
+
+Output is a JSON object with:
+
+- `query`: normalized mode and subject;
+- `assessment.status`: `no_known_flags`, `review_required`, or `unknown`;
+- `assessment.signals`: fields requiring review;
+- `assessment.unknownReasons`: missing or incomplete upstream security fields, when applicable;
+- `assessment.unresolved`: transaction hashes omitted by the upstream API, when applicable;
+- `data`: the complete TronScan response.
+
+Treat `no_known_flags` as a narrow statement about the current TronScan response, never as proof
+that an account, token, URL, transaction, permission structure, or approval is safe. Corroborate
+material decisions with contract source, transaction details, and another current source.
+
+**When to use:** Before interacting with an unfamiliar TRON address, token, DApp URL, transaction,
+multi-signature account, or existing token approval.
 
 ## Examples
 
@@ -265,6 +314,42 @@ node scripts/transfer.js --trc20 TDqSquXBgUCLYvYC4XZgrprLK589dkhSCf --token TR7N
 node scripts/overview.js
 ```
 
+### Check a token and an account before interacting
+
+```bash
+node scripts/security.js token TPYmHEhy5n8TCEfYGqW2rPxsghSfzghPDn
+node scripts/security.js account TT2T17KZhoDu47i2E4FWxfG79zdkEWkU9N
+```
+
+Representative account-check output:
+
+```json
+{
+  "query": {
+    "mode": "account",
+    "subject": "TT2T17KZhoDu47i2E4FWxfG79zdkEWkU9N"
+  },
+  "assessment": {
+    "status": "no_known_flags",
+    "signals": [],
+    "caveat": "TronScan signals are one data source, not proof that a target is safe."
+  },
+  "data": {
+    "send_ad_by_memo": false,
+    "has_fraud_transaction": false,
+    "fraud_token_creator": false,
+    "is_black_list": false
+  }
+}
+```
+
+### Review approvals and multi-signature permissions
+
+```bash
+node scripts/security.js approvals THSiB9MT2sCnAUgnYs9euMCY9aiZCD4HB5
+node scripts/security.js multisig THSiB9MT2sCnAUgnYs9euMCY9aiZCD4HB5
+```
+
 ## Error Handling
 
 All scripts handle errors consistently:
@@ -276,6 +361,8 @@ All scripts handle errors consistently:
 | `Request failed with status 404` | Endpoint not found or invalid params | Verify address/hash format |
 | `timeout of 15000ms exceeded` | API server slow or unreachable | Retry after a few seconds |
 | `ENOTFOUND` | No network connectivity | Check internet connection |
+| `Invalid TRON address` | Bad prefix, alphabet, length, or checksum | Re-copy the Base58Check address from a trusted source |
+| `assessment.status: unknown` | A transaction hash was omitted or expected security fields were missing upstream | Verify the target exists, then retry or use the corresponding lookup script |
 
 Scripts exit with code 1 on error and output `{ "error": "message" }` to stdout for machine parsing.
 
@@ -286,6 +373,10 @@ Scripts exit with code 1 on error and output `{ "error": "message" }` to stdout 
 - When no API key is set, requests go through the BofAI proxy (`ts.bankofai.io`) with no key header
 - Never embed private keys or wallet secrets in script invocations
 - All queries are **read-only GET requests** against the public TronScan API
+- Security checks send only public addresses, token IDs, transaction hashes, or a sanitized public URL
+- URL credentials are rejected; query parameters and fragments are stripped before transmission
+- Do not submit private/internal URLs or paths containing secrets; path components are not removed
+- A clear security response is not a guarantee of safety and must not override contradictory evidence
 - The API key should be rotated if ever exposed in logs or public repositories
 - Rate limit to **5 requests/second** maximum to avoid key revocation
 

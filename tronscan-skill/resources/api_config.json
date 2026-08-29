@@ -42,7 +42,13 @@
     "dailyAccounts": "/api/overview/dailyaccounts",
     "trxVolume": "/api/trx/volume",
     "funds": "/api/funds",
-    "nodemap": "/api/nodemap"
+    "nodemap": "/api/nodemap",
+    "securityAccount": "/api/security/account/data",
+    "securityToken": "/api/security/token/data",
+    "securityUrl": "/api/security/url/data",
+    "securityTransaction": "/api/security/transaction/data",
+    "securityMultisig": "/api/security/sign/data",
+    "securityApprovals": "/api/security/auth/data"
   },
   "defaults": {
     "limit": 20,

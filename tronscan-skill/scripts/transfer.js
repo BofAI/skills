@@ -4,8 +4,8 @@
  *
  * Usage:
  *   node scripts/transfer.js --trx <address>                             # TRX transfers
- *   node scripts/transfer.js --trc20 <address> [--token <contract>]      # TRC20 transfers
- *   node scripts/transfer.js --trc10 <address> [--token <token_id>]      # TRC10 transfers
+ *   node scripts/transfer.js --trc20 <address> --token <contract>        # TRC20 transfers
+ *   node scripts/transfer.js --trc10 <address> --token <token_id>        # TRC10 transfers
  *   node scripts/transfer.js --trc20-contract <contract> [--addr <addr>] # TRC20 transfers by contract
  *   node scripts/transfer.js --internal <address>                        # Internal transactions
  *
@@ -47,9 +47,9 @@ async function main() {
   if (args.trc20) {
     const address = typeof args.trc20 === 'string' ? args.trc20 : positional[0];
     if (!address) fatal('--trc20 requires an address');
+    if (!args.token || typeof args.token !== 'string') fatal('--trc20 requires --token <contract>');
     log(`Fetching TRC20 transfers for ${address}...`);
-    const params = { ...commonParams, address };
-    if (args.token) params.trc20Id = args.token;
+    const params = { ...commonParams, address, trc20Id: args.token };
     const data = await apiGet('transferTrc20', params);
     output(data);
     return;
@@ -58,9 +58,9 @@ async function main() {
   if (args.trc10) {
     const address = typeof args.trc10 === 'string' ? args.trc10 : positional[0];
     if (!address) fatal('--trc10 requires an address');
+    if (!args.token || typeof args.token !== 'string') fatal('--trc10 requires --token <token_id>');
     log(`Fetching TRC10 transfers for ${address}...`);
-    const params = { ...commonParams, address };
-    if (args.token) params.trc10Id = args.token;
+    const params = { ...commonParams, address, trc10Id: args.token };
     const data = await apiGet('transferTrc10', params);
     output(data);
     return;
