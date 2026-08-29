@@ -82,7 +82,9 @@ sun --json position list --owner TAddress
 
 ## Version
 
-2.0.0 (2026-08-26) - align with the unified BofAI Skills repository release
+Unreleased - pin the runtime dependency to `@sun-protocol/sun-cli@1.2.2`
+
+3.3.0 (2026-07-09) - migrate runtime dependency to `@sun-protocol/sun-cli` and document wallet-free dry-run previews
 
 3.0.0 (2026-03-15) - sun-cli based approach
 

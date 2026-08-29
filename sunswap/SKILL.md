@@ -1,7 +1,7 @@
 ---
 name: SunSwap DEX Trading
 description: Execute token swaps, manage liquidity, and query market data on SunSwap DEX via the sun-cli.
-version: 2.0.0
+version: 3.3.0
 dependencies:
   - "@sun-protocol/sun-cli@1.2.2"
 tags:
@@ -948,7 +948,7 @@ Set one of: `TRON_PRIVATE_KEY`, `TRON_MNEMONIC`, or `AGENT_WALLET_PASSWORD`.
 
 ---
 
-- **Skill release**: 2.0.0
+- **Skill version**: 3.3.0
 - **Runtime dependency**: `@sun-protocol/sun-cli@1.2.2`
 **Last Updated**: 2026-07-09
 **Maintainer**: Bank of AI Team

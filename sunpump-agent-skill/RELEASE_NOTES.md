@@ -1,8 +1,5 @@
 # Release Notes — SunPump Meme Token Toolkit
 
-> Historical per-skill release notes through repository release 1.x. Starting with 2.0.0, the root
-> `CHANGELOG.md` and `VERSION` are authoritative for every skill.
-
 ## v1.4.0 — 2026-07-09 _(docs only)_
 
 > **TL;DR** — Runtime package moved to `@sun-protocol/sun-cli`.

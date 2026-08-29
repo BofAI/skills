@@ -76,19 +76,13 @@ tags:
 |-------|----------|-------------|
 | `name` | ✅ | Human-readable skill name |
 | `description` | ✅ | Brief description (1-2 sentences) |
-| `version` | ✅ | Repository release version from the root `VERSION` file |
+| `version` | ✅ | Semantic version (e.g., 1.0.0) |
 | `dependencies` | ⚠️ | List of required tools/servers (e.g., mcp-server-tron) |
 | `tags` | ⚠️ | Searchable tags for skill discovery |
 
 ---
 
 ## 🗂 Skill Directory Structure
-
-### Versioning
-
-All skills are released together and must use the exact version in the root `VERSION` file. Skill
-versions do not track their external CLI or SDK dependencies. See [VERSIONING.md](./VERSIONING.md)
-and run `sh scripts/check_versions.sh` after changing a version.
 
 ### Required Files
 
@@ -125,7 +119,7 @@ cat > skills/my-skill/SKILL.md << 'EOF'
 ---
 name: My Skill
 description: What this skill does
-version: <value from root VERSION>
+version: 1.0.0
 tags:
   - category
 ---
@@ -246,7 +240,6 @@ tags:
 ### Manual Testing Checklist
 
 - [ ] SKILL.md has valid YAML frontmatter
-- [ ] SKILL.md version matches the root VERSION file
 - [ ] All dependencies are documented
 - [ ] Instructions are clear and step-by-step
 - [ ] Examples run without errors
@@ -361,8 +354,7 @@ Future skills to consider:
 A: Yes, list it in `dependencies` and reference it in instructions.
 
 ### Q: How do I version a skill?
-A: Use the repository release in the root `VERSION` file. All skills advance together; dependency
-versions remain independent.
+A: Use semantic versioning (MAJOR.MINOR.PATCH) in frontmatter.
 
 ### Q: Can I use external APIs in a skill?
 A: Yes, but document them clearly in prerequisites.
@@ -381,5 +373,5 @@ A: Use resource files (JSON) with network-specific configs.
 
 ---
 
-**Last Updated**: 2026-08-26
+**Last Updated**: 2026-02-09  
 **Maintainer**: Bank of AI Team

@@ -124,7 +124,9 @@ sun --json sunpump tx user T... --size 20
 
 ## Version
 
-2.0.0 (2026-08-26) — align with the unified BofAI Skills repository release and pin `@sun-protocol/sun-cli@1.2.2`
+Unreleased — pin the runtime dependency to `@sun-protocol/sun-cli@1.2.2`
+
+1.4.0 (2026-07-09) — migrate runtime dependency to `@sun-protocol/sun-cli`; require `>= 1.2.2` and document wallet-free `--dry-run` previews
 
 1.3.1 (2026-06-08) — docs: clarify `sun sunpump launch` is mainnet-only (sun-cli dropped SunPump nile support again); document that `--dry-run` does not skip the mainnet check
 

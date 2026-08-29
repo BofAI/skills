@@ -1,7 +1,6 @@
 ---
 name: agent-wallet
 description: 'Use when the user asks to create a wallet, check wallet addresses, sign transactions or messages, switch active wallets, or perform any blockchain signing operation using the agent-wallet CLI. Supports EVM and TRON networks.'
-version: 2.0.0
 compatibility: Requires Node.js 20+.
 metadata:
   author: BofAI

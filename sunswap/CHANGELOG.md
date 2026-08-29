@@ -1,8 +1,5 @@
 # Changelog
 
-> Historical per-skill changelog through repository release 1.x. Starting with 2.0.0, the root
-> `CHANGELOG.md` and `VERSION` are authoritative for every skill.
-
 All notable changes to the SunSwap skill will be documented in this file.
 
 ## [3.3.0] - 2026-07-09

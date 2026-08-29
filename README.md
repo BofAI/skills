@@ -42,9 +42,6 @@ A curated collection of practical, DeFi-focused utility skills developed by the 
 
 BANK OF AI Skills are reusable, task-oriented capabilities that teach AI agents how to perform specific blockchain workflows. Each skill encapsulates domain knowledge (like SunSwap pathfinding) and provides step-by-step instructions for the agent to follow.
 
-All skills share the repository release version in [`VERSION`](./VERSION). External CLI and SDK
-versions remain independent dependencies. See [`VERSIONING.md`](./VERSIONING.md) for the policy.
-
 ## Installation
 
 Use the stable `main` branch and follow the `npx` prompts to select the skills you want and the agentic platform you use. This installs the selected Skill definitions but does not install their external CLI dependencies.

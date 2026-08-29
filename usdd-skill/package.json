@@ -1,6 +1,6 @@
 {
   "name": "@bankofai/usdd-skill",
-  "version": "2.0.0",
+  "version": "1.0.0",
   "description": "USDD vault (CDP) positions and PSM swaps via JUST Protocol on TRON",
   "license": "MIT",
   "private": true,

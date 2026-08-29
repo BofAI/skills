@@ -1,7 +1,7 @@
 ---
 name: recharge-skill
 description: "BANK OF AI account query and recharge skill. Use for requests like 'recharge 1 usdt', '给 BANK OF AI 充值 1 USDT', or to query BANK OF AI balance/orders. Recharge uses the remote MCP endpoint https://recharge.bankofai.io/mcp with the single `recharge` tool."
-version: 2.0.0
+version: 1.1.1
 dependencies:
   - node >= 18.0.0
   - x402-recharge-server MCP (https://recharge.bankofai.io/mcp)
