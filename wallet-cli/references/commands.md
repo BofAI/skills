@@ -1,21 +1,21 @@
 # Command Routing
 
-Use this reference to select a wallet-cli command family. It summarizes version 4.12.0; the CLI's
+Use this reference to select a wallet-cli command family. It summarizes version 4.13.0; the CLI's
 generated schema remains authoritative for exact flags and combinations.
 
 ## Discover the live command contract
 
 ```bash
-wallet-cli --json-schema
-wallet-cli <group> --json-schema
-wallet-cli <group> <command> --json-schema
+wallet-cli --json-schema -o json
+wallet-cli <group> --json-schema -o json
+wallet-cli <group> <command> --json-schema -o json
 ```
 
 Root and group schemas return command catalogs. A leaf schema describes its accepted inputs. Use
 `--help` only when the schema does not communicate enough human meaning.
 
 Every operational example below must also include `-o json`. Chain operations must include an
-explicit `--network tron:mainnet|tron:nile|tron:shasta`.
+explicit canonical `--network tron:728126428|tron:3448148188|tron:2494104990`.
 
 ## Local wallet and account lifecycle
 
@@ -53,7 +53,7 @@ Use `tx send` for TRX, TRC20, or TRC10 transfers. It accepts exactly one amount 
 at most one token selector:
 
 ```bash
-wallet-cli tx send --to T... --amount 1 --network tron:nile --dry-run -o json
+wallet-cli tx send --to T... --amount 1 --network tron:3448148188 --dry-run -o json
 ```
 
 - No selector means TRX.

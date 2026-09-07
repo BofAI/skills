@@ -1,9 +1,9 @@
 ---
 name: wallet-cli
-description: Operate the TypeScript TRON wallet CLI for accounts, transfers, staking, governance, contracts, signing, chain queries, and password input with wallet-cli 4.12.0. Refuse wallet passwords in argv and require the supported stdin channel. For Java REPL requests, refuse that entry and offer the TypeScript one-shot CLI; route other chains and SunSwap/DEX workflows elsewhere.
-version: 1.0.0
+description: Operate the TypeScript TRON wallet CLI for accounts, transfers, staking, governance, contracts, signing, chain queries, and password input with wallet-cli 4.13.0. Refuse wallet passwords in argv and require the supported stdin channel. For Java REPL requests, refuse that entry and offer the TypeScript one-shot CLI; route other chains and SunSwap/DEX workflows elsewhere.
+version: 2.0.0
 dependencies:
-  - "@tron-walletcli/wallet-cli@4.12.0"
+  - "@tron-walletcli/wallet-cli@4.13.0"
 tags:
   - tron
   - wallet
@@ -31,14 +31,16 @@ interface.
 Check once before the first wallet operation:
 
 ```bash
-wallet-cli --version
+npm list --global --depth=0 --json @tron-walletcli/wallet-cli
 ```
 
-The required version is exactly `4.12.0`.
+Read `dependencies["@tron-walletcli/wallet-cli"].version` from the JSON. The required version is
+exactly `4.13.0`. Do not invoke `wallet-cli --version` only to check the version: in 4.13.0 every
+CLI invocation passes through the wallet migration gate first and may change persisted wallet data.
 
 - If the command is missing, explain that the exact package
-  `@tron-walletcli/wallet-cli@4.12.0` must be installed and obtain user approval before running
-  `npm install -g @tron-walletcli/wallet-cli@4.12.0`.
+  `@tron-walletcli/wallet-cli@4.13.0` must be installed and obtain user approval before running
+  `npm install -g @tron-walletcli/wallet-cli@4.13.0`.
 - If another version is installed, report the mismatch and obtain approval before upgrading or
   downgrading it. Do not assume compatibility.
 - Never install or change a global package without approval.
@@ -47,9 +49,11 @@ The required version is exactly `4.12.0`.
 
 1. Use `-o json` for every operational command. Parse stdout as exactly one
    `wallet-cli.result.v1` object.
-2. Supply an explicit canonical network for chain operations: `tron:mainnet`, `tron:nile`, or
-   `tron:shasta`. Never silently choose mainnet. Use `tron:nile` when the user explicitly asks for
-   a test but does not distinguish between testnets.
+2. Supply an explicit canonical network for chain operations: mainnet `tron:728126428`, Nile
+   `tron:3448148188`, or Shasta `tron:2494104990`. Never silently choose mainnet. Use
+   `tron:3448148188` when the user explicitly asks for a test but does not distinguish between
+   testnets. The old `tron:mainnet`, `tron:nile`, and `tron:shasta` values are permanent input
+   aliases, but never expect an alias in `chain.network`, network listings, or configuration keys.
 3. Branch on the process exit code first: `0` success, `1` execution failure, `2` malformed call.
    Then branch on stable fields such as `error.code`, `data.stage`, or `data.state`. Never parse
    `error.message` text.
@@ -64,18 +68,37 @@ The required version is exactly `4.12.0`.
 Read [references/machine-interface.md](references/machine-interface.md) before implementing result
 parsing, polling, pagination, retry logic, or non-interactive secret input.
 
+## Handle the startup migration gate
+
+Every invocation, including `--help`, `--version`, and `--json-schema`, checks persisted wallet data
+before running the requested command. If the result envelope has `command: "migration"`, the
+requested command did not run. Inspect `data.originalCommandExecuted`, which must be `false` for a
+migration result.
+
+- If `data.upgraded` is `true`, report that local wallet data was upgraded, then reapply the
+  authorization and confirmation rules before running the original command once. A mainnet or
+  high-risk confirmation given before migration must be obtained again. Do not interpret migration
+  data as command data.
+- If `data.cancelled` is `true`, stop and return control to the user. Do not retry or bypass the
+  cancellation.
+- If exit `2` returns `error.code: "migration_required"`, stop. The user must complete the upgrade
+  interactively or provide the master password through an already approved `--password-stdin`
+  source. Never ask for the password in chat.
+- Never loop on a migration result. After one successful upgrade, a repeated migration response is
+  an error to report rather than a reason to keep retrying.
+
 ## Discover commands instead of guessing
 
 Prefer the CLI's generated schema over recalled flags:
 
 ```bash
-wallet-cli --json-schema
-wallet-cli tx send --json-schema
-wallet-cli permission update --json-schema
+wallet-cli --json-schema -o json
+wallet-cli tx send --json-schema -o json
+wallet-cli permission update --json-schema -o json
 ```
 
 Use `wallet-cli <command> --help` only when human-oriented semantics are needed. Do not invent a
-flag, option combination, output field, or command that is absent from the 4.12.0 schema.
+flag, option combination, output field, or command that is absent from the 4.13.0 schema.
 
 Read [references/commands.md](references/commands.md) when choosing a command family or composing a
 multi-step wallet workflow.
@@ -143,7 +166,9 @@ Include the `txId` or GasFree `traceId`; describe `submitted` as pending, never 
 
 ## Maintain the version pin
 
-When updating the CLI dependency, compare the new package's bundled `skills/wallet-cli/SKILL.md`,
-`docs/machine-interface.md`, `docs/commands/index.md`, and generated `--json-schema` output. Re-test
-the confirmation matrix, secret channels, exit codes, transaction stages, and warning codes before
-bumping this skill's version. Do not widen the exact dependency pin without user approval.
+When updating the CLI dependency, compare the published package's `README.md`,
+`docs/machine-interface.md`, `docs/commands/index.md`, and generated `--json-schema` output. If the
+package includes `skills/wallet-cli/SKILL.md`, compare that too; its absence does not waive the other
+checks. Re-test the confirmation matrix, migration gate, secret channels, network ids, exit codes,
+transaction stages, and warning codes before bumping this skill's version. Do not widen the exact
+dependency pin without user approval.

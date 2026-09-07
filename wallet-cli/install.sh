@@ -3,7 +3,7 @@ set -eu
 
 SKILL_NAME="wallet-cli"
 CLI_PACKAGE="@tron-walletcli/wallet-cli"
-CLI_VERSION="4.12.0"
+CLI_VERSION="4.13.0"
 
 TAG="${WALLET_CLI_SKILL_TAG:-main}"
 REPO="${WALLET_CLI_SKILL_REPO:-https://github.com/BofAI/skills.git}"
@@ -148,10 +148,21 @@ check_node_and_npm() {
 }
 
 installed_cli_version() {
-  if ! command_exists wallet-cli; then
+  if ! command_exists wallet-cli || ! command_exists npm || ! command_exists node; then
     return 1
   fi
-  wallet-cli --version 2>/dev/null
+  npm list --global --depth=0 --json "$CLI_PACKAGE" 2>/dev/null |
+    node -e '
+      let input = "";
+      process.stdin.setEncoding("utf8");
+      process.stdin.on("data", chunk => input += chunk);
+      process.stdin.on("end", () => {
+        const data = JSON.parse(input);
+        const version = data.dependencies?.[process.argv[1]]?.version;
+        if (!version) process.exit(1);
+        process.stdout.write(version);
+      });
+    ' "$CLI_PACKAGE" 2>/dev/null
 }
 
 prepare_cli_install() {

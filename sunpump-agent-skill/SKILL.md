@@ -1,9 +1,9 @@
 ---
 name: SunPump Meme Token Toolkit
 description: Create meme tokens on SunPump (`sun sunpump launch`), trade them — both pre-launch (bonding curve via `sun sunpump buy/sell`) and post-launch (SunSwap via `sun swap`) — and query token info, rankings, holders, portfolios, and trade history.
-version: 1.4.0
+version: 2.0.0
 dependencies:
-  - "@sun-protocol/sun-cli"
+  - "@sun-protocol/sun-cli@1.2.2"
 tags:
   - defi
   - meme
@@ -42,7 +42,7 @@ Always call `sun sunpump state <addr>` or `sun sunpump token get <addr>` first t
 > If no wallets exist, invoke `bankofai-guide` (Section C — Wallet Guard) before proceeding.
 > All read-only SunPump queries (portfolio, tx history, token info, ranking, holders) work without a wallet.
 > Token creation (`sun sunpump launch`) is server-side and also needs **no wallet**.
-> `--dry-run` previews do not need wallet credentials on `@sun-protocol/sun-cli >= 1.2.2`.
+> `--dry-run` previews do not need wallet credentials on `@sun-protocol/sun-cli@1.2.2`.
 
 1. **Install this skill** (once, picked up by Claude Code / Cursor / Codex):
    ```bash
@@ -50,9 +50,15 @@ Always call `sun sunpump state <addr>` or `sun sunpump token get <addr>` first t
    ```
 
 
-2. **Install sun-cli** (≥ 1.2.2 required — includes `sunpump launch`, bonding-curve trading, and wallet-free `--dry-run` previews):
+2. **Verify sun-cli**:
    ```bash
-   npm install -g @sun-protocol/sun-cli@^1.2.2
+   sun --version
+   ```
+   The required version is exactly `1.2.2`; it includes `sunpump launch`, bonding-curve trading,
+   and wallet-free `--dry-run` previews. If it is missing or another version is installed, obtain
+   approval before changing the global package:
+   ```bash
+   npm install -g @sun-protocol/sun-cli@1.2.2
    ```
 
 3. **Configure wallet** (required for write commands — `sun swap`, `sun sunpump buy`, `sun sunpump sell`):
@@ -818,7 +824,7 @@ Token created.
 
 ### "sun: command not found"
 ```bash
-npm install -g @sun-protocol/sun-cli@^1.2.2
+npm install -g @sun-protocol/sun-cli@1.2.2
 ```
 
 ### Empty results from a SunPump query
@@ -857,6 +863,7 @@ Set one of `TRON_PRIVATE_KEY`, `TRON_MNEMONIC`, or `AGENT_WALLET_PASSWORD`. Read
 
 ---
 
-**Version**: 1.4.0 (sun-protocol sun-cli scope)
+- **Skill version**: 2.0.0
+- **Runtime dependency**: `@sun-protocol/sun-cli@1.2.2`
 **Last Updated**: 2026-07-09
 **Maintainer**: Bank of AI Team

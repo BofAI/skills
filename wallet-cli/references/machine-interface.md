@@ -2,7 +2,7 @@
 
 Use this reference when parsing results, handling errors, polling transactions, paginating, or
 providing secrets non-interactively. It summarizes the stable `wallet-cli.result.v1` contract in
-wallet-cli 4.12.0.
+wallet-cli 4.13.0.
 
 ## Calling convention
 
@@ -11,6 +11,37 @@ wallet-cli <command> -o json [--network <id>] [--timeout <ms>] [--account <id|la
 ```
 
 JSON mode writes exactly one terminal result object to stdout. Diagnostics go to stderr.
+
+## Network ids
+
+Use canonical CAIP-2 ids for TRON chain operations:
+
+| Network | Canonical id | Permanent input alias |
+|---|---|---|
+| Mainnet | `tron:728126428` | `tron:mainnet` |
+| Nile | `tron:3448148188` | `tron:nile` |
+| Shasta | `tron:2494104990` | `tron:shasta` |
+
+Aliases are accepted only when selecting a network. `chain.network`, `networks` results, and
+configuration keys report canonical ids, so never compare those fields with an alias.
+
+## Startup wallet-data upgrades
+
+Every invocation checks the persisted wallet schema before executing the requested command. When an
+upgrade runs, stdout still contains one valid result envelope, but its canonical command is
+`migration` and `data.originalCommandExecuted` is `false`. The triggering command was not run.
+
+- A successful upgrade reports `data.upgraded: true`. Inspect and report it, then reapply the
+  authorization and confirmation rules before invoking the original command once. Obtain a new
+  mainnet or high-risk confirmation if migration occurred after the earlier confirmation.
+- An interactive cancellation reports exit `0`, `data.upgraded: false`, and
+  `data.cancelled: true`. Stop without retrying.
+- A password-bearing migration without an approved password channel returns exit `2` with
+  `error.code: "migration_required"`. Return control to the user or use an already approved
+  `--password-stdin` source.
+- Do not interpret the migration envelope using the triggering command's leaf schema.
+- Pass `-o json` even with `--help`, `--version`, or `--json-schema` when invoking them for machine
+  use, so a migration result remains a parseable envelope.
 
 ## Exit codes
 
@@ -34,7 +65,7 @@ Success:
   "command": "account.balance",
   "data": {},
   "meta": { "durationMs": 42, "warnings": [] },
-  "chain": { "family": "tron", "network": "tron:nile", "chainId": "nile" }
+  "chain": { "family": "tron", "network": "tron:3448148188", "chainId": "3448148188" }
 }
 ```
 
@@ -47,7 +78,7 @@ Failure:
   "command": "tx.info",
   "error": { "code": "rpc_error", "message": "human-readable only" },
   "meta": { "durationMs": 42, "warnings": [] },
-  "chain": { "family": "tron", "network": "tron:nile", "chainId": "nile" }
+  "chain": { "family": "tron", "network": "tron:3448148188", "chainId": "3448148188" }
 }
 ```
 
@@ -59,7 +90,7 @@ Failure:
 - `bigint` values and on-chain amounts are decimal strings. Keep those fields as strings or
   arbitrary-precision integers; never use floating point for them.
 - Other counters and configuration values follow the command-specific documentation and schema and
-  may be JSON numbers. For example, `chain params.data.value` is a number in wallet-cli 4.12.0; do
+  may be JSON numbers. For example, `chain params.data.value` is a number in wallet-cli 4.13.0; do
   not coerce a field based only on it coming from the chain.
 
 ## Warnings
@@ -148,5 +179,5 @@ Secrets are never valid in argv or environment variables.
 
 ## Version boundary
 
-This contract is pinned to wallet-cli `4.12.0`. If the installed version differs, stop and obtain
+This contract is pinned to wallet-cli `4.13.0`. If the installed version differs, stop and obtain
 approval before changing it. Do not silently apply this reference to another version.

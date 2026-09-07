@@ -6,12 +6,13 @@ Read this reference before any local wallet mutation, signature, broadcast, or o
 
 | Network | Meaning | Policy |
 |---|---|---|
-| `tron:mainnet` | Production; real funds and persistent public state | Preview and explicit confirmation before funds-moving or externally visible writes |
-| `tron:nile` | Primary testnet | Clearly authorized ordinary writes may proceed without a second confirmation |
-| `tron:shasta` | Alternate testnet | Clearly authorized ordinary writes may proceed without a second confirmation |
+| `tron:728126428` | Production; real funds and persistent public state | Preview and explicit confirmation before funds-moving or externally visible writes |
+| `tron:3448148188` | Primary testnet (Nile) | Clearly authorized ordinary writes may proceed without a second confirmation |
+| `tron:2494104990` | Alternate testnet (Shasta) | Clearly authorized ordinary writes may proceed without a second confirmation |
 
 Always pass the canonical network explicitly for chain operations. Never infer mainnet from an
-address because TRON addresses are identical across networks.
+address because TRON addresses are identical across networks. The legacy `tron:mainnet`,
+`tron:nile`, and `tron:shasta` values are input aliases, not canonical output values.
 
 ## Confirmation matrix
 
@@ -68,6 +69,20 @@ file output and tell the user where it was written without reading the file.
 For `message sign`, `typed-data sign`, transaction signing, and contract writes, show the exact
 human-meaningful payload, domain, network, account, permission id, and destination before signing.
 Treat opaque or untrusted payloads as high risk. Never sign a challenge whose purpose is unclear.
+
+### Token approvals
+
+For a TRC20 `approve(address,uint256)` contract write, verify the token contract and spender,
+inspect the current allowance, and approve only the amount required for the intended operation.
+Reject unlimited approvals. Treat an approval as permission for the spender to move the owner's
+tokens, not as a harmless preparatory transaction.
+
+### Staking and voting
+
+Before unfreezing TRX, surface the current unbonding delay and explain that the user must withdraw
+the expired unfreeze separately. Warn that reducing TRON Power can invalidate votes that depend on
+it. Before `vote cast`, show the complete resulting vote slate because a vote transaction replaces
+the account's previous votes rather than incrementally adding one choice.
 
 ### One-shot account operations
 
