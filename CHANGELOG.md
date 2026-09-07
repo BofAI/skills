@@ -20,6 +20,8 @@
 - Added the `develop`, `main`, `release_*`, `feature/*`, and `hotfix/*` branch workflow.
 - Added pull-request branch routing checks and a repository pull-request template.
 - Pinned stable installation documentation to the `main` branch.
+- Pinned wallet-cli to `4.13.0` and aligned its Skill with startup migrations and canonical CAIP-2
+  TRON network ids.
 
 ### Security
 
