@@ -1,6 +1,8 @@
 ---
 name: x402-payment
 description: Pay x402-protected HTTP APIs with the x402-cli command on TRON or BSC using USDT, USDD, or USDC. Use when an agent receives an HTTP 402 challenge, needs to inspect payment requirements safely, pay a protected URL, select exact or TRON exact_gasfree, or limit the amount/network/token before payment.
+dependencies:
+  - "@bankofai/x402-cli@1.0.1"
 ---
 
 # x402 Payment
@@ -10,7 +12,7 @@ Use `x402-cli`; do not run local TypeScript payment scripts.
 ## Prerequisites
 
 1. Run `command -v x402-cli && x402-cli --version`.
-2. Require x402 CLI 1.0.1 or newer (built with x402 SDK 1.0.1 and Gateway 1.0.1). If it is missing, ask the user to install it with `npm install -g @bankofai/x402-cli@1.0.1`.
+2. Require exactly x402 CLI 1.0.1 (built with x402 SDK 1.0.1 and Gateway 1.0.1). If it is missing or another version is installed, ask the user before installing `npm install -g @bankofai/x402-cli@1.0.1`.
 3. Run `agent-wallet list` and confirm a compatible payer wallet exists.
 4. Never print, echo, or interpolate a private key or mnemonic into a command. Let the CLI resolve Agent Wallet credentials, or rely on private-key environment variables already configured outside the conversation.
 

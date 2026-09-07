@@ -21,10 +21,10 @@ This skill uses **sun-cli** (`@sun-protocol/sun-cli`) — a unified CLI for SUN.
 ## Prerequisites
 
 ```bash
-npm install -g @sun-protocol/sun-cli@^1.2.2
+npm install -g @sun-protocol/sun-cli@1.2.2
 ```
 
-`@sun-protocol/sun-cli >= 1.2.2` is required for wallet-free `--dry-run` previews.
+Exactly `@sun-protocol/sun-cli@1.2.2` is required for wallet-free `--dry-run` previews.
 
 ## Networks
 
@@ -78,9 +78,11 @@ sun --json position list --owner TAddress
 
 ## Dependencies
 
-- `@sun-protocol/sun-cli >= 1.2.2` (installed globally)
+- `@sun-protocol/sun-cli@1.2.2` (installed globally)
 
 ## Version
+
+Unreleased - pin the runtime dependency to `@sun-protocol/sun-cli@1.2.2`
 
 3.3.0 (2026-07-09) - migrate runtime dependency to `@sun-protocol/sun-cli` and document wallet-free dry-run previews
 

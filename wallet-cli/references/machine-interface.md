@@ -2,7 +2,7 @@
 
 Use this reference when parsing results, handling errors, polling transactions, paginating, or
 providing secrets non-interactively. It summarizes the stable `wallet-cli.result.v1` contract in
-wallet-cli 4.12.0.
+wallet-cli 4.13.0.
 
 ## Calling convention
 
@@ -59,7 +59,7 @@ Failure:
 - `bigint` values and on-chain amounts are decimal strings. Keep those fields as strings or
   arbitrary-precision integers; never use floating point for them.
 - Other counters and configuration values follow the command-specific documentation and schema and
-  may be JSON numbers. For example, `chain params.data.value` is a number in wallet-cli 4.12.0; do
+  may be JSON numbers. For example, `chain params.data.value` is a number in wallet-cli 4.13.0; do
   not coerce a field based only on it coming from the chain.
 
 ## Warnings
@@ -148,5 +148,5 @@ Secrets are never valid in argv or environment variables.
 
 ## Version boundary
 
-This contract is pinned to wallet-cli `4.12.0`. If the installed version differs, stop and obtain
+This contract is pinned to wallet-cli `4.13.0`. If the installed version differs, stop and obtain
 approval before changing it. Do not silently apply this reference to another version.
