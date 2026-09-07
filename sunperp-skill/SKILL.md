@@ -1,7 +1,7 @@
 ---
 name: SunPerp Perpetual Futures Trading
 description: Trade USDT-margined perpetual futures on SunPerp (TRON) — place orders, manage positions, query market data, and manage account via REST API.
-version: 1.0.0
+version: 2.0.0
 dependencies:
   - node >= 18.0.0
 tags:
@@ -694,4 +694,4 @@ Proceed? (yes/no)
 
 ---
 
-*Version 1.0.0 — Created by [M2M Agent Registry](https://m2mregistry.io) for Bank of AI*
+*Version 2.0.0 — Created by [M2M Agent Registry](https://m2mregistry.io) for Bank of AI*

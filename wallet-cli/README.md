@@ -6,7 +6,7 @@ chain queries and is pinned to `@tron-walletcli/wallet-cli@4.13.0`.
 
 ## Installation
 
-Choose either method below. Both install Skill version `1.0.0` and use
+Choose either method below. Both install Skill version `2.0.0` and use
 `@tron-walletcli/wallet-cli@4.13.0`.
 
 ### Method 1: Install the CLI, then the Skill
