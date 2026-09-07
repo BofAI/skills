@@ -1,7 +1,7 @@
 ---
 name: TronScan Data Lookup
 description: Query TRON blockchain data via the TronScan API — accounts, transactions, tokens, blocks, contracts, transfers, and chain statistics.
-version: 1.0.0
+version: 2.0.0
 dependencies:
   - axios
 tags:
@@ -308,4 +308,4 @@ Agents can use these addresses directly instead of searching for them.
 
 ---
 
-*Version 1.0.0 — Created by [M2M Agent Registry](https://m2mregistry.io) for Bank of AI*
+*Version 2.0.0 — Created by [M2M Agent Registry](https://m2mregistry.io) for Bank of AI*

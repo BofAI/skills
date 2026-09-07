@@ -124,7 +124,7 @@ sun --json sunpump tx user T... --size 20
 
 ## Version
 
-Unreleased — pin the runtime dependency to `@sun-protocol/sun-cli@1.2.2`
+2.0.0 (2026-09-07) — align with the unified BofAI Skills repository release and pin `@sun-protocol/sun-cli@1.2.2`
 
 1.4.0 (2026-07-09) — migrate runtime dependency to `@sun-protocol/sun-cli`; require `>= 1.2.2` and document wallet-free `--dry-run` previews
 

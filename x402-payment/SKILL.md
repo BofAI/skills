@@ -1,6 +1,7 @@
 ---
 name: x402-payment
 description: Pay x402-protected HTTP APIs with the x402-cli command on TRON or BSC using USDT, USDD, or USDC. Use when an agent receives an HTTP 402 challenge, needs to inspect payment requirements safely, pay a protected URL, select exact or TRON exact_gasfree, or limit the amount/network/token before payment.
+version: 2.0.0
 dependencies:
   - "@bankofai/x402-cli@1.0.1"
 ---

@@ -6,7 +6,7 @@ chain queries and is pinned to `@tron-walletcli/wallet-cli@4.13.0`.
 
 ## Installation
 
-Choose either method below. Both install Skill version `1.0.0` and use
+Choose either method below. Both install Skill version `2.0.0` and use
 `@tron-walletcli/wallet-cli@4.13.0`.
 
 ### Method 1: Install the CLI, then the Skill
@@ -41,11 +41,16 @@ curl -fsSL https://raw.githubusercontent.com/BofAI/skills/main/wallet-cli/instal
 curl -fsSL https://raw.githubusercontent.com/BofAI/skills/main/wallet-cli/install.sh | sh -s -- --dry-run
 ```
 
-After either method, verify the CLI version:
+After either method, verify the installed package version without invoking the CLI's startup wallet
+migration gate:
 
 ```bash
-wallet-cli --version
+npm list --global --depth=0 --json @tron-walletcli/wallet-cli
 ```
+
+The first actual `wallet-cli` invocation may upgrade persisted wallet data and return a
+`command: "migration"` result without running the requested command. Inspect that result before
+running the original command once more.
 
 ## Contents
 

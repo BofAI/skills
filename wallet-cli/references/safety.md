@@ -6,12 +6,13 @@ Read this reference before any local wallet mutation, signature, broadcast, or o
 
 | Network | Meaning | Policy |
 |---|---|---|
-| `tron:mainnet` | Production; real funds and persistent public state | Preview and explicit confirmation before funds-moving or externally visible writes |
-| `tron:nile` | Primary testnet | Clearly authorized ordinary writes may proceed without a second confirmation |
-| `tron:shasta` | Alternate testnet | Clearly authorized ordinary writes may proceed without a second confirmation |
+| `tron:728126428` | Production; real funds and persistent public state | Preview and explicit confirmation before funds-moving or externally visible writes |
+| `tron:3448148188` | Primary testnet (Nile) | Clearly authorized ordinary writes may proceed without a second confirmation |
+| `tron:2494104990` | Alternate testnet (Shasta) | Clearly authorized ordinary writes may proceed without a second confirmation |
 
 Always pass the canonical network explicitly for chain operations. Never infer mainnet from an
-address because TRON addresses are identical across networks.
+address because TRON addresses are identical across networks. The legacy `tron:mainnet`,
+`tron:nile`, and `tron:shasta` values are input aliases, not canonical output values.
 
 ## Confirmation matrix
 

@@ -1,23 +1,27 @@
 # Changelog
 
-## [Unreleased]
+## [2.0.0] - 2026-09-07
 
 ### Breaking Changes
 
 - Removed `multisig-permissions`, `trc20-toolkit-skill`, `trx-staking-skill`, `twitter-digest`, and
   `twitter-mcp`. Generic TRON workflows are now handled by `wallet-cli`; X/Twitter workflows no
   longer belong to this DeFi-focused Skills collection.
+- Unified every retained Skill version with the repository release version.
 
 ### Features
 
 - Added the `wallet-cli` skill for machine-readable TRON wallet, transfer, staking, governance,
   contract, signing, permission, and chain-query operations.
+- Added a root version source, repository versioning policy, and CI consistency check.
 
 ### Improvements
 
 - Added the `develop`, `main`, `release_*`, `feature/*`, and `hotfix/*` branch workflow.
 - Added pull-request branch routing checks and a repository pull-request template.
 - Pinned stable installation documentation to the `main` branch.
+- Pinned wallet-cli to `4.13.0` and aligned its Skill with startup migrations and canonical CAIP-2
+  TRON network ids.
 
 ### Security
 
