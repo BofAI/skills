@@ -3,7 +3,7 @@ set -eu
 
 SKILL_NAME="wallet-cli"
 CLI_PACKAGE="@tron-walletcli/wallet-cli"
-CLI_VERSION="4.12.0"
+CLI_VERSION="4.13.0"
 
 TAG="${WALLET_CLI_SKILL_TAG:-main}"
 REPO="${WALLET_CLI_SKILL_REPO:-https://github.com/BofAI/skills.git}"

@@ -68,7 +68,7 @@ Some skills require wallet signature operations and are built on Agent Wallet. B
 
 ### Wallet & TRON
 
-- [**wallet-cli**](./wallet-cli) - Safe, machine-readable TRON wallet operations through `@tron-walletcli/wallet-cli@4.12.0`, including accounts, transfers, staking, governance, contracts, signing, and chain queries. See [README](./wallet-cli/README.md).
+- [**wallet-cli**](./wallet-cli) - Safe, machine-readable TRON wallet operations through `@tron-walletcli/wallet-cli@4.13.0`, including accounts, transfers, staking, governance, contracts, signing, and chain queries. See [README](./wallet-cli/README.md).
 
 ### DeFi & DEX
 

@@ -2,19 +2,19 @@
 
 Agent instructions for operating the TypeScript `wallet-cli` safely through its machine-readable
 interface. The Skill covers TRON accounts, transfers, staking, governance, contracts, signing, and
-chain queries and is pinned to `@tron-walletcli/wallet-cli@4.12.0`.
+chain queries and is pinned to `@tron-walletcli/wallet-cli@4.13.0`.
 
 ## Installation
 
 Choose either method below. Both install Skill version `1.0.0` and use
-`@tron-walletcli/wallet-cli@4.12.0`.
+`@tron-walletcli/wallet-cli@4.13.0`.
 
 ### Method 1: Install the CLI, then the Skill
 
 Install the pinned npm CLI first, then install the Skill through the standard Skills CLI:
 
 ```bash
-npm install --global --no-fund --no-audit @tron-walletcli/wallet-cli@4.12.0
+npm install --global --no-fund --no-audit @tron-walletcli/wallet-cli@4.13.0
 npx skills add BofAI/skills --skill wallet-cli --global --yes
 ```
 

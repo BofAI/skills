@@ -1,6 +1,6 @@
 # Command Routing
 
-Use this reference to select a wallet-cli command family. It summarizes version 4.12.0; the CLI's
+Use this reference to select a wallet-cli command family. It summarizes version 4.13.0; the CLI's
 generated schema remains authoritative for exact flags and combinations.
 
 ## Discover the live command contract
