@@ -9,7 +9,7 @@
   </a>
 </p>
 
-A curated collection of practical, DeFi-focused utility skills developed by the **BANK OF AI team**. These skills enable AI agents to perform complex on-chain operations, payments, and identity management across various platforms.
+A curated collection of practical, DeFi-focused utility skills developed by the **BANK OF AI team**. These skills enable AI agents to manage wallets, use DeFi protocols, and query blockchain data on TRON and supported EVM networks.
 
 > **Project Positioning:** We focus on delivering high-value DeFi utility skills that are platform-agnostic. These skills provide the domain knowledge needed to interact with the TRON blockchain and beyond.
 
@@ -23,8 +23,6 @@ A curated collection of practical, DeFi-focused utility skills developed by the 
 - [Available Skills](#available-skills)
   - [Wallet & TRON](#wallet--tron)
   - [DeFi & DEX](#defi--dex)
-  - [Payments & x402](#payments--x402)
-  - [AI & Account Recharge](#ai--account-recharge)
   - [Security & Permissions](#security--permissions)
   - [Data & Analytics](#data--analytics)
   - [Guides & Onboarding](#guides--onboarding)
@@ -78,14 +76,6 @@ Some skills require wallet signature operations and are built on Agent Wallet. B
 - [**sunswap**](./sunswap) - SunSwap DEX integration for TRON via `sun-cli`. Supports price quotes, token swaps, liquidity and pool operations. See [README](./sunswap/README.md).
 - [**sunperp-skill**](./sunperp-skill) - SunPerp perpetual futures trading skill for TRON. Supports market data, account queries, order placement, and position management. See [README](./sunperp-skill/README.md).
 
-### Payments & x402
-
-- [**x402-payment**](./x402-payment) - x402 payment skill for calling paid APIs and agent resources on TRON and BSC (EVM). Aligned with the modular BankofAI x402 SDK 1.0 packages. See [README](./x402-payment/README.md).
-
-### AI & Account Recharge
-
-- [**recharge-skill**](./recharge-skill) - BANK OF AI account recharge and account query skill. Uses the remote MCP recharge service for supported payment flows. See [README](./recharge-skill/README.md).
-
 ### Security & Permissions
 
 - [**agent-wallet**](./agent-wallet) - Wallet management and signing skill for creating wallets, switching active wallets, resolving addresses, and signing transactions or messages on EVM and TRON. See [README](./agent-wallet/README.md).
@@ -105,13 +95,11 @@ Each current skill now has its own README for quick discovery:
 
 - [agent-wallet/README.md](./agent-wallet/README.md)
 - [bankofai-guide/README.md](./bankofai-guide/README.md)
-- [recharge-skill/README.md](./recharge-skill/README.md)
 - [sunperp-skill/README.md](./sunperp-skill/README.md)
 - [sunswap/README.md](./sunswap/README.md)
 - [tronscan-skill/README.md](./tronscan-skill/README.md)
 - [usdd-skill/README.md](./usdd-skill/README.md)
 - [wallet-cli/README.md](./wallet-cli/README.md)
-- [x402-payment/README.md](./x402-payment/README.md)
 
 ---
 
