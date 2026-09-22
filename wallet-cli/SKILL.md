@@ -1,9 +1,9 @@
 ---
 name: wallet-cli
-description: Operate the TypeScript TRON wallet CLI for accounts, transfers, staking, governance, contracts, signing, chain queries, and password input with wallet-cli 4.13.0. Refuse wallet passwords in argv and require the supported stdin channel. For Java REPL requests, refuse that entry and offer the TypeScript one-shot CLI; route other chains and SunSwap/DEX workflows elsewhere.
+description: Operate the TypeScript TRON wallet CLI for accounts, transfers, staking, governance, contracts, signing, chain queries, and password input with wallet-cli 4.14.0. Refuse wallet passwords in argv and require the supported stdin channel. For Java REPL requests, refuse that entry and offer the TypeScript one-shot CLI; route other chains and SunSwap/DEX workflows elsewhere.
 version: 2.0.0
 dependencies:
-  - "@tron-walletcli/wallet-cli@4.13.0"
+  - "@tron-walletcli/wallet-cli@4.14.0"
 tags:
   - tron
   - wallet
@@ -35,12 +35,13 @@ npm list --global --depth=0 --json @tron-walletcli/wallet-cli
 ```
 
 Read `dependencies["@tron-walletcli/wallet-cli"].version` from the JSON. The required version is
-exactly `4.13.0`. Do not invoke `wallet-cli --version` only to check the version: in 4.13.0 every
-CLI invocation passes through the wallet migration gate first and may change persisted wallet data.
+exactly `4.14.0`. In this version, `--version`, `--help`, `--json-schema`, and a bare
+`wallet-cli` skip wallet-data access and the startup migration gate. Operational commands can
+still upgrade persisted wallet data before executing.
 
 - If the command is missing, explain that the exact package
-  `@tron-walletcli/wallet-cli@4.13.0` must be installed and obtain user approval before running
-  `npm install -g @tron-walletcli/wallet-cli@4.13.0`.
+  `@tron-walletcli/wallet-cli@4.14.0` must be installed and obtain user approval before running
+  `npm install -g @tron-walletcli/wallet-cli@4.14.0`.
 - If another version is installed, report the mismatch and obtain approval before upgrading or
   downgrading it. Do not assume compatibility.
 - Never install or change a global package without approval.
@@ -70,10 +71,10 @@ parsing, polling, pagination, retry logic, or non-interactive secret input.
 
 ## Handle the startup migration gate
 
-Every invocation, including `--help`, `--version`, and `--json-schema`, checks persisted wallet data
-before running the requested command. If the result envelope has `command: "migration"`, the
-requested command did not run. Inspect `data.originalCommandExecuted`, which must be `false` for a
-migration result.
+Operational commands check persisted wallet data before running the requested command. Discovery
+invocations (`--help`, `--version`, `--json-schema`, and bare `wallet-cli`) skip this check. If the
+result envelope has `command: "migration"`, the requested command did not run. Inspect
+`data.originalCommandExecuted`, which must be `false` for a migration result.
 
 - If `data.upgraded` is `true`, report that local wallet data was upgraded, then reapply the
   authorization and confirmation rules before running the original command once. A mainnet or
@@ -98,7 +99,7 @@ wallet-cli permission update --json-schema -o json
 ```
 
 Use `wallet-cli <command> --help` only when human-oriented semantics are needed. Do not invent a
-flag, option combination, output field, or command that is absent from the 4.13.0 schema.
+flag, option combination, output field, or command that is absent from the 4.14.0 schema.
 
 Read [references/commands.md](references/commands.md) when choosing a command family or composing a
 multi-step wallet workflow.

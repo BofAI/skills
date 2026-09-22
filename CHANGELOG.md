@@ -1,5 +1,14 @@
 # Changelog
 
+## Unreleased
+
+### Improvements
+
+- Pin the wallet-cli Skill, installer, and current documentation to `@tron-walletcli/wallet-cli@4.14.0`.
+- Align startup migration guidance with 4.14.0: help, version, schema discovery, and bare CLI calls
+  skip wallet-data access; operational commands retain the migration gate.
+- Clarify schema discovery output and the TRON scope of the existing command reference.
+
 ## [2.0.0] - 2026-09-07
 
 ### Breaking Changes
