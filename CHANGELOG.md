@@ -2,6 +2,12 @@
 
 ## Unreleased
 
+### Breaking Changes
+
+- Remove the `agent-wallet` and `bankofai-guide` Skills and their README entries.
+- Remove their mandatory wallet guards from SunSwap, SunPump, and SunPerp. Preserve
+  each tool's supported credentials and signing configuration; use wallet-cli for official wallet setup.
+
 ### Improvements
 
 - Pin the wallet-cli Skill, installer, and current documentation to `@tron-walletcli/wallet-cli@4.14.0`.

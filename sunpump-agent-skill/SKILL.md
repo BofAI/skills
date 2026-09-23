@@ -38,8 +38,10 @@ Always call `sun sunpump state <addr>` or `sun sunpump token get <addr>` first t
 
 ### Prerequisites
 
-> **Wallet required for trading only:** Run `agent-wallet list` first.
-> If no wallets exist, invoke `bankofai-guide` (Section C — Wallet Guard) before proceeding.
+> **Wallet required for trading only:** Configure a supported sun-cli wallet source locally,
+> then verify the public address with `sun wallet address` before trading. The retired wallet
+> and onboarding Skills are not prerequisites; wallet-cli accounts are not automatically
+> available to sun-cli. Never request or display secret values in chat.
 > All read-only SunPump queries (portfolio, tx history, token info, ranking, holders) work without a wallet.
 > Token creation (`sun sunpump launch`) is server-side and also needs **no wallet**.
 > `--dry-run` previews do not need wallet credentials on `@sun-protocol/sun-cli@1.2.2`.
