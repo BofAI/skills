@@ -6,7 +6,7 @@ chain queries and is pinned to `@tron-walletcli/wallet-cli@4.14.0`.
 
 ## Installation
 
-Choose either method below. Both install Skill version `3.0.0` and use
+Choose either method below. Both install Skill version `2.0.0` and use
 `@tron-walletcli/wallet-cli@4.14.0`.
 
 ### Method 1: Install the CLI, then the Skill
@@ -15,7 +15,7 @@ Install the pinned npm CLI first, then install the Skill through the standard Sk
 
 ```bash
 npm install --global --no-fund --no-audit @tron-walletcli/wallet-cli@4.14.0
-npx skills add https://github.com/BofAI/skills/tree/main --skill wallet-cli --global --yes
+npx skills add BofAI/skills --skill wallet-cli --global --yes
 ```
 
 The `npx skills` command installs only the Skill; it does not install or update the `wallet-cli`
