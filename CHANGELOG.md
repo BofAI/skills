@@ -4,7 +4,9 @@
 
 ### Breaking Changes
 
-- Remove standalone `x402-payment` and `recharge-skill` and their bundled helpers.
+- Retain `x402-payment` and `recharge-skill` as business Skills using wallet-cli 4.14.0.
+  Replace their execution paths with `wallet-cli x402` and `wallet-cli bai`; remove bundled
+  standalone CLI installers, query scripts, and separate recharge configuration.
 
 - Remove the `agent-wallet` and `bankofai-guide` Skills and their README entries.
 - Remove their mandatory wallet guards from SunSwap, SunPump, and SunPerp. Preserve

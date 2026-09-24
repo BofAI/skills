@@ -22,6 +22,7 @@ A curated collection of practical, DeFi-focused utility skills developed by the 
   - [Wallet and Credentials](#wallet-and-credentials)
 - [Available Skills](#available-skills)
   - [Wallet & TRON](#wallet--tron)
+  - [Payments & Recharge](#payments--recharge)
   - [DeFi & DEX](#defi--dex)
   - [Data & Analytics](#data--analytics)
   - [Skill Docs](#skill-docs)
@@ -82,6 +83,11 @@ implicitly shared with other tools. There is no collection-wide wallet prerequis
 
 - [**wallet-cli**](./wallet-cli) - Safe, machine-readable TRON wallet operations through `@tron-walletcli/wallet-cli@4.14.0`, including accounts, transfers, staking, governance, contracts, signing, and chain queries. See [README](./wallet-cli/README.md).
 
+### Payments & Recharge
+
+- [**x402-payment**](./x402-payment) - Discover and pay HTTP APIs through `wallet-cli x402`.
+- [**recharge-skill**](./recharge-skill) - B.AI balance, usage, recharge, and reconciliation through `wallet-cli bai`.
+
 ### DeFi & DEX
 
 - [**sunswap**](./sunswap) - SunSwap DEX integration for TRON via `sun-cli`. Supports price quotes, token swaps, liquidity and pool operations. See [README](./sunswap/README.md).
@@ -101,6 +107,8 @@ Each current skill now has its own README for quick discovery:
 - [tronscan-skill/README.md](./tronscan-skill/README.md)
 - [usdd-skill/README.md](./usdd-skill/README.md)
 - [wallet-cli/README.md](./wallet-cli/README.md)
+- [x402-payment/README.md](./x402-payment/README.md)
+- [recharge-skill/README.md](./recharge-skill/README.md)
 
 ---
 

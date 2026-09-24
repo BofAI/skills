@@ -111,3 +111,9 @@ This skill covers the TRON wallet workflows above. wallet-cli 4.14.0 also expose
 command families, including `x402`, `bai`, and `8004`; discover their contracts separately rather
 than applying TRON-only flags or transaction-state assumptions. Route SunSwap swaps, pool discovery,
 pricing, and liquidity management to the SunSwap skill.
+
+## Business workflows
+
+Use [x402-payment](../../x402-payment/SKILL.md) for protected HTTP API payments and
+[recharge-skill](../../recharge-skill/SKILL.md) for B.AI credits and recharge. Both use this
+wallet-cli dependency and account store; follow their service-specific result and recovery rules.
