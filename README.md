@@ -9,7 +9,7 @@
   </a>
 </p>
 
-A curated collection of practical, DeFi-focused utility skills developed by the **BANK OF AI team**. These skills enable AI agents to perform complex on-chain operations, payments, and identity management across various platforms.
+A curated collection of practical, DeFi-focused utility skills developed by the **BANK OF AI team**. These skills enable AI agents to manage wallets, use DeFi protocols, and query blockchain data on TRON and supported EVM networks.
 
 > **Project Positioning:** We focus on delivering high-value DeFi utility skills that are platform-agnostic. These skills provide the domain knowledge needed to interact with the TRON blockchain and beyond.
 
@@ -19,15 +19,11 @@ A curated collection of practical, DeFi-focused utility skills developed by the 
 
 - [What are BANK OF AI Skills?](#what-are-bank-of-ai-skills)
 - [Installation](#installation)
-  - [Agent Wallet (Required for Signing Skills)](#agent-wallet-required-for-signing-skills)
+  - [Wallet and Credentials](#wallet-and-credentials)
 - [Available Skills](#available-skills)
   - [Wallet & TRON](#wallet--tron)
   - [DeFi & DEX](#defi--dex)
-  - [Payments & x402](#payments--x402)
-  - [AI & Account Recharge](#ai--account-recharge)
-  - [Security & Permissions](#security--permissions)
   - [Data & Analytics](#data--analytics)
-  - [Guides & Onboarding](#guides--onboarding)
   - [Skill Docs](#skill-docs)
 - [Usage Tips](#usage-tips)
   - [Explicit Invocation](#explicit-invocation)
@@ -61,9 +57,22 @@ npx skills add https://github.com/BofAI/skills/tree/develop
 
 See [BRANCHING.md](./BRANCHING.md) for the development, release, and hotfix workflow.
 
-### Agent Wallet (Required for Signing Skills)
+### Wallet and Credentials
 
-Some skills require wallet signature operations and are built on Agent Wallet. Before using those skills, follow the [Agent Wallet Quick Start](https://github.com/BofAI/agent-wallet?tab=readme-ov-file#quick-start) to configure your environment.
+Use the [wallet-cli Skill](./wallet-cli/README.md) for official wallet setup and operations through
+`@tron-walletcli/wallet-cli@4.14.0`. Configure accounts locally; do not send private keys,
+mnemonics, or passwords through chat.
+
+Other Skills retain their actual execution and credential requirements:
+
+- SunSwap and SunPump use `sun-cli`; configure its supported wallet source for transactions.
+  Read-only queries and supported dry-run previews do not require a wallet.
+- SunPerp public market queries require no credentials; private API calls use SunPerp API keys,
+  and withdrawals additionally require the signing key described in that Skill.
+- USDD and TronScan follow their own documented signing and API-key requirements.
+
+Installing a Skill does not configure these credentials, and wallet-cli accounts are not
+implicitly shared with other tools. There is no collection-wide wallet prerequisite.
 
 ---
 
@@ -71,47 +80,27 @@ Some skills require wallet signature operations and are built on Agent Wallet. B
 
 ### Wallet & TRON
 
-- [**wallet-cli**](./wallet-cli) - Safe, machine-readable TRON wallet operations through `@tron-walletcli/wallet-cli@4.13.0`, including accounts, transfers, staking, governance, contracts, signing, and chain queries. See [README](./wallet-cli/README.md).
+- [**wallet-cli**](./wallet-cli) - Safe, machine-readable TRON wallet operations through `@tron-walletcli/wallet-cli@4.14.0`, including accounts, transfers, staking, governance, contracts, signing, and chain queries. See [README](./wallet-cli/README.md).
 
 ### DeFi & DEX
 
 - [**sunswap**](./sunswap) - SunSwap DEX integration for TRON via `sun-cli`. Supports price quotes, token swaps, liquidity and pool operations. See [README](./sunswap/README.md).
 - [**sunperp-skill**](./sunperp-skill) - SunPerp perpetual futures trading skill for TRON. Supports market data, account queries, order placement, and position management. See [README](./sunperp-skill/README.md).
 
-### Payments & x402
-
-- [**x402-payment**](./x402-payment) - x402 payment skill for calling paid APIs and agent resources on TRON and BSC (EVM). Aligned with the modular BankofAI x402 SDK 1.0 packages. See [README](./x402-payment/README.md).
-
-### AI & Account Recharge
-
-- [**recharge-skill**](./recharge-skill) - BANK OF AI account recharge and account query skill. Uses the remote MCP recharge service for supported payment flows. See [README](./recharge-skill/README.md).
-
-### Security & Permissions
-
-- [**agent-wallet**](./agent-wallet) - Wallet management and signing skill for creating wallets, switching active wallets, resolving addresses, and signing transactions or messages on EVM and TRON. See [README](./agent-wallet/README.md).
-
 ### Data & Analytics
 
 - [**tronscan-skill**](./tronscan-skill) - Comprehensive TRON blockchain data lookup via TronScan API. Supports accounts, transactions, tokens, blocks, and network-wide statistics. See [README](./tronscan-skill/README.md).
 - [**usdd-skill**](./usdd-skill) - USDD toolkit for balance checks, PSM inspection, swaps, and vault information. See [README](./usdd-skill/README.md).
 
-### Guides & Onboarding
-
-- [**bankofai-guide**](./bankofai-guide) - Onboarding and wallet-guard guide for post-install setup and first wallet creation. See [README](./bankofai-guide/README.md).
-
 ### Skill Docs
 
 Each current skill now has its own README for quick discovery:
 
-- [agent-wallet/README.md](./agent-wallet/README.md)
-- [bankofai-guide/README.md](./bankofai-guide/README.md)
-- [recharge-skill/README.md](./recharge-skill/README.md)
 - [sunperp-skill/README.md](./sunperp-skill/README.md)
 - [sunswap/README.md](./sunswap/README.md)
 - [tronscan-skill/README.md](./tronscan-skill/README.md)
 - [usdd-skill/README.md](./usdd-skill/README.md)
 - [wallet-cli/README.md](./wallet-cli/README.md)
-- [x402-payment/README.md](./x402-payment/README.md)
 
 ---
 

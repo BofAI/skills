@@ -21,10 +21,11 @@ This skill enables AI agents to interact with SunSwap DEX on the TRON blockchain
 
 ### Prerequisites
 
-> **Wallet required for real writes only:** Run `agent-wallet list` before executing swaps,
-> liquidity changes, or `contract send`.
-> Read-only queries and `--dry-run` previews do not need a wallet.
-> If no wallets exist, invoke `bankofai-guide` (Section C — Wallet Guard) before proceeding.
+> **Wallet required for real writes only:** Configure a supported sun-cli wallet source
+> before swaps, liquidity changes, or `contract send`, then verify the public address with
+> `sun wallet address`. Read-only queries and `--dry-run` previews do not need a wallet.
+> The retired wallet and onboarding Skills are not prerequisites; wallet-cli accounts are
+> not automatically available to sun-cli. Never request or display secret values in chat.
 
 1. **Verify sun-cli**:
    ```bash

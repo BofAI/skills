@@ -30,10 +30,10 @@ For example:
 ```yaml
 version: 2.0.0
 dependencies:
-  - "@tron-walletcli/wallet-cli@4.13.0"
+  - "@tron-walletcli/wallet-cli@4.14.0"
 ```
 
-Here `2.0.0` is the BofAI Skills release and `4.13.0` is the independently maintained CLI version.
+Here `2.0.0` is the BofAI Skills release and `4.14.0` is the independently maintained CLI version.
 
 ## Release rules
 
