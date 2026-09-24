@@ -1,8 +1,10 @@
 # Changelog
 
-## Unreleased
+## [3.0.0] - 2026-09-24
 
 ### Breaking Changes
+
+- Remove standalone `x402-payment` and `recharge-skill` and their bundled helpers.
 
 - Remove the `agent-wallet` and `bankofai-guide` Skills and their README entries.
 - Remove their mandatory wallet guards from SunSwap, SunPump, and SunPerp. Preserve
