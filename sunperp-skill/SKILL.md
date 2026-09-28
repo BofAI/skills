@@ -1,7 +1,7 @@
 ---
 name: SunPerp Perpetual Futures Trading
 description: Trade USDT-margined perpetual futures on SunPerp (TRON) — place orders, manage positions, query market data, and manage account via REST API.
-version: 2.0.0
+version: 3.0.0
 dependencies:
   - node >= 18.0.0
 tags:
@@ -46,8 +46,10 @@ All scripts communicate with the SunPerp REST API at `https://api.sunx.io`.
 
 ## Prerequisites
 
-> **Wallet required:** Run `agent-wallet list` first.  
-> If no wallets exist, invoke `bankofai-guide` (Section C — Wallet Guard) before proceeding.
+> **Credentials depend on the operation:** Public market queries require no credentials.
+> Private account and trading calls use `SUNPERP_ACCESS_KEY` and `SUNPERP_SECRET_KEY`.
+> Withdrawals additionally require `TRON_PRIVATE_KEY` for confirmation signing.
+> No separate wallet or onboarding Skill is required; follow the operation-specific setup below.
 
 ### 1. Environment Setup
 
