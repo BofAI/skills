@@ -1,8 +1,9 @@
 # TRON Wallet CLI Skill
 
 Agent instructions for operating the TypeScript `wallet-cli` safely through its machine-readable
-interface. The Skill covers TRON accounts, transfers, staking, governance, contracts, signing, and
-chain queries and is pinned to `@tron-walletcli/wallet-cli@4.15.0`.
+interface. The Skill covers TRON accounts, transfers, staking, governance, contracts, signing, chain
+queries, SunSwap swaps and liquidity, and SunPump trading and launches, and is pinned to
+`@tron-walletcli/wallet-cli@4.15.0`.
 
 ## Installation
 
