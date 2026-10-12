@@ -78,11 +78,12 @@ preparatory transaction.
 - **An approval the Agent builds** — a `contract send` of TRC20 `approve(address,uint256)`: verify
   the token contract and spender, inspect the current allowance, and approve only the amount
   required for the intended operation. Never build an unlimited approval.
-- **An approval a wallet-cli command sends itself** — the `sunswap` liquidity commands, a router
-  `sunswap swap` that spends a token, `sunpump sell`, and a first TRON `exact` payment in
-  `x402 pay` or `bai recharge`: follow the CLI's choice of amount. Some of these grant an unlimited
-  allowance by design (a V4 deposit to Permit2, a SunPump sale to the launchpad proxy, an x402
-  payment to Permit2); do not block or work around it. In the preview, show every approval the dry
+- **An approval a wallet-cli command sends itself** — the `sunswap` liquidity commands, a
+  `sunswap swap` that spends a token (router or bonding curve), `sunpump sell`, and a first TRON
+  `exact` payment in `x402 pay` or `bai recharge`: follow the CLI's choice of amount. Some of these
+  grant an unlimited allowance by design (a V4 deposit to Permit2; a `sunpump sell` or a
+  curve-routed `sunswap swap` selling a SunPump token, to the launchpad proxy; an x402 payment to
+  Permit2); do not block or work around it. In the preview, show every approval the dry
   run reports — `approvals[]` spender and amount, including `"unlimited"`. `x402 pay` reports its
   approval in `data.approval` after the payment.
 
@@ -149,7 +150,9 @@ A launch creates a permanent, public token. Treat it as high-risk.
 3. Execute once. On `launch_outcome_unknown`, never retry: run `sunpump token-search <symbol>` to
    find out whether the token exists, then report. A second launch is a second permanent token.
 4. There is no `txId`, `stage`, or `--wait`. Check `createTxHash` with `tx info`; do not treat
-   `tx status` as the launch outcome.
+   `tx status` as the launch outcome. An `rpc_error` from `tx info` soon after a successful launch
+   means the hash is not on chain yet, not that the launch failed: wait and check again, and never
+   launch again because of it.
 
 ### Ledger
 

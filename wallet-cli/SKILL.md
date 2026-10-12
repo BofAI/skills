@@ -53,9 +53,10 @@ still upgrade persisted wallet data before executing.
 1. Use `-o json` for every operational command. Parse stdout as exactly one
    `wallet-cli.result.v1` object.
 2. Supply an explicit canonical network for chain operations: mainnet `tron:728126428`, Nile
-   `tron:3448148188`, or Shasta `tron:2494104990`. Never silently choose mainnet. Use
-   `tron:3448148188` when the user explicitly asks for a test but does not distinguish between
-   testnets. The old `tron:mainnet`, `tron:nile`, and `tron:shasta` values are permanent input
+   `tron:3448148188`, or Shasta `tron:2494104990`. Never silently choose mainnet; the one exception
+   is read-only `sunswap` / `sunpump` queries, which exist only on mainnet (see
+   [references/commands.md](references/commands.md)). Use `tron:3448148188` when the user
+   explicitly asks for a test but does not distinguish between testnets. The old `tron:mainnet`, `tron:nile`, and `tron:shasta` values are permanent input
    aliases, but never expect an alias in `chain.network`, network listings, or configuration keys.
 3. Branch on the process exit code first: `0` success, `1` execution failure, `2` malformed call.
    Then branch on stable fields such as `error.code`, `data.stage`, or `data.state`. Never parse
@@ -159,8 +160,8 @@ Apply these confirmed rules:
 - Otherwise retain the `txId` and poll `tx status` until `confirmed` or `failed`, with a finite
   deadline. `pending` and `not_found` are non-terminal.
 - GasFree transfers return a `traceId`; follow them with `gasfree trace`, not `tx status`.
-- The `sunswap` liquidity commands, a router `sunswap swap` that spends a token, and a first
-  `sunpump sell` may send approval transactions before the main one. Track every id in
+- The `sunswap` liquidity commands, a `sunswap swap` that spends a token (router or bonding curve),
+  and a first `sunpump sell` may send approval transactions before the main one. Track every id in
   `data.approvalTxIds` (or `error.details.approvalTxIds` after a failure) alongside the main `txId`.
 - `sunpump launch` submits no transaction of its own: there is no `txId`, `stage`, or `--wait`.
   Check its `createTxHash` with `tx info`.

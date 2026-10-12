@@ -192,9 +192,9 @@ states until `SUCCEED` or `FAILED`; do not pass a trace id to `tx status`.
 
 ### Commands that send several transactions
 
-The `sunswap` liquidity commands, a router `sunswap swap` that spends a token, and a first
-`sunpump sell` send approvals before the main transaction. Their ids are in `data.approvalTxIds`, in
-the order sent, beside the main `txId`. Approvals always wait for confirmation, each up to
+The `sunswap` liquidity commands, a `sunswap swap` that spends a token (router or bonding curve),
+and a first `sunpump sell` send approvals before the main transaction. Their ids are in
+`data.approvalTxIds`, in the order sent, beside the main `txId`. Approvals always wait for confirmation, each up to
 `--wait-timeout`, even without `--wait`; `--wait` governs only the main transaction. If a later step
 fails, the original error code is kept and `error.details.approvalTxIds` lists the approvals already
 submitted. They are not rolled back; check each before any retry.
@@ -203,7 +203,8 @@ submitted. They are not rolled back; check each before any retry.
 
 A launch is created by the SunPump service, not by a local transaction: there is no `stage`,
 `confirmed`, fee, or `--wait`, and `data.token.owner` is the creator the service chose, not the
-local account. Use `tx info` on `createTxHash` to see whether it is on chain.
+local account. Use `tx info` on `createTxHash` to see whether it is on chain; an `rpc_error` there
+means the hash is not on chain yet, not that the launch failed.
 
 ### Measured and quoted amounts
 
