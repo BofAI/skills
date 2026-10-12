@@ -115,8 +115,9 @@ it means preview and confirm; only the Nile liquidity commands fall under testne
 
 - In the preview, identify each token by contract address (`tokenIn.address`, `token0.address`);
   the symbol is a label, and impersonation tokens share real symbols.
-- On `ambiguous_token_symbol`, present the candidate addresses and let the user choose. Never pick
-  one.
+- On `ambiguous_token_symbol`, let the user choose by contract address. Never pick one. The error
+  carries no `error.details`: its message lists every candidate address, so show that message to
+  the user as written instead of parsing it into a choice yourself.
 - Call out any side resolved from the user's own token book (`fromTokenBook`).
 - `sunswap price` returning `"0"` means the token is not indexed, not that it is worthless.
 
