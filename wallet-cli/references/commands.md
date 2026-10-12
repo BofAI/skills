@@ -1,6 +1,6 @@
 # Command Routing
 
-Use this reference to select a wallet-cli command family. It summarizes version 4.14.0; the CLI's
+Use this reference to select a wallet-cli command family. It summarizes version 4.15.0; the CLI's
 generated schema remains authoritative for exact flags and combinations.
 
 ## Discover the live command contract
@@ -107,7 +107,7 @@ Treat every command in this section as a write. Apply the network and confirmati
 
 ## Scope boundary
 
-This skill covers the TRON wallet workflows above. wallet-cli 4.14.0 also exposes EVM and service
+This skill covers the TRON wallet workflows above. wallet-cli 4.15.0 also exposes EVM and service
 command families, including `x402`, `bai`, and `8004`; discover their contracts separately rather
 than applying TRON-only flags or transaction-state assumptions. Route SunSwap swaps, pool discovery,
 pricing, and liquidity management to the SunSwap skill.
