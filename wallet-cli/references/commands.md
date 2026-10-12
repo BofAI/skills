@@ -142,6 +142,8 @@ networks fail with `family_mismatch`.
   fee. Default slippage is 5%; `--slippage` and `--min-out` exclude each other.
 - `launch` signs nothing and takes no account or password, and SunPump chooses the new token's
   owner. Read [safety.md](safety.md) before any launch.
+- The read-only queries follow the SunSwap rule: when the user names no network, run them on
+  `tron:728126428` and say so. Never extend that to a write.
 
 ## Local address books and configuration
 
