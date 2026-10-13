@@ -199,6 +199,15 @@ and a first `sunpump sell` send approvals before the main transaction. Their ids
 fails, the original error code is kept and `error.details.approvalTxIds` lists the approvals already
 submitted. They are not rolled back; check each before any retry.
 
+With `--build-only`, such a command returns `data.transactions[]` instead of a single transaction
+whenever an approval is still needed: each entry has `purpose` `"approval"` or `"main"`, in the
+order they must be sent. Sign and broadcast each one only after the one before it confirms; the
+main call reverts if it lands before its approval. These transactions expire one hour after they
+are built, and the main call of `add-liquidity` / `remove-liquidity` is also bounded by
+`--deadline` (default 30 minutes from the build). `feeCovers` is `"approvals"`, because the main
+call cannot be priced before its approvals exist. With no approval needed, the output is the
+ordinary single unsigned transaction.
+
 ### `sunpump launch`
 
 A launch is created by the SunPump service, not by a local transaction: there is no `stage`,

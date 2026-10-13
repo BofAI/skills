@@ -118,8 +118,11 @@ a label.
   `tron:728126428` and say so. Never extend that to a write.
 - `swap` chooses its market from chain state: TRX against a SunPump token that has not launched
   trades on that token's bonding curve; everything else goes through the SunSwap router.
-- `--dry-run` and `--build-only` need no password. There is no `--sign-only`, and `--build-only` is
-  refused for a router swap that spends a token.
+- `--dry-run` and `--build-only` need no password. There is no `--sign-only`. `--build-only` fails
+  with `invalid_option` when the call must carry a new Permit2 signature: always for a router swap
+  that spends a token, and for a V4 `add-liquidity` whose standing Permit2 grants do not cover the
+  amounts. Use `--dry-run` for those. A command that needs approvals first builds them too; see
+  [machine-interface.md](machine-interface.md).
 - A V4 pool is named by `--token0`, `--token1`, `--fee`, `--tick-spacing`, and optional `--hooks`;
   `sunswap pool-list --protocol V4` publishes each pool's `tickSpacing` and `hooks`. V3 pools hold
   TRX as WTRX; V2 and V4 handle TRX natively.
