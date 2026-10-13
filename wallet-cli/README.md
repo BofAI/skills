@@ -1,20 +1,21 @@
 # TRON Wallet CLI Skill
 
 Agent instructions for operating the TypeScript `wallet-cli` safely through its machine-readable
-interface. The Skill covers TRON accounts, transfers, staking, governance, contracts, signing, and
-chain queries and is pinned to `@tron-walletcli/wallet-cli@4.14.0`.
+interface. The Skill covers TRON accounts, transfers, staking, governance, contracts, signing, chain
+queries, SunSwap swaps and liquidity, and SunPump trading and launches, and is pinned to
+`@tron-walletcli/wallet-cli@4.15.0`.
 
 ## Installation
 
 Choose either method below. Both install Skill version `3.0.0` and use
-`@tron-walletcli/wallet-cli@4.14.0`.
+`@tron-walletcli/wallet-cli@4.15.0`.
 
 ### Method 1: Install the CLI, then the Skill
 
 Install the pinned npm CLI first, then install the Skill through the standard Skills CLI:
 
 ```bash
-npm install --global --no-fund --no-audit @tron-walletcli/wallet-cli@4.14.0
+npm install --global --no-fund --no-audit @tron-walletcli/wallet-cli@4.15.0
 npx skills add https://github.com/BofAI/skills/tree/main --skill wallet-cli --global --yes
 ```
 
@@ -47,7 +48,7 @@ After either method, verify the installed package version:
 npm list --global --depth=0 --json @tron-walletcli/wallet-cli
 ```
 
-In 4.14.0, `--version`, `--help`, `--json-schema`, and bare `wallet-cli` skip wallet-data access.
+In 4.15.0, `--version`, `--help`, `--json-schema`, and bare `wallet-cli` skip wallet-data access.
 The first operational command may upgrade persisted wallet data and return a
 `command: "migration"` result without running the requested command. Inspect that result before
 running the original command once more.

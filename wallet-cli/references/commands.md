@@ -1,6 +1,6 @@
 # Command Routing
 
-Use this reference to select a wallet-cli command family. It summarizes version 4.14.0; the CLI's
+Use this reference to select a wallet-cli command family. It summarizes version 4.15.0; the CLI's
 generated schema remains authoritative for exact flags and combinations.
 
 ## Discover the live command contract
@@ -94,6 +94,60 @@ still means submitted, not confirmed.
 Treat every command in this section as a write. Apply the network and confirmation matrix in
 [safety.md](safety.md) before execution.
 
+## SunSwap
+
+TRON only; every command fails with `family_mismatch` on an EVM network. Results carry token
+amounts as base-unit strings with their `decimals`. Identify tokens by contract address; a symbol is
+a label.
+
+| Goal | Command | Kind | Networks |
+|---|---|---|---|
+| Swap one token for another | `sunswap swap <tokenIn> <tokenOut> <amountIn>` | write; `--quote` is read-only | mainnet |
+| Deposit liquidity | `sunswap add-liquidity --protocol <V2\|V3\|V4>` | write | mainnet, Nile |
+| Withdraw liquidity | `sunswap remove-liquidity --protocol <V2\|V3\|V4> --liquidity <n>` | write | mainnet, Nile |
+| Collect V3/V4 position fees | `sunswap collect-fees --protocol <V3\|V4> --position-id <id>` | write | mainnet, Nile |
+| Read one V3/V4 position from chain | `sunswap position-info --protocol <V3\|V4> --position-id <id>` | read | mainnet, Nile |
+| List an address's positions | `sunswap position-list` | read | mainnet |
+| Rank or search pools | `sunswap pool-list`, `sunswap pool-search <keyword>` | read | mainnet |
+| List or search tokens | `sunswap token-list`, `sunswap token-search <keyword>` | read | mainnet |
+| USD price | `sunswap price [<token>]` | read | mainnet |
+
+- On an unsupported TRON network (Shasta for every command, Nile for the market queries and
+  `swap`), a command fails with `unsupported_network_capability` (exit 2).
+- The read-only queries exist only on mainnet. When the user names no network for one, run it on
+  `tron:728126428` and say so. Never extend that to a write.
+- `swap` chooses its market from chain state: TRX against a SunPump token that has not launched
+  trades on that token's bonding curve; everything else goes through the SunSwap router.
+- `--dry-run` and `--build-only` need no password. There is no `--sign-only`. `--build-only` fails
+  with `invalid_option` when the call must carry a new Permit2 signature: always for a router swap
+  that spends a token, and for a V4 `add-liquidity` whose standing Permit2 grants do not cover the
+  amounts. Use `--dry-run` for those. A command that needs approvals first builds them too; see
+  [machine-interface.md](machine-interface.md).
+- A V4 pool is named by `--token0`, `--token1`, `--fee`, `--tick-spacing`, and optional `--hooks`;
+  `sunswap pool-list --protocol V4` publishes each pool's `tickSpacing` and `hooks`. V3 pools hold
+  TRX as WTRX; V2 and V4 handle TRX natively.
+
+## SunPump
+
+TRON mainnet only: Nile and Shasta fail with `unsupported_network_capability` (exit 2), and EVM
+networks fail with `family_mismatch`.
+
+| Goal | Command | Kind |
+|---|---|---|
+| Buy on the bonding curve | `sunpump buy <address> --trx <amount>` | write; `--quote` is read-only |
+| Sell back to the curve | `sunpump sell <address> --amount <tokens>` | write; `--quote` is read-only |
+| Launch a new token | `sunpump launch --name <name> --symbol <symbol> --description <text>` | write, high-risk |
+| List, inspect, or search tokens | `sunpump token-list`, `sunpump token-info <address>`, `sunpump token-search <keyword>` | read |
+
+- `buy` and `sell` read the token's state first. A closed curve fails with
+  `launchpad_trading_closed`; a launched token trades through `sunswap swap` instead.
+- SunPump charges a 1% platform fee with a 0.01 TRX minimum, reported separately from the network
+  fee. Default slippage is 5%; `--slippage` and `--min-out` exclude each other.
+- `launch` signs nothing and takes no account or password, and SunPump chooses the new token's
+  owner. Read [safety.md](safety.md) before any launch.
+- The read-only queries follow the SunSwap rule: when the user names no network, run them on
+  `tron:728126428` and say so. Never extend that to a write.
+
 ## Local address books and configuration
 
 - `contact add|list|remove` manages recipient aliases accepted by `--to`.
@@ -107,7 +161,6 @@ Treat every command in this section as a write. Apply the network and confirmati
 
 ## Scope boundary
 
-This skill covers the TRON wallet workflows above. wallet-cli 4.14.0 also exposes EVM and service
-command families, including `x402`, `bai`, and `8004`; discover their contracts separately rather
-than applying TRON-only flags or transaction-state assumptions. Route SunSwap swaps, pool discovery,
-pricing, and liquidity management to the SunSwap skill.
+This skill covers the TRON wallet workflows above, including `sunswap` and `sunpump`. wallet-cli
+4.15.0 also exposes EVM and service command families, including `x402`, `bai`, and `8004`; discover
+their contracts separately rather than applying TRON-only flags or transaction-state assumptions.

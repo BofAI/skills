@@ -1,9 +1,9 @@
 ---
 name: wallet-cli
-description: Operate the TypeScript TRON wallet CLI for accounts, transfers, staking, governance, contracts, signing, chain queries, and password input with wallet-cli 4.14.0. Refuse wallet passwords in argv and require the supported stdin channel. For Java REPL requests, refuse that entry and offer the TypeScript one-shot CLI; route other chains and SunSwap/DEX workflows elsewhere.
+description: Operate the TypeScript TRON wallet CLI for accounts, transfers, staking, governance, contracts, signing, chain queries, SunSwap swaps and liquidity, SunPump bonding-curve trading and token launches, and password input with wallet-cli 4.15.0. Refuse wallet passwords in argv and require the supported stdin channel. For Java REPL requests, refuse that entry and offer the TypeScript one-shot CLI; route other chains elsewhere.
 version: 3.0.0
 dependencies:
-  - "@tron-walletcli/wallet-cli@4.14.0"
+  - "@tron-walletcli/wallet-cli@4.15.0"
 tags:
   - tron
   - wallet
@@ -11,6 +11,9 @@ tags:
   - transfer
   - staking
   - governance
+  - sunswap
+  - sunpump
+  - dex
 ---
 
 # TRON Wallet CLI
@@ -19,12 +22,11 @@ Use the TypeScript, one-shot `wallet-cli` as the execution engine. Keep determin
 signing, validation, and chain logic in the CLI; use this skill to select commands, enforce
 authorization boundaries, and interpret results.
 
-This skill does not drive the repository's Java REPL and does not replace protocol-specific skills
-such as SunSwap. Use a DEX skill for swaps or liquidity workflows and this skill for the wallet,
-signing, resource, governance, and general TRON operations beneath them. If the user requests the
-Java REPL, do not execute it or offer to switch to it; state that this skill supports only the
-TypeScript one-shot CLI and, when applicable, offer to express the intended operation through that
-interface.
+This skill covers wallet, signing, resource, governance, and general TRON operations, and the
+`sunswap` (swaps and V2/V3/V4 liquidity) and `sunpump` (bonding-curve trading and token launches)
+command groups. It does not drive the repository's Java REPL. If the user requests the Java REPL, do
+not execute it or offer to switch to it; state that this skill supports only the TypeScript
+one-shot CLI and, when applicable, offer to express the intended operation through that interface.
 
 ## Verify the dependency
 
@@ -35,13 +37,13 @@ npm list --global --depth=0 --json @tron-walletcli/wallet-cli
 ```
 
 Read `dependencies["@tron-walletcli/wallet-cli"].version` from the JSON. The required version is
-exactly `4.14.0`. In this version, `--version`, `--help`, `--json-schema`, and a bare
+exactly `4.15.0`. In this version, `--version`, `--help`, `--json-schema`, and a bare
 `wallet-cli` skip wallet-data access and the startup migration gate. Operational commands can
 still upgrade persisted wallet data before executing.
 
 - If the command is missing, explain that the exact package
-  `@tron-walletcli/wallet-cli@4.14.0` must be installed and obtain user approval before running
-  `npm install -g @tron-walletcli/wallet-cli@4.14.0`.
+  `@tron-walletcli/wallet-cli@4.15.0` must be installed and obtain user approval before running
+  `npm install -g @tron-walletcli/wallet-cli@4.15.0`.
 - If another version is installed, report the mismatch and obtain approval before upgrading or
   downgrading it. Do not assume compatibility.
 - Never install or change a global package without approval.
@@ -51,9 +53,10 @@ still upgrade persisted wallet data before executing.
 1. Use `-o json` for every operational command. Parse stdout as exactly one
    `wallet-cli.result.v1` object.
 2. Supply an explicit canonical network for chain operations: mainnet `tron:728126428`, Nile
-   `tron:3448148188`, or Shasta `tron:2494104990`. Never silently choose mainnet. Use
-   `tron:3448148188` when the user explicitly asks for a test but does not distinguish between
-   testnets. The old `tron:mainnet`, `tron:nile`, and `tron:shasta` values are permanent input
+   `tron:3448148188`, or Shasta `tron:2494104990`. Never silently choose mainnet; the one exception
+   is read-only `sunswap` / `sunpump` queries, which exist only on mainnet (see
+   [references/commands.md](references/commands.md)). Use `tron:3448148188` when the user
+   explicitly asks for a test but does not distinguish between testnets. The old `tron:mainnet`, `tron:nile`, and `tron:shasta` values are permanent input
    aliases, but never expect an alias in `chain.network`, network listings, or configuration keys.
 3. Branch on the process exit code first: `0` success, `1` execution failure, `2` malformed call.
    Then branch on stable fields such as `error.code`, `data.stage`, or `data.state`. Never parse
@@ -99,7 +102,7 @@ wallet-cli permission update --json-schema -o json
 ```
 
 Use `wallet-cli <command> --help` only when human-oriented semantics are needed. Do not invent a
-flag, option combination, output field, or command that is absent from the 4.14.0 schema.
+flag, option combination, output field, or command that is absent from the 4.15.0 schema.
 
 Read [references/commands.md](references/commands.md) when choosing a command family or composing a
 multi-step wallet workflow.
@@ -143,6 +146,9 @@ Apply these confirmed rules:
   funds-moving or externally visible write.
 - On every network, high-risk operations require explicit confirmation. `permission update` also
   requires a successful `--dry-run` and review of the complete rendered permission structure.
+- For `sunswap` and `sunpump` writes, preview from a `--dry-run`, never from `--quote`.
+  `sunpump launch` always requires a dry run and explicit confirmation. Read the SunSwap and SunPump
+  section of [references/safety.md](references/safety.md) first.
 - Confirmation never authorizes a human-only command listed above.
 - Never use authorization for one transaction as permission for another transaction, retry, batch,
   recipient, amount, token, account, or network.
@@ -154,6 +160,11 @@ Apply these confirmed rules:
 - Otherwise retain the `txId` and poll `tx status` until `confirmed` or `failed`, with a finite
   deadline. `pending` and `not_found` are non-terminal.
 - GasFree transfers return a `traceId`; follow them with `gasfree trace`, not `tx status`.
+- The `sunswap` liquidity commands, a `sunswap swap` that spends a token (router or bonding curve),
+  and a first `sunpump sell` may send approval transactions before the main one. Track every id in
+  `data.approvalTxIds` (or `error.details.approvalTxIds` after a failure) alongside the main `txId`.
+- `sunpump launch` submits no transaction of its own: there is no `txId`, `stage`, or `--wait`.
+  Check its `createTxHash` with `tx info`.
 - After a timeout or ambiguous submission, reconcile the transaction before retrying. Never resend
   merely because confirmation was not observed.
 - For a batch, stop on the first failure by default and track every submitted transaction
