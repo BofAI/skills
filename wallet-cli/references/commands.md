@@ -124,8 +124,25 @@ a label.
   amounts. Use `--dry-run` for those. A command that needs approvals first builds them too; see
   [machine-interface.md](machine-interface.md).
 - A V4 pool is named by `--token0`, `--token1`, `--fee`, `--tick-spacing`, and optional `--hooks`;
-  `sunswap pool-list --protocol V4` publishes each pool's `tickSpacing` and `hooks`. V3 pools hold
-  TRX as WTRX; V2 and V4 handle TRX natively.
+  `sunswap pool-list --protocol V4` publishes each pool's `tickSpacing` and `hooks`.
+
+### TRX and WTRX on V3
+
+V2 and V4 take and return native TRX. V3 pools hold WTRX (wrapped TRX, a TRC20 token exchanged 1:1
+with TRX), and wallet-cli neither wraps nor unwraps it for you:
+
+- `add-liquidity --protocol V3` reads `TRX` as WTRX and spends the account's WTRX. With too little,
+  it fails with `insufficient_token_balance`; it never converts TRX.
+- `remove-liquidity` and `collect-fees` on V3 pay out WTRX, not TRX. Say so when reporting the
+  result, because the account's TRX balance does not rise.
+- wallet-cli has no wrap or unwrap command. Before proposing a wrap, mention that V2 and V4 accept
+  TRX directly. If the user still wants V3, wrapping is `contract send --contract <WTRX address>
+  --method "deposit()" --value <TRX>`. Unwrapping is `--method "withdraw(uint256)"` with the
+  base-unit amount in `--params`. Take the WTRX address from CLI output, such as the pool's tokens
+  in `sunswap pool-search WTRX`, never from memory. Each is its own write, with its own dry run,
+  preview, and confirmation.
+- `sunswap pool-list --token TRX` matches only native-TRX pools. When the user asks about TRX
+  pools, query `WTRX` as well, or the V3 pools are missing.
 
 ## SunPump
 
