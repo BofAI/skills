@@ -4,6 +4,7 @@
 
 ### Breaking Changes
 
+- Require Node.js `^22.23.4 || ^24.22.1 || >=26.12.1` for the bundled Node.js skills and wallet-cli installer; use Node.js 24.22.1 in version-validation CI.
 - Remove standalone `x402-payment` and `recharge-skill` and their bundled helpers.
 - Remove the `agent-wallet` and `bankofai-guide` Skills and their README entries.
 - Remove their mandatory wallet guards from SunSwap, SunPump, and SunPerp. Preserve

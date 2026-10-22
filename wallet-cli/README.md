@@ -63,7 +63,7 @@ running the original command once more.
 
 ## Requirements
 
-- Node.js 20 or newer when installing the npm CLI
+- Node.js `^22.23.4 || ^24.22.1 || >=26.12.1` when installing or running the npm CLI
 - Git, a POSIX shell, and standard POSIX utilities for the one-command installer
 - Explicit network selection for chain operations
 
