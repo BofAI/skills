@@ -6,7 +6,7 @@ chain queries and is pinned to `@tron-walletcli/wallet-cli@4.14.0`.
 
 ## Installation
 
-Choose either method below. Both install Skill version `3.0.0` and use
+Choose either method below. Both install Skill version `3.0.1` and use
 `@tron-walletcli/wallet-cli@4.14.0`.
 
 ### Method 1: Install the CLI, then the Skill
@@ -62,7 +62,7 @@ running the original command once more.
 
 ## Requirements
 
-- Node.js 20 or newer when installing the npm CLI
+- Node.js `^22.23.4 || ^24.22.1 || >=26.12.1` when installing or running the npm CLI
 - Git, a POSIX shell, and standard POSIX utilities for the one-command installer
 - Explicit network selection for chain operations
 

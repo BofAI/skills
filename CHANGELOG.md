@@ -1,5 +1,12 @@
 # Changelog
 
+## [3.0.1] - 2026-10-22
+
+### Security
+
+- Require Node.js `^22.23.4 || ^24.22.1 || >=26.12.1` for the bundled Node.js skills and wallet-cli installer; use Node.js 24.22.1 in version-validation CI.
+- Validate the full Node.js version in the wallet-cli installer, including when the pinned CLI is already installed.
+
 ## [3.0.0] - 2026-09-28
 
 ### Breaking Changes

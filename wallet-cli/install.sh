@@ -141,9 +141,17 @@ if [ "$DRY_RUN" != "1" ]; then
 fi
 
 check_node_and_npm() {
-  command_exists node || fail "Node.js 20+ is required to install ${CLI_PACKAGE}."
-  node_major="$(node -e 'process.stdout.write(String(process.versions.node.split(".")[0]))' 2>/dev/null || printf '0')"
-  [ "$node_major" -ge 20 ] 2>/dev/null || fail "Node.js 20+ is required; detected $(node --version 2>/dev/null || printf 'unknown')."
+  node_range='^22.23.4 || ^24.22.1 || >=26.12.1'
+  command_exists node || fail "Node.js ${node_range} is required to install ${CLI_PACKAGE}."
+  node -e '
+    const version = process.versions.node;
+    const [major, minor, patch] = version.split(".").map(Number);
+    const minimum = major === 22 ? [23, 4] : major === 24 ? [22, 1] : major === 26 ? [12, 1] : null;
+    const supported = /^\d+\.\d+\.\d+$/.test(version) && (
+      major > 26 || (minimum && (minor > minimum[0] || (minor === minimum[0] && patch >= minimum[1])))
+    );
+    process.exit(supported ? 0 : 1);
+  ' 2>/dev/null || fail "Node.js ${node_range} is required; detected $(node --version 2>/dev/null || printf 'unknown')."
   command_exists npm || fail "npm is required to install ${CLI_PACKAGE}."
 }
 
@@ -171,6 +179,10 @@ prepare_cli_install() {
     return
   fi
 
+  if [ "$DRY_RUN" != "1" ]; then
+    check_node_and_npm
+  fi
+
   CURRENT_CLI_VERSION="$(installed_cli_version || true)"
   if [ "$CURRENT_CLI_VERSION" = "$CLI_VERSION" ]; then
     CLI_ACTION="keep"
@@ -178,9 +190,6 @@ prepare_cli_install() {
   fi
 
   CLI_ACTION="install"
-  if [ "$DRY_RUN" != "1" ]; then
-    check_node_and_npm
-  fi
 }
 
 show_plan() {
