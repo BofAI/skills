@@ -3,6 +3,7 @@ name: wallet-cli
 description: Operate the TypeScript TRON wallet CLI for accounts, transfers, staking, governance, contracts, signing, chain queries, SunSwap swaps and liquidity, SunPump bonding-curve trading and token launches, and password input with wallet-cli 4.15.0. Refuse wallet passwords in argv and require the supported stdin channel. For Java REPL requests, refuse that entry and offer the TypeScript one-shot CLI; route other chains elsewhere.
 version: 3.0.0
 dependencies:
+  - "node ^22.23.4 || ^24.22.1 || >=26.12.1"
   - "@tron-walletcli/wallet-cli@4.15.0"
 tags:
   - tron

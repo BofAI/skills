@@ -4,6 +4,9 @@
   "description": "AI Agent skill for querying TRON blockchain data via the TronScan API",
   "license": "MIT",
   "private": true,
+  "engines": {
+    "node": "^22.23.4 || ^24.22.1 || >=26.12.1"
+  },
   "scripts": {
     "search": "node scripts/search.js",
     "account": "node scripts/account.js",
