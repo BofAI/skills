@@ -1,7 +1,7 @@
 ---
 name: TronScan Data Lookup
 description: Query TRON blockchain data via the TronScan API — accounts, transactions, tokens, blocks, contracts, transfers, and chain statistics.
-version: 3.0.0
+version: 3.0.1
 dependencies:
   - axios
 tags:
@@ -29,7 +29,7 @@ All scripts output structured JSON to stdout and log progress to stderr, followi
 
 ## Prerequisites
 
-- **Node.js** >= 16
+- **Node.js** `^22.23.4 || ^24.22.1 || >=26.12.1`
 - **npm** (for installing dependencies)
 - Run `npm install` in the skill root directory before first use
 
