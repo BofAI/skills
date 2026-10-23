@@ -150,6 +150,9 @@ Apply these confirmed rules:
 - For `sunswap` and `sunpump` writes, preview from a `--dry-run`, never from `--quote`.
   `sunpump launch` always requires a dry run and explicit confirmation. Read the SunSwap and SunPump
   section of [references/safety.md](references/safety.md) first.
+- Describe every step in plain language first: what the user gives, what they get, and whether it
+  charges, signs, or broadcasts. Method names and contract addresses are supporting detail (see
+  Preview contents in [references/safety.md](references/safety.md)).
 - Confirmation never authorizes a human-only command listed above.
 - Never use authorization for one transaction as permission for another transaction, retry, batch,
   recipient, amount, token, account, or network.
