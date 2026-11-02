@@ -165,6 +165,14 @@ A launch creates a permanent, public token. Treat it as high-risk.
 
 ## Preview contents
 
+Open every preview, and every question about whether to continue, with one plain-language
+sentence: what the user gives, what they get, and whether this step charges, signs, or broadcasts.
+A dry run charges nothing, needs no signature, and broadcasts nothing; say so whenever you propose
+or report one. Explain a term such as WTRX the first time it appears. Method names, selectors, and
+contract addresses are supporting detail. Show them after the plain-language sentence; never use
+them as the description of the operation. When wrapping TRX, also say that WTRX converts back 1:1,
+that converting back is another transaction with its own fee, and that wrapping earns nothing.
+
 Before a mainnet confirmation, show all fields available for the operation:
 
 - canonical network;
