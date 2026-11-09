@@ -9,7 +9,7 @@
   },
   "dependencies": {
     "node-fetch": "^3.3.2",
-    "tronweb": "^6.2.1"
+    "tronweb": "6.5.1"
   },
   "keywords": [
     "sunperp",
