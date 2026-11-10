@@ -17,7 +17,8 @@ Ledger confirmation, and waiting for confirmation (built-in 90000, which `config
 change; `0` disables it). Time spent at an interactive TTY prompt does not count; reading a
 `*-stdin` source does. No transaction or payment is submitted with less than 2000 ms left; that
 step fails with `timeout`, and approvals sent before it stay on chain. `--wait-timeout` and the
-`waitTimeoutMs` config key no longer exist.
+`waitTimeoutMs` config key no longer exist. Use at most one bare `--wait` or `--no-wait`; giving
+either a value or both flags fails with `invalid_option`.
 
 ## Network ids
 
@@ -133,7 +134,7 @@ For `permission update`, stop on `owner_lockout` and require explicit review of
   payment or service write): the request may have acted, whatever the code's retry class says.
   Never rebuild or re-sign it. Reconcile first:
   - a chain broadcast: look up `error.details.txId` with `tx status`, or rebroadcast the same
-    signed transaction with `tx broadcast` (`alreadyKnown: true` when the node holds it);
+    signed transaction with `tx broadcast`;
   - `tx multisig`: list the account's TronLink collection with `tx multisig` on the same network,
     even when a `txId` is present;
   - GasFree: follow a known `traceId` with `gasfree trace`, or compare the `nonce` from
