@@ -1,10 +1,10 @@
 ---
 name: wallet-cli
-description: Operate the TypeScript TRON wallet CLI for accounts, transfers, staking, governance, contracts, signing, chain queries, SunSwap swaps and liquidity, SunPump bonding-curve trading and token launches, and password input with wallet-cli 4.15.0. Refuse wallet passwords in argv and require the supported stdin channel. For Java REPL requests, refuse that entry and offer the TypeScript one-shot CLI; route other chains elsewhere.
+description: Operate the TypeScript TRON wallet CLI for accounts, transfers, staking, governance, contracts, signing, chain queries, SunSwap swaps and liquidity, SunPump bonding-curve trading and token launches, and password input with wallet-cli 4.16.0. Refuse wallet passwords in argv and require the supported stdin channel. For Java REPL requests, refuse that entry and offer the TypeScript one-shot CLI; route other chains elsewhere.
 version: 3.1.0
 dependencies:
   - "node ^22.23.4 || ^24.22.1 || >=26.12.1"
-  - "@tron-walletcli/wallet-cli@4.15.0"
+  - "@tron-walletcli/wallet-cli@4.16.0"
 tags:
   - tron
   - wallet
@@ -38,13 +38,13 @@ npm list --global --depth=0 --json @tron-walletcli/wallet-cli
 ```
 
 Read `dependencies["@tron-walletcli/wallet-cli"].version` from the JSON. The required version is
-exactly `4.15.0`. In this version, `--version`, `--help`, `--json-schema`, and a bare
+exactly `4.16.0`. In this version, `--version`, `--help`, `--json-schema`, and a bare
 `wallet-cli` skip wallet-data access and the startup migration gate. Operational commands can
 still upgrade persisted wallet data before executing.
 
 - If the command is missing, explain that the exact package
-  `@tron-walletcli/wallet-cli@4.15.0` must be installed and obtain user approval before running
-  `npm install -g @tron-walletcli/wallet-cli@4.15.0`.
+  `@tron-walletcli/wallet-cli@4.16.0` must be installed and obtain user approval before running
+  `npm install -g @tron-walletcli/wallet-cli@4.16.0`.
 - If another version is installed, report the mismatch and obtain approval before upgrading or
   downgrading it. Do not assume compatibility.
 - Never install or change a global package without approval.
@@ -65,8 +65,9 @@ still upgrade persisted wallet data before executing.
 4. Treat `bigint` values and command-defined on-chain amount fields as decimal strings. Preserve
    every field according to the leaf schema; other counters and configuration values may be JSON
    numbers. Never use floating point for string amounts.
-5. Set `--timeout <ms>` when the surrounding task has a tighter deadline than the CLI's 60-second
-   default.
+5. `--timeout <ms>` is one deadline for the whole command, including waiting for confirmation
+   (default 90000; `0` means no limit). Set it when the surrounding task has a tighter deadline. A
+   finite value below 2000 never submits a transaction or payment.
 6. Never infer that exit code `0` means a transaction confirmed. A submitted or reverted
    transaction can still have a successful command envelope.
 
@@ -103,7 +104,7 @@ wallet-cli permission update --json-schema -o json
 ```
 
 Use `wallet-cli <command> --help` only when human-oriented semantics are needed. Do not invent a
-flag, option combination, output field, or command that is absent from the 4.15.0 schema.
+flag, option combination, output field, or command that is absent from the 4.16.0 schema.
 
 Read [references/commands.md](references/commands.md) when choosing a command family or composing a
 multi-step wallet workflow.
@@ -118,6 +119,9 @@ multi-step wallet workflow.
   documentation.
 - Use only a CLI-supported `*-stdin` flag connected to an approved, non-logging secret source.
   Only one `*-stdin` consumer may be used in a single invocation.
+- Service credentials (TronLink, GasFree, B.AI, a network's `apiKey`) are set only with
+  `config <key> --api-key-stdin`; a credential given as a command-line value fails with
+  `invalid_option`.
 - Do not read, summarize, or transmit keystores, backup files, configuration credentials, or other
   wallet secret material.
 
@@ -159,18 +163,25 @@ Apply these confirmed rules:
 
 ## Transaction completion
 
-- Prefer `--wait` when the command supports it and the task can tolerate waiting. After it returns,
-  inspect `data.stage`; `failed` is an on-chain failure even when the process exits `0`.
-- Otherwise retain the `txId` and poll `tx status` until `confirmed` or `failed`, with a finite
-  deadline. `pending` and `not_found` are non-terminal.
-- GasFree transfers return a `traceId`; follow them with `gasfree trace`, not `tx status`.
+- A command that submits a transaction waits for its confirmation by default, within `--timeout`.
+  Inspect `data.stage`: `failed` is an on-chain failure even when the process exits `0`, and
+  `submitted` (the wait ended first, with a warning) means the outcome is not known yet.
+- After `--no-wait` or a `submitted` stage, retain the `txId` and poll `tx status` until
+  `confirmed` or `failed`, with a finite deadline. `pending` and `not_found` are non-terminal.
+- `--wait` and `--no-wait` apply only where a transaction is submitted. With `--dry-run`,
+  `--build-only`, `--sign-only`, or `--quote`, on reads and local commands, and on `x402 pay`,
+  `bai recharge`, `sunpump launch`, and `tx multisig`, either flag fails with `invalid_option`.
+- GasFree transfers return a `traceId`. The command follows it by default; after `--no-wait` or a
+  `submitted` stage, follow it with `gasfree trace`, not `tx status`.
 - The `sunswap` liquidity commands, a `sunswap swap` that spends a token (router or bonding curve),
   and a first `sunpump sell` may send approval transactions before the main one. Track every id in
   `data.approvalTxIds` (or `error.details.approvalTxIds` after a failure) alongside the main `txId`.
 - `sunpump launch` submits no transaction of its own: there is no `txId`, `stage`, or `--wait`.
   Check its `createTxHash` with `tx info`.
-- After a timeout or ambiguous submission, reconcile the transaction before retrying. Never resend
-  merely because confirmation was not observed.
+- An error with `error.details.outcome: "unknown"` may have taken effect. Check
+  `error.details.txId` with `tx status` before anything else; never rebuild or re-sign the
+  operation, because that creates a second one. Never resend merely because confirmation was not
+  observed.
 - For a batch, stop on the first failure by default and track every submitted transaction
   separately.
 
