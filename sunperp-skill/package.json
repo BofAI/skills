@@ -1,6 +1,6 @@
 {
   "name": "@bankofai/sunperp-skill",
-  "version": "3.0.1",
+  "version": "3.1.0",
   "description": "AI agent skill for perpetual futures trading on SunPerp (TRON)",
   "private": true,
   "type": "module",
@@ -9,7 +9,7 @@
   },
   "dependencies": {
     "node-fetch": "^3.3.2",
-    "tronweb": "^6.2.1"
+    "tronweb": "6.5.1"
   },
   "keywords": [
     "sunperp",

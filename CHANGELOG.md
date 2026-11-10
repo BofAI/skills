@@ -1,5 +1,27 @@
 # Changelog
 
+## [3.1.0] - Unreleased
+
+### Breaking Changes
+
+- Require Node.js `^22.23.4 || ^24.22.1 || >=26.12.1` for the bundled Node.js skills and
+  wallet-cli installer; use Node.js 24.22.1 in version-validation CI. Upgrade older runtimes
+  before installing this release.
+
+### Features
+
+- Extend the wallet-cli Skill to cover SunSwap swaps and V2/V3/V4 liquidity, plus SunPump
+  bonding-curve trading and token launches.
+
+### Improvements
+
+- Pin the wallet-cli Skill, installer, and current documentation to `@tron-walletcli/wallet-cli@4.15.0`.
+- Document the expanded machine interface, Permit2 build-only restrictions, approval transaction
+  tracking, and SunSwap/SunPump dry-run and confirmation rules.
+- Clarify V3 WTRX handling and require plain-language transaction previews.
+- Pin TronWeb to `6.5.1` for SunPerp and USDD ([#90](https://github.com/BofAI/skills/pull/90)).
+- Synchronize all Skill and package release versions to `3.1.0`.
+
 ## [3.0.1] - 2026-10-22
 
 ### Security
