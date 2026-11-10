@@ -2,7 +2,7 @@
 
 Use this reference when parsing results, handling errors, polling transactions, paginating, or
 providing secrets non-interactively. It summarizes the stable `wallet-cli.result.v1` contract in
-wallet-cli 4.15.0.
+wallet-cli 4.16.0.
 
 ## Calling convention
 
@@ -11,6 +11,14 @@ wallet-cli <command> -o json [--network <id>] [--timeout <ms>] [--account <id|la
 ```
 
 JSON mode writes exactly one terminal result object to stdout. Diagnostics go to stderr.
+
+`--timeout` is one deadline for the whole command: node, service, and device calls, approvals,
+Ledger confirmation, and waiting for confirmation (built-in 90000, which `config timeoutMs` can
+change; `0` disables it). Time spent at an interactive TTY prompt does not count; reading a
+`*-stdin` source does. No transaction or payment is submitted with less than 2000 ms left; that
+step fails with `timeout`, and approvals sent before it stay on chain. `--wait-timeout` and the
+`waitTimeoutMs` config key no longer exist. Use at most one bare `--wait` or `--no-wait`; giving
+either a value or both flags fails with `invalid_option`.
 
 ## Network ids
 
@@ -92,7 +100,7 @@ Failure:
 - `bigint` values and on-chain amounts are decimal strings. Keep those fields as strings or
   arbitrary-precision integers; never use floating point for them.
 - Other counters and configuration values follow the command-specific documentation and schema and
-  may be JSON numbers. For example, `chain params.data.value` is a number in wallet-cli 4.15.0; do
+  may be JSON numbers. For example, `chain params.data.value` is a number in wallet-cli 4.16.0; do
   not coerce a field based only on it coming from the chain.
 - Ordered listings echo their ordering in `meta.query` as `{orderBy, sort}`; listings without an
   ordering flag omit it.
@@ -101,6 +109,8 @@ Failure:
   Scale with the sibling `decimals`, never an assumed one. A V3 or V4 position's `liquidity`,
   `liquidityAfter`, and `liquidityExpected` have no decimals; do not scale them.
 - JSON identifies tokens by address only. Text output may show symbols that JSON omits.
+- In `account history`, `status: "unknown"` is not success. A TRC10 row carries `assetId` and
+  `rawAmount`; an empty `amount` means the human amount is unavailable, not zero.
 
 ## Warnings
 
@@ -120,21 +130,35 @@ For `permission update`, stop on `owner_lockout` and require explicit review of
 
 - Exit `2`, including `usage_error`, `missing_option`, `invalid_option`, and `invalid_value`: inspect
   the leaf `--json-schema`, fix the request, then retry.
-- `timeout`: increase the timeout only if still within the task deadline. If broadcasting may have
-  occurred, reconcile transaction state before retrying.
+- `error.details.outcome: "unknown"` (on `timeout`, `rpc_error`, `invalid_node_response`, or a
+  payment or service write): the request may have acted, whatever the code's retry class says.
+  Never rebuild or re-sign it. Reconcile first:
+  - a chain broadcast: look up `error.details.txId` with `tx status`, or rebroadcast the same
+    signed transaction with `tx broadcast`;
+  - `tx multisig`: list the account's TronLink collection with `tx multisig` on the same network,
+    even when a `txId` is present;
+  - GasFree: follow a known `traceId` with `gasfree trace`, or compare the `nonce` from
+    `gasfree info` with `error.details.nonce`;
+  - `sunpump launch` (`launch_outcome_unknown`): `sunpump token-search <symbol>`.
+- `timeout` without `outcome`: no transaction was sent except the approvals in
+  `error.details.approvalTxIds`, and a pending one may still confirm; check them first.
+  Increase the timeout only if still within the task deadline.
 - `rpc_error`: verify network, endpoint, address, funds, resources, and permission. Do not retry
   blindly.
 - `auth_required` or `auth_failed`: use the approved secret channel or return control to the user;
   never request the password in chat.
-- `insufficient_balance` or `insufficient_token_balance`: stop and report the shortfall.
+- `insufficient_balance`, `insufficient_token_balance`, or `insufficient_stake`: stop and report
+  the shortfall.
 - `internal_error`: stop and report; do not loop.
 - If `error.details.matches` exists, present the structured candidates and ask the user to select
   rather than parsing `error.message`.
 
-Codes added in 4.15.0:
+Codes that need a specific action:
 
 | Code | Exit | Action |
 |---|---|---|
+| `chain_id_mismatch` | 1 | The transaction or typed data names another chain than `--network`. Stop and report; never switch the network on your own |
+| `signed_payload_mismatch` | 1 | A signature, including any Ledger signature, does not match the account or payload; it was not used. Stop and report; do not retry |
 | `unsupported_network_capability` | 2 | The selected network does not offer the command. Choose a supported network from the command routing reference; never switch a write to mainnet without asking |
 | `launch_outcome_unknown` | 1 | Never retry. Run `sunpump token-search <symbol>` to find out whether the token exists |
 | `no_matching_route` | 1 | The same request may succeed later; a retry still needs fresh authorization |
@@ -168,17 +192,17 @@ and `sunpump` listings (`token-list`, `token-search`) are paginated too:
 
 ## Transaction state
 
-Broadcasting commands normally return:
+Broadcasting commands wait for confirmation by default and report the outcome in `data.stage`:
+`confirmed`, `failed`, or `submitted`. A mined revert returns exit `0`, `success: true`, and
+`stage: "failed"`. `submitted` is pending, not completed: the wait ended first (the time limit ran
+out, or polling hit an error that cannot be retried unchanged; a warning says which), or
+`--no-wait` was passed:
 
 ```json
 {"kind":"send","stage":"submitted","txId":"..."}
 ```
 
-`submitted` is pending, not completed.
-
-- With `--wait`, inspect `data.stage`: `confirmed`, `failed`, or still `submitted` after the wait
-  cap. A mined revert can return exit `0`, `success: true`, and `stage: "failed"`.
-- Without `--wait`, poll `tx status` using a finite deadline:
+After a `submitted` stage, poll `tx status` using a finite deadline:
 
 | `data.state` | Terminal | Action |
 |---|---|---|
@@ -187,17 +211,20 @@ Broadcasting commands normally return:
 | `pending` | no | Continue within the deadline |
 | `not_found` | no | Continue within the deadline; verify network before concluding |
 
-GasFree is different: `gasfree transfer` returns `traceId`. Poll `gasfree trace` through provider
-states until `SUCCEED` or `FAILED`; do not pass a trace id to `tx status`.
+GasFree is different: `gasfree transfer` returns `traceId` and follows the provider states until
+`SUCCEED` or `FAILED` by default. After a `submitted` stage, poll `gasfree trace`; do not pass a
+trace id to `tx status`.
 
 ### Commands that send several transactions
 
 The `sunswap` liquidity commands, a `sunswap swap` that spends a token (router or bonding curve),
 and a first `sunpump sell` send approvals before the main transaction. Their ids are in
-`data.approvalTxIds`, in the order sent, beside the main `txId`. Approvals always wait for confirmation, each up to
-`--wait-timeout`, even without `--wait`; `--wait` governs only the main transaction. If a later step
-fails, the original error code is kept and `error.details.approvalTxIds` lists the approvals already
-submitted. They are not rolled back; check each before any retry.
+`data.approvalTxIds`, in the order sent, beside the main `txId`. Approvals always wait for
+confirmation, also with `--no-wait`, which applies only to the main transaction. Approvals and the
+main transaction share the `--timeout` deadline; an approval that does not confirm in time stops
+the command with `timeout`. If a later step fails, the original error code is kept and
+`error.details.approvalTxIds` lists the approvals already submitted. They are not rolled back;
+check each before any retry.
 
 With `--build-only`, such a command returns `data.transactions[]` instead of a single transaction
 whenever an approval is still needed: each entry has `purpose` `"approval"` or `"main"`, in the
@@ -211,9 +238,10 @@ ordinary single unsigned transaction.
 ### `sunpump launch`
 
 A launch is created by the SunPump service, not by a local transaction: there is no `stage`,
-`confirmed`, fee, or `--wait`, and `data.token.owner` is the creator the service chose, not the
-local account. Use `tx info` on `createTxHash` to see whether it is on chain; an `rpc_error` there
-means the hash is not on chain yet, not that the launch failed.
+`confirmed`, fee, `--wait`, or `--no-wait`, and `data.token.owner` is the creator the service
+chose, not the local account. Use `tx info` on `createTxHash` to see whether it is on chain; an
+`rpc_error` there is inconclusive (not on chain yet, or the node request failed), not a failed
+launch.
 
 ### Measured and quoted amounts
 
@@ -235,8 +263,9 @@ always quoted figures (`priceImpactEstimated: true`).
 
 Secrets are never valid in argv or environment variables.
 
-- Use CLI-supported flags such as `--password-stdin`, `--tx-stdin`, or `--message-stdin` only with
-  an approved, non-logging stdin source.
+- Use CLI-supported flags such as `--password-stdin`, `--tx-stdin`, `--message-stdin`, or
+  `--api-key-stdin` (service credentials for `config`) only with an approved, non-logging stdin
+  source.
 - Only one `*-stdin` option may consume stdin in a single process.
 - Mnemonic/private-key import and `change-password` require a hidden interactive TTY; return those
   steps to the user.
@@ -265,5 +294,5 @@ When reporting a fee, say what it covers.
 
 ## Version boundary
 
-This contract is pinned to wallet-cli `4.15.0`. If the installed version differs, stop and obtain
+This contract is pinned to wallet-cli `4.16.0`. If the installed version differs, stop and obtain
 approval before changing it. Do not silently apply this reference to another version.
