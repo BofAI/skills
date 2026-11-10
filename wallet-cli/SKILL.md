@@ -55,7 +55,7 @@ still upgrade persisted wallet data before executing.
    `wallet-cli.result.v1` object.
 2. Supply an explicit canonical network for chain operations: mainnet `tron:728126428`, Nile
    `tron:3448148188`, or Shasta `tron:2494104990`. Never silently choose mainnet; the one exception
-   is read-only `sunswap` / `sunpump` queries, which exist only on mainnet (see
+   is the mainnet-only `sunswap` market queries and `sunpump` read queries (see
    [references/commands.md](references/commands.md)). Use `tron:3448148188` when the user
    explicitly asks for a test but does not distinguish between testnets. The old `tron:mainnet`, `tron:nile`, and `tron:shasta` values are permanent input
    aliases, but never expect an alias in `chain.network`, network listings, or configuration keys.
@@ -63,11 +63,11 @@ still upgrade persisted wallet data before executing.
    Then branch on stable fields such as `error.code`, `data.stage`, or `data.state`. Never parse
    `error.message` text.
 4. Treat `bigint` values and command-defined on-chain amount fields as decimal strings. Preserve
-   every field according to the leaf schema; other counters and configuration values may be JSON
-   numbers. Never use floating point for string amounts.
+   every field according to the documented output contract; other counters and configuration
+   values may be JSON numbers. Never use floating point for string amounts.
 5. `--timeout <ms>` is one deadline for the whole command, including waiting for confirmation
-   (default 90000; `0` means no limit). Set it when the surrounding task has a tighter deadline. A
-   finite value below 2000 never submits a transaction or payment.
+   (built-in 90000, which `config timeoutMs` can change; `0` means no limit). Pass it explicitly
+   when the task needs a bound. A finite value below 2000 never submits a transaction or payment.
 6. Never infer that exit code `0` means a transaction confirmed. A submitted or reverted
    transaction can still have a successful command envelope.
 
@@ -104,7 +104,9 @@ wallet-cli permission update --json-schema -o json
 ```
 
 Use `wallet-cli <command> --help` only when human-oriented semantics are needed. Do not invent a
-flag, option combination, output field, or command that is absent from the 4.16.0 schema.
+flag, option combination, or command that is absent from the 4.16.0 schema. The schema describes
+inputs only; take output fields from
+[references/machine-interface.md](references/machine-interface.md).
 
 Read [references/commands.md](references/commands.md) when choosing a command family or composing a
 multi-step wallet workflow.
@@ -169,8 +171,8 @@ Apply these confirmed rules:
 - After `--no-wait` or a `submitted` stage, retain the `txId` and poll `tx status` until
   `confirmed` or `failed`, with a finite deadline. `pending` and `not_found` are non-terminal.
 - `--wait` and `--no-wait` apply only where a transaction is submitted. With `--dry-run`,
-  `--build-only`, `--sign-only`, or `--quote`, on reads and local commands, and on `x402 pay`,
-  `bai recharge`, `sunpump launch`, and `tx multisig`, either flag fails with `invalid_option`.
+  `--build-only`, `--sign-only`, or `--quote`, on reads and local commands, and on
+  `sunpump launch` and `tx multisig`, either flag fails with `invalid_option`.
 - GasFree transfers return a `traceId`. The command follows it by default; after `--no-wait` or a
   `submitted` stage, follow it with `gasfree trace`, not `tx status`.
 - The `sunswap` liquidity commands, a `sunswap swap` that spends a token (router or bonding curve),
@@ -178,8 +180,9 @@ Apply these confirmed rules:
   `data.approvalTxIds` (or `error.details.approvalTxIds` after a failure) alongside the main `txId`.
 - `sunpump launch` submits no transaction of its own: there is no `txId`, `stage`, or `--wait`.
   Check its `createTxHash` with `tx info`.
-- An error with `error.details.outcome: "unknown"` may have taken effect. Check
-  `error.details.txId` with `tx status` before anything else; never rebuild or re-sign the
+- An error with `error.details.outcome: "unknown"` may have taken effect. Reconcile it first with
+  the evidence it carries (see Error decisions in
+  [references/machine-interface.md](references/machine-interface.md)); never rebuild or re-sign the
   operation, because that creates a second one. Never resend merely because confirmation was not
   observed.
 - For a batch, stop on the first failure by default and track every submitted transaction

@@ -13,9 +13,11 @@ wallet-cli <command> -o json [--network <id>] [--timeout <ms>] [--account <id|la
 JSON mode writes exactly one terminal result object to stdout. Diagnostics go to stderr.
 
 `--timeout` is one deadline for the whole command: node, service, and device calls, approvals,
-Ledger confirmation, and waiting for confirmation (default 90000; `0` disables it). Time spent at
-an interactive TTY prompt does not count. No transaction or payment is submitted with less than
-2000 ms left; it fails with `timeout` and nothing was sent.
+Ledger confirmation, and waiting for confirmation (built-in 90000, which `config timeoutMs` can
+change; `0` disables it). Time spent at an interactive TTY prompt does not count; reading a
+`*-stdin` source does. No transaction or payment is submitted with less than 2000 ms left; that
+step fails with `timeout`, and approvals sent before it stay on chain. `--wait-timeout` and the
+`waitTimeoutMs` config key no longer exist.
 
 ## Network ids
 
@@ -106,6 +108,8 @@ Failure:
   Scale with the sibling `decimals`, never an assumed one. A V3 or V4 position's `liquidity`,
   `liquidityAfter`, and `liquidityExpected` have no decimals; do not scale them.
 - JSON identifies tokens by address only. Text output may show symbols that JSON omits.
+- In `account history`, `status: "unknown"` is not success. A TRC10 row carries `assetId` and
+  `rawAmount`; an empty `amount` means the human amount is unavailable, not zero.
 
 ## Warnings
 
@@ -126,13 +130,18 @@ For `permission update`, stop on `owner_lockout` and require explicit review of
 - Exit `2`, including `usage_error`, `missing_option`, `invalid_option`, and `invalid_value`: inspect
   the leaf `--json-schema`, fix the request, then retry.
 - `error.details.outcome: "unknown"` (on `timeout`, `rpc_error`, `invalid_node_response`, or a
-  payment or service write): the request may have acted, whatever the code's retry class says. Look
-  up `error.details.txId` with `tx status`, or rebroadcast the same signed transaction with
-  `tx broadcast` (a node that holds it answers `alreadyKnown: true`). Never rebuild or re-sign it.
-  Without a `txId`, reconcile with the command's own evidence (GasFree `traceId` or `nonce`,
-  `candidateTxHash`, `sunpump token-search`).
-- `timeout` without `outcome`: nothing was sent. Increase the timeout only if still within the task
-  deadline.
+  payment or service write): the request may have acted, whatever the code's retry class says.
+  Never rebuild or re-sign it. Reconcile first:
+  - a chain broadcast: look up `error.details.txId` with `tx status`, or rebroadcast the same
+    signed transaction with `tx broadcast` (`alreadyKnown: true` when the node holds it);
+  - `tx multisig`: list the account's TronLink collection with `tx multisig` on the same network,
+    even when a `txId` is present;
+  - GasFree: follow a known `traceId` with `gasfree trace`, or compare the `nonce` from
+    `gasfree info` with `error.details.nonce`;
+  - `sunpump launch` (`launch_outcome_unknown`): `sunpump token-search <symbol>`.
+- `timeout` without `outcome`: no transaction was sent except the approvals in
+  `error.details.approvalTxIds`, and a pending one may still confirm; check them first.
+  Increase the timeout only if still within the task deadline.
 - `rpc_error`: verify network, endpoint, address, funds, resources, and permission. Do not retry
   blindly.
 - `auth_required` or `auth_failed`: use the approved secret channel or return control to the user;
@@ -230,7 +239,8 @@ ordinary single unsigned transaction.
 A launch is created by the SunPump service, not by a local transaction: there is no `stage`,
 `confirmed`, fee, `--wait`, or `--no-wait`, and `data.token.owner` is the creator the service
 chose, not the local account. Use `tx info` on `createTxHash` to see whether it is on chain; an
-`rpc_error` there means the hash is not on chain yet, not that the launch failed.
+`rpc_error` there is inconclusive (not on chain yet, or the node request failed), not a failed
+launch.
 
 ### Measured and quoted amounts
 
