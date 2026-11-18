@@ -21,6 +21,8 @@
 - Clarify V3 WTRX handling and require plain-language transaction previews.
 - Document the wallet-cli 4.16.0 confirmation wait by default, the whole-command `--timeout`,
   unknown-outcome reconciliation, `--api-key-stdin` credentials, and `sunswap swap --min-out`.
+- Run wallet-cli invocations one at a time unless the network has a TronGrid API key, since
+  public TronGrid throttling surfaces as `rpc_error`.
 - Pin TronWeb to `6.5.1` for SunPerp and USDD ([#90](https://github.com/BofAI/skills/pull/90)).
 - Synchronize all Skill and package release versions to `3.1.0`.
 

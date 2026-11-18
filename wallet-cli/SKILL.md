@@ -70,6 +70,13 @@ still upgrade persisted wallet data before executing.
    when the task needs a bound. A finite value below 2000 never submits a transaction or payment.
 6. Never infer that exit code `0` means a transaction confirmed. A submitted or reverted
    transaction can still have a successful command envelope.
+7. Unless the network has an `apiKey` configured, run one `wallet-cli` invocation at a time; never
+   start them in parallel. Check with `wallet-cli config networks.<id> -o json`: a configured key
+   shows as `data.value.apiKey: "********"`, and the field is absent otherwise. Each process paces
+   its own node requests, so parallel processes add up and the public TronGrid endpoint throttles
+   them. That throttling surfaces as `rpc_error`, not `provider_rate_limited`. With a key, a few
+   reads may run in parallel; writes still run one at a time. The user can set a key with
+   `config networks.<id>.apiKey --api-key-stdin`.
 
 Read [references/machine-interface.md](references/machine-interface.md) before implementing result
 parsing, polling, pagination, retry logic, or non-interactive secret input.

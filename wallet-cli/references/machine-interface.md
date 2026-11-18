@@ -144,7 +144,8 @@ For `permission update`, stop on `owner_lockout` and require explicit review of
   `error.details.approvalTxIds`, and a pending one may still confirm; check them first.
   Increase the timeout only if still within the task deadline.
 - `rpc_error`: verify network, endpoint, address, funds, resources, and permission. Do not retry
-  blindly.
+  blindly. If invocations ran in parallel, rerun them one at a time and retry once before
+  investigating further.
 - `auth_required` or `auth_failed`: use the approved secret channel or return control to the user;
   never request the password in chat.
 - `insufficient_balance`, `insufficient_token_balance`, or `insufficient_stake`: stop and report
