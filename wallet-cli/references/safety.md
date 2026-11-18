@@ -55,7 +55,7 @@ This replaces the entire permission structure. A wrong owner group can lock the 
 5. Stop on `owner_lockout`; explicitly surface `owner_lockout_partial` and
    `active_can_update_permission` warnings.
 6. Obtain explicit confirmation of the rendered replacement.
-7. Execute once, preferably with `--wait`, and inspect `data.stage` plus warnings.
+7. Execute once without `--no-wait`, and inspect `data.stage` plus warnings.
 
 Never reconstruct a permission bitmap from memory when the CLI can export or decode it.
 
@@ -69,6 +69,13 @@ file output and tell the user where it was written without reading the file.
 For `message sign`, `typed-data sign`, transaction signing, and contract writes, show the exact
 human-meaningful payload, domain, network, account, permission id, and destination before signing.
 Treat opaque or untrusted payloads as high risk. Never sign a challenge whose purpose is unclear.
+
+The CLI refuses a transaction or typed data built for another chain than `--network`
+(`chain_id_mismatch`). Stop and report it; never switch `--network` to make the payload sign
+without the user's explicit instruction. `tx sign --offline` and `tx sign --transaction` skip this
+check and warn `network_not_verified`, and typed data without `domain.chainId` is not bound to a
+chain: there, the signature proves nothing about the network, so confirm where the payload came
+from.
 
 ### Token approvals
 
@@ -124,7 +131,8 @@ it means preview and confirm; only the Nile liquidity commands fall under testne
 
 ### Slippage and floors
 
-- Keep the CLI defaults (`sunswap swap` 0.5%, `sunpump` 5%) unless the user sets a tolerance.
+- Keep the CLI defaults (`sunswap swap` 0.5%, `sunpump` 5%) unless the user sets a tolerance or a
+  minimum to receive (`--min-out`, in base units of the token received).
 - After `slippage_exceeded`, never retry with a wider tolerance on your own; that is a new trade and
   needs a new confirmation.
 - V3 and V4 `remove-liquidity` without `--min0` / `--min1` accepts any output, and the dry run warns.
@@ -150,9 +158,9 @@ A launch creates a permanent, public token. Treat it as high-risk.
 3. Execute once. On `launch_outcome_unknown`, never retry: run `sunpump token-search <symbol>` to
    find out whether the token exists, then report. A second launch is a second permanent token.
 4. There is no `txId`, `stage`, or `--wait`. Check `createTxHash` with `tx info`; do not treat
-   `tx status` as the launch outcome. An `rpc_error` from `tx info` soon after a successful launch
-   means the hash is not on chain yet, not that the launch failed: wait and check again, and never
-   launch again because of it.
+   `tx status` as the launch outcome. An `rpc_error` from `tx info` is inconclusive (the hash
+   may not be on chain yet, or the node request failed); it does not mean the launch failed. Wait
+   and check again, and never launch again because of it.
 
 ### Ledger
 
@@ -227,9 +235,14 @@ imports remain hidden interactive TTY operations.
 ## Retry and stopping rules
 
 - Never retry a successful submission.
-- A timeout during signing or broadcasting is ambiguous. Check `tx status`, transaction history,
-  or the relevant provider trace before any retry.
+- An error with `error.details.outcome: "unknown"` may have acted. Reconcile it as the Error
+  decisions in [machine-interface.md](machine-interface.md) describe before any retry.
+- An error without `outcome` can still follow submitted approvals, and a pending one may still
+  confirm: check every id in `error.details.approvalTxIds` before any retry.
 - `pending` and `not_found` are not permission to resend.
 - Do not continue a batch after failure unless the user explicitly requested best-effort behavior.
+- When an error names a `.lock` file, a wallet-cli process holds it or left it behind. Let your
+  other wallet-cli commands finish, then retry once. If it is still held, report the path to the
+  user; never delete the lock file yourself.
 - Stop when the requested operation reaches a terminal state, the task deadline expires, or user
   input is required. Report unresolved txids/trace ids for later reconciliation.

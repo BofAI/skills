@@ -1,6 +1,6 @@
 # Command Routing
 
-Use this reference to select a wallet-cli command family. It summarizes version 4.15.0; the CLI's
+Use this reference to select a wallet-cli command family. It summarizes version 4.16.0; the CLI's
 generated schema remains authoritative for exact flags and combinations.
 
 ## Discover the live command contract
@@ -11,8 +11,10 @@ wallet-cli <group> --json-schema -o json
 wallet-cli <group> <command> --json-schema -o json
 ```
 
-Root and group schemas return command catalogs. A leaf schema describes its accepted inputs. Use
-`--help` only when the schema does not communicate enough human meaning.
+Root and group schemas return command catalogs. A leaf schema describes its accepted inputs. In the
+root catalog, a command may carry `support`, which maps each network to `supported`,
+`unsupported`, or `needs-inputs`, and `exclusive`, which groups flags of which exactly one or at
+most one may be given. Use `--help` only when the schema does not communicate enough human meaning.
 
 Every operational example below must also include `-o json`. Chain operations must include an
 explicit canonical `--network tron:728126428|tron:3448148188|tron:2494104990`.
@@ -57,14 +59,18 @@ wallet-cli tx send --to T... --amount 1 --network tron:3448148188 --dry-run -o j
 ```
 
 - No selector means TRX.
-- `--token` resolves an address-book symbol.
+- `--token` resolves an address-book symbol. It must match exactly one entry, or the command stops
+  with `token_not_in_book` or `ambiguous_token_symbol` (exit 2); let the user choose the token by
+  contract address (`--contract`, TRC20) or asset id (`--asset-id`, TRC10).
 - `--contract` selects a TRC20 contract address.
 - `--asset-id` selects a TRC10 id.
 - `--amount` is a human-unit decimal string; `--raw-amount` is an unscaled integer string.
 - `--dry-run` builds and estimates without signing or broadcasting.
 - `--sign-only` emits signed transaction hex; `--build-only` emits unsigned hex.
-- `--wait` polls after broadcast but can still return `data.stage: "submitted"` when its wait cap
-  expires.
+- By default the command waits for confirmation and can still return `data.stage: "submitted"`
+  when `--timeout` runs out first; `--no-wait` returns at submission.
+- A TRC20 transfer above the token balance fails with `insufficient_token_balance` before signing,
+  also with `--dry-run`.
 
 Use `tx sign` and `tx approvals` for file-based multi-signature artifacts. Use `tx multisig` for the
 TronLink collaboration service. Broadcast only after signature threshold validation:
@@ -73,8 +79,9 @@ TronLink collaboration service. Broadcast only after signature threshold validat
 build unsigned → collect signatures → inspect approvals → dry-run broadcast → broadcast once
 ```
 
-`tx broadcast` validates expiration and signature weight before submission. Its default success
-still means submitted, not confirmed.
+`tx broadcast` validates expiration, network, and signature weight before submission, then waits
+for confirmation like `tx send`. When the node answers that it already holds the same signed
+transaction, the result carries `alreadyKnown: true` instead of an error.
 
 ## Resource, governance, and contract writes
 
@@ -83,7 +90,7 @@ still means submitted, not confirmed.
 | Stake and delegate resources | `stake freeze|unfreeze|withdraw|cancel-unfreeze|delegate|undelegate` |
 | Vote or claim rewards | `vote cast`, `reward withdraw` |
 | Activate or name an account | `account activate`, `account set` |
-| Contract write/deploy/governance | `contract send|deploy|clear-abi|set-origin-energy-limit|set-user-resource-percent|create2` |
+| Contract write/deploy/governance | `contract send|deploy|clear-abi|set-origin-energy-limit|set-user-resource-percent` |
 | Replace permissions | `permission update` |
 | GasFree transfer | `gasfree transfer` |
 | Proposal governance | `proposal create|approve|delete` |
@@ -114,10 +121,16 @@ a label.
 
 - On an unsupported TRON network (Shasta for every command, Nile for the market queries and
   `swap`), a command fails with `unsupported_network_capability` (exit 2).
-- The read-only queries exist only on mainnet. When the user names no network for one, run it on
-  `tron:728126428` and say so. Never extend that to a write.
+- The market queries (`pool-list`, `pool-search`, `position-list`, `token-list`, `token-search`,
+  `price`) exist only on mainnet. When the user names no network for one, run it on
+  `tron:728126428` and say so. Never extend that to a write or to `position-info`, which also
+  works on Nile.
 - `swap` chooses its market from chain state: TRX against a SunPump token that has not launched
   trades on that token's bonding curve; everything else goes through the SunSwap router.
+- `swap` takes `--slippage` (default 0.5%) or `--min-out <base-units>`, never both, and neither
+  with `--quote`. When the route already quotes less than `--min-out`, it stops with
+  `slippage_exceeded` before anything is approved, signed, or sent. With `--min-out`, the result
+  has `amountOutMinimum` and no `slippage`.
 - `--dry-run` and `--build-only` need no password. There is no `--sign-only`. `--build-only` fails
   with `invalid_option` when the call must carry a new Permit2 signature: always for a router swap
   that spends a token, and for a V4 `add-liquidity` whose standing Permit2 grants do not cover the
@@ -169,15 +182,16 @@ networks fail with `family_mismatch`.
 
 - `contact add|list|remove` manages recipient aliases accepted by `--to`.
 - `token add|list|remove|info|balance` manages token metadata and queries token state.
-- `config` changes CLI configuration, including service credentials. Never print or read credential
-  values into model context.
+- `config` changes CLI configuration, including service credentials, which it accepts only through
+  `config <key> --api-key-stdin`. Never print or read credential values into model context.
 - `networks` lists canonical network ids.
 - `encoding convert` converts or validates address and binary encodings locally.
+- `contract create2` computes a CREATE2 address locally; it signs and sends nothing.
 - `message sign` and `typed-data sign` create externally usable signatures; treat them as visible
   writes and confirm the exact payload/domain before signing.
 
 ## Scope boundary
 
 This skill covers the TRON wallet workflows above, including `sunswap` and `sunpump`. wallet-cli
-4.15.0 also exposes EVM and service command families, including `x402`, `bai`, and `8004`; discover
+4.16.0 also exposes EVM and service command families, including `x402`, `bai`, and `8004`; discover
 their contracts separately rather than applying TRON-only flags or transaction-state assumptions.
