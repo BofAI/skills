@@ -24,4 +24,4 @@ node scripts/vault-info.js
 ## Dependencies
 
 - Node.js `^22.23.4 || ^24.22.1 || >=26.12.1`
-- [tronweb](https://www.npmjs.com/package/tronweb) ^6.0.0
+- [tronweb](https://www.npmjs.com/package/tronweb) 6.5.1

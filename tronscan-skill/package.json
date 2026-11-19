@@ -1,6 +1,6 @@
 {
   "name": "@bankofai/tronscan-skill",
-  "version": "3.0.1",
+  "version": "3.1.0",
   "description": "AI Agent skill for querying TRON blockchain data via the TronScan API",
   "license": "MIT",
   "private": true,

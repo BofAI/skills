@@ -20,7 +20,7 @@ address because TRON addresses are identical across networks. The legacy `tron:m
 |---|---|---|
 | Read-only query | Execute within scope | Execute within scope |
 | Ordinary wallet or chain write | User's clear request authorizes the exact operation | Preview, then obtain explicit confirmation immediately before execution |
-| Funds transfer, broadcast, contract write, staking, voting, governance, exchange, or GasFree transfer | User's clear request authorizes the exact operation | Preview, then obtain explicit confirmation immediately before execution |
+| Funds transfer, broadcast, contract write, staking, voting, governance, exchange, GasFree transfer, or SunSwap/SunPump trade or liquidity change | User's clear request authorizes the exact operation | Preview, then obtain explicit confirmation immediately before execution |
 | High-risk local or permission operation | Always preview where possible and confirm | Always preview where possible and confirm |
 
 A confirmation is scoped to the displayed network, account, target, command, amount, asset,
@@ -55,7 +55,7 @@ This replaces the entire permission structure. A wrong owner group can lock the 
 5. Stop on `owner_lockout`; explicitly surface `owner_lockout_partial` and
    `active_can_update_permission` warnings.
 6. Obtain explicit confirmation of the rendered replacement.
-7. Execute once, preferably with `--wait`, and inspect `data.stage` plus warnings.
+7. Execute once without `--no-wait`, and inspect `data.stage` plus warnings.
 
 Never reconstruct a permission bitmap from memory when the CLI can export or decode it.
 
@@ -70,12 +70,29 @@ For `message sign`, `typed-data sign`, transaction signing, and contract writes,
 human-meaningful payload, domain, network, account, permission id, and destination before signing.
 Treat opaque or untrusted payloads as high risk. Never sign a challenge whose purpose is unclear.
 
+The CLI refuses a transaction or typed data built for another chain than `--network`
+(`chain_id_mismatch`). Stop and report it; never switch `--network` to make the payload sign
+without the user's explicit instruction. `tx sign --offline` and `tx sign --transaction` skip this
+check and warn `network_not_verified`, and typed data without `domain.chainId` is not bound to a
+chain: there, the signature proves nothing about the network, so confirm where the payload came
+from.
+
 ### Token approvals
 
-For a TRC20 `approve(address,uint256)` contract write, verify the token contract and spender,
-inspect the current allowance, and approve only the amount required for the intended operation.
-Reject unlimited approvals. Treat an approval as permission for the spender to move the owner's
-tokens, not as a harmless preparatory transaction.
+Treat an approval as permission for the spender to move the owner's tokens, not as a harmless
+preparatory transaction.
+
+- **An approval the Agent builds** — a `contract send` of TRC20 `approve(address,uint256)`: verify
+  the token contract and spender, inspect the current allowance, and approve only the amount
+  required for the intended operation. Never build an unlimited approval.
+- **An approval a wallet-cli command sends itself** — the `sunswap` liquidity commands, a
+  `sunswap swap` that spends a token (router or bonding curve), `sunpump sell`, and a first TRON
+  `exact` payment in `x402 pay` or `bai recharge`: follow the CLI's choice of amount. Some of these
+  grant an unlimited allowance by design (a V4 deposit to Permit2; a `sunpump sell` or a
+  curve-routed `sunswap swap` selling a SunPump token, to the launchpad proxy; an x402 payment to
+  Permit2); do not block or work around it. In the preview, show every approval the dry
+  run reports — `approvals[]` spender and amount, including `"unlimited"`. `x402 pay` reports its
+  approval in `data.approval` after the payment.
 
 ### Staking and voting
 
@@ -89,7 +106,80 @@ the account's previous votes rather than incrementally adding one choice.
 `account activate` charges the active payer. On-chain account name and id settings are effectively
 one-time. Confirm payer, target, name/id, network, and irreversibility before execution.
 
+## SunSwap and SunPump
+
+The confirmation matrix applies unchanged. Nearly every write here is mainnet-only, so in practice
+it means preview and confirm; only the Nile liquidity commands fall under testnet authorization.
+
+### Read or write
+
+- Read-only, run within scope: `sunswap pool-list|pool-search|position-list|token-list|token-search|price|position-info`,
+  `sunpump token-list|token-info|token-search`, and every `--quote`.
+- Writes: `sunswap swap|add-liquidity|remove-liquidity|collect-fees` and `sunpump buy|sell|launch`.
+- On mainnet, run `--dry-run` and confirm from its result. A `--quote` carries no floor and no
+  approvals, so it is not a preview.
+
+### Tokens
+
+- In the preview, identify each token by contract address (`tokenIn.address`, `token0.address`);
+  the symbol is a label, and impersonation tokens share real symbols.
+- On `ambiguous_token_symbol`, let the user choose by contract address. Never pick one. The error
+  carries no `error.details`: its message lists every candidate address, so show that message to
+  the user as written instead of parsing it into a choice yourself.
+- Call out any side resolved from the user's own token book (`fromTokenBook`).
+- `sunswap price` returning `"0"` means the token is not indexed, not that it is worthless.
+
+### Slippage and floors
+
+- Keep the CLI defaults (`sunswap swap` 0.5%, `sunpump` 5%) unless the user sets a tolerance or a
+  minimum to receive (`--min-out`, in base units of the token received).
+- After `slippage_exceeded`, never retry with a wider tolerance on your own; that is a new trade and
+  needs a new confirmation.
+- V3 and V4 `remove-liquidity` without `--min0` / `--min1` accepts any output, and the dry run warns.
+  Surface that in a mainnet preview.
+- On V4, `--slippage` raises a ceiling on a deposit and lowers a floor on a withdrawal. Present the
+  bound the dry run reports.
+
+### Approvals and multi-transaction commands
+
+- One confirmation covers the command and the approvals its dry run listed. If a later run lists
+  different approvals, confirm again.
+- After a failure that carries `error.details.approvalTxIds`, check each id with `tx status` before
+  considering a re-run. Approvals are not rolled back, and a re-run needs fresh authorization.
+- Report every submitted approval id with the outcome.
+
+### `sunpump launch`
+
+A launch creates a permanent, public token. Treat it as high-risk.
+
+1. Run `sunpump launch ... --dry-run -o json`.
+2. Confirm explicitly, stating that SunPump chooses the token's owner — not the user's account — and
+   that a launch cannot be undone.
+3. Execute once. On `launch_outcome_unknown`, never retry: run `sunpump token-search <symbol>` to
+   find out whether the token exists, then report. A second launch is a second permanent token.
+4. There is no `txId`, `stage`, or `--wait`. Check `createTxHash` with `tx info`; do not treat
+   `tx status` as the launch outcome. An `rpc_error` from `tx info` is inconclusive (the hash
+   may not be on chain yet, or the node request failed); it does not mean the launch failed. Wait
+   and check again, and never launch again because of it.
+
+### Ledger
+
+- `sunswap` and `sunpump` writes need **Custom contracts** and **Sign by Hash** enabled in the Ledger
+  TRON app. On `ledger_setting_required`, ask the user to enable the named setting; do not retry on
+  your own.
+- Permit2 grants are signed by hash, so the device cannot show the token, amount, or spender. Before
+  a Ledger signature, show the dry run's `permit` / `permits[]` (token, amount, spender,
+  expiration); the CLI preview is the only place the user can verify them.
+
 ## Preview contents
+
+Open every preview, and every question about whether to continue, with one plain-language
+sentence: what the user gives, what they get, and whether this step charges, signs, or broadcasts.
+A dry run charges nothing, needs no signature, and broadcasts nothing; say so whenever you propose
+or report one. Explain a term such as WTRX the first time it appears. Method names, selectors, and
+contract addresses are supporting detail. Show them after the plain-language sentence; never use
+them as the description of the operation. When wrapping TRX, also say that WTRX converts back 1:1,
+that converting back is another transaction with its own fee, and that wrapping earns nothing.
 
 Before a mainnet confirmation, show all fields available for the operation:
 
@@ -99,6 +189,8 @@ Before a mainnet confirmation, show all fields available for the operation:
 - human amount plus raw base-unit amount when available;
 - token symbol and verified contract/asset id;
 - fee limit, resource, duration, lock, slippage/min-return, permission id, and other material flags;
+- approvals the command will send first (token, spender, amount — including `unlimited`) and any
+  Permit2 grant (`permit` / `permits[]`);
 - whether the command will build, sign, submit, wait, write a file, or expose a secret;
 - dry-run estimates and warnings.
 
@@ -143,9 +235,14 @@ imports remain hidden interactive TTY operations.
 ## Retry and stopping rules
 
 - Never retry a successful submission.
-- A timeout during signing or broadcasting is ambiguous. Check `tx status`, transaction history,
-  or the relevant provider trace before any retry.
+- An error with `error.details.outcome: "unknown"` may have acted. Reconcile it as the Error
+  decisions in [machine-interface.md](machine-interface.md) describe before any retry.
+- An error without `outcome` can still follow submitted approvals, and a pending one may still
+  confirm: check every id in `error.details.approvalTxIds` before any retry.
 - `pending` and `not_found` are not permission to resend.
 - Do not continue a batch after failure unless the user explicitly requested best-effort behavior.
+- When an error names a `.lock` file, a wallet-cli process holds it or left it behind. Let your
+  other wallet-cli commands finish, then retry once. If it is still held, report the path to the
+  user; never delete the lock file yourself.
 - Stop when the requested operation reaches a terminal state, the task deadline expires, or user
   input is required. Report unresolved txids/trace ids for later reconciliation.
