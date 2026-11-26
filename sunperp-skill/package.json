@@ -20,5 +20,10 @@
     "trading",
     "ai-agent"
   ],
-  "license": "MIT"
+  "license": "MIT",
+  "overrides": {
+    "tronweb": {
+      "axios": "1.21.1"
+    }
+  }
 }

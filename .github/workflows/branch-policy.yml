@@ -16,4 +16,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - name: Validate pull request route
-        run: sh scripts/check_branch_policy.sh "${{ github.base_ref }}" "${{ github.head_ref }}"
+        env:
+          PR_BASE_REF: ${{ github.base_ref }}
+          PR_HEAD_REF: ${{ github.head_ref }}
+        run: sh scripts/check_branch_policy.sh "$PR_BASE_REF" "$PR_HEAD_REF"
